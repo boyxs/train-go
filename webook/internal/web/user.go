@@ -1,0 +1,186 @@
+package web
+
+import (
+	"gitee.com/train-cloud/geektime-basic-go/internal/domain"
+	"gitee.com/train-cloud/geektime-basic-go/internal/service"
+	"github.com/gin-contrib/sessions"
+	"github.com/gin-gonic/gin"
+	"net/http"
+	//"regexp" 此库不支持 (?=
+	regexp "github.com/dlclark/regexp2"
+)
+
+const (
+	emailExpr = "^\\w+([-+.]\\w+)*@\\w+([-.]\\w+)*\\.\\w+([-.]\\w+)*$"
+	// 和上面比起来，用 ` 看起来就比较清爽
+	passwordExpr = `^(?=.*[A-Za-z])(?=.*\d)(?=.*[$@$!%*#?&])[A-Za-z\d$@$!%*#?&]{8,}$`
+)
+
+type UserHandler struct {
+	userService    *service.UserService
+	emailRegexp    *regexp.Regexp
+	passwordRegexp *regexp.Regexp
+}
+
+func NewUserHandler(us *service.UserService) *UserHandler {
+	er := regexp.MustCompile(emailExpr, regexp.None)
+	pr := regexp.MustCompile(passwordExpr, regexp.None)
+	return &UserHandler{
+		userService:    us,
+		emailRegexp:    er,
+		passwordRegexp: pr,
+	}
+}
+
+func (h *UserHandler) RegisterRoutes(server *gin.Engine) {
+	ug := server.Group("/user")
+	ug.POST("/register", h.Register)
+	ug.POST("/login", h.Login)
+	ug.POST("/logout", h.Logout)
+	ug.POST("/edit", h.Edit)
+	ug.GET("/profile", h.Profile)
+}
+
+func (h *UserHandler) Register(ctx *gin.Context) {
+	type RegisterRequest struct {
+		Email           string `json:"email" binding:"required,email"`                      // 必填，且必须是邮箱格式
+		Password        string `json:"password" binding:"required,min=8,max=20"`            // 必填，长度8-20位
+		ConfirmPassword string `json:"confirmPassword" binding:"required,eqfield=Password"` // 必填，且必须与 Password 字段相等
+	}
+	var req RegisterRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	// &syntax.Error{Code:"invalid or unsupported Perl syntax", Expr:"(?="}
+	// match, err := regexp.Match(passwordRegexPattern, []byte("000"))
+
+	isEmail, err := h.emailRegexp.MatchString(req.Email)
+	if err != nil {
+		ctx.String(http.StatusOK, "系统错误")
+		return
+	}
+	if !isEmail {
+		ctx.String(http.StatusOK, "非法邮箱格式")
+		return
+	}
+	isPassword, err := h.passwordRegexp.MatchString(req.Password)
+	if err != nil {
+		ctx.String(http.StatusOK, "系统错误")
+		return
+	}
+	if !isPassword {
+		ctx.String(http.StatusOK, "密码必须包含字母、数字、特殊字符，并且不少于八位")
+		return
+	}
+	//ctx.String(http.StatusOK, "注册成功")
+	err = h.userService.Register(ctx, domain.User{
+		Email:    req.Email,
+		Password: req.Password,
+	})
+	//if errors.Is(err, service.ErrDuplicateEmail) {}
+	if err == service.ErrDuplicateEmail {
+		ctx.String(http.StatusInternalServerError, "邮箱已被注册")
+		return
+	}
+	if err != nil {
+		ctx.String(http.StatusInternalServerError, "系统异常")
+		return
+	}
+	ctx.String(http.StatusOK, "注册成功")
+}
+
+func (h *UserHandler) Login(ctx *gin.Context) {
+	type LoginRequest struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+	var req LoginRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		return
+	}
+	user, err := h.userService.Login(ctx, req.Email, req.Password)
+	switch err {
+	case nil:
+		session := sessions.Default(ctx)
+		session.Set("userid", user.Id)
+		session.Options(sessions.Options{
+			Path:     "/",
+			MaxAge:   10 * 60,
+			Secure:   true,
+			HttpOnly: true,
+		})
+		err := session.Save()
+		if err != nil {
+			ctx.String(http.StatusInternalServerError, "系统异常")
+			return
+		}
+		ctx.String(http.StatusOK, "登录成功")
+	case service.ErrInvalidUserOrPassword:
+		ctx.String(http.StatusOK, "用户名或密码错误")
+	default:
+		ctx.String(http.StatusOK, "系统错误")
+	}
+}
+
+func (h *UserHandler) Logout(ctx *gin.Context) {
+	//err := h.ClearToken(ctx)
+	session := sessions.Default(ctx)
+	session.Delete("userid")
+	//session.Clear()
+	err := session.Save()
+	if err != nil {
+		ctx.JSON(http.StatusOK, gin.H{
+			"code": 5,
+			"msg":  "退出失败",
+		})
+		return
+	}
+	ctx.JSON(http.StatusOK, gin.H{
+		"code": 0,
+		"msg":  "退出成功",
+	})
+}
+
+func (h *UserHandler) Edit(ctx *gin.Context) {
+	type EditRequest struct {
+		Nickname string `json:"nickname"`
+		Birthday string `json:"birthday"`
+		AboutMe  string `json:"aboutMe"`
+	}
+	var req EditRequest
+	err := ctx.Bind(&req)
+	if err != nil {
+		return
+	}
+	session := sessions.Default(ctx)
+	userid := session.Get("userid")
+	user, err := h.userService.Edit(ctx, domain.User{
+		Id:       userid.(int64),
+		Nickname: req.Nickname,
+		Birthday: req.Birthday,
+		AboutMe:  req.AboutMe,
+	})
+	if err != nil {
+		return
+	}
+	ctx.JSON(http.StatusOK, gin.H{
+		"code": 0, "data": user,
+	})
+}
+
+func (h *UserHandler) Profile(ctx *gin.Context) {
+	session := sessions.Default(ctx)
+	val := session.Get("userid")
+	userid, ok := val.(int64)
+	if !ok {
+		ctx.JSON(http.StatusUnauthorized, "请先登录")
+		return
+	}
+	profile, err := h.userService.Profile(ctx, userid)
+	if err != nil {
+		ctx.String(http.StatusInternalServerError, "系统异常")
+		return
+	}
+	ctx.JSON(http.StatusOK, profile)
+}
