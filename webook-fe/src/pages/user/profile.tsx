@@ -30,6 +30,7 @@ function Page() {
         if (data?.code === 0) {
           document.cookie =
             'ssid=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+          localStorage.removeItem('access-token');
           router.push('/user/login');
           message.success(data?.msg);
         }

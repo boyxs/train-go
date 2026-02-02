@@ -1,24 +1,29 @@
 package main
 
 import (
+	"strings"
+	"time"
+
+	"gitee.com/train-cloud/geektime-basic-go/config"
 	"gitee.com/train-cloud/geektime-basic-go/internal/repository"
 	"gitee.com/train-cloud/geektime-basic-go/internal/repository/dao"
 	"gitee.com/train-cloud/geektime-basic-go/internal/service"
 	"gitee.com/train-cloud/geektime-basic-go/internal/web"
 	"gitee.com/train-cloud/geektime-basic-go/internal/web/middleware"
+	"gitee.com/train-cloud/geektime-basic-go/pkg/ginx/middleware/ratelimit"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/sessions"
-	"github.com/gin-contrib/sessions/redis"
+	redisSession "github.com/gin-contrib/sessions/redis"
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
-	"strings"
-	"time"
 )
 
 func main() {
 	db := initDB()
-	server := initServer()
+	rdb := initRedis()
+	server := initServer(rdb)
 	// handler
 	initUserHandler(db, server)
 
@@ -38,7 +43,7 @@ func initUserHandler(db *gorm.DB, server *gin.Engine) {
 }
 
 func initDB() *gorm.DB {
-	db, err := gorm.Open(mysql.Open("root:13520@tcp(localhost:3306)/webook"), &gorm.Config{})
+	db, err := gorm.Open(mysql.Open(config.Config.MySQL.DSN), &gorm.Config{})
 	if err != nil {
 		// 数据库都连接不上，就不要启动服务了
 		panic("failed to connect database")
@@ -50,13 +55,22 @@ func initDB() *gorm.DB {
 	return db
 }
 
-func initServer() *gin.Engine {
+func initRedis() *redis.Client {
+	client := redis.NewClient(&redis.Options{
+		Addr:     config.Config.Redis.Addr,
+		Password: config.Config.Redis.Password,
+	})
+	return client
+}
+
+func initServer(rdb *redis.Client) *gin.Engine {
 	server := gin.Default()
 	//server.Use(func(ctx *gin.Context) {}) // 自定义中间件
 	server.Use(cors.New(cors.Config{
 		AllowOrigins: []string{"http://localhost:3000"},
 		//AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"},
 		AllowHeaders:     []string{"Content-Type", "Content-Length", "Authorization"},
+		ExposeHeaders:    []string{web.JwtHeader},
 		AllowCredentials: true,
 		AllowOriginFunc: func(origin string) bool {
 			if strings.HasPrefix(origin, "http://localhost") {
@@ -66,8 +80,12 @@ func initServer() *gin.Engine {
 		},
 		MaxAge: 12 * time.Hour,
 	}))
+	// 限流中间件
+	server.Use(ratelimit.NewBuilder(rdb, time.Second, 10).Prefix("ip_limiter").Build())
 	// session
-	useSession(server)
+	//useSession(server)
+	// jwt
+	useJwt(server)
 	return server
 }
 
@@ -76,7 +94,7 @@ func useSession(server *gin.Engine) {
 		IgnorePaths("/user/register", "/user/login").
 		Build()
 	//store := cookie.NewStore([]byte("k6CswdUm75WKcbM68UQUuxVsHSpTCwgK"))
-	store, err := redis.NewStore(16,
+	store, err := redisSession.NewStore(16,
 		"tcp",
 		"localhost:6379",
 		"",
@@ -87,4 +105,11 @@ func useSession(server *gin.Engine) {
 		panic(err)
 	}
 	server.Use(sessions.Sessions("ssid", store), loginMiddleware)
+}
+
+func useJwt(server *gin.Engine) {
+	loginJwtMiddleware := middleware.NewLoginJwtMiddlewareBuilder().
+		IgnorePaths("/user/register", "/user/login").
+		Build()
+	server.Use(loginJwtMiddleware)
 }

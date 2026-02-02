@@ -1,13 +1,17 @@
 package web
 
 import (
+	"net/http"
+	"time"
+
 	"gitee.com/train-cloud/geektime-basic-go/internal/domain"
 	"gitee.com/train-cloud/geektime-basic-go/internal/service"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
-	"net/http"
+
 	//"regexp" 此库不支持 (?=
 	regexp "github.com/dlclark/regexp2"
+	jwt "github.com/golang-jwt/jwt/v5"
 )
 
 const (
@@ -35,10 +39,14 @@ func NewUserHandler(us *service.UserService) *UserHandler {
 func (h *UserHandler) RegisterRoutes(server *gin.Engine) {
 	ug := server.Group("/user")
 	ug.POST("/register", h.Register)
-	ug.POST("/login", h.Login)
-	ug.POST("/logout", h.Logout)
-	ug.POST("/edit", h.Edit)
-	ug.GET("/profile", h.Profile)
+	ug.POST("/login", h.LoginJwt)
+	ug.POST("/logout", h.LogoutJwt)
+	ug.POST("/edit", h.EditJwt)
+	ug.GET("/profile", h.ProfileJwt)
+	//ug.POST("/login", h.Login)
+	//ug.POST("/logout", h.Logout)
+	//ug.POST("/edit", h.Edit)
+	//ug.GET("/profile", h.Profile)
 }
 
 func (h *UserHandler) Register(ctx *gin.Context) {
@@ -90,6 +98,108 @@ func (h *UserHandler) Register(ctx *gin.Context) {
 	ctx.String(http.StatusOK, "注册成功")
 }
 
+func (h *UserHandler) LoginJwt(ctx *gin.Context) {
+	type LoginRequest struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+	var req LoginRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		return
+	}
+	user, err := h.userService.Login(ctx, req.Email, req.Password)
+	switch err {
+	case nil:
+		err := h.setJwtToken(ctx, user.Id)
+		if err != nil {
+			ctx.String(http.StatusInternalServerError, "系统异常")
+			return
+		}
+		ctx.String(http.StatusOK, "登录成功")
+	case service.ErrInvalidUserOrPassword:
+		ctx.String(http.StatusOK, "用户名或密码错误")
+	default:
+		ctx.String(http.StatusOK, "系统错误")
+	}
+}
+
+func (h *UserHandler) LogoutJwt(ctx *gin.Context) {
+	header := ctx.GetHeader(Authorization)
+	if header == "" {
+		ctx.JSON(http.StatusOK, gin.H{
+			"code": 5,
+			"msg":  "退出失败",
+		})
+		return
+	}
+	ctx.JSON(http.StatusOK, gin.H{
+		"code": 0,
+		"msg":  "退出成功",
+	})
+}
+
+func (h *UserHandler) EditJwt(ctx *gin.Context) {
+	type EditRequest struct {
+		Nickname string `json:"nickname"`
+		Birthday string `json:"birthday"`
+		AboutMe  string `json:"aboutMe"`
+	}
+	var req EditRequest
+	err := ctx.Bind(&req)
+	if err != nil {
+		return
+	}
+	uc, ok := ctx.MustGet(UserKey).(UserClaims)
+	if !ok {
+		ctx.JSON(http.StatusUnauthorized, "请先登录")
+		return
+	}
+	user, err := h.userService.Edit(ctx, domain.User{
+		Id:       uc.Userid,
+		Nickname: req.Nickname,
+		Birthday: req.Birthday,
+		AboutMe:  req.AboutMe,
+	})
+	if err != nil {
+		return
+	}
+	ctx.JSON(http.StatusOK, gin.H{
+		"code": 0, "data": user,
+	})
+}
+
+func (h *UserHandler) ProfileJwt(ctx *gin.Context) {
+	uc, ok := ctx.MustGet(UserKey).(UserClaims)
+	if !ok {
+		ctx.JSON(http.StatusUnauthorized, "请先登录")
+		return
+	}
+	profile, err := h.userService.Profile(ctx, uc.Userid)
+	if err != nil {
+		ctx.String(http.StatusInternalServerError, "系统异常")
+		return
+	}
+	ctx.JSON(http.StatusOK, profile)
+}
+
+func (h *UserHandler) setJwtToken(ctx *gin.Context, userid int64) error {
+	uc := UserClaims{
+		Userid:    userid,
+		UserAgent: ctx.GetHeader("User-Agent"),
+		RegisteredClaims: jwt.RegisteredClaims{
+			// 1 分钟过期
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(ExpireTime)),
+		},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS512, uc)
+	tokenStr, err := token.SignedString(JwtKey)
+	if err != nil {
+		return err
+	}
+	ctx.Header(JwtHeader, tokenStr)
+	return nil
+}
+
 func (h *UserHandler) Login(ctx *gin.Context) {
 	type LoginRequest struct {
 		Email    string `json:"email"`
@@ -106,7 +216,7 @@ func (h *UserHandler) Login(ctx *gin.Context) {
 		session.Set("userid", user.Id)
 		session.Options(sessions.Options{
 			Path:     "/",
-			MaxAge:   10 * 60,
+			MaxAge:   int(ExpireTime.Minutes()),
 			Secure:   true,
 			HttpOnly: true,
 		})
@@ -183,4 +293,20 @@ func (h *UserHandler) Profile(ctx *gin.Context) {
 		return
 	}
 	ctx.JSON(http.StatusOK, profile)
+}
+
+var (
+	JwtKey        = []byte("k6CswdUm75WKcbM68UQUuxVsHSpTCwgK")
+	JwtHeader     = "x-jwt-token"
+	Authorization = "Authorization"
+	UserAgent     = "User-Agent"
+	UserKey       = "user_claims"
+	RefreshTime   = time.Minute*30 - time.Second*10
+	ExpireTime    = time.Minute * 30
+)
+
+type UserClaims struct {
+	jwt.RegisteredClaims
+	Userid    int64
+	UserAgent string
 }

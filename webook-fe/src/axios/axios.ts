@@ -5,6 +5,8 @@ const instance = axios.create({
   withCredentials: true,
 });
 
+const accessToken = 'access-token';
+
 instance.interceptors.response.use(
   function (resp) {
     // const newToken = resp.headers['x-jwt-token'];
@@ -16,6 +18,10 @@ instance.interceptors.response.use(
     // if (newRefreshToken) {
     //     localStorage.setItem('refresh_token', newRefreshToken);
     // }
+    const token = resp?.headers?.['x-jwt-token'];
+    if (token) {
+      localStorage.setItem(accessToken, token);
+    }
     if (resp?.status === 401) {
       window.location.href = '/user/login';
     }
@@ -33,7 +39,7 @@ instance.interceptors.response.use(
 // 在这里让每一个请求都加上 authorization 的头部
 instance.interceptors.request.use(
   (req) => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem(accessToken);
     req.headers.setAuthorization('Bearer ' + token, true);
     return req;
   },
