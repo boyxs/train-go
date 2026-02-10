@@ -5,7 +5,9 @@ import (
 	"time"
 
 	"gitee.com/train-cloud/geektime-basic-go/config"
+	"gitee.com/train-cloud/geektime-basic-go/internal/consts"
 	"gitee.com/train-cloud/geektime-basic-go/internal/repository"
+	"gitee.com/train-cloud/geektime-basic-go/internal/repository/cache"
 	"gitee.com/train-cloud/geektime-basic-go/internal/repository/dao"
 	"gitee.com/train-cloud/geektime-basic-go/internal/service"
 	"gitee.com/train-cloud/geektime-basic-go/internal/web"
@@ -25,7 +27,7 @@ func main() {
 	rdb := initRedis()
 	server := initServer(rdb)
 	// handler
-	initUserHandler(db, server)
+	initUserHandler(db, rdb, server)
 
 	err := server.Run(":8089")
 	if err != nil {
@@ -33,9 +35,10 @@ func main() {
 	}
 }
 
-func initUserHandler(db *gorm.DB, server *gin.Engine) {
+func initUserHandler(db *gorm.DB, rdb *redis.Client, server *gin.Engine) {
 	userDAO := dao.NewUserDAO(db)
-	userRepository := repository.NewUserRepository(userDAO)
+	userCache := cache.NewUserCache(rdb)
+	userRepository := repository.NewUserRepository(userDAO, userCache)
 	userService := service.NewUserService(userRepository)
 	//u := &web.UserHandler{}
 	u := web.NewUserHandler(userService)
@@ -70,7 +73,7 @@ func initServer(rdb *redis.Client) *gin.Engine {
 		AllowOrigins: []string{"http://localhost:3000"},
 		//AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"},
 		AllowHeaders:     []string{"Content-Type", "Content-Length", "Authorization"},
-		ExposeHeaders:    []string{web.JwtHeader},
+		ExposeHeaders:    []string{consts.JwtHeader},
 		AllowCredentials: true,
 		AllowOriginFunc: func(origin string) bool {
 			if strings.HasPrefix(origin, "http://localhost") {
@@ -81,7 +84,7 @@ func initServer(rdb *redis.Client) *gin.Engine {
 		MaxAge: 12 * time.Hour,
 	}))
 	// 限流中间件
-	server.Use(ratelimit.NewBuilder(rdb, time.Second, 10).Prefix("ip_limiter").Build())
+	server.Use(ratelimit.NewBuilder(rdb, time.Second, 20).Prefix("ip_limiter").Build())
 	// session
 	//useSession(server)
 	// jwt

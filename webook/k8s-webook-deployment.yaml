@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webook-record
+  labels:
+    app: webook-record
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: webook-record
+  template:
+    metadata:
+      name: webook-record
+      labels:
+        # 这个 webook-record 一定要和前面的 selector 的 matchLabels 匹配上
+        app: webook-record
+        # 这个是 Deployment 管理的 Pod 的模板
+    spec:
+      # Pod 里面运行的所有的 container
+      containers:
+        - name: webook-record
+          image: train/webook:1.0.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8089
+      restartPolicy: Always # OnFailure
+      

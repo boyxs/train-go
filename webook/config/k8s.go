@@ -1,13 +1,13 @@
-//go:build !k8s
+//go:build k8s
 
 package config
 
 var Config = config{
 	MySQL: MySQLConfig{
-		DSN: "root:13520@tcp(localhost:3306)/webook",
+		DSN: "root:13520@tcp(webook-mysql:3307)/webook",
 	},
 	Redis: RedisConfig{
-		Addr:     "127.0.0.1:6379",
+		Addr:     "webook-redis:6380",
 		Password: "13520",
 	},
 }

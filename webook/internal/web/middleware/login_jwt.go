@@ -3,12 +3,14 @@ package middleware
 import (
 	"encoding/gob"
 	"fmt"
-	"gitee.com/train-cloud/geektime-basic-go/internal/web"
-	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
 	"net/http"
 	"strings"
 	"time"
+
+	"gitee.com/train-cloud/geektime-basic-go/internal/consts"
+	"gitee.com/train-cloud/geektime-basic-go/internal/web"
+	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 type LoginJwtMiddlewareBuilder struct {
@@ -37,7 +39,7 @@ func (l *LoginJwtMiddlewareBuilder) Build() gin.HandlerFunc {
 		if _, ok := l.ignorePaths[ctx.Request.URL.Path]; ok {
 			return
 		}
-		authorization := ctx.GetHeader(web.Authorization)
+		authorization := ctx.GetHeader(consts.Authorization)
 		if authorization == "" {
 			ctx.AbortWithStatus(http.StatusUnauthorized)
 			return
@@ -53,7 +55,7 @@ func (l *LoginJwtMiddlewareBuilder) Build() gin.HandlerFunc {
 		tokenStr := splits[1]
 		var uc web.UserClaims
 		token, err := jwt.ParseWithClaims(tokenStr, &uc, func(token *jwt.Token) (any, error) {
-			return web.JwtKey, nil
+			return consts.JwtKey, nil
 		})
 		if err != nil {
 			ctx.AbortWithStatus(http.StatusUnauthorized)
@@ -63,7 +65,7 @@ func (l *LoginJwtMiddlewareBuilder) Build() gin.HandlerFunc {
 			ctx.AbortWithStatus(http.StatusUnauthorized)
 			return
 		}
-		if uc.UserAgent != ctx.GetHeader(web.UserAgent) {
+		if uc.UserAgent != ctx.GetHeader(consts.UserAgent) {
 			// 后期我们讲到了监控告警的时候，这个地方要埋点
 			// 能够进来这个分支的，大概率是攻击者
 			ctx.AbortWithStatus(http.StatusUnauthorized)
@@ -71,15 +73,15 @@ func (l *LoginJwtMiddlewareBuilder) Build() gin.HandlerFunc {
 		}
 		expiresAt := uc.ExpiresAt
 		// 每10秒刷新一次
-		if expiresAt.Sub(time.Now()) < web.RefreshTime {
-			uc.ExpiresAt = jwt.NewNumericDate(time.Now().Add(web.ExpireTime))
-			tokenStr, err := token.SignedString(web.JwtKey)
+		if expiresAt.Sub(time.Now()) < consts.RefreshTime {
+			uc.ExpiresAt = jwt.NewNumericDate(time.Now().Add(consts.ExpireTime))
+			tokenStr, err := token.SignedString(consts.JwtKey)
 			if err != nil {
 				// 这里续约失败，仅需要记录日志
 				fmt.Printf("🚀 ~ file: login_jwt.go ~ line 79 ~ err: %#v\n", err)
 			}
-			ctx.Header(web.JwtHeader, tokenStr)
+			ctx.Header(consts.JwtHeader, tokenStr)
 		}
-		ctx.Set(web.UserKey, uc)
+		ctx.Set(consts.UserKey, uc)
 	}
 }

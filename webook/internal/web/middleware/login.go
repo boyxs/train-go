@@ -3,10 +3,12 @@ package middleware
 import (
 	"encoding/gob"
 	"fmt"
-	"github.com/gin-contrib/sessions"
-	"github.com/gin-gonic/gin"
 	"net/http"
 	"time"
+
+	"gitee.com/train-cloud/geektime-basic-go/internal/consts"
+	"github.com/gin-contrib/sessions"
+	"github.com/gin-gonic/gin"
 )
 
 type LoginMiddlewareBuilder struct {
@@ -48,7 +50,7 @@ func (l *LoginMiddlewareBuilder) Build() gin.HandlerFunc {
 		updateTimeKey := "updateTime"
 		val := session.Get(updateTimeKey)
 		lastUpdateTime, ok := val.(time.Time)
-		if val == nil || !ok || now.Sub(lastUpdateTime) > time.Minute {
+		if val == nil || !ok || now.Sub(lastUpdateTime) > consts.Interval {
 			session.Set("userid", userid)
 			session.Set(updateTimeKey, now)
 			session.Options(sessions.Options{

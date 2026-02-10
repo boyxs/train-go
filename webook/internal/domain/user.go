@@ -7,7 +7,7 @@ type User struct {
 	Nickname string
 	Birthday string
 	AboutMe  string
-
+	Phone    string
 	// UTC 0 的时区
 	//CreatedAt time.Time
 	//UpdatedAt time.Time

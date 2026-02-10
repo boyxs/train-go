@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+
 	"gitee.com/train-cloud/geektime-basic-go/internal/domain"
 	"gitee.com/train-cloud/geektime-basic-go/internal/repository"
 	"golang.org/x/crypto/bcrypt"
@@ -15,10 +16,10 @@ var (
 )
 
 type UserService struct {
-	repo *repository.UserRepository
+	repo repository.IUserRepository
 }
 
-func NewUserService(repo *repository.UserRepository) *UserService {
+func NewUserService(repo repository.IUserRepository) *UserService {
 	return &UserService{
 		repo: repo,
 	}

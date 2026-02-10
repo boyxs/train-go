@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"time"
 
+	"gitee.com/train-cloud/geektime-basic-go/internal/consts"
 	"gitee.com/train-cloud/geektime-basic-go/internal/domain"
 	"gitee.com/train-cloud/geektime-basic-go/internal/service"
 	"github.com/gin-contrib/sessions"
@@ -124,7 +125,7 @@ func (h *UserHandler) LoginJwt(ctx *gin.Context) {
 }
 
 func (h *UserHandler) LogoutJwt(ctx *gin.Context) {
-	header := ctx.GetHeader(Authorization)
+	header := ctx.GetHeader(consts.Authorization)
 	if header == "" {
 		ctx.JSON(http.StatusOK, gin.H{
 			"code": 5,
@@ -149,7 +150,7 @@ func (h *UserHandler) EditJwt(ctx *gin.Context) {
 	if err != nil {
 		return
 	}
-	uc, ok := ctx.MustGet(UserKey).(UserClaims)
+	uc, ok := ctx.MustGet(consts.UserKey).(UserClaims)
 	if !ok {
 		ctx.JSON(http.StatusUnauthorized, "请先登录")
 		return
@@ -169,7 +170,7 @@ func (h *UserHandler) EditJwt(ctx *gin.Context) {
 }
 
 func (h *UserHandler) ProfileJwt(ctx *gin.Context) {
-	uc, ok := ctx.MustGet(UserKey).(UserClaims)
+	uc, ok := ctx.MustGet(consts.UserKey).(UserClaims)
 	if !ok {
 		ctx.JSON(http.StatusUnauthorized, "请先登录")
 		return
@@ -188,15 +189,15 @@ func (h *UserHandler) setJwtToken(ctx *gin.Context, userid int64) error {
 		UserAgent: ctx.GetHeader("User-Agent"),
 		RegisteredClaims: jwt.RegisteredClaims{
 			// 1 分钟过期
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(ExpireTime)),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(consts.ExpireTime)),
 		},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS512, uc)
-	tokenStr, err := token.SignedString(JwtKey)
+	tokenStr, err := token.SignedString(consts.JwtKey)
 	if err != nil {
 		return err
 	}
-	ctx.Header(JwtHeader, tokenStr)
+	ctx.Header(consts.JwtHeader, tokenStr)
 	return nil
 }
 
@@ -216,7 +217,7 @@ func (h *UserHandler) Login(ctx *gin.Context) {
 		session.Set("userid", user.Id)
 		session.Options(sessions.Options{
 			Path:     "/",
-			MaxAge:   int(ExpireTime.Minutes()),
+			MaxAge:   int(consts.ExpireTime.Minutes()),
 			Secure:   true,
 			HttpOnly: true,
 		})
@@ -294,16 +295,6 @@ func (h *UserHandler) Profile(ctx *gin.Context) {
 	}
 	ctx.JSON(http.StatusOK, profile)
 }
-
-var (
-	JwtKey        = []byte("k6CswdUm75WKcbM68UQUuxVsHSpTCwgK")
-	JwtHeader     = "x-jwt-token"
-	Authorization = "Authorization"
-	UserAgent     = "User-Agent"
-	UserKey       = "user_claims"
-	RefreshTime   = time.Minute*30 - time.Second*10
-	ExpireTime    = time.Minute * 30
-)
 
 type UserClaims struct {
 	jwt.RegisteredClaims

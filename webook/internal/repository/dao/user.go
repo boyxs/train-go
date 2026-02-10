@@ -2,10 +2,12 @@ package dao
 
 import (
 	"context"
+	"database/sql"
 	"errors"
+	"time"
+
 	"github.com/go-sql-driver/mysql"
 	"gorm.io/gorm"
-	"time"
 )
 
 var (
@@ -13,11 +15,18 @@ var (
 	ErrRecordNotFound = gorm.ErrRecordNotFound
 )
 
+type IUserDAO interface {
+	Insert(ctx context.Context, u User) error
+	Update(ctx context.Context, user User) (User, error)
+	FindByEmail(ctx context.Context, email string) (User, error)
+	FindById(ctx context.Context, userid int64) (User, error)
+}
+
 type UserDAO struct {
 	db *gorm.DB
 }
 
-func NewUserDAO(db *gorm.DB) *UserDAO {
+func NewUserDAO(db *gorm.DB) IUserDAO {
 	return &UserDAO{db: db}
 }
 
@@ -71,12 +80,13 @@ func (ud *UserDAO) FindById(ctx context.Context, userid int64) (User, error) {
 type User struct {
 	// gorm.Model 默认包含 ID (uint), CreatedAt, UpdatedAt, DeletedAt
 	// 如果用了 gorm.Model，通常就不再手动定义 ID 了
-	Id       int64  `gorm:"primaryKey,autoIncrement"`
-	Email    string `gorm:"unique;type:varchar(100);not null"`
-	Password string `gorm:"type:varchar(256);not null"`
-	Nickname string `gorm:"type:varchar(50)"`
-	Birthday int64  `gorm:"column:birthday"`
-	AboutMe  string `gorm:"type:text"`
+	Id       int64          `gorm:"primaryKey,autoIncrement"`
+	Email    sql.NullString `gorm:"unique;type:varchar(100);not null"`
+	Password string         `gorm:"type:varchar(256);not null"`
+	Nickname string         `gorm:"type:varchar(50)"`
+	Birthday int64          `gorm:"column:birthday"`
+	AboutMe  string         `gorm:"type:text"`
+	Phone    sql.NullString `gorm:"unique"`
 
 	// 自动生成时间戳
 	CreatedAt int64 `gorm:"autoCreateTime:milli"`

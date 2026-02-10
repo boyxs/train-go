@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webook-mysql
+  labels:
+    app: webook-mysql
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: webook-mysql
+  template:
+    metadata:
+      name: webook-mysql
+      labels:
+        # 这个 webook-mysql 一定要和前面的 selector 的 matchLabels 匹配上
+        app: webook-mysql
+        # 这个是 Deployment 管理的 Pod 的模板
+    spec:
+      # Pod 里面运行的所有的 container
+      containers:
+        - name: webook-mysql
+          image: mysql:8.0
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              value: "13520"
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+            # 持久化路径
+            - mountPath: /var/lib/mysql
+              name: mysql-store
+          ports:
+            - containerPort: 3306
+      restartPolicy: Always # OnFailure
+      volumes:
+        - name: mysql-store
+          persistentVolumeClaim:
+            # 对应上 pvc 配置里面的名字
+            # Pod -> PVC  PVC -> PV
+            claimName: webook-mysql-pvc
+      
