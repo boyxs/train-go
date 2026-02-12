@@ -13,6 +13,7 @@ import (
 )
 
 var (
+	ErrDuplicateUser  = dao.ErrDuplicateUser
 	ErrDuplicateEmail = dao.ErrDuplicateEmail
 	ErrRecordNotFound = dao.ErrRecordNotFound
 )
@@ -26,6 +27,7 @@ type IUserRepository interface {
 	Create(ctx context.Context, user domain.User) error
 	Update(ctx context.Context, user domain.User) (domain.User, error)
 	FindByEmail(ctx context.Context, email string) (domain.User, error)
+	FindByPhone(ctx context.Context, phone string) (domain.User, error)
 	FindById(ctx context.Context, userid int64) (domain.User, error)
 }
 
@@ -42,6 +44,10 @@ func (ur *UserRepository) Create(ctx context.Context, user domain.User) error {
 
 func (ur *UserRepository) Update(ctx context.Context, user domain.User) (domain.User, error) {
 	u, err := ur.dao.Update(ctx, ur.toEntity(user))
+	err = ur.cache.Del(ctx, user.Id)
+	if err != nil {
+		return domain.User{}, err
+	}
 	return ur.toDomain(u), err
 }
 
@@ -70,10 +76,19 @@ func (ur *UserRepository) FindById(ctx context.Context, userid int64) (domain.Us
 	return cu, nil
 }
 
+func (ur *UserRepository) FindByPhone(ctx context.Context, phone string) (domain.User, error) {
+	u, err := ur.dao.FindByPhone(ctx, phone)
+	if err != nil {
+		return domain.User{}, err
+	}
+	return ur.toDomain(u), nil
+}
+
 func (ur *UserRepository) toDomain(u dao.User) domain.User {
 	return domain.User{
 		Id:        u.Id,
 		Email:     u.Email.String,
+		Phone:     u.Phone.String,
 		Password:  u.Password,
 		Nickname:  u.Nickname,
 		Birthday:  time.UnixMilli(u.Birthday).Format(consts.DateOnly),

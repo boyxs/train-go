@@ -37,10 +37,14 @@ const LoginFormSMS: React.FC = () => {
       .post('/user/login_sms/code/send', { phone: data })
       .then((res) => {
         if (res.status !== 200) {
-          message.error(res.statusText);
+          message.error((res as any)?.response?.statusText);
           return;
         }
-        message.error(res?.data?.msg || '系统错误，请重试');
+        if (res?.data?.code === 4) {
+          message.error(res?.data?.msg);
+          return;
+        }
+        message.success(res?.data?.msg);
       })
       .catch((err) => {
         message.error(err);

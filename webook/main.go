@@ -10,6 +10,7 @@ import (
 	"gitee.com/train-cloud/geektime-basic-go/internal/repository/cache"
 	"gitee.com/train-cloud/geektime-basic-go/internal/repository/dao"
 	"gitee.com/train-cloud/geektime-basic-go/internal/service"
+	"gitee.com/train-cloud/geektime-basic-go/internal/service/sms/memory"
 	"gitee.com/train-cloud/geektime-basic-go/internal/web"
 	"gitee.com/train-cloud/geektime-basic-go/internal/web/middleware"
 	"gitee.com/train-cloud/geektime-basic-go/pkg/ginx/middleware/ratelimit"
@@ -40,8 +41,13 @@ func initUserHandler(db *gorm.DB, rdb *redis.Client, server *gin.Engine) {
 	userCache := cache.NewUserCache(rdb)
 	userRepository := repository.NewUserRepository(userDAO, userCache)
 	userService := service.NewUserService(userRepository)
+	codeCache := cache.NewCodeCache(rdb)
+	codeRepository := repository.NewCodeRepository(codeCache)
+	//smsService := tencent.NewSmsService(...)
+	smsService := memory.NewSmsService()
+	codeService := service.NewCodeService(codeRepository, smsService)
 	//u := &web.UserHandler{}
-	u := web.NewUserHandler(userService)
+	u := web.NewUserHandler(userService, codeService)
 	u.RegisterRoutes(server)
 }
 
@@ -94,7 +100,7 @@ func initServer(rdb *redis.Client) *gin.Engine {
 
 func useSession(server *gin.Engine) {
 	loginMiddleware := middleware.NewLoginMiddlewareBuilder().
-		IgnorePaths("/user/register", "/user/login").
+		IgnorePaths("/user/register", "/user/login", "/user/login_sms/code/send", "/user/login_sms").
 		Build()
 	//store := cookie.NewStore([]byte("k6CswdUm75WKcbM68UQUuxVsHSpTCwgK"))
 	store, err := redisSession.NewStore(16,
@@ -112,7 +118,7 @@ func useSession(server *gin.Engine) {
 
 func useJwt(server *gin.Engine) {
 	loginJwtMiddleware := middleware.NewLoginJwtMiddlewareBuilder().
-		IgnorePaths("/user/register", "/user/login").
+		IgnorePaths("/user/register", "/user/login", "/user/login_sms/code/send", "/user/login_sms").
 		Build()
 	server.Use(loginJwtMiddleware)
 }

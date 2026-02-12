@@ -15,14 +15,15 @@ var (
 	ErrInvalidUserOrPassword = errors.New("用户或密码错误")
 )
 
+type IUserService interface {
+	Register(ctx context.Context, user domain.User) error
+	Login(ctx context.Context, email string, password string) (domain.User, error)
+	Profile(ctx context.Context, userid int64) (domain.User, error)
+	Edit(ctx context.Context, user domain.User) (domain.User, error)
+	FindOrCreate(ctx context.Context, phone string) (domain.User, error)
+}
 type UserService struct {
 	repo repository.IUserRepository
-}
-
-func NewUserService(repo repository.IUserRepository) *UserService {
-	return &UserService{
-		repo: repo,
-	}
 }
 
 func (us *UserService) Register(ctx context.Context, user domain.User) error {
@@ -70,4 +71,29 @@ func (us *UserService) Edit(ctx context.Context, user domain.User) (domain.User,
 	// 不要返回密码
 	//user.Password = ""
 	return user, nil
+}
+
+func (us *UserService) FindOrCreate(ctx context.Context, phone string) (domain.User, error) {
+	u, err := us.repo.FindByPhone(ctx, phone)
+	if errors.Is(err, repository.ErrRecordNotFound) {
+		// 有两种情况
+		// err == nil, u 是可用的
+		// err != nil，系统错误，
+		return u, err
+	}
+	err = us.repo.Create(ctx, domain.User{Phone: phone})
+	// 有两种可能，一种是 err 恰好是唯一索引冲突（phone）
+	// 一种是 err != nil，系统错误
+	if err != nil && !errors.Is(err, repository.ErrDuplicateUser) {
+		return domain.User{}, err
+	}
+	// 要么 err ==nil，要么ErrDuplicateUser，也代表用户存在
+	// 主从延迟，理论上来讲，强制走主库
+	return us.repo.FindByPhone(ctx, phone)
+}
+
+func NewUserService(repo repository.IUserRepository) IUserService {
+	return &UserService{
+		repo: repo,
+	}
 }

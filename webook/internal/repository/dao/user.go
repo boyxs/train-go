@@ -11,6 +11,7 @@ import (
 )
 
 var (
+	ErrDuplicateUser  = errors.New("此用户已被注册")
 	ErrDuplicateEmail = errors.New("邮箱已被注册")
 	ErrRecordNotFound = gorm.ErrRecordNotFound
 )
@@ -19,6 +20,7 @@ type IUserDAO interface {
 	Insert(ctx context.Context, u User) error
 	Update(ctx context.Context, user User) (User, error)
 	FindByEmail(ctx context.Context, email string) (User, error)
+	FindByPhone(ctx context.Context, phone string) (User, error)
 	FindById(ctx context.Context, userid int64) (User, error)
 }
 
@@ -71,6 +73,12 @@ func (ud *UserDAO) FindByEmail(ctx context.Context, email string) (User, error) 
 	return u, err
 }
 
+func (ud *UserDAO) FindByPhone(ctx context.Context, phone string) (User, error) {
+	var u User
+	err := ud.db.WithContext(ctx).First(&u, "phone = ?", phone).Error
+	return u, err
+}
+
 func (ud *UserDAO) FindById(ctx context.Context, userid int64) (User, error) {
 	var u User
 	err := ud.db.WithContext(ctx).First(&u, "id = ?", userid).Error
@@ -81,8 +89,8 @@ type User struct {
 	// gorm.Model 默认包含 ID (uint), CreatedAt, UpdatedAt, DeletedAt
 	// 如果用了 gorm.Model，通常就不再手动定义 ID 了
 	Id       int64          `gorm:"primaryKey,autoIncrement"`
-	Email    sql.NullString `gorm:"unique;type:varchar(100);not null"`
-	Password string         `gorm:"type:varchar(256);not null"`
+	Email    sql.NullString `gorm:"unique"`
+	Password string         `gorm:"type:varchar(256)"`
 	Nickname string         `gorm:"type:varchar(50)"`
 	Birthday int64          `gorm:"column:birthday"`
 	AboutMe  string         `gorm:"type:text"`

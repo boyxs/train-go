@@ -23,14 +23,16 @@ instance.interceptors.response.use(
       localStorage.setItem(accessToken, token);
     }
     if (resp?.status === 401) {
-      window.location.href = '/user/login';
+      localStorage.removeItem(accessToken);
+      setTimeout(() => (window.location.href = '/user/login'), 3000);
     }
     return resp;
   },
   (err) => {
     console.log(err);
     if (err?.response?.status === 401) {
-      window.location.href = '/user/login';
+      localStorage.removeItem(accessToken);
+      setTimeout(() => (window.location.href = '/user/login'), 3000);
     }
     return err;
   },

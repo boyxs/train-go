@@ -1,6 +1,8 @@
 package web
 
 import (
+	"errors"
+	"log"
 	"net/http"
 	"time"
 
@@ -19,21 +21,24 @@ const (
 	emailExpr = "^\\w+([-+.]\\w+)*@\\w+([-.]\\w+)*\\.\\w+([-.]\\w+)*$"
 	// 和上面比起来，用 ` 看起来就比较清爽
 	passwordExpr = `^(?=.*[A-Za-z])(?=.*\d)(?=.*[$@$!%*#?&])[A-Za-z\d$@$!%*#?&]{8,}$`
+	loginBiz     = "login"
 )
 
 type UserHandler struct {
-	userService    *service.UserService
 	emailRegexp    *regexp.Regexp
 	passwordRegexp *regexp.Regexp
+	userService    service.IUserService
+	codeService    service.ICodeService
 }
 
-func NewUserHandler(us *service.UserService) *UserHandler {
+func NewUserHandler(us service.IUserService, cs service.ICodeService) *UserHandler {
 	er := regexp.MustCompile(emailExpr, regexp.None)
 	pr := regexp.MustCompile(passwordExpr, regexp.None)
 	return &UserHandler{
-		userService:    us,
 		emailRegexp:    er,
 		passwordRegexp: pr,
+		userService:    us,
+		codeService:    cs,
 	}
 }
 
@@ -48,6 +53,10 @@ func (h *UserHandler) RegisterRoutes(server *gin.Engine) {
 	//ug.POST("/logout", h.Logout)
 	//ug.POST("/edit", h.Edit)
 	//ug.GET("/profile", h.Profile)
+
+	//手机验证码登录相关功能
+	ug.POST("/login_sms/code/send", h.SendLoginSMSCode)
+	ug.POST("/login_sms", h.LoginSMS)
 }
 
 func (h *UserHandler) Register(ctx *gin.Context) {
@@ -97,6 +106,88 @@ func (h *UserHandler) Register(ctx *gin.Context) {
 		return
 	}
 	ctx.String(http.StatusOK, "注册成功")
+}
+
+func (h *UserHandler) SendLoginSMSCode(ctx *gin.Context) {
+	type CodeRequest struct {
+		Phone string `json:"phone"`
+	}
+	var req CodeRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		return
+	}
+	if req.Phone == "" {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 4,
+			Msg:  "请输入手机号码",
+		})
+		return
+	}
+	err := h.codeService.Send(ctx, loginBiz, req.Phone)
+	switch {
+	case err == nil:
+		ctx.JSON(http.StatusOK, Result{
+			Msg: "发送成功",
+		})
+	case errors.Is(err, service.ErrCodeSendTooMany):
+		ctx.JSON(http.StatusOK, Result{
+			Code: 4,
+			Msg:  "短信发送太频繁，请稍后再试",
+		})
+	default:
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统错误",
+		})
+		//记录日志
+		log.Println(err)
+	}
+}
+
+func (h *UserHandler) LoginSMS(ctx *gin.Context) {
+	type LoginRequest struct {
+		Phone string `json:"phone"`
+		Code  string `json:"code"`
+	}
+	var req LoginRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		return
+	}
+	ok, err := h.codeService.Verify(ctx, loginBiz, req.Phone, req.Code)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统异常",
+		})
+		return
+	}
+	if !ok {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 4,
+			Msg:  "验证码错误，请重新输入",
+		})
+		return
+	}
+	user, err := h.userService.FindOrCreate(ctx, req.Phone)
+	if err != nil {
+		msg := err.Error()
+		if msg == "" {
+			msg = "系统错误"
+		}
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  msg,
+		})
+		return
+	}
+	err = h.setJwtToken(ctx, user.Id)
+	if err != nil {
+		ctx.String(http.StatusInternalServerError, "系统异常")
+		return
+	}
+	ctx.JSON(http.StatusOK, Result{
+		Msg: "登录成功",
+	})
 }
 
 func (h *UserHandler) LoginJwt(ctx *gin.Context) {

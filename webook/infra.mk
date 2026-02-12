@@ -64,3 +64,5 @@ clean:
 	@echo "$(STEP) Cleaning up infrastructure..."
 	@$(KUBECTL) delete -f k8s-mysql-deployment.yaml,k8s-mysql-service.yaml,k8s-redis-deployment.yaml,k8s-redis-service.yaml -n $(NAMESPACE) --ignore-not-found
 	@echo "$(INFO) Cleanup complete."
+
+# make -f infra.mk xxx
