@@ -16,7 +16,7 @@ var (
 	ErrRecordNotFound = gorm.ErrRecordNotFound
 )
 
-type IUserDAO interface {
+type UserDAO interface {
 	Insert(ctx context.Context, u User) error
 	Update(ctx context.Context, user User) (User, error)
 	FindByEmail(ctx context.Context, email string) (User, error)
@@ -24,15 +24,15 @@ type IUserDAO interface {
 	FindById(ctx context.Context, userid int64) (User, error)
 }
 
-type UserDAO struct {
+type GormUserDAO struct {
 	db *gorm.DB
 }
 
-func NewUserDAO(db *gorm.DB) IUserDAO {
-	return &UserDAO{db: db}
+func NewGormUserDAO(db *gorm.DB) UserDAO {
+	return &GormUserDAO{db: db}
 }
 
-func (ud *UserDAO) Insert(ctx context.Context, u User) error {
+func (ud *GormUserDAO) Insert(ctx context.Context, u User) error {
 	now := time.Now().UnixMilli() // 毫秒值
 	u.CreatedAt = now
 	u.UpdatedAt = now
@@ -48,7 +48,7 @@ func (ud *UserDAO) Insert(ctx context.Context, u User) error {
 	return err
 }
 
-func (ud *UserDAO) Update(ctx context.Context, user User) (User, error) {
+func (ud *GormUserDAO) Update(ctx context.Context, user User) (User, error) {
 	//now := time.Now().UnixMilli()
 	err := ud.db.WithContext(ctx).
 		Model(&User{}).
@@ -66,20 +66,20 @@ func (ud *UserDAO) Update(ctx context.Context, user User) (User, error) {
 	return user, err
 }
 
-func (ud *UserDAO) FindByEmail(ctx context.Context, email string) (User, error) {
+func (ud *GormUserDAO) FindByEmail(ctx context.Context, email string) (User, error) {
 	var u User
 	//err := ud.db.WithContext(ctx).Where("email = ?", email).First(&u).Error
 	err := ud.db.WithContext(ctx).First(&u, "email = ?", email).Error
 	return u, err
 }
 
-func (ud *UserDAO) FindByPhone(ctx context.Context, phone string) (User, error) {
+func (ud *GormUserDAO) FindByPhone(ctx context.Context, phone string) (User, error) {
 	var u User
 	err := ud.db.WithContext(ctx).First(&u, "phone = ?", phone).Error
 	return u, err
 }
 
-func (ud *UserDAO) FindById(ctx context.Context, userid int64) (User, error) {
+func (ud *GormUserDAO) FindById(ctx context.Context, userid int64) (User, error) {
 	var u User
 	err := ud.db.WithContext(ctx).First(&u, "id = ?", userid).Error
 	return u, err

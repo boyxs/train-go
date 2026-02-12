@@ -16,7 +16,7 @@ type SmsService struct {
 	signName *string
 }
 
-func NewSmsService(client *tsms.Client, appId string, signName string) sms.ISmsService {
+func NewSmsService(client *tsms.Client, appId string, signName string) sms.SmsService {
 	return &SmsService{
 		client:   client,
 		appId:    &appId,

@@ -15,18 +15,18 @@ var (
 	ErrInvalidUserOrPassword = errors.New("用户或密码错误")
 )
 
-type IUserService interface {
+type UserService interface {
 	Register(ctx context.Context, user domain.User) error
 	Login(ctx context.Context, email string, password string) (domain.User, error)
 	Profile(ctx context.Context, userid int64) (domain.User, error)
 	Edit(ctx context.Context, user domain.User) (domain.User, error)
 	FindOrCreate(ctx context.Context, phone string) (domain.User, error)
 }
-type UserService struct {
-	repo repository.IUserRepository
+type InternalUserService struct {
+	repo repository.UserRepository
 }
 
-func (us *UserService) Register(ctx context.Context, user domain.User) error {
+func (us *InternalUserService) Register(ctx context.Context, user domain.User) error {
 	// 加密处理
 	hash, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
 	if err != nil {
@@ -36,7 +36,7 @@ func (us *UserService) Register(ctx context.Context, user domain.User) error {
 	return us.repo.Create(ctx, user)
 }
 
-func (us *UserService) Login(ctx context.Context, email string, password string) (domain.User, error) {
+func (us *InternalUserService) Login(ctx context.Context, email string, password string) (domain.User, error) {
 	// 查找用户
 	user, err := us.repo.FindByEmail(ctx, email)
 	if err == ErrRecordNotFound {
@@ -53,7 +53,7 @@ func (us *UserService) Login(ctx context.Context, email string, password string)
 	return user, err
 }
 
-func (us *UserService) Profile(ctx context.Context, userid int64) (domain.User, error) {
+func (us *InternalUserService) Profile(ctx context.Context, userid int64) (domain.User, error) {
 	user, err := us.repo.FindById(ctx, userid)
 	if err != nil {
 		return domain.User{}, err
@@ -63,7 +63,7 @@ func (us *UserService) Profile(ctx context.Context, userid int64) (domain.User, 
 	return user, nil
 }
 
-func (us *UserService) Edit(ctx context.Context, user domain.User) (domain.User, error) {
+func (us *InternalUserService) Edit(ctx context.Context, user domain.User) (domain.User, error) {
 	user, err := us.repo.Update(ctx, user)
 	if err != nil {
 		return domain.User{}, err
@@ -73,7 +73,7 @@ func (us *UserService) Edit(ctx context.Context, user domain.User) (domain.User,
 	return user, nil
 }
 
-func (us *UserService) FindOrCreate(ctx context.Context, phone string) (domain.User, error) {
+func (us *InternalUserService) FindOrCreate(ctx context.Context, phone string) (domain.User, error) {
 	u, err := us.repo.FindByPhone(ctx, phone)
 	if errors.Is(err, repository.ErrRecordNotFound) {
 		// 有两种情况
@@ -92,8 +92,8 @@ func (us *UserService) FindOrCreate(ctx context.Context, phone string) (domain.U
 	return us.repo.FindByPhone(ctx, phone)
 }
 
-func NewUserService(repo repository.IUserRepository) IUserService {
-	return &UserService{
+func NewInternalUserService(repo repository.UserRepository) UserService {
+	return &InternalUserService{
 		repo: repo,
 	}
 }

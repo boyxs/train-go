@@ -18,12 +18,7 @@ var (
 	ErrRecordNotFound = dao.ErrRecordNotFound
 )
 
-type UserRepository struct {
-	dao   dao.IUserDAO
-	cache cache.IUserCache
-}
-
-type IUserRepository interface {
+type UserRepository interface {
 	Create(ctx context.Context, user domain.User) error
 	Update(ctx context.Context, user domain.User) (domain.User, error)
 	FindByEmail(ctx context.Context, email string) (domain.User, error)
@@ -31,18 +26,23 @@ type IUserRepository interface {
 	FindById(ctx context.Context, userid int64) (domain.User, error)
 }
 
-func NewUserRepository(dao dao.IUserDAO, cache cache.IUserCache) IUserRepository {
-	return &UserRepository{
+type RedisUserRepository struct {
+	dao   dao.UserDAO
+	cache cache.UserCache
+}
+
+func NewRedisUserRepository(dao dao.UserDAO, cache cache.UserCache) UserRepository {
+	return &RedisUserRepository{
 		dao:   dao,
 		cache: cache,
 	}
 }
 
-func (ur *UserRepository) Create(ctx context.Context, user domain.User) error {
+func (ur *RedisUserRepository) Create(ctx context.Context, user domain.User) error {
 	return ur.dao.Insert(ctx, ur.toEntity(user))
 }
 
-func (ur *UserRepository) Update(ctx context.Context, user domain.User) (domain.User, error) {
+func (ur *RedisUserRepository) Update(ctx context.Context, user domain.User) (domain.User, error) {
 	u, err := ur.dao.Update(ctx, ur.toEntity(user))
 	err = ur.cache.Del(ctx, user.Id)
 	if err != nil {
@@ -51,7 +51,7 @@ func (ur *UserRepository) Update(ctx context.Context, user domain.User) (domain.
 	return ur.toDomain(u), err
 }
 
-func (ur *UserRepository) FindByEmail(ctx context.Context, email string) (domain.User, error) {
+func (ur *RedisUserRepository) FindByEmail(ctx context.Context, email string) (domain.User, error) {
 	u, err := ur.dao.FindByEmail(ctx, email)
 	if err != nil {
 		return domain.User{}, err
@@ -59,7 +59,7 @@ func (ur *UserRepository) FindByEmail(ctx context.Context, email string) (domain
 	return ur.toDomain(u), nil
 }
 
-func (ur *UserRepository) FindById(ctx context.Context, userid int64) (domain.User, error) {
+func (ur *RedisUserRepository) FindById(ctx context.Context, userid int64) (domain.User, error) {
 	cu, err := ur.cache.Get(ctx, userid)
 	if err == nil {
 		return cu, err
@@ -76,7 +76,7 @@ func (ur *UserRepository) FindById(ctx context.Context, userid int64) (domain.Us
 	return cu, nil
 }
 
-func (ur *UserRepository) FindByPhone(ctx context.Context, phone string) (domain.User, error) {
+func (ur *RedisUserRepository) FindByPhone(ctx context.Context, phone string) (domain.User, error) {
 	u, err := ur.dao.FindByPhone(ctx, phone)
 	if err != nil {
 		return domain.User{}, err
@@ -84,7 +84,7 @@ func (ur *UserRepository) FindByPhone(ctx context.Context, phone string) (domain
 	return ur.toDomain(u), nil
 }
 
-func (ur *UserRepository) toDomain(u dao.User) domain.User {
+func (ur *RedisUserRepository) toDomain(u dao.User) domain.User {
 	return domain.User{
 		Id:        u.Id,
 		Email:     u.Email.String,
@@ -98,7 +98,7 @@ func (ur *UserRepository) toDomain(u dao.User) domain.User {
 	}
 }
 
-func (ur *UserRepository) toEntity(u domain.User) dao.User {
+func (ur *RedisUserRepository) toEntity(u domain.User) dao.User {
 	birthday, _ := time.ParseInLocation(consts.DateOnly, u.Birthday, time.Local)
 	return dao.User{
 		Id: u.Id,

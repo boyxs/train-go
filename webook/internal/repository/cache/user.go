@@ -13,35 +13,35 @@ import (
 
 var ErrKeyNotExist = redis.Nil
 
-type IUserCache interface {
+type UserCache interface {
 	Set(ctx context.Context, user domain.User) error
 	Get(ctx context.Context, userid int64) (domain.User, error)
 	Del(ctx context.Context, userid int64) error
 }
 
-type UserCache struct {
+type RedisUserCache struct {
 	cmd        redis.Cmdable
 	expiration time.Duration
 }
 
-func NewUserCache(cmd redis.Cmdable) IUserCache {
-	return &UserCache{
+func NewRedisUserCache(cmd redis.Cmdable) UserCache {
+	return &RedisUserCache{
 		cmd:        cmd,
 		expiration: consts.CacheTTL,
 	}
 }
 
-func (uc *UserCache) Set(ctx context.Context, u domain.User) error {
+func (uc *RedisUserCache) Set(ctx context.Context, u domain.User) error {
 	data, err := json.Marshal(u)
 	if err != nil {
 		return err
 	}
-	return uc.cmd.Set(ctx, getKey(u.Id), data, uc.expiration).Err()
+	return uc.cmd.Set(ctx, uc.getKey(u.Id), data, uc.expiration).Err()
 
 }
 
-func (uc *UserCache) Get(ctx context.Context, userid int64) (domain.User, error) {
-	data, err := uc.cmd.Get(ctx, getKey(userid)).Result()
+func (uc *RedisUserCache) Get(ctx context.Context, userid int64) (domain.User, error) {
+	data, err := uc.cmd.Get(ctx, uc.getKey(userid)).Result()
 	if err != nil {
 		return domain.User{}, err
 	}
@@ -50,10 +50,10 @@ func (uc *UserCache) Get(ctx context.Context, userid int64) (domain.User, error)
 	return u, err
 }
 
-func (uc *UserCache) Del(ctx context.Context, userid int64) error {
-	return uc.cmd.Del(ctx, getKey(userid)).Err()
+func (uc *RedisUserCache) Del(ctx context.Context, userid int64) error {
+	return uc.cmd.Del(ctx, uc.getKey(userid)).Err()
 }
 
-func getKey(userid int64) string {
+func (uc *RedisUserCache) getKey(userid int64) string {
 	return fmt.Sprintf("user:%d", userid)
 }

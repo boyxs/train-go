@@ -10,7 +10,7 @@ import (
 type SmsService struct {
 }
 
-func NewSmsService() sms.ISmsService {
+func NewSmsService() sms.SmsService {
 	return &SmsService{}
 }
 

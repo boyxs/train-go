@@ -27,11 +27,11 @@ const (
 type UserHandler struct {
 	emailRegexp    *regexp.Regexp
 	passwordRegexp *regexp.Regexp
-	userService    service.IUserService
-	codeService    service.ICodeService
+	userService    service.UserService
+	codeService    service.CodeService
 }
 
-func NewUserHandler(us service.IUserService, cs service.ICodeService) *UserHandler {
+func NewUserHandler(us service.UserService, cs service.CodeService) *UserHandler {
 	er := regexp.MustCompile(emailExpr, regexp.None)
 	pr := regexp.MustCompile(passwordExpr, regexp.None)
 	return &UserHandler{
@@ -155,9 +155,13 @@ func (h *UserHandler) LoginSMS(ctx *gin.Context) {
 	}
 	ok, err := h.codeService.Verify(ctx, loginBiz, req.Phone, req.Code)
 	if err != nil {
+		msg := err.Error()
+		if msg == "" {
+			msg = "系统异常"
+		}
 		ctx.JSON(http.StatusOK, Result{
 			Code: 5,
-			Msg:  "系统异常",
+			Msg:  msg,
 		})
 		return
 	}

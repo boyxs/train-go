@@ -2,6 +2,6 @@ package sms
 
 import "context"
 
-type ISmsService interface {
+type SmsService interface {
 	Send(ctx context.Context, templateId string, args []string, phoneNumbers ...string) error
 }

@@ -15,17 +15,17 @@ var (
 	ErrCodeVerifyTooMany = repository.ErrCodeVerifyTooMany
 )
 
-type ICodeService interface {
+type CodeService interface {
 	Send(ctx context.Context, biz string, phone string) error
 	Verify(ctx context.Context, biz string, phone string, code string) (bool, error)
 }
 
-type CodeService struct {
-	repo repository.ICodeRepository
-	sms  sms.ISmsService
+type SmsCodeService struct {
+	repo repository.CodeRepository
+	sms  sms.SmsService
 }
 
-func (cs *CodeService) Send(ctx context.Context, biz string, phone string) error {
+func (cs *SmsCodeService) Send(ctx context.Context, biz string, phone string) error {
 	code := cs.genCode()
 	err := cs.repo.Store(ctx, biz, phone, code)
 	if err != nil {
@@ -35,7 +35,7 @@ func (cs *CodeService) Send(ctx context.Context, biz string, phone string) error
 	return cs.sms.Send(ctx, templateId, []string{code}, phone)
 }
 
-func (cs *CodeService) Verify(ctx context.Context, biz string, phone string, code string) (bool, error) {
+func (cs *SmsCodeService) Verify(ctx context.Context, biz string, phone string, code string) (bool, error) {
 	ok, err := cs.repo.Verify(ctx, biz, phone, code)
 	if errors.Is(err, ErrCodeVerifyTooMany) {
 		return false, err
@@ -43,14 +43,14 @@ func (cs *CodeService) Verify(ctx context.Context, biz string, phone string, cod
 	return ok, nil
 }
 
-func NewCodeService(repo repository.ICodeRepository, sms sms.ISmsService) ICodeService {
-	return &CodeService{
+func NewSmsCodeService(repo repository.CodeRepository, sms sms.SmsService) CodeService {
+	return &SmsCodeService{
 		repo: repo,
 		sms:  sms,
 	}
 }
 
-func (cs *CodeService) genCode() string {
+func (cs *SmsCodeService) genCode() string {
 	// 0-999999
 	code := rand.Intn(1000000)
 	return fmt.Sprintf("%06d", code)
