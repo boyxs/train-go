@@ -75,7 +75,7 @@ func (us *InternalUserService) Edit(ctx context.Context, user domain.User) (doma
 
 func (us *InternalUserService) FindOrCreate(ctx context.Context, phone string) (domain.User, error) {
 	u, err := us.repo.FindByPhone(ctx, phone)
-	if errors.Is(err, repository.ErrRecordNotFound) {
+	if !errors.Is(err, repository.ErrRecordNotFound) {
 		// 有两种情况
 		// err == nil, u 是可用的
 		// err != nil，系统错误，
