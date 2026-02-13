@@ -1,0 +1,184 @@
+package repository
+
+import (
+	"context"
+	"database/sql"
+	"errors"
+	"testing"
+	"time"
+
+	"gitee.com/train-cloud/geektime-basic-go/internal/consts"
+	"gitee.com/train-cloud/geektime-basic-go/internal/domain"
+	"gitee.com/train-cloud/geektime-basic-go/internal/repository/cache"
+	cachemocks "gitee.com/train-cloud/geektime-basic-go/internal/repository/cache/mocks"
+	"gitee.com/train-cloud/geektime-basic-go/internal/repository/dao"
+	daomocks "gitee.com/train-cloud/geektime-basic-go/internal/repository/dao/mocks"
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
+)
+
+func TestRedisUserRepository_FindById(t *testing.T) {
+	//模拟当前时间测试
+	mockNowMs := time.Now().UnixMilli()
+	mockNow := time.UnixMilli(mockNowMs)
+	userid := int64(101)
+	testCases := []struct {
+		name string
+		mock func(ctrl *gomock.Controller) (dao.UserDAO, cache.UserCache)
+
+		ctx    context.Context
+		userid int64
+
+		wantUser domain.User
+		wantErr  error
+	}{
+		{
+			name: "查找成功，缓存未命中",
+			mock: func(ctrl *gomock.Controller) (dao.UserDAO, cache.UserCache) {
+				userDAO := daomocks.NewMockUserDAO(ctrl)
+				userCache := cachemocks.NewMockUserCache(ctrl)
+				userCache.EXPECT().Get(gomock.Any(), userid).
+					Return(domain.User{}, cache.ErrKeyNotExist)
+				birthday, _ := time.ParseInLocation(consts.DateOnly, "2026-02-13", time.Local)
+				userDAO.EXPECT().FindById(gomock.Any(), userid).
+					Return(dao.User{
+						Id: userid,
+						Email: sql.NullString{
+							String: "123456@qq.com",
+							Valid:  true,
+						},
+						Password:  "$2a$10$vWf3.tFGTv7OMhK5HZKrquNKqH5rBp1tlevur4a7HPVu0IizhkB0e",
+						Birthday:  birthday.UnixMilli(),
+						AboutMe:   "say my name",
+						CreatedAt: mockNowMs,
+						UpdatedAt: mockNowMs,
+					}, nil)
+				userCache.EXPECT().Set(gomock.Any(), domain.User{
+					Id:        userid,
+					Email:     "123456@qq.com",
+					Password:  "$2a$10$vWf3.tFGTv7OMhK5HZKrquNKqH5rBp1tlevur4a7HPVu0IizhkB0e",
+					Birthday:  "2026-02-13",
+					AboutMe:   "say my name",
+					CreatedAt: mockNow.Format(consts.DateTimeFull),
+					UpdatedAt: mockNow.Format(consts.DateTimeFull),
+				}).
+					Return(nil)
+				return userDAO, userCache
+			},
+			ctx:    context.Background(),
+			userid: userid,
+			wantUser: domain.User{
+				Id:        userid,
+				Email:     "123456@qq.com",
+				Password:  "$2a$10$vWf3.tFGTv7OMhK5HZKrquNKqH5rBp1tlevur4a7HPVu0IizhkB0e",
+				Birthday:  "2026-02-13",
+				AboutMe:   "say my name",
+				CreatedAt: mockNow.Format(consts.DateTimeFull),
+				UpdatedAt: mockNow.Format(consts.DateTimeFull),
+			},
+			wantErr: nil,
+		},
+		{
+			name: "缓存命中",
+			mock: func(ctrl *gomock.Controller) (dao.UserDAO, cache.UserCache) {
+				userCache := cachemocks.NewMockUserCache(ctrl)
+				userCache.EXPECT().Get(gomock.Any(), userid).
+					Return(domain.User{
+						Id:        userid,
+						Email:     "123456@qq.com",
+						Password:  "$2a$10$vWf3.tFGTv7OMhK5HZKrquNKqH5rBp1tlevur4a7HPVu0IizhkB0e",
+						Birthday:  "2026-02-13",
+						AboutMe:   "say my name",
+						CreatedAt: mockNow.Format(consts.DateTimeFull),
+						UpdatedAt: mockNow.Format(consts.DateTimeFull),
+					}, nil)
+				return nil, userCache
+			},
+			ctx:    context.Background(),
+			userid: userid,
+			wantUser: domain.User{
+				Id:        userid,
+				Email:     "123456@qq.com",
+				Password:  "$2a$10$vWf3.tFGTv7OMhK5HZKrquNKqH5rBp1tlevur4a7HPVu0IizhkB0e",
+				Birthday:  "2026-02-13",
+				AboutMe:   "say my name",
+				CreatedAt: mockNow.Format(consts.DateTimeFull),
+				UpdatedAt: mockNow.Format(consts.DateTimeFull),
+			},
+			wantErr: nil,
+		},
+		{
+			name: "未找到用户",
+			mock: func(ctrl *gomock.Controller) (dao.UserDAO, cache.UserCache) {
+				userDAO := daomocks.NewMockUserDAO(ctrl)
+				userCache := cachemocks.NewMockUserCache(ctrl)
+				userCache.EXPECT().Get(gomock.Any(), userid).
+					Return(domain.User{}, cache.ErrKeyNotExist)
+				userDAO.EXPECT().FindById(gomock.Any(), userid).
+					Return(dao.User{}, ErrRecordNotFound)
+				return userDAO, userCache
+			},
+			ctx:      context.Background(),
+			userid:   userid,
+			wantUser: domain.User{},
+			wantErr:  ErrRecordNotFound,
+		},
+		{
+			name: "回写缓存失败",
+			mock: func(ctrl *gomock.Controller) (dao.UserDAO, cache.UserCache) {
+				userDAO := daomocks.NewMockUserDAO(ctrl)
+				userCache := cachemocks.NewMockUserCache(ctrl)
+				birthday, _ := time.ParseInLocation(consts.DateOnly, "2026-02-13", time.Local)
+				userCache.EXPECT().Get(gomock.Any(), userid).
+					Return(domain.User{}, cache.ErrKeyNotExist)
+				userDAO.EXPECT().FindById(gomock.Any(), userid).
+					Return(dao.User{
+						Id: userid,
+						Email: sql.NullString{
+							String: "123456@qq.com",
+							Valid:  true,
+						},
+						Password:  "$2a$10$vWf3.tFGTv7OMhK5HZKrquNKqH5rBp1tlevur4a7HPVu0IizhkB0e",
+						Birthday:  birthday.UnixMilli(),
+						AboutMe:   "say my name",
+						CreatedAt: mockNowMs,
+						UpdatedAt: mockNowMs,
+					}, nil)
+				userCache.EXPECT().Set(gomock.Any(), domain.User{
+					Id:        userid,
+					Email:     "123456@qq.com",
+					Password:  "$2a$10$vWf3.tFGTv7OMhK5HZKrquNKqH5rBp1tlevur4a7HPVu0IizhkB0e",
+					Birthday:  "2026-02-13",
+					AboutMe:   "say my name",
+					CreatedAt: mockNow.Format(consts.DateTimeFull),
+					UpdatedAt: mockNow.Format(consts.DateTimeFull),
+				}).
+					Return(errors.New("cache error"))
+				return userDAO, userCache
+			},
+			ctx:    context.Background(),
+			userid: userid,
+			wantUser: domain.User{
+				Id:        userid,
+				Email:     "123456@qq.com",
+				Password:  "$2a$10$vWf3.tFGTv7OMhK5HZKrquNKqH5rBp1tlevur4a7HPVu0IizhkB0e",
+				Birthday:  "2026-02-13",
+				AboutMe:   "say my name",
+				CreatedAt: mockNow.Format(consts.DateTimeFull),
+				UpdatedAt: mockNow.Format(consts.DateTimeFull),
+			},
+			wantErr: nil, //这里没有返回错误，使用查出来的数据
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+			userDAO, userCache := tc.mock(ctrl)
+			repo := NewRedisUserRepository(userDAO, userCache)
+			user, err := repo.FindById(tc.ctx, tc.userid)
+			assert.Equal(t, tc.wantErr, err)
+			assert.Equal(t, tc.wantUser, user)
+		})
+	}
+}

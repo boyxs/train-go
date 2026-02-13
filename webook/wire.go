@@ -27,7 +27,7 @@ func InitWebServer() *gin.Engine {
 		ioc.InitSmsService,
 		service.NewInternalUserService, service.NewSmsCodeService,
 		//handler
-		web.NewUserHandler,
+		web.NewInternalUserHandler,
 
 		ioc.InitMiddlewares,
 		ioc.InitWebServer,

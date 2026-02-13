@@ -4,7 +4,6 @@ import (
 	"errors"
 	"log"
 	"net/http"
-	"time"
 
 	"gitee.com/train-cloud/geektime-basic-go/internal/consts"
 	"gitee.com/train-cloud/geektime-basic-go/internal/domain"
@@ -14,7 +13,6 @@ import (
 
 	//"regexp" 此库不支持 (?=
 	regexp "github.com/dlclark/regexp2"
-	jwt "github.com/golang-jwt/jwt/v5"
 )
 
 const (
@@ -24,17 +22,34 @@ const (
 	loginBiz     = "login"
 )
 
-type UserHandler struct {
+type UserHandler interface {
+	RegisterRoutes(server *gin.Engine)
+	Register(ctx *gin.Context)
+	SendLoginSMSCode(ctx *gin.Context)
+	LoginSMS(ctx *gin.Context)
+	LoginJwt(ctx *gin.Context)
+	LogoutJwt(ctx *gin.Context)
+	EditJwt(ctx *gin.Context)
+	ProfileJwt(ctx *gin.Context)
+	Login(ctx *gin.Context)
+	Logout(ctx *gin.Context)
+	Edit(ctx *gin.Context)
+	Profile(ctx *gin.Context)
+}
+
+type InternalUserHandler struct {
 	emailRegexp    *regexp.Regexp
 	passwordRegexp *regexp.Regexp
 	userService    service.UserService
 	codeService    service.CodeService
 }
 
-func NewUserHandler(us service.UserService, cs service.CodeService) *UserHandler {
+type UserClaims = service.UserClaims
+
+func NewInternalUserHandler(us service.UserService, cs service.CodeService) UserHandler {
 	er := regexp.MustCompile(emailExpr, regexp.None)
 	pr := regexp.MustCompile(passwordExpr, regexp.None)
-	return &UserHandler{
+	return &InternalUserHandler{
 		emailRegexp:    er,
 		passwordRegexp: pr,
 		userService:    us,
@@ -42,7 +57,7 @@ func NewUserHandler(us service.UserService, cs service.CodeService) *UserHandler
 	}
 }
 
-func (h *UserHandler) RegisterRoutes(server *gin.Engine) {
+func (h *InternalUserHandler) RegisterRoutes(server *gin.Engine) {
 	ug := server.Group("/user")
 	ug.POST("/register", h.Register)
 	ug.POST("/login", h.LoginJwt)
@@ -59,15 +74,18 @@ func (h *UserHandler) RegisterRoutes(server *gin.Engine) {
 	ug.POST("/login_sms", h.LoginSMS)
 }
 
-func (h *UserHandler) Register(ctx *gin.Context) {
+func (h *InternalUserHandler) Register(ctx *gin.Context) {
 	type RegisterRequest struct {
-		Email           string `json:"email" binding:"required,email"`                      // 必填，且必须是邮箱格式
-		Password        string `json:"password" binding:"required,min=8,max=20"`            // 必填，长度8-20位
-		ConfirmPassword string `json:"confirmPassword" binding:"required,eqfield=Password"` // 必填，且必须与 Password 字段相等
+		//Email           string `json:"email" binding:"required,email"`                      // 必填，且必须是邮箱格式
+		//Password        string `json:"password" binding:"required,min=8,max=20"`            // 必填，长度8-20位
+		//ConfirmPassword string `json:"confirmPassword" binding:"required,eqfield=Password"` // 必填，且必须与 Password 字段相等
+		Email           string `json:"email" binding:"required"`           // 必填，这里使用后面逻辑校验
+		Password        string `json:"password" binding:"required"`        // 必填，这里使用后面逻辑校验
+		ConfirmPassword string `json:"confirmPassword" binding:"required"` // 必填，这里使用后面逻辑校验
 	}
 	var req RegisterRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		ctx.AbortWithStatus(http.StatusBadRequest)
 		return
 	}
 	// &syntax.Error{Code:"invalid or unsupported Perl syntax", Expr:"(?="}
@@ -80,6 +98,10 @@ func (h *UserHandler) Register(ctx *gin.Context) {
 	}
 	if !isEmail {
 		ctx.String(http.StatusOK, "非法邮箱格式")
+		return
+	}
+	if req.Password != req.ConfirmPassword {
+		ctx.String(http.StatusOK, "两次输入密码不匹配")
 		return
 	}
 	isPassword, err := h.passwordRegexp.MatchString(req.Password)
@@ -96,19 +118,18 @@ func (h *UserHandler) Register(ctx *gin.Context) {
 		Email:    req.Email,
 		Password: req.Password,
 	})
-	//if errors.Is(err, service.ErrDuplicateEmail) {}
-	if err == service.ErrDuplicateEmail {
-		ctx.String(http.StatusInternalServerError, "邮箱已被注册")
+	if errors.Is(err, service.ErrDuplicateEmail) {
+		ctx.String(http.StatusOK, "邮箱已被注册")
 		return
 	}
 	if err != nil {
-		ctx.String(http.StatusInternalServerError, "系统异常")
+		ctx.String(http.StatusOK, "系统异常")
 		return
 	}
 	ctx.String(http.StatusOK, "注册成功")
 }
 
-func (h *UserHandler) SendLoginSMSCode(ctx *gin.Context) {
+func (h *InternalUserHandler) SendLoginSMSCode(ctx *gin.Context) {
 	type CodeRequest struct {
 		Phone string `json:"phone"`
 	}
@@ -144,7 +165,7 @@ func (h *UserHandler) SendLoginSMSCode(ctx *gin.Context) {
 	}
 }
 
-func (h *UserHandler) LoginSMS(ctx *gin.Context) {
+func (h *InternalUserHandler) LoginSMS(ctx *gin.Context) {
 	type LoginRequest struct {
 		Phone string `json:"phone"`
 		Code  string `json:"code"`
@@ -155,13 +176,9 @@ func (h *UserHandler) LoginSMS(ctx *gin.Context) {
 	}
 	ok, err := h.codeService.Verify(ctx, loginBiz, req.Phone, req.Code)
 	if err != nil {
-		msg := err.Error()
-		if msg == "" {
-			msg = "系统异常"
-		}
 		ctx.JSON(http.StatusOK, Result{
 			Code: 5,
-			Msg:  msg,
+			Msg:  err.Error(),
 		})
 		return
 	}
@@ -174,17 +191,13 @@ func (h *UserHandler) LoginSMS(ctx *gin.Context) {
 	}
 	user, err := h.userService.FindOrCreate(ctx, req.Phone)
 	if err != nil {
-		msg := err.Error()
-		if msg == "" {
-			msg = "系统错误"
-		}
 		ctx.JSON(http.StatusOK, Result{
 			Code: 5,
-			Msg:  msg,
+			Msg:  err.Error(),
 		})
 		return
 	}
-	err = h.setJwtToken(ctx, user.Id)
+	err = h.userService.SetJwtToken(ctx, user.Id)
 	if err != nil {
 		ctx.String(http.StatusInternalServerError, "系统异常")
 		return
@@ -194,7 +207,7 @@ func (h *UserHandler) LoginSMS(ctx *gin.Context) {
 	})
 }
 
-func (h *UserHandler) LoginJwt(ctx *gin.Context) {
+func (h *InternalUserHandler) LoginJwt(ctx *gin.Context) {
 	type LoginRequest struct {
 		Email    string `json:"email"`
 		Password string `json:"password"`
@@ -206,7 +219,7 @@ func (h *UserHandler) LoginJwt(ctx *gin.Context) {
 	user, err := h.userService.Login(ctx, req.Email, req.Password)
 	switch err {
 	case nil:
-		err := h.setJwtToken(ctx, user.Id)
+		err := h.userService.SetJwtToken(ctx, user.Id)
 		if err != nil {
 			ctx.String(http.StatusInternalServerError, "系统异常")
 			return
@@ -219,7 +232,7 @@ func (h *UserHandler) LoginJwt(ctx *gin.Context) {
 	}
 }
 
-func (h *UserHandler) LogoutJwt(ctx *gin.Context) {
+func (h *InternalUserHandler) LogoutJwt(ctx *gin.Context) {
 	header := ctx.GetHeader(consts.Authorization)
 	if header == "" {
 		ctx.JSON(http.StatusOK, gin.H{
@@ -234,7 +247,7 @@ func (h *UserHandler) LogoutJwt(ctx *gin.Context) {
 	})
 }
 
-func (h *UserHandler) EditJwt(ctx *gin.Context) {
+func (h *InternalUserHandler) EditJwt(ctx *gin.Context) {
 	type EditRequest struct {
 		Nickname string `json:"nickname"`
 		Birthday string `json:"birthday"`
@@ -264,7 +277,7 @@ func (h *UserHandler) EditJwt(ctx *gin.Context) {
 	})
 }
 
-func (h *UserHandler) ProfileJwt(ctx *gin.Context) {
+func (h *InternalUserHandler) ProfileJwt(ctx *gin.Context) {
 	uc, ok := ctx.MustGet(consts.UserKey).(UserClaims)
 	if !ok {
 		ctx.JSON(http.StatusUnauthorized, "请先登录")
@@ -278,25 +291,7 @@ func (h *UserHandler) ProfileJwt(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, profile)
 }
 
-func (h *UserHandler) setJwtToken(ctx *gin.Context, userid int64) error {
-	uc := UserClaims{
-		Userid:    userid,
-		UserAgent: ctx.GetHeader("User-Agent"),
-		RegisteredClaims: jwt.RegisteredClaims{
-			// 1 分钟过期
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(consts.ExpireTime)),
-		},
-	}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS512, uc)
-	tokenStr, err := token.SignedString(consts.JwtKey)
-	if err != nil {
-		return err
-	}
-	ctx.Header(consts.JwtHeader, tokenStr)
-	return nil
-}
-
-func (h *UserHandler) Login(ctx *gin.Context) {
+func (h *InternalUserHandler) Login(ctx *gin.Context) {
 	type LoginRequest struct {
 		Email    string `json:"email"`
 		Password string `json:"password"`
@@ -329,7 +324,7 @@ func (h *UserHandler) Login(ctx *gin.Context) {
 	}
 }
 
-func (h *UserHandler) Logout(ctx *gin.Context) {
+func (h *InternalUserHandler) Logout(ctx *gin.Context) {
 	//err := h.ClearToken(ctx)
 	session := sessions.Default(ctx)
 	session.Delete("userid")
@@ -348,7 +343,7 @@ func (h *UserHandler) Logout(ctx *gin.Context) {
 	})
 }
 
-func (h *UserHandler) Edit(ctx *gin.Context) {
+func (h *InternalUserHandler) Edit(ctx *gin.Context) {
 	type EditRequest struct {
 		Nickname string `json:"nickname"`
 		Birthday string `json:"birthday"`
@@ -375,7 +370,7 @@ func (h *UserHandler) Edit(ctx *gin.Context) {
 	})
 }
 
-func (h *UserHandler) Profile(ctx *gin.Context) {
+func (h *InternalUserHandler) Profile(ctx *gin.Context) {
 	session := sessions.Default(ctx)
 	val := session.Get("userid")
 	userid, ok := val.(int64)
@@ -389,10 +384,4 @@ func (h *UserHandler) Profile(ctx *gin.Context) {
 		return
 	}
 	ctx.JSON(http.StatusOK, profile)
-}
-
-type UserClaims struct {
-	jwt.RegisteredClaims
-	Userid    int64
-	UserAgent string
 }

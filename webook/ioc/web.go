@@ -17,7 +17,7 @@ import (
 
 func InitWebServer(
 	middlewares []gin.HandlerFunc,
-	userHandler *web.UserHandler,
+	userHandler *web.InternalUserHandler,
 ) *gin.Engine {
 	server := gin.Default()
 	server.Use(middlewares...)

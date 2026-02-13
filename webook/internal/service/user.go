@@ -3,9 +3,13 @@ package service
 import (
 	"context"
 	"errors"
+	"time"
 
+	"gitee.com/train-cloud/geektime-basic-go/internal/consts"
 	"gitee.com/train-cloud/geektime-basic-go/internal/domain"
 	"gitee.com/train-cloud/geektime-basic-go/internal/repository"
+	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -21,6 +25,7 @@ type UserService interface {
 	Profile(ctx context.Context, userid int64) (domain.User, error)
 	Edit(ctx context.Context, user domain.User) (domain.User, error)
 	FindOrCreate(ctx context.Context, phone string) (domain.User, error)
+	SetJwtToken(ctx *gin.Context, userid int64) error
 }
 type InternalUserService struct {
 	repo repository.UserRepository
@@ -39,7 +44,7 @@ func (us *InternalUserService) Register(ctx context.Context, user domain.User) e
 func (us *InternalUserService) Login(ctx context.Context, email string, password string) (domain.User, error) {
 	// 查找用户
 	user, err := us.repo.FindByEmail(ctx, email)
-	if err == ErrRecordNotFound {
+	if errors.Is(err, ErrRecordNotFound) {
 		return domain.User{}, ErrInvalidUserOrPassword
 	}
 	if err != nil {
@@ -92,8 +97,32 @@ func (us *InternalUserService) FindOrCreate(ctx context.Context, phone string) (
 	return us.repo.FindByPhone(ctx, phone)
 }
 
+func (us *InternalUserService) SetJwtToken(ctx *gin.Context, userid int64) error {
+	uc := UserClaims{
+		Userid:    userid,
+		UserAgent: ctx.GetHeader("User-Agent"),
+		RegisteredClaims: jwt.RegisteredClaims{
+			// 1 分钟过期
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(consts.ExpireTime)),
+		},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS512, uc)
+	tokenStr, err := token.SignedString(consts.JwtKey)
+	if err != nil {
+		return err
+	}
+	ctx.Header(consts.JwtHeader, tokenStr)
+	return nil
+}
+
 func NewInternalUserService(repo repository.UserRepository) UserService {
 	return &InternalUserService{
 		repo: repo,
 	}
+}
+
+type UserClaims struct {
+	jwt.RegisteredClaims
+	Userid    int64
+	UserAgent string
 }
