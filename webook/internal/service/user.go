@@ -102,7 +102,7 @@ func (us *InternalUserService) SetJwtToken(ctx *gin.Context, userid int64) error
 		Userid:    userid,
 		UserAgent: ctx.GetHeader("User-Agent"),
 		RegisteredClaims: jwt.RegisteredClaims{
-			// 1 分钟过期
+			// 7 天过期
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(consts.ExpireTime)),
 		},
 	}
