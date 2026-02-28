@@ -18,7 +18,7 @@ type Builder struct {
 	rate int
 }
 
-//go:embed slide_window.lua
+//go:embed sliding_window.lua
 var luaScript string
 
 func NewBuilder(cmd redis.Cmdable, interval time.Duration, rate int) *Builder {

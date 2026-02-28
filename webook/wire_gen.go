@@ -28,7 +28,7 @@ func InitWebServer() *gin.Engine {
 	userService := service.NewInternalUserService(userRepository)
 	codeCache := cache.NewRedisCodeCache(cmdable)
 	codeRepository := repository.NewRedisCodeRepository(codeCache)
-	smsService := ioc.InitSmsService()
+	smsService := ioc.InitSmsService(cmdable)
 	codeService := service.NewSmsCodeService(codeRepository, smsService)
 	userHandler := web.NewInternalUserHandler(userService, codeService)
 	engine := ioc.InitWebServer(v, userHandler)
