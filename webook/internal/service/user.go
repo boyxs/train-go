@@ -3,13 +3,10 @@ package service
 import (
 	"context"
 	"errors"
-	"time"
 
-	"gitee.com/train-cloud/geektime-basic-go/internal/consts"
 	"gitee.com/train-cloud/geektime-basic-go/internal/domain"
 	"gitee.com/train-cloud/geektime-basic-go/internal/repository"
-	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
+	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -25,7 +22,7 @@ type UserService interface {
 	Profile(ctx context.Context, userid int64) (domain.User, error)
 	Edit(ctx context.Context, user domain.User) (domain.User, error)
 	FindOrCreate(ctx context.Context, phone string) (domain.User, error)
-	SetJwtToken(ctx *gin.Context, userid int64) error
+	FindOrCreateByWechat(ctx context.Context, wechatAuth domain.WechatAuth) (domain.User, error)
 }
 type InternalUserService struct {
 	repo repository.UserRepository
@@ -97,32 +94,26 @@ func (us *InternalUserService) FindOrCreate(ctx context.Context, phone string) (
 	return us.repo.FindByPhone(ctx, phone)
 }
 
-func (us *InternalUserService) SetJwtToken(ctx *gin.Context, userid int64) error {
-	uc := UserClaims{
-		Userid:    userid,
-		UserAgent: ctx.GetHeader("User-Agent"),
-		RegisteredClaims: jwt.RegisteredClaims{
-			// 7 天过期
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(consts.ExpireTime)),
-		},
+func (us *InternalUserService) FindOrCreateByWechat(ctx context.Context, wechatAuth domain.WechatAuth) (domain.User, error) {
+	u, err := us.repo.FindByWechat(ctx, wechatAuth.OpenId)
+	if !errors.Is(err, repository.ErrRecordNotFound) {
+		return u, err
 	}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS512, uc)
-	tokenStr, err := token.SignedString(consts.JwtKey)
-	if err != nil {
-		return err
+	// 创建一个新用户
+	// JSON 格式的 wechatAuth
+	zap.L().Info("新用户", zap.Any("wechatAuth", wechatAuth))
+	//us.logger.Info("新用户", zap.Any("wechatAuth", wechatAuth))
+	err = us.repo.Create(ctx, domain.User{
+		WechatAuth: wechatAuth,
+	})
+	if err != nil && !errors.Is(err, repository.ErrDuplicateUser) {
+		return domain.User{}, err
 	}
-	ctx.Header(consts.JwtHeader, tokenStr)
-	return nil
+	return us.repo.FindByWechat(ctx, wechatAuth.OpenId)
 }
 
 func NewInternalUserService(repo repository.UserRepository) UserService {
 	return &InternalUserService{
 		repo: repo,
 	}
-}
-
-type UserClaims struct {
-	jwt.RegisteredClaims
-	Userid    int64
-	UserAgent string
 }

@@ -8,8 +8,10 @@ import (
 	"gitee.com/train-cloud/geektime-basic-go/internal/consts"
 	"gitee.com/train-cloud/geektime-basic-go/internal/domain"
 	"gitee.com/train-cloud/geektime-basic-go/internal/service"
+	"gitee.com/train-cloud/geektime-basic-go/internal/web/jwt"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
+	jwt2 "github.com/golang-jwt/jwt/v5"
 
 	//"regexp" 此库不支持 (?=
 	regexp "github.com/dlclark/regexp2"
@@ -38,18 +40,20 @@ type UserHandler interface {
 }
 
 type InternalUserHandler struct {
+	jwt.JwtHandler
 	emailRegexp    *regexp.Regexp
 	passwordRegexp *regexp.Regexp
 	userService    service.UserService
 	codeService    service.CodeService
 }
 
-type UserClaims = service.UserClaims
+type UserClaims = jwt.UserClaims
 
-func NewInternalUserHandler(us service.UserService, cs service.CodeService) UserHandler {
+func NewInternalUserHandler(hdl jwt.JwtHandler, us service.UserService, cs service.CodeService) UserHandler {
 	er := regexp.MustCompile(emailExpr, regexp.None)
 	pr := regexp.MustCompile(passwordExpr, regexp.None)
 	return &InternalUserHandler{
+		JwtHandler:     hdl,
 		emailRegexp:    er,
 		passwordRegexp: pr,
 		userService:    us,
@@ -63,6 +67,7 @@ func (h *InternalUserHandler) RegisterRoutes(server *gin.Engine) {
 	ug.POST("/login", h.LoginJwt)
 	ug.POST("/logout", h.LogoutJwt)
 	ug.POST("/edit", h.EditJwt)
+	ug.GET("/refresh_token", h.RefreshToken)
 	ug.GET("/profile", h.ProfileJwt)
 	//ug.POST("/login", h.Login)
 	//ug.POST("/logout", h.Logout)
@@ -197,7 +202,7 @@ func (h *InternalUserHandler) LoginSMS(ctx *gin.Context) {
 		})
 		return
 	}
-	err = h.userService.SetJwtToken(ctx, user.Id)
+	err = h.SetLoginToken(ctx, user.Id)
 	if err != nil {
 		ctx.String(http.StatusInternalServerError, "系统异常")
 		return
@@ -219,7 +224,7 @@ func (h *InternalUserHandler) LoginJwt(ctx *gin.Context) {
 	user, err := h.userService.Login(ctx, req.Email, req.Password)
 	switch err {
 	case nil:
-		err := h.userService.SetJwtToken(ctx, user.Id)
+		err := h.SetLoginToken(ctx, user.Id)
 		if err != nil {
 			ctx.String(http.StatusInternalServerError, "系统异常")
 			return
@@ -233,17 +238,40 @@ func (h *InternalUserHandler) LoginJwt(ctx *gin.Context) {
 }
 
 func (h *InternalUserHandler) LogoutJwt(ctx *gin.Context) {
-	header := ctx.GetHeader(consts.Authorization)
-	if header == "" {
-		ctx.JSON(http.StatusOK, gin.H{
-			"code": 5,
-			"msg":  "退出失败",
-		})
+	err := h.ClearToken(ctx)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{Code: 5, Msg: "退出失败"})
 		return
 	}
-	ctx.JSON(http.StatusOK, gin.H{
-		"code": 0,
-		"msg":  "退出成功",
+	ctx.JSON(http.StatusOK, Result{Code: 0, Msg: "退出成功"})
+}
+
+func (h *InternalUserHandler) RefreshToken(ctx *gin.Context) {
+	tokenStr := h.ExtractToken(ctx)
+	var rc jwt.RefreshClaims
+	token, err := jwt2.ParseWithClaims(tokenStr, &rc, func(token *jwt2.Token) (any, error) {
+		return consts.RefreshKey, nil
+	})
+	if err != nil {
+		ctx.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+	if token == nil || !token.Valid {
+		ctx.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+	err = h.CheckSession(ctx, rc.Ssid)
+	if err != nil {
+		ctx.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+	err = h.SetAccessToken(ctx, rc.Userid, rc.Ssid)
+	if err != nil {
+		ctx.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+	ctx.JSON(http.StatusOK, Result{
+		Msg: "OK",
 	})
 }
 
@@ -272,9 +300,7 @@ func (h *InternalUserHandler) EditJwt(ctx *gin.Context) {
 	if err != nil {
 		return
 	}
-	ctx.JSON(http.StatusOK, gin.H{
-		"code": 0, "data": user,
-	})
+	ctx.JSON(http.StatusOK, Result{Code: 0, Data: user})
 }
 
 func (h *InternalUserHandler) ProfileJwt(ctx *gin.Context) {
@@ -331,16 +357,10 @@ func (h *InternalUserHandler) Logout(ctx *gin.Context) {
 	//session.Clear()
 	err := session.Save()
 	if err != nil {
-		ctx.JSON(http.StatusOK, gin.H{
-			"code": 5,
-			"msg":  "退出失败",
-		})
+		ctx.JSON(http.StatusOK, Result{Code: 5, Msg: "退出失败"})
 		return
 	}
-	ctx.JSON(http.StatusOK, gin.H{
-		"code": 0,
-		"msg":  "退出成功",
-	})
+	ctx.JSON(http.StatusOK, Result{Code: 0, Msg: "退出成功"})
 }
 
 func (h *InternalUserHandler) Edit(ctx *gin.Context) {
@@ -365,9 +385,7 @@ func (h *InternalUserHandler) Edit(ctx *gin.Context) {
 	if err != nil {
 		return
 	}
-	ctx.JSON(http.StatusOK, gin.H{
-		"code": 0, "data": user,
-	})
+	ctx.JSON(http.StatusOK, Result{Code: 0, Data: user})
 }
 
 func (h *InternalUserHandler) Profile(ctx *gin.Context) {

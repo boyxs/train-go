@@ -15,6 +15,9 @@ type TimeoutFailoverSmsService struct {
 	idx       int32 //当前使用的服务商下标
 	cnt       int32 //连续超时的计数
 	threshold int32 //触发切换的超时阈值
+
+	//仅测试用：在 CAS 之前注入的钩子，生产代码此字段为 nil
+	beforeCAS func()
 }
 
 func (t *TimeoutFailoverSmsService) Send(ctx context.Context, templateId string, args []string, phoneNumbers ...string) error {
@@ -22,6 +25,11 @@ func (t *TimeoutFailoverSmsService) Send(ctx context.Context, templateId string,
 	cnt := atomic.LoadInt32(&t.cnt)
 	if cnt >= t.threshold {
 		newIdx := (idx + 1) % int32(len(t.svcs))
+		//仅测试Start
+		if t.beforeCAS != nil {
+			t.beforeCAS()
+		}
+		//仅测试End
 		if atomic.CompareAndSwapInt32(&t.idx, idx, newIdx) {
 			atomic.StoreInt32(&t.cnt, 0)
 			log.Printf("[SMS_SWITCH] 主动切换成功: 连续失败 %d 次, 已从服务商 %d 切至 %d", cnt, idx, newIdx)

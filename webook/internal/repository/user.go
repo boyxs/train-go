@@ -3,13 +3,13 @@ package repository
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"time"
 
 	"gitee.com/train-cloud/geektime-basic-go/internal/consts"
 	"gitee.com/train-cloud/geektime-basic-go/internal/domain"
 	"gitee.com/train-cloud/geektime-basic-go/internal/repository/cache"
 	"gitee.com/train-cloud/geektime-basic-go/internal/repository/dao"
+	"go.uber.org/zap"
 )
 
 var (
@@ -24,6 +24,7 @@ type UserRepository interface {
 	FindByEmail(ctx context.Context, email string) (domain.User, error)
 	FindByPhone(ctx context.Context, phone string) (domain.User, error)
 	FindById(ctx context.Context, userid int64) (domain.User, error)
+	FindByWechat(ctx context.Context, openId string) (domain.User, error)
 }
 
 type RedisUserRepository struct {
@@ -44,9 +45,12 @@ func (ur *RedisUserRepository) Create(ctx context.Context, user domain.User) err
 
 func (ur *RedisUserRepository) Update(ctx context.Context, user domain.User) (domain.User, error) {
 	u, err := ur.dao.Update(ctx, ur.toEntity(user))
-	err = ur.cache.Del(ctx, user.Id)
 	if err != nil {
 		return domain.User{}, err
+	}
+	delErr := ur.cache.Del(ctx, user.Id)
+	if delErr != nil {
+		zap.L().Error("删除用户缓存失败", zap.Error(delErr))
 	}
 	return ur.toDomain(u), err
 }
@@ -71,13 +75,21 @@ func (ur *RedisUserRepository) FindById(ctx context.Context, userid int64) (doma
 	cu = ur.toDomain(u)
 	err = ur.cache.Set(ctx, cu)
 	if err != nil {
-		fmt.Printf("🚀 ~ file: user.go ~ line 68 ~ err: %#v\n", err)
+		zap.L().Error("设置用户缓存失败", zap.Error(err))
 	}
 	return cu, nil
 }
 
 func (ur *RedisUserRepository) FindByPhone(ctx context.Context, phone string) (domain.User, error) {
 	u, err := ur.dao.FindByPhone(ctx, phone)
+	if err != nil {
+		return domain.User{}, err
+	}
+	return ur.toDomain(u), nil
+}
+
+func (ur *RedisUserRepository) FindByWechat(ctx context.Context, openId string) (domain.User, error) {
+	u, err := ur.dao.FindByWechat(ctx, openId)
 	if err != nil {
 		return domain.User{}, err
 	}
@@ -95,6 +107,11 @@ func (ur *RedisUserRepository) toDomain(u dao.User) domain.User {
 		AboutMe:   u.AboutMe,
 		CreatedAt: time.UnixMilli(u.CreatedAt).Format(consts.DateTimeFull),
 		UpdatedAt: time.UnixMilli(u.UpdatedAt).Format(consts.DateTimeFull),
+
+		WechatAuth: domain.WechatAuth{
+			OpenId:  u.WechatOpenId.String,
+			UnionId: u.WechatUnionId.String,
+		},
 	}
 }
 
@@ -114,5 +131,14 @@ func (ur *RedisUserRepository) toEntity(u domain.User) dao.User {
 		Birthday: birthday.UnixMilli(),
 		AboutMe:  u.AboutMe,
 		Nickname: u.Nickname,
+
+		WechatOpenId: sql.NullString{
+			String: u.WechatAuth.OpenId,
+			Valid:  u.WechatAuth.OpenId != "",
+		},
+		WechatUnionId: sql.NullString{
+			String: u.WechatAuth.UnionId,
+			Valid:  u.WechatAuth.UnionId != "",
+		},
 	}
 }

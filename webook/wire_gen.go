@@ -12,6 +12,7 @@ import (
 	"gitee.com/train-cloud/geektime-basic-go/internal/repository/dao"
 	"gitee.com/train-cloud/geektime-basic-go/internal/service"
 	"gitee.com/train-cloud/geektime-basic-go/internal/web"
+	"gitee.com/train-cloud/geektime-basic-go/internal/web/jwt"
 	"gitee.com/train-cloud/geektime-basic-go/ioc"
 	"github.com/gin-gonic/gin"
 )
@@ -20,7 +21,8 @@ import (
 
 func InitWebServer() *gin.Engine {
 	cmdable := ioc.InitRedis()
-	v := ioc.InitMiddlewares(cmdable)
+	jwtHandler := jwt.NewRedisJwtHandler(cmdable)
+	v := ioc.InitMiddlewares(jwtHandler, cmdable)
 	db := ioc.InitDB()
 	userDAO := dao.NewGormUserDAO(db)
 	userCache := cache.NewRedisUserCache(cmdable)
@@ -30,7 +32,9 @@ func InitWebServer() *gin.Engine {
 	codeRepository := repository.NewRedisCodeRepository(codeCache)
 	smsService := ioc.InitSmsService(cmdable)
 	codeService := service.NewSmsCodeService(codeRepository, smsService)
-	userHandler := web.NewInternalUserHandler(userService, codeService)
-	engine := ioc.InitWebServer(v, userHandler)
+	userHandler := web.NewInternalUserHandler(jwtHandler, userService, codeService)
+	oAuth2Service := ioc.InitWechatOAuth2Service()
+	oAuth2Handler := web.NewOAuth2WechatHandler(jwtHandler, oAuth2Service, userService)
+	engine := ioc.InitWebServer(v, userHandler, oAuth2Handler)
 	return engine
 }

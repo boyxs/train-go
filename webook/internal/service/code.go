@@ -31,7 +31,7 @@ func (cs *SmsCodeService) Send(ctx context.Context, biz string, phone string) er
 	if err != nil {
 		return err
 	}
-	const templateId = "1877556"
+	const templateId = "1177249"
 	return cs.sms.Send(ctx, templateId, []string{code}, phone)
 }
 

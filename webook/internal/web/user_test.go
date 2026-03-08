@@ -15,6 +15,8 @@ import (
 	"gitee.com/train-cloud/geektime-basic-go/internal/repository"
 	"gitee.com/train-cloud/geektime-basic-go/internal/service"
 	svcmocks "gitee.com/train-cloud/geektime-basic-go/internal/service/mocks"
+	"gitee.com/train-cloud/geektime-basic-go/internal/web/jwt"
+	jwtmocks "gitee.com/train-cloud/geektime-basic-go/internal/web/jwt/mocks"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -54,7 +56,7 @@ func TestEmail(t *testing.T) {
 		},
 	}
 
-	h := NewInternalUserHandler(nil, nil)
+	h := NewInternalUserHandler(nil, nil, nil)
 	for _, ts := range testCases {
 		t.Run(ts.name, func(t *testing.T) {
 			matchStr, err := h.(*InternalUserHandler).emailRegexp.MatchString(ts.email)
@@ -83,20 +85,20 @@ func TestMock(t *testing.T) {
 func TestInternalUserHandler_Register(t *testing.T) {
 	testCases := []struct {
 		name       string
-		mock       func(ctrl *gomock.Controller) (service.UserService, service.CodeService)
+		mock       func(ctrl *gomock.Controller) (jwt.JwtHandler, service.UserService, service.CodeService)
 		reqBuilder func(t *testing.T) *http.Request
 		wantCode   int
 		wantBody   string
 	}{
 		{
 			name: "注册成功",
-			mock: func(ctrl *gomock.Controller) (service.UserService, service.CodeService) {
+			mock: func(ctrl *gomock.Controller) (jwt.JwtHandler, service.UserService, service.CodeService) {
 				userService := svcmocks.NewMockUserService(ctrl)
 				userService.EXPECT().Register(gomock.Any(), domain.User{
 					Email:    "123456@qq.com",
 					Password: "@12345678a",
 				}).Return(nil)
-				return userService, nil
+				return nil, userService, nil
 			},
 			reqBuilder: func(t *testing.T) *http.Request {
 				req, err := http.NewRequest(
@@ -114,8 +116,8 @@ func TestInternalUserHandler_Register(t *testing.T) {
 		},
 		{
 			name: "ShouldBindJSON 出错",
-			mock: func(ctrl *gomock.Controller) (service.UserService, service.CodeService) {
-				return nil, nil
+			mock: func(ctrl *gomock.Controller) (jwt.JwtHandler, service.UserService, service.CodeService) {
+				return nil, nil, nil
 			},
 			reqBuilder: func(t *testing.T) *http.Request {
 				req, err := http.NewRequest(
@@ -131,8 +133,8 @@ func TestInternalUserHandler_Register(t *testing.T) {
 		},
 		{
 			name: "非法邮箱格式",
-			mock: func(ctrl *gomock.Controller) (service.UserService, service.CodeService) {
-				return nil, nil
+			mock: func(ctrl *gomock.Controller) (jwt.JwtHandler, service.UserService, service.CodeService) {
+				return nil, nil, nil
 			},
 			reqBuilder: func(t *testing.T) *http.Request {
 				req, err := http.NewRequest(
@@ -150,8 +152,8 @@ func TestInternalUserHandler_Register(t *testing.T) {
 		},
 		{
 			name: "两次输入密码不匹配",
-			mock: func(ctrl *gomock.Controller) (service.UserService, service.CodeService) {
-				return nil, nil
+			mock: func(ctrl *gomock.Controller) (jwt.JwtHandler, service.UserService, service.CodeService) {
+				return nil, nil, nil
 			},
 			reqBuilder: func(t *testing.T) *http.Request {
 				req, err := http.NewRequest(
@@ -169,8 +171,8 @@ func TestInternalUserHandler_Register(t *testing.T) {
 		},
 		{
 			name: "密码格式不对",
-			mock: func(ctrl *gomock.Controller) (service.UserService, service.CodeService) {
-				return nil, nil
+			mock: func(ctrl *gomock.Controller) (jwt.JwtHandler, service.UserService, service.CodeService) {
+				return nil, nil, nil
 			},
 			reqBuilder: func(t *testing.T) *http.Request {
 				req, err := http.NewRequest(
@@ -188,13 +190,13 @@ func TestInternalUserHandler_Register(t *testing.T) {
 		},
 		{
 			name: "邮箱已被注册",
-			mock: func(ctrl *gomock.Controller) (service.UserService, service.CodeService) {
+			mock: func(ctrl *gomock.Controller) (jwt.JwtHandler, service.UserService, service.CodeService) {
 				userService := svcmocks.NewMockUserService(ctrl)
 				userService.EXPECT().Register(gomock.Any(), domain.User{
 					Email:    "123456@qq.com",
 					Password: "@12345678a",
 				}).Return(service.ErrDuplicateEmail)
-				return userService, nil
+				return nil, userService, nil
 			},
 			reqBuilder: func(t *testing.T) *http.Request {
 				req, err := http.NewRequest(
@@ -212,13 +214,13 @@ func TestInternalUserHandler_Register(t *testing.T) {
 		},
 		{
 			name: "系统异常",
-			mock: func(ctrl *gomock.Controller) (service.UserService, service.CodeService) {
+			mock: func(ctrl *gomock.Controller) (jwt.JwtHandler, service.UserService, service.CodeService) {
 				userService := svcmocks.NewMockUserService(ctrl)
 				userService.EXPECT().Register(gomock.Any(), domain.User{
 					Email:    "123456@qq.com",
 					Password: "@12345678a",
 				}).Return(errors.New("系统异常"))
-				return userService, nil
+				return nil, userService, nil
 			},
 			reqBuilder: func(t *testing.T) *http.Request {
 				req, err := http.NewRequest(
@@ -240,8 +242,8 @@ func TestInternalUserHandler_Register(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 			//构建Handler
-			userService, codeService := tc.mock(ctrl)
-			h := NewInternalUserHandler(userService, codeService)
+			jwtHandler, userService, codeService := tc.mock(ctrl)
+			h := NewInternalUserHandler(jwtHandler, userService, codeService)
 			//启动服务，注册路由
 			server := gin.Default()
 			h.RegisterRoutes(server)
@@ -261,7 +263,7 @@ func TestInternalUserHandler_LoginSMS(t *testing.T) {
 	testCases := []struct {
 		name string
 
-		mock       func(ctrl *gomock.Controller) (service.UserService, service.CodeService)
+		mock       func(ctrl *gomock.Controller) (jwt.JwtHandler, service.UserService, service.CodeService)
 		reqBuilder func(t *testing.T) *http.Request
 
 		ctx *gin.Context
@@ -272,7 +274,8 @@ func TestInternalUserHandler_LoginSMS(t *testing.T) {
 	}{
 		{
 			name: "登录成功",
-			mock: func(ctrl *gomock.Controller) (service.UserService, service.CodeService) {
+			mock: func(ctrl *gomock.Controller) (jwt.JwtHandler, service.UserService, service.CodeService) {
+				jwtHandler := jwtmocks.NewMockJwtHandler(ctrl)
 				userService := svcmocks.NewMockUserService(ctrl)
 				codeService := svcmocks.NewMockCodeService(ctrl)
 				codeService.EXPECT().Verify(gomock.Any(), loginBiz, "18608261234", "123456").
@@ -284,9 +287,9 @@ func TestInternalUserHandler_LoginSMS(t *testing.T) {
 						AboutMe:  "say my name",
 						Phone:    "18608261234",
 					}, nil)
-				userService.EXPECT().SetJwtToken(gomock.Any(), int64(102)).
+				jwtHandler.EXPECT().SetLoginToken(gomock.Any(), int64(102)).
 					Return(nil)
-				return userService, codeService
+				return jwtHandler, userService, codeService
 			},
 			reqBuilder: func(t *testing.T) *http.Request {
 				req, err := http.NewRequest(http.MethodPost, "/user/login_sms", bytes.NewReader([]byte(`{
@@ -302,10 +305,10 @@ func TestInternalUserHandler_LoginSMS(t *testing.T) {
 		},
 		{
 			name: "ShouldBindJSON 错误",
-			mock: func(ctrl *gomock.Controller) (service.UserService, service.CodeService) {
+			mock: func(ctrl *gomock.Controller) (jwt.JwtHandler, service.UserService, service.CodeService) {
 				userService := svcmocks.NewMockUserService(ctrl)
 				codeService := svcmocks.NewMockCodeService(ctrl)
-				return userService, codeService
+				return nil, userService, codeService
 			},
 			reqBuilder: func(t *testing.T) *http.Request {
 				req, err := http.NewRequest(http.MethodPost, "/user/login_sms", bytes.NewReader([]byte(`{
@@ -320,12 +323,12 @@ func TestInternalUserHandler_LoginSMS(t *testing.T) {
 		},
 		{
 			name: "验证码验证太频繁",
-			mock: func(ctrl *gomock.Controller) (service.UserService, service.CodeService) {
+			mock: func(ctrl *gomock.Controller) (jwt.JwtHandler, service.UserService, service.CodeService) {
 				userService := svcmocks.NewMockUserService(ctrl)
 				codeService := svcmocks.NewMockCodeService(ctrl)
 				codeService.EXPECT().Verify(gomock.Any(), loginBiz, "18608261234", "123456").
 					Return(false, service.ErrCodeVerifyTooMany)
-				return userService, codeService
+				return nil, userService, codeService
 			},
 			reqBuilder: func(t *testing.T) *http.Request {
 				req, err := http.NewRequest(http.MethodPost, "/user/login_sms", bytes.NewReader([]byte(`{
@@ -341,12 +344,12 @@ func TestInternalUserHandler_LoginSMS(t *testing.T) {
 		},
 		{
 			name: "验证码错误，请重新输入",
-			mock: func(ctrl *gomock.Controller) (service.UserService, service.CodeService) {
+			mock: func(ctrl *gomock.Controller) (jwt.JwtHandler, service.UserService, service.CodeService) {
 				userService := svcmocks.NewMockUserService(ctrl)
 				codeService := svcmocks.NewMockCodeService(ctrl)
 				codeService.EXPECT().Verify(gomock.Any(), loginBiz, "18608261234", "123456").
 					Return(false, nil)
-				return userService, codeService
+				return nil, userService, codeService
 			},
 			reqBuilder: func(t *testing.T) *http.Request {
 				req, err := http.NewRequest(http.MethodPost, "/user/login_sms", bytes.NewReader([]byte(`{
@@ -362,14 +365,14 @@ func TestInternalUserHandler_LoginSMS(t *testing.T) {
 		},
 		{
 			name: "用户未找到",
-			mock: func(ctrl *gomock.Controller) (service.UserService, service.CodeService) {
+			mock: func(ctrl *gomock.Controller) (jwt.JwtHandler, service.UserService, service.CodeService) {
 				userService := svcmocks.NewMockUserService(ctrl)
 				codeService := svcmocks.NewMockCodeService(ctrl)
 				codeService.EXPECT().Verify(gomock.Any(), loginBiz, "18608261234", "123456").
 					Return(true, nil)
 				userService.EXPECT().FindOrCreate(gomock.Any(), "18608261234").
 					Return(domain.User{}, service.ErrRecordNotFound)
-				return userService, codeService
+				return nil, userService, codeService
 			},
 			reqBuilder: func(t *testing.T) *http.Request {
 				req, err := http.NewRequest(http.MethodPost, "/user/login_sms", bytes.NewReader([]byte(`{
@@ -385,14 +388,14 @@ func TestInternalUserHandler_LoginSMS(t *testing.T) {
 		},
 		{
 			name: "用户已存在",
-			mock: func(ctrl *gomock.Controller) (service.UserService, service.CodeService) {
+			mock: func(ctrl *gomock.Controller) (jwt.JwtHandler, service.UserService, service.CodeService) {
 				userService := svcmocks.NewMockUserService(ctrl)
 				codeService := svcmocks.NewMockCodeService(ctrl)
 				codeService.EXPECT().Verify(gomock.Any(), loginBiz, "18608261234", "123456").
 					Return(true, nil)
 				userService.EXPECT().FindOrCreate(gomock.Any(), "18608261234").
 					Return(domain.User{}, repository.ErrDuplicateUser)
-				return userService, codeService
+				return nil, userService, codeService
 			},
 			reqBuilder: func(t *testing.T) *http.Request {
 				req, err := http.NewRequest(http.MethodPost, "/user/login_sms", bytes.NewReader([]byte(`{
@@ -408,7 +411,8 @@ func TestInternalUserHandler_LoginSMS(t *testing.T) {
 		},
 		{
 			name: "系统异常",
-			mock: func(ctrl *gomock.Controller) (service.UserService, service.CodeService) {
+			mock: func(ctrl *gomock.Controller) (jwt.JwtHandler, service.UserService, service.CodeService) {
+				jwtHandler := jwtmocks.NewMockJwtHandler(ctrl)
 				userService := svcmocks.NewMockUserService(ctrl)
 				codeService := svcmocks.NewMockCodeService(ctrl)
 				codeService.EXPECT().Verify(gomock.Any(), loginBiz, "18608261234", "123456").
@@ -420,9 +424,9 @@ func TestInternalUserHandler_LoginSMS(t *testing.T) {
 						AboutMe:  "say my name",
 						Phone:    "18608261234",
 					}, nil)
-				userService.EXPECT().SetJwtToken(gomock.Any(), int64(102)).
-					Return(errors.New("jwt error"))
-				return userService, codeService
+				jwtHandler.EXPECT().SetLoginToken(gomock.Any(), int64(102)).
+					Return(errors.New("token expired"))
+				return jwtHandler, userService, codeService
 			},
 			reqBuilder: func(t *testing.T) *http.Request {
 				req, err := http.NewRequest(http.MethodPost, "/user/login_sms", bytes.NewReader([]byte(`{
@@ -441,8 +445,8 @@ func TestInternalUserHandler_LoginSMS(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
-			userService, codeService := tc.mock(ctrl)
-			h := NewInternalUserHandler(userService, codeService)
+			jwtHandler, userService, codeService := tc.mock(ctrl)
+			h := NewInternalUserHandler(jwtHandler, userService, codeService)
 			server := gin.Default()
 			h.RegisterRoutes(server)
 			req := tc.reqBuilder(t)

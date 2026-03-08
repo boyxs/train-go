@@ -2,13 +2,9 @@ package ioc
 
 import (
 	"os"
-	"time"
 
 	sms "gitee.com/train-cloud/geektime-basic-go/internal/service/sms"
-	"gitee.com/train-cloud/geektime-basic-go/internal/service/sms/memory"
-	"gitee.com/train-cloud/geektime-basic-go/internal/service/sms/ratelimit"
 	"gitee.com/train-cloud/geektime-basic-go/internal/service/sms/tencent"
-	ratelimit2 "gitee.com/train-cloud/geektime-basic-go/pkg/ratelimit"
 	"github.com/redis/go-redis/v9"
 	"github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common"
 	"github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common/profile"
@@ -17,15 +13,29 @@ import (
 
 func InitSmsService(cmd redis.Cmdable) sms.SmsService {
 	//return initTencentSmsService()
+	return initLocalTencentSmsService()
 	//return memory.NewSmsService()
 	//这里测试需要忽略Store返回的错误
 	//type CodeService interface {
 	//	Send(ctx context.Context, biz string, phone string) error
 	//}
-	return ratelimit.NewRateLimitSmsService(
-		memory.NewSmsService(),
-		ratelimit2.NewRedisSlidingWindowLimiter(cmd, time.Second, 20),
+	//return ratelimit.NewRateLimitSmsService(
+	//	memory.NewSmsService(),
+	//	ratelimit2.NewRedisSlidingWindowLimiter(cmd, time.Second, 20),
+	//)
+}
+func initLocalTencentSmsService() sms.SmsService {
+	secretId := "AKIDNbYFenfGZbMp1wbtynMgla9SWKsACyUn"
+	secretKey := "5uTu50f4E8mAJDrGQL0PYS7WfYCbkdHg"
+	c, err := tsms.NewClient(
+		common.NewCredential(secretId, secretKey),
+		"ap-guangzhou",
+		profile.NewClientProfile(),
 	)
+	if err != nil {
+		panic(err)
+	}
+	return tencent.NewSmsService(c, "1400587666", "传智播客")
 }
 
 func initTencentSmsService() sms.SmsService {
@@ -39,11 +49,11 @@ func initTencentSmsService() sms.SmsService {
 	}
 	c, err := tsms.NewClient(
 		common.NewCredential(secretId, secretKey),
-		"ap-nanjing",
+		"ap-guangzhou",
 		profile.NewClientProfile(),
 	)
 	if err != nil {
 		panic(err)
 	}
-	return tencent.NewSmsService(c, "1400842696", "Tommy")
+	return tencent.NewSmsService(c, "1400587666", "传智播客")
 }

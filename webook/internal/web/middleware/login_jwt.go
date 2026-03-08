@@ -2,25 +2,26 @@ package middleware
 
 import (
 	"encoding/gob"
-	"fmt"
 	"net/http"
-	"strings"
 	"time"
 
 	"gitee.com/train-cloud/geektime-basic-go/internal/consts"
 	"gitee.com/train-cloud/geektime-basic-go/internal/web"
+	myJwt "gitee.com/train-cloud/geektime-basic-go/internal/web/jwt"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 )
 
 type LoginJwtMiddlewareBuilder struct {
+	myJwt.JwtHandler
 	// 使用切片存储放行路径列表
 	ignorePaths map[string]struct{}
 }
 
-func NewLoginJwtMiddlewareBuilder() *LoginJwtMiddlewareBuilder {
+func NewLoginJwtMiddlewareBuilder(hdl myJwt.JwtHandler) *LoginJwtMiddlewareBuilder {
 	return &LoginJwtMiddlewareBuilder{
 		ignorePaths: make(map[string]struct{}),
+		JwtHandler:  hdl,
 	}
 }
 
@@ -39,23 +40,14 @@ func (l *LoginJwtMiddlewareBuilder) Build() gin.HandlerFunc {
 		if _, ok := l.ignorePaths[ctx.Request.URL.Path]; ok {
 			return
 		}
-		authorization := ctx.GetHeader(consts.Authorization)
-		if authorization == "" {
-			ctx.AbortWithStatus(http.StatusUnauthorized)
+		tokenStr := l.ExtractToken(ctx)
+		if tokenStr == "" {
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 			return
 		}
-
-		splits := strings.Split(authorization, " ")
-		if len(splits) != 2 || strings.ToLower(splits[0]) != "bearer" {
-			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-				"error": "Invalid authorization header format",
-			})
-			return
-		}
-		tokenStr := splits[1]
 		var uc web.UserClaims
 		token, err := jwt.ParseWithClaims(tokenStr, &uc, func(token *jwt.Token) (any, error) {
-			return consts.JwtKey, nil
+			return consts.AccessKey, nil
 		})
 		if err != nil {
 			ctx.AbortWithStatus(http.StatusUnauthorized)
@@ -71,17 +63,21 @@ func (l *LoginJwtMiddlewareBuilder) Build() gin.HandlerFunc {
 			ctx.AbortWithStatus(http.StatusUnauthorized)
 			return
 		}
-		expiresAt := uc.ExpiresAt
-		// 每10秒刷新一次
-		if expiresAt.Sub(time.Now()) < consts.RefreshTime {
-			uc.ExpiresAt = jwt.NewNumericDate(time.Now().Add(consts.ExpireTime))
-			tokenStr, err := token.SignedString(consts.JwtKey)
-			if err != nil {
-				// 这里续约失败，仅需要记录日志
-				fmt.Printf("🚀 ~ file: login_jwt.go ~ line 79 ~ err: %#v\n", err)
-			}
-			ctx.Header(consts.JwtHeader, tokenStr)
+		if err = l.CheckSession(ctx, uc.Ssid); err != nil {
+			ctx.AbortWithStatus(http.StatusUnauthorized)
+			return
 		}
+		//expiresAt := uc.ExpiresAt
+		// 每10秒刷新一次
+		//if expiresAt.Sub(time.Now()) < consts.RefreshThreshold {
+		//	uc.ExpiresAt = jwt.NewNumericDate(time.Now().Add(consts.ExpireTime))
+		//	tokenStr, err := token.SignedString(consts.AccessKey)
+		//	if err != nil {
+		//		// 这里续约失败，仅需要记录日志
+		//		zap.L().Error("续约 access token 失败", zap.Error(err))
+		//	}
+		//	ctx.Header(consts.AccessHeader, tokenStr)
+		//}
 		ctx.Set(consts.UserKey, uc)
 	}
 }

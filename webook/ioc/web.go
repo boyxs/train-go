@@ -6,6 +6,7 @@ import (
 
 	"gitee.com/train-cloud/geektime-basic-go/internal/consts"
 	"gitee.com/train-cloud/geektime-basic-go/internal/web"
+	"gitee.com/train-cloud/geektime-basic-go/internal/web/jwt"
 	"gitee.com/train-cloud/geektime-basic-go/internal/web/middleware"
 	"gitee.com/train-cloud/geektime-basic-go/pkg/ginx/middleware/ratelimit"
 	"github.com/gin-contrib/cors"
@@ -18,14 +19,19 @@ import (
 func InitWebServer(
 	middlewares []gin.HandlerFunc,
 	userHandler web.UserHandler,
+	oauth2Handler web.OAuth2Handler,
 ) *gin.Engine {
 	server := gin.Default()
 	server.Use(middlewares...)
 	userHandler.RegisterRoutes(server)
+	oauth2Handler.RegisterRoutes(server)
 	return server
 }
 
-func InitMiddlewares(cmd redis.Cmdable) []gin.HandlerFunc {
+func InitMiddlewares(
+	hdl jwt.JwtHandler,
+	cmd redis.Cmdable,
+) []gin.HandlerFunc {
 	return []gin.HandlerFunc{
 		//自定义中间件
 		//func(ctx *gin.Context) {},
@@ -34,7 +40,7 @@ func InitMiddlewares(cmd redis.Cmdable) []gin.HandlerFunc {
 			AllowOrigins: []string{"http://localhost:3000"},
 			//AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"},
 			AllowHeaders:     []string{"Content-Type", "Content-Length", "Authorization"},
-			ExposeHeaders:    []string{consts.JwtHeader},
+			ExposeHeaders:    []string{consts.AccessHeader, consts.RefreshHeader},
 			AllowCredentials: true,
 			AllowOriginFunc: func(origin string) bool {
 				if strings.HasPrefix(origin, "http://localhost") {
@@ -47,16 +53,23 @@ func InitMiddlewares(cmd redis.Cmdable) []gin.HandlerFunc {
 		//限流
 		ratelimit.NewBuilder(cmd, time.Second, 20).Prefix("ip_limiter").Build(),
 		//jwt
-		loginJwtMiddleware(),
+		loginJwtMiddleware(hdl),
 		//session
 		//redisSessionMiddleware(),
 		//loginMiddleware(),
 	}
 }
 
-func loginJwtMiddleware() gin.HandlerFunc {
-	return middleware.NewLoginJwtMiddlewareBuilder().
-		IgnorePaths("/user/register", "/user/login", "/user/login_sms/code/send", "/user/login_sms").
+func loginJwtMiddleware(hdl jwt.JwtHandler) gin.HandlerFunc {
+	return middleware.NewLoginJwtMiddlewareBuilder(hdl).
+		IgnorePaths("/user/register",
+			"/user/login",
+			"/user/refresh_token",
+			"/user/login_sms/code/send",
+			"/user/login_sms",
+			"/oauth2/wechat/authurl",
+			"/oauth2/wechat/callback",
+		).
 		Build()
 }
 

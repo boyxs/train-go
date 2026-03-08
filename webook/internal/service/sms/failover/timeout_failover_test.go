@@ -3,12 +3,10 @@ package failover
 import (
 	"context"
 	"errors"
-	"math/rand"
 	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
-	"time"
 
 	"gitee.com/train-cloud/geektime-basic-go/internal/service/sms"
 	smsmocks "gitee.com/train-cloud/geektime-basic-go/internal/service/sms/mocks"
@@ -184,18 +182,29 @@ func TestTimeoutFailoverSmsService_CAS_Else(t *testing.T) {
 	s1 := smsmocks.NewMockSmsService(ctrl)
 	svcs := []sms.SmsService{s0, s1}
 
+	concurrency := 2
+	var loadCount int32
+	startCAS := make(chan struct{})
+
 	//模拟已经达到触发点
 	svc := &TimeoutFailoverSmsService{
 		svcs:      svcs,
 		idx:       0,
 		cnt:       1,
 		threshold: 1,
+
+		beforeCAS: func() {
+			//每个 goroutine 到达 CAS 前先报到
+			if atomic.AddInt32(&loadCount, 1) == int32(concurrency) {
+				close(startCAS)
+			}
+			<-startCAS
+		},
 	}
 
 	//断点测试可能会触发并发
 	//预期：只有一个 s1 会被调用（因为切换后 idx 变成 1）
 	//由于并发，我们预期两次调用都应该打到 s1 上
-	concurrency := 100
 	s0.EXPECT().Send(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 		Times(0).MaxTimes(0)
 	s1.EXPECT().Send(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
@@ -211,7 +220,6 @@ func TestTimeoutFailoverSmsService_CAS_Else(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			<-start //等待
-			time.Sleep(time.Millisecond * time.Duration(rand.Intn(100)))
 			_ = svc.Send(context.Background(), "tpl", []string{"args"}, "188...")
 		}()
 	}

@@ -145,3 +145,81 @@ func TestInternalUserHandler_SendSMSCode(t *testing.T) {
 		})
 	}
 }
+
+func TestInternalUserHandler_LoginSMS(t *testing.T) {
+	server := setup.InitWebServer()
+	cmd := setup.InitRedis()
+
+	getKeyFunc := func(biz string, phone string) string {
+		return fmt.Sprintf("code:%s:%s", biz, phone)
+	}
+	testCases := []struct {
+		name  string
+		phone string
+		code  string
+
+		before   func(t *testing.T)
+		after    func(t *testing.T)
+		wantBody web.Result
+	}{
+		{
+			name:  "登录成功",
+			phone: "18608261234",
+			code:  "123456",
+			before: func(t *testing.T) {
+				ctx, cancelFunc := context.WithTimeout(context.Background(), time.Second*10)
+				defer cancelFunc()
+
+				key := getKeyFunc("login", "18608261234")
+				cntKey := key + ":cnt"
+				err := cmd.Set(ctx, key, "123456", time.Minute*10).Err()
+				err = cmd.Set(ctx, cntKey, 3, time.Minute*10).Err()
+				assert.NoError(t, err)
+			},
+			after: func(t *testing.T) {
+				ctx, cancelFunc := context.WithTimeout(context.Background(), time.Second*10)
+				defer cancelFunc()
+
+				key := getKeyFunc("login", "18608261234")
+				cntKey := key + ":cnt"
+
+				code, err := cmd.GetDel(ctx, key).Result()
+				assert.NoError(t, err)
+				assert.True(t, len(code) == 6)
+				assert.Equal(t, "123456", code)
+
+				cnt, err := cmd.GetDel(ctx, cntKey).Result()
+				assert.Equal(t, cnt, "0")
+				assert.NoError(t, err)
+			},
+			wantBody: web.Result{
+				Msg: "登录成功",
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tc.before(t)
+			defer tc.after(t)
+
+			req, err := http.NewRequest(
+				http.MethodPost, "/user/login_sms",
+				bytes.NewReader([]byte(fmt.Sprintf(`{
+"phone": "%s",
+"code": "%s"
+}`, tc.phone, tc.code))))
+			req.Header.Add("Content-Type", "application/json")
+			assert.NoError(t, err)
+			recorder := httptest.NewRecorder()
+			server.ServeHTTP(recorder, req)
+
+			//if tc.wantCode != http.StatusOK {
+			//	return
+			//}
+			var result web.Result
+			err = json.NewDecoder(recorder.Body).Decode(&result)
+			assert.NoError(t, err)
+			assert.Equal(t, tc.wantBody, result)
+		})
+	}
+}

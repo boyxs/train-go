@@ -14,7 +14,6 @@ import (
 	reflect "reflect"
 
 	domain "gitee.com/train-cloud/geektime-basic-go/internal/domain"
-	gin "github.com/gin-gonic/gin"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -72,6 +71,21 @@ func (mr *MockUserServiceMockRecorder) FindOrCreate(ctx, phone any) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindOrCreate", reflect.TypeOf((*MockUserService)(nil).FindOrCreate), ctx, phone)
 }
 
+// FindOrCreateByWechat mocks base method.
+func (m *MockUserService) FindOrCreateByWechat(ctx context.Context, wechatAuth domain.WechatAuth) (domain.User, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FindOrCreateByWechat", ctx, wechatAuth)
+	ret0, _ := ret[0].(domain.User)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// FindOrCreateByWechat indicates an expected call of FindOrCreateByWechat.
+func (mr *MockUserServiceMockRecorder) FindOrCreateByWechat(ctx, wechatAuth any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindOrCreateByWechat", reflect.TypeOf((*MockUserService)(nil).FindOrCreateByWechat), ctx, wechatAuth)
+}
+
 // Login mocks base method.
 func (m *MockUserService) Login(ctx context.Context, email, password string) (domain.User, error) {
 	m.ctrl.T.Helper()
@@ -114,18 +128,4 @@ func (m *MockUserService) Register(ctx context.Context, user domain.User) error 
 func (mr *MockUserServiceMockRecorder) Register(ctx, user any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Register", reflect.TypeOf((*MockUserService)(nil).Register), ctx, user)
-}
-
-// SetJwtToken mocks base method.
-func (m *MockUserService) SetJwtToken(ctx *gin.Context, userid int64) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetJwtToken", ctx, userid)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// SetJwtToken indicates an expected call of SetJwtToken.
-func (mr *MockUserServiceMockRecorder) SetJwtToken(ctx, userid any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetJwtToken", reflect.TypeOf((*MockUserService)(nil).SetJwtToken), ctx, userid)
 }

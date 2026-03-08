@@ -55,5 +55,5 @@ func (uc *RedisUserCache) Del(ctx context.Context, userid int64) error {
 }
 
 func (uc *RedisUserCache) getKey(userid int64) string {
-	return fmt.Sprintf("user:%d", userid)
+	return fmt.Sprintf(consts.UserPattern, userid)
 }

@@ -3,15 +3,24 @@ package consts
 import "time"
 
 var (
-	JwtKey        = []byte("k6CswdUm75WKcbM68UQUuxVsHSpTCwgK")
-	JwtHeader     = "x-jwt-token"
-	Authorization = "Authorization"
-	UserAgent     = "User-Agent"
-	UserKey       = "user_claims"
-	Interval      = time.Second * 10
-	RefreshTime   = time.Hour*24*7 - Interval
-	ExpireTime    = time.Hour * 24 * 7
-	CacheTTL      = time.Minute * 30
+	AccessKey        = []byte("k6CswdUm75WKcbM68UQUuxVsHSpTCwgK")
+	RefreshKey       = []byte("k6CswdUm77WKcbM68UQUuxVsHSpTCwgA")
+	AccessHeader     = "x-access-token"
+	RefreshHeader    = "x-refresh-token"
+	Authorization    = "Authorization"
+	UserAgent        = "User-Agent"
+	UserKey          = "user_claims"
+	Interval         = time.Second * 10
+	ExpireTime       = time.Minute * 30
+	RefreshTime      = time.Hour * 24 * 7
+	RefreshThreshold = ExpireTime - Interval
+	Expiration       = time.Minute * 30
+	CacheTTL         = time.Minute * 30
+)
+
+const (
+	UserPattern     = "user:%d"
+	UserSsidPattern = "user:ssid:%s"
 )
 
 // 2006 年 1 月 2 日 下午 3 点 4 分 5 秒 减 7 小时时区
