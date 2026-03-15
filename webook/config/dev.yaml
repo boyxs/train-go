@@ -1,0 +1,11 @@
+etcd:
+  endpoint: 'http://127.0.0.1:2379'
+  path: '/webook'
+  type: 'yaml'
+
+# mysql:
+#   dsn: 'root:13520@tcp(localhost:3306)/webook'
+
+# redis:
+#   addr: '127.0.0.1:6379'
+#   password: '13520'

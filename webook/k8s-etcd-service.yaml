@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: webook-etcd
+spec:
+  selector:
+    app: webook-etcd
+  ports:
+    - protocol: TCP
+      port: 2379
+      targetPort: 2379
+      nodePort: 30379
+  type: NodePort

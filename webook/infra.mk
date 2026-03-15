@@ -54,15 +54,26 @@ redis:
 	@$(KUBECTL) rollout status deployment webook-redis -n $(NAMESPACE)
 	@echo "$(INFO) Redis deployment finished."
 
+# --- Etcd Target ---
+etcd:
+	@echo "$(STEP) Step 1/3: Applying Etcd manifests..."
+	@$(KUBECTL) apply -f k8s-etcd-deployment.yaml -n $(NAMESPACE)
+	@$(KUBECTL) apply -f k8s-etcd-service.yaml -n $(NAMESPACE)
+	@echo "$(STEP) Step 2/3: Restarting webook-etcd..."
+	@$(KUBECTL) rollout restart deployment webook-etcd -n $(NAMESPACE)
+	@echo "$(STEP) Step 3/3: Waiting for stability..."
+	@$(KUBECTL) rollout status deployment webook-etcd -n $(NAMESPACE)
+	@echo "$(INFO) Etcd deployment finished."
+
 # --- Observability ---
 status:
 	@echo "$(STEP) Fetching current status..."
-	@$(KUBECTL) get pods,svc -l 'app in (mysql, redis)' -n $(NAMESPACE)
+	@$(KUBECTL) get pods,svc -l 'app in (mysql, redis, etcd)' -n $(NAMESPACE)
 
 # --- Cleanup ---
 clean:
 	@echo "$(STEP) Cleaning up infrastructure..."
-	@$(KUBECTL) delete -f k8s-mysql-deployment.yaml,k8s-mysql-service.yaml,k8s-redis-deployment.yaml,k8s-redis-service.yaml -n $(NAMESPACE) --ignore-not-found
+	@$(KUBECTL) delete -f k8s-mysql-deployment.yaml,k8s-mysql-service.yaml,k8s-redis-deployment.yaml,k8s-redis-service.yaml,k8s-etcd-deployment.yaml,k8s-etcd-service.yaml -n $(NAMESPACE) --ignore-not-found
 	@echo "$(INFO) Cleanup complete."
 
 # make -f infra.mk xxx

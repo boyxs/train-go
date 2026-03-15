@@ -226,11 +226,10 @@ type User struct {
 ### WechatAuth (`internal/domain/wechat.go`)
 OpenId + UnionId from WeChat OAuth2.
 
-## Current Development Status (2026-03-08)
+## 工作规则
 
-- [x] 用户注册/登录（邮箱+密码）
-- [x] 短信验证码登录
-- [x] JWT 双 Token 认证（access 30min + refresh 7天）
-- [x] 微信 OAuth2 登录
-- [x] SMS 服务（内存/腾讯云/故障转移/限流/权限装饰器）
-- [x] 集成测试框架
+- 完成功能后自动追加到 `DEVLOG.md`，同一天归类到同一个日期标题下
+- `CLAUDE.md` 只放规则和约定，不放功能记录
+- 用中文沟通，代码注释可中可英但需要简洁
+- 发现问题、踩过的坑、更好的做法，主动记录到 `memory/` 目录（feedback 类型），并同步更新 `MEMORY.md` 索引
+- 每次对话结束前，检查 `CLAUDE.md` 和 `MEMORY.md` 是否需要更新

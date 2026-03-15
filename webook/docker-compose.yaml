@@ -1,0 +1,70 @@
+version: "3.8"
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: webook-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: "13520"
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      extnetwork:
+        ipv4_address: 172.21.0.2
+
+  redis:
+    image: redis:7.0
+    container_name: webook-redis
+    restart: always
+    command: ["redis-server", "--requirepass", "13520", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    networks:
+      extnetwork:
+        ipv4_address: 172.21.0.3
+
+  etcd:
+    image: bitnami/etcd:3.5.17
+    container_name: webook-etcd
+    restart: always
+    environment:
+      ALLOW_NONE_AUTHENTICATION: "no"
+      ETCD_ROOT_PASSWORD: "13520"
+      ETCD_ADVERTISE_CLIENT_URLS: "http://webook-etcd:2379"
+      ETCD_LISTEN_CLIENT_URLS: "http://0.0.0.0:2379"
+    ports:
+      - "2379:2379"
+    networks:
+      extnetwork:
+        ipv4_address: 172.21.0.4
+
+  webook:
+    image: train/webook:1.0.0
+    container_name: webook-app
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "8089:8089"
+    depends_on:
+      - mysql
+      - redis
+      - etcd
+    networks:
+      extnetwork:
+        ipv4_address: 172.21.0.10
+
+volumes:
+  mysql-data:
+
+networks:
+  extnetwork:
+    external: true
+    # name: extnetwork
+    # ipam:
+    #   config:
+    #     - subnet: 172.21.0.0/16

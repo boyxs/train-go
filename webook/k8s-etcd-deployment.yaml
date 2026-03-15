@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webook-etcd
+  labels:
+    app: webook-etcd
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: webook-etcd
+  template:
+    metadata:
+      name: webook-etcd
+      labels:
+        app: webook-etcd
+    spec:
+      containers:
+        - name: webook-etcd
+          image: bitnami/etcd:3.5.17
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: ALLOW_NONE_AUTHENTICATION
+              value: "no"
+            - name: ETCD_ROOT_PASSWORD
+              value: "13520"
+            - name: ETCD_ADVERTISE_CLIENT_URLS
+              value: "http://webook-etcd:2379"
+            - name: ETCD_LISTEN_CLIENT_URLS
+              value: "http://0.0.0.0:2379"
+          ports:
+            - containerPort: 2379
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "200m"
+              memory: "256Mi"
+          livenessProbe:
+            exec:
+              command:
+                - bash
+                - -c
+                - etcdctl --user root:13520 endpoint health
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      restartPolicy: Always

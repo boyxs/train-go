@@ -29,14 +29,15 @@ type UserHandler interface {
 	Register(ctx *gin.Context)
 	SendLoginSMSCode(ctx *gin.Context)
 	LoginSMS(ctx *gin.Context)
-	LoginJwt(ctx *gin.Context)
-	LogoutJwt(ctx *gin.Context)
-	EditJwt(ctx *gin.Context)
-	ProfileJwt(ctx *gin.Context)
 	Login(ctx *gin.Context)
 	Logout(ctx *gin.Context)
 	Edit(ctx *gin.Context)
 	Profile(ctx *gin.Context)
+	//Session Operations
+	LoginSS(ctx *gin.Context)
+	LogoutSS(ctx *gin.Context)
+	EditSS(ctx *gin.Context)
+	ProfileSS(ctx *gin.Context)
 }
 
 type InternalUserHandler struct {
@@ -64,15 +65,15 @@ func NewInternalUserHandler(hdl jwt.JwtHandler, us service.UserService, cs servi
 func (h *InternalUserHandler) RegisterRoutes(server *gin.Engine) {
 	ug := server.Group("/user")
 	ug.POST("/register", h.Register)
-	ug.POST("/login", h.LoginJwt)
-	ug.POST("/logout", h.LogoutJwt)
-	ug.POST("/edit", h.EditJwt)
+	ug.POST("/login", h.Login)
+	ug.POST("/logout", h.Logout)
+	ug.POST("/edit", h.Edit)
 	ug.GET("/refresh_token", h.RefreshToken)
-	ug.GET("/profile", h.ProfileJwt)
-	//ug.POST("/login", h.Login)
-	//ug.POST("/logout", h.Logout)
-	//ug.POST("/edit", h.Edit)
-	//ug.GET("/profile", h.Profile)
+	ug.GET("/profile", h.Profile)
+	//ug.POST("/login", h.LoginSS)
+	//ug.POST("/logout", h.LogoutSS)
+	//ug.POST("/edit", h.EditSS)
+	//ug.GET("/profile", h.ProfileSS)
 
 	//手机验证码登录相关功能
 	ug.POST("/login_sms/code/send", h.SendLoginSMSCode)
@@ -212,7 +213,7 @@ func (h *InternalUserHandler) LoginSMS(ctx *gin.Context) {
 	})
 }
 
-func (h *InternalUserHandler) LoginJwt(ctx *gin.Context) {
+func (h *InternalUserHandler) Login(ctx *gin.Context) {
 	type LoginRequest struct {
 		Email    string `json:"email"`
 		Password string `json:"password"`
@@ -237,7 +238,7 @@ func (h *InternalUserHandler) LoginJwt(ctx *gin.Context) {
 	}
 }
 
-func (h *InternalUserHandler) LogoutJwt(ctx *gin.Context) {
+func (h *InternalUserHandler) Logout(ctx *gin.Context) {
 	err := h.ClearToken(ctx)
 	if err != nil {
 		ctx.JSON(http.StatusOK, Result{Code: 5, Msg: "退出失败"})
@@ -275,7 +276,7 @@ func (h *InternalUserHandler) RefreshToken(ctx *gin.Context) {
 	})
 }
 
-func (h *InternalUserHandler) EditJwt(ctx *gin.Context) {
+func (h *InternalUserHandler) Edit(ctx *gin.Context) {
 	type EditRequest struct {
 		Nickname string `json:"nickname"`
 		Birthday string `json:"birthday"`
@@ -303,7 +304,7 @@ func (h *InternalUserHandler) EditJwt(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, Result{Code: 0, Data: user})
 }
 
-func (h *InternalUserHandler) ProfileJwt(ctx *gin.Context) {
+func (h *InternalUserHandler) Profile(ctx *gin.Context) {
 	uc, ok := ctx.MustGet(consts.UserKey).(UserClaims)
 	if !ok {
 		ctx.JSON(http.StatusUnauthorized, "请先登录")
@@ -317,7 +318,9 @@ func (h *InternalUserHandler) ProfileJwt(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, profile)
 }
 
-func (h *InternalUserHandler) Login(ctx *gin.Context) {
+// ==================Session Operations==================
+
+func (h *InternalUserHandler) LoginSS(ctx *gin.Context) {
 	type LoginRequest struct {
 		Email    string `json:"email"`
 		Password string `json:"password"`
@@ -350,7 +353,7 @@ func (h *InternalUserHandler) Login(ctx *gin.Context) {
 	}
 }
 
-func (h *InternalUserHandler) Logout(ctx *gin.Context) {
+func (h *InternalUserHandler) LogoutSS(ctx *gin.Context) {
 	//err := h.ClearToken(ctx)
 	session := sessions.Default(ctx)
 	session.Delete("userid")
@@ -363,7 +366,7 @@ func (h *InternalUserHandler) Logout(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, Result{Code: 0, Msg: "退出成功"})
 }
 
-func (h *InternalUserHandler) Edit(ctx *gin.Context) {
+func (h *InternalUserHandler) EditSS(ctx *gin.Context) {
 	type EditRequest struct {
 		Nickname string `json:"nickname"`
 		Birthday string `json:"birthday"`
@@ -388,7 +391,7 @@ func (h *InternalUserHandler) Edit(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, Result{Code: 0, Data: user})
 }
 
-func (h *InternalUserHandler) Profile(ctx *gin.Context) {
+func (h *InternalUserHandler) ProfileSS(ctx *gin.Context) {
 	session := sessions.Default(ctx)
 	val := session.Get("userid")
 	userid, ok := val.(int64)

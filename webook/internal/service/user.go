@@ -61,7 +61,7 @@ func (us *InternalUserService) Profile(ctx context.Context, userid int64) (domai
 		return domain.User{}, err
 	}
 	// 不要返回密码
-	//user.Password = ""
+	user.Password = ""
 	return user, nil
 }
 
