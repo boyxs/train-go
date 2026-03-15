@@ -2,11 +2,11 @@ package middleware
 
 import (
 	"encoding/gob"
-	"fmt"
 	"net/http"
 	"time"
 
 	"gitee.com/train-cloud/geektime-basic-go/internal/consts"
+	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 )
@@ -14,11 +14,13 @@ import (
 type LoginMiddlewareBuilder struct {
 	// 使用切片存储放行路径列表
 	ignorePaths map[string]struct{}
+	l           logger.LoggerX
 }
 
-func NewLoginMiddlewareBuilder() *LoginMiddlewareBuilder {
+func NewLoginMiddlewareBuilder(l logger.LoggerX) *LoginMiddlewareBuilder {
 	return &LoginMiddlewareBuilder{
 		ignorePaths: make(map[string]struct{}),
+		l:           l,
 	}
 }
 
@@ -61,7 +63,7 @@ func (l *LoginMiddlewareBuilder) Build() gin.HandlerFunc {
 			})
 			err := session.Save()
 			if err != nil {
-				fmt.Printf("🚀 ~ file: login.go ~ line 60 ~ err: %#v\n", err)
+				l.l.Error("session保存失败", logger.Error(err))
 				return
 			}
 		}

@@ -3,28 +3,17 @@ package failover
 import (
 	"context"
 	"errors"
-	"log"
 	"sync/atomic"
 
 	"gitee.com/train-cloud/geektime-basic-go/internal/service/sms"
+	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
 )
 
 type FailoverSmsService struct {
 	svcs []sms.SmsService
 	idx  uint64 //当前服务商下标
+	l    logger.LoggerX
 }
-
-// Send 普通轮询
-//func (f *FailoverSmsService) Send(ctx context.Context, templateId string, args []string, phoneNumbers ...string) error {
-//	for _, svc := range f.svcs {
-//		err := svc.Send(ctx, templateId, args, phoneNumbers...)
-//		if err == nil {
-//			return nil
-//		}
-//		log.Fatalln(err)
-//	}
-//	return errors.New("轮询所有服务商均告失败")
-//}
 
 // Send 严格轮询
 func (f *FailoverSmsService) Send(ctx context.Context, templateId string, args []string, phoneNumbers ...string) error {
@@ -44,14 +33,18 @@ func (f *FailoverSmsService) Send(ctx context.Context, templateId string, args [
 		case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
 			return err
 		}
-		log.Printf("并发请求序号 %d 尝试服务商 %d 失败: %v", globalIdx, index, err)
+		f.l.Warn("短信服务商发送失败",
+			logger.Uint64("requestIdx", globalIdx),
+			logger.Uint64("providerIdx", index),
+			logger.Error(err))
 	}
 
 	return errors.New("轮询所有服务商均告失败")
 }
 
-func NewFailoverSmsService(svcs []sms.SmsService) sms.SmsService {
+func NewFailoverSmsService(svcs []sms.SmsService, l logger.LoggerX) sms.SmsService {
 	return &FailoverSmsService{
 		svcs: svcs,
+		l:    l,
 	}
 }

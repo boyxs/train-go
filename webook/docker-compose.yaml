@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   mysql:
     image: mysql:8.0
@@ -16,15 +14,30 @@ services:
         ipv4_address: 172.21.0.2
 
   redis:
-    image: redis:7.0
+    image: redis:7.2-alpine
     container_name: webook-redis
     restart: always
-    command: ["redis-server", "--requirepass", "13520", "--appendonly", "yes"]
     ports:
       - "6379:6379"
     networks:
       extnetwork:
         ipv4_address: 172.21.0.3
+    volumes:
+      - /home/docker/redis:/data
+      # - /home/docker/redis.conf:/usr/local/etc/redis/redis.conf
+    # 使用命令开启持久化并设置密码
+    # command: ["redis-server", "--requirepass", "13520", "--appendonly", "yes"]
+    command: >
+      redis-server
+      --requirepass 13520
+      --appendonly yes
+      --bind 0.0.0.0
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "13520", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      # docker inspect --format='{{json .State.Health}}' redis
 
   etcd:
     image: bitnami/etcd:3.5.17
@@ -42,12 +55,14 @@ services:
         ipv4_address: 172.21.0.4
 
   webook:
-    image: train/webook:1.0.0
+    # image: train/webook:1.0.0
     container_name: webook-app
     build:
       context: .
       dockerfile: Dockerfile
     restart: always
+    environment:
+      APP_ENV: "config/k8s.yaml"
     ports:
       - "8089:8089"
     depends_on:

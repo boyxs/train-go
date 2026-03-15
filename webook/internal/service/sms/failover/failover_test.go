@@ -9,6 +9,7 @@ import (
 
 	"gitee.com/train-cloud/geektime-basic-go/internal/service/sms"
 	smsmocks "gitee.com/train-cloud/geektime-basic-go/internal/service/sms/mocks"
+	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 )
@@ -76,7 +77,7 @@ func TestFailoverSmsService_Send(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			svc := NewFailoverSmsService(tc.mock(ctrl))
+			svc := NewFailoverSmsService(tc.mock(ctrl), logger.NewNopLogger())
 
 			err := svc.Send(context.Background(), "tpl", []string{"123"}, "13800138000")
 			assert.Equal(t, tc.wantErr, err)
@@ -102,7 +103,7 @@ func TestFailoverSmsService_Parallel(t *testing.T) {
 		mockSvcs[i] = s
 	}
 
-	svcInterface := NewFailoverSmsService(mockSvcs)
+	svcInterface := NewFailoverSmsService(mockSvcs, logger.NewNopLogger())
 
 	f, ok := svcInterface.(*FailoverSmsService)
 	assert.True(t, ok)

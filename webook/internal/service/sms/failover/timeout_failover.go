@@ -3,11 +3,11 @@ package failover
 import (
 	"context"
 	"errors"
-	"log"
 	"strings"
 	"sync/atomic"
 
 	"gitee.com/train-cloud/geektime-basic-go/internal/service/sms"
+	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
 )
 
 type TimeoutFailoverSmsService struct {
@@ -15,6 +15,7 @@ type TimeoutFailoverSmsService struct {
 	idx       int32 //当前使用的服务商下标
 	cnt       int32 //连续超时的计数
 	threshold int32 //触发切换的超时阈值
+	l         logger.LoggerX
 
 	//仅测试用：在 CAS 之前注入的钩子，生产代码此字段为 nil
 	beforeCAS func()
@@ -32,11 +33,16 @@ func (t *TimeoutFailoverSmsService) Send(ctx context.Context, templateId string,
 		//仅测试End
 		if atomic.CompareAndSwapInt32(&t.idx, idx, newIdx) {
 			atomic.StoreInt32(&t.cnt, 0)
-			log.Printf("[SMS_SWITCH] 主动切换成功: 连续失败 %d 次, 已从服务商 %d 切至 %d", cnt, idx, newIdx)
+			t.l.Warn("SMS主动切换成功",
+				logger.Int32("consecutiveFails", cnt),
+				logger.Int32("from", idx),
+				logger.Int32("to", newIdx))
 			idx = newIdx
 		} else {
 			newActualIdx := atomic.LoadInt32(&t.idx)
-			log.Printf("[SMS_SWITCH] 触发并发竞争: 原本预期切至 %d, 实际已被其它协程切至 %d", newIdx, newActualIdx)
+			t.l.Warn("SMS切换并发竞争",
+				logger.Int32("expected", newIdx),
+				logger.Int32("actual", newActualIdx))
 			idx = newActualIdx
 		}
 	}
@@ -58,7 +64,9 @@ func (t *TimeoutFailoverSmsService) Send(ctx context.Context, templateId string,
 		if t.isCriticalError(err) {
 			atomic.AddInt32(&t.cnt, 1)
 		}
-		log.Printf("[SMS_DEBUG] 服务商 %d 调用失败: %v", idx, err)
+		t.l.Warn("SMS服务商调用失败",
+			logger.Int32("providerIdx", idx),
+			logger.Error(err))
 	}
 	return err
 }
@@ -75,7 +83,7 @@ func (t *TimeoutFailoverSmsService) isCriticalError(err error) bool {
 	return false
 }
 
-func NewTimeoutFailoverSmsService(svcs []sms.SmsService, threshold int32) sms.SmsService {
+func NewTimeoutFailoverSmsService(svcs []sms.SmsService, threshold int32, l logger.LoggerX) sms.SmsService {
 	if len(svcs) == 0 {
 		panic("短信服务商列表不能为空")
 	}
@@ -85,5 +93,6 @@ func NewTimeoutFailoverSmsService(svcs []sms.SmsService, threshold int32) sms.Sm
 	return &TimeoutFailoverSmsService{
 		svcs:      svcs,
 		threshold: threshold,
+		l:         l,
 	}
 }

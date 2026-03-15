@@ -6,6 +6,7 @@ interface RefreshConfig extends InternalAxiosRequestConfig {
 
 const axiosInstance = axios.create({
   baseURL: 'http://localhost:8089',
+  // baseURL: 'http://192.168.150.101:8089',
   withCredentials: true,
   timeout: 10_000,
 });

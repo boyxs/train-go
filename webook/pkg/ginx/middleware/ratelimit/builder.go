@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
 )
@@ -13,6 +14,7 @@ import (
 type Builder struct {
 	prefix   string
 	cmd      redis.Cmdable
+	l        logger.LoggerX
 	interval time.Duration
 	// 阈值
 	rate int
@@ -21,12 +23,13 @@ type Builder struct {
 //go:embed sliding_window.lua
 var luaScript string
 
-func NewBuilder(cmd redis.Cmdable, interval time.Duration, rate int) *Builder {
+func NewBuilder(cmd redis.Cmdable, interval time.Duration, rate int, l logger.LoggerX) *Builder {
 	return &Builder{
 		cmd:      cmd,
 		prefix:   "ip-limiter",
 		interval: interval,
 		rate:     rate,
+		l:        l,
 	}
 }
 
@@ -39,7 +42,7 @@ func (b *Builder) Build() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		limited, err := b.limit(ctx)
 		if err != nil {
-			fmt.Printf("🚀 ~ file: builder.go ~ line 42 ~ err: %#v\n", err)
+			b.l.Error("限流器异常", logger.Error(err))
 			// 这一步很有意思，就是如果这边出错了
 			// 保守做法：因为借助于 Redis 来做限流，那么 Redis 崩溃了，为了防止系统崩溃，直接限流
 			ctx.AbortWithStatus(http.StatusInternalServerError)
@@ -48,7 +51,7 @@ func (b *Builder) Build() gin.HandlerFunc {
 			return
 		}
 		if limited {
-			fmt.Printf("🚀 ~ file: builder.go ~ line 51 ~ http.StatusTooManyRequests: %#v\n", http.StatusTooManyRequests)
+			b.l.Warn("触发限流", logger.String("ip", ctx.ClientIP()))
 			ctx.AbortWithStatus(http.StatusTooManyRequests)
 			return
 		}

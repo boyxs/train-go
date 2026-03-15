@@ -3,9 +3,17 @@ etcd:
   path: '/webook'
   type: 'yaml'
 
-# mysql:
-#   dsn: 'root:13520@tcp(localhost:3306)/webook'
+mysql:
+  dsn: 'root:13520@tcp(localhost:3306)/webook'
 
-# redis:
-#   addr: '127.0.0.1:6379'
-#   password: '13520'
+redis:
+  addr: '127.0.0.1:6379'
+  password: '13520'
+
+#logger:
+#  level:
+#    l: -1 #debug/info/warn/error
+#  development: true
+#  encoding: 'console'
+#  outputPaths: [ 'stdout' ]
+#  errorOutputPaths: [ 'stderr' ]

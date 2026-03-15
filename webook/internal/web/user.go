@@ -2,17 +2,16 @@ package web
 
 import (
 	"errors"
-	"log"
 	"net/http"
 
 	"gitee.com/train-cloud/geektime-basic-go/internal/consts"
 	"gitee.com/train-cloud/geektime-basic-go/internal/domain"
 	"gitee.com/train-cloud/geektime-basic-go/internal/service"
 	"gitee.com/train-cloud/geektime-basic-go/internal/web/jwt"
+	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	jwt2 "github.com/golang-jwt/jwt/v5"
-
 	//"regexp" 此库不支持 (?=
 	regexp "github.com/dlclark/regexp2"
 )
@@ -46,11 +45,12 @@ type InternalUserHandler struct {
 	passwordRegexp *regexp.Regexp
 	userService    service.UserService
 	codeService    service.CodeService
+	l              logger.LoggerX
 }
 
 type UserClaims = jwt.UserClaims
 
-func NewInternalUserHandler(hdl jwt.JwtHandler, us service.UserService, cs service.CodeService) UserHandler {
+func NewInternalUserHandler(hdl jwt.JwtHandler, us service.UserService, cs service.CodeService, l logger.LoggerX) UserHandler {
 	er := regexp.MustCompile(emailExpr, regexp.None)
 	pr := regexp.MustCompile(passwordExpr, regexp.None)
 	return &InternalUserHandler{
@@ -59,6 +59,7 @@ func NewInternalUserHandler(hdl jwt.JwtHandler, us service.UserService, cs servi
 		passwordRegexp: pr,
 		userService:    us,
 		codeService:    cs,
+		l:              l,
 	}
 }
 
@@ -167,7 +168,7 @@ func (h *InternalUserHandler) SendLoginSMSCode(ctx *gin.Context) {
 			Msg:  "系统错误",
 		})
 		//记录日志
-		log.Println(err)
+		h.l.Error("发送验证码失败", logger.Error(err))
 	}
 }
 

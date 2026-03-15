@@ -9,14 +9,12 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	_ "github.com/spf13/viper/remote"
-	"go.uber.org/zap"
 )
 
 func main() {
 	// initViper()
 	// initViperV1()
 	initViperV2()
-	initLogger()
 	server := InitWebServer()
 	err := server.Run(":8089")
 	if err != nil {
@@ -103,14 +101,6 @@ func initViperRemote(cfg EtcdConfig) {
 			time.Sleep(5 * time.Second)
 		}
 	}()
-}
-
-func initLogger() {
-	logger, err := zap.NewDevelopment()
-	if err != nil {
-		panic(err)
-	}
-	zap.ReplaceGlobals(logger)
 }
 
 type EtcdConfig struct {

@@ -4,8 +4,16 @@ etcd:
   type: 'yaml'
 
 mysql:
-  dsn: 'root:13520@tcp(webook-mysql:3307)/webook'
+  dsn: 'root:13520@tcp(webook-mysql:3306)/webook'
 
 redis:
-  addr: 'webook-redis:6380'
+  addr: 'webook-redis:6379'
   password: '13520'
+
+logger:
+  level:
+    l: 0
+  development: false
+  encoding: 'json'
+  outputPaths: [ 'stdout' ]
+  errorOutputPaths: [ 'stderr' ]

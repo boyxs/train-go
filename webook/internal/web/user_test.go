@@ -17,6 +17,7 @@ import (
 	svcmocks "gitee.com/train-cloud/geektime-basic-go/internal/service/mocks"
 	"gitee.com/train-cloud/geektime-basic-go/internal/web/jwt"
 	jwtmocks "gitee.com/train-cloud/geektime-basic-go/internal/web/jwt/mocks"
+	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -56,7 +57,7 @@ func TestEmail(t *testing.T) {
 		},
 	}
 
-	h := NewInternalUserHandler(nil, nil, nil)
+	h := NewInternalUserHandler(nil, nil, nil, logger.NewNopLogger())
 	for _, ts := range testCases {
 		t.Run(ts.name, func(t *testing.T) {
 			matchStr, err := h.(*InternalUserHandler).emailRegexp.MatchString(ts.email)
@@ -243,7 +244,7 @@ func TestInternalUserHandler_Register(t *testing.T) {
 			defer ctrl.Finish()
 			//构建Handler
 			jwtHandler, userService, codeService := tc.mock(ctrl)
-			h := NewInternalUserHandler(jwtHandler, userService, codeService)
+			h := NewInternalUserHandler(jwtHandler, userService, codeService, logger.NewNopLogger())
 			//启动服务，注册路由
 			server := gin.Default()
 			h.RegisterRoutes(server)
@@ -446,7 +447,7 @@ func TestInternalUserHandler_LoginSMS(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 			jwtHandler, userService, codeService := tc.mock(ctrl)
-			h := NewInternalUserHandler(jwtHandler, userService, codeService)
+			h := NewInternalUserHandler(jwtHandler, userService, codeService, logger.NewNopLogger())
 			server := gin.Default()
 			h.RegisterRoutes(server)
 			req := tc.reqBuilder(t)

@@ -10,6 +10,7 @@ import (
 
 	"gitee.com/train-cloud/geektime-basic-go/internal/service/sms"
 	smsmocks "gitee.com/train-cloud/geektime-basic-go/internal/service/sms/mocks"
+	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 )
@@ -155,12 +156,12 @@ func TestTimeoutFailoverSmsService_Send(t *testing.T) {
 			svcs := tc.mock(ctrl)
 			if tc.name == "客户端列表为空" {
 				assert.PanicsWithValue(t, "短信服务商列表不能为空", func() {
-					NewTimeoutFailoverSmsService(svcs, tc.threshold)
+					NewTimeoutFailoverSmsService(svcs, tc.threshold, logger.NewNopLogger())
 				})
 				return
 			}
 
-			svc := NewTimeoutFailoverSmsService(svcs, tc.threshold).(*TimeoutFailoverSmsService)
+			svc := NewTimeoutFailoverSmsService(svcs, tc.threshold, logger.NewNopLogger()).(*TimeoutFailoverSmsService)
 
 			// 为了测试连续性，我们需要多次调用
 			var err error

@@ -1,6 +1,7 @@
 package ioc
 
 import (
+	"context"
 	"strings"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 	"gitee.com/train-cloud/geektime-basic-go/internal/web/jwt"
 	"gitee.com/train-cloud/geektime-basic-go/internal/web/middleware"
 	"gitee.com/train-cloud/geektime-basic-go/pkg/ginx/middleware/ratelimit"
+	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/sessions"
 	redisSession "github.com/gin-contrib/sessions/redis"
@@ -30,6 +32,7 @@ func InitWebServer(
 
 func InitMiddlewares(
 	hdl jwt.JwtHandler,
+	l logger.LoggerX,
 	cmd redis.Cmdable,
 ) []gin.HandlerFunc {
 	return []gin.HandlerFunc{
@@ -51,13 +54,27 @@ func InitMiddlewares(
 			MaxAge: 12 * time.Hour,
 		}),
 		//限流
-		ratelimit.NewBuilder(cmd, time.Second, 20).Prefix("ip_limiter").Build(),
+		ratelimit.NewBuilder(cmd, time.Second, 20, l).Prefix("ip_limiter").Build(),
 		//jwt
 		loginJwtMiddleware(hdl),
 		//session
 		//redisSessionMiddleware(),
 		//loginMiddleware(),
+		// logger
+		loggerMiddleware(l),
 	}
+}
+
+func loggerMiddleware(l logger.LoggerX) gin.HandlerFunc {
+	return middleware.NewLoggerMiddlewareBuilder(func(ctx context.Context, val middleware.RequestLog) {
+		l.Debug("HTTP request", logger.Field{
+			Key: "request",
+			Val: val,
+		})
+	}).
+		AllowReqBody().
+		AllowResBody().
+		Build()
 }
 
 func loginJwtMiddleware(hdl jwt.JwtHandler) gin.HandlerFunc {
@@ -73,8 +90,8 @@ func loginJwtMiddleware(hdl jwt.JwtHandler) gin.HandlerFunc {
 		Build()
 }
 
-func loginMiddleware() gin.HandlerFunc {
-	return middleware.NewLoginMiddlewareBuilder().
+func loginMiddleware(l logger.LoggerX) gin.HandlerFunc {
+	return middleware.NewLoginMiddlewareBuilder(l).
 		IgnorePaths("/user/register", "/user/login").
 		Build()
 }

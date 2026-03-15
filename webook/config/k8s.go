@@ -4,10 +4,10 @@ package config
 
 var Config = config{
 	MySQL: MySQLConfig{
-		DSN: "root:13520@tcp(webook-mysql:3307)/webook",
+		DSN: "root:13520@tcp(webook-mysql:3306)/webook",
 	},
 	Redis: RedisConfig{
-		Addr:     "webook-redis:6380",
+		Addr:     "webook-redis:6379",
 		Password: "13520",
 	},
 }
