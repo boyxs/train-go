@@ -5,6 +5,7 @@ import (
 	"os"
 	"time"
 
+	"gitee.com/train-cloud/geektime-basic-go/ioc"
 	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -89,16 +90,17 @@ func initViperRemote(cfg EtcdConfig) {
 		return
 	}
 	log.Printf("[Config] 远程配置加载成功: endpoint=%s key=%s", cfg.Endpoint, cfg.Path)
-	viper.OnConfigChange(func(e fsnotify.Event) {
-		log.Printf("[Config] 远程配置变更: %s", e.Name)
-	})
 	go func() {
 		for {
-			err := viper.WatchRemoteConfig()
+			time.Sleep(5 * time.Second)
+			err := viper.ReadRemoteConfig()
 			if err != nil {
 				log.Printf("[Config] watch 失败: %v", err)
+				continue
 			}
-			time.Sleep(5 * time.Second)
+			for _, fn := range ioc.ConfigChangeCallbacks {
+				fn()
+			}
 		}
 	}()
 }

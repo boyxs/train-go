@@ -1,19 +1,21 @@
 etcd:
-  endpoint: 'http://127.0.0.1:2379'
-  path: '/webook'
-  type: 'yaml'
+    endpoint: http://127.0.0.1:2379
+    path: /webook
+    type: yaml
 
 mysql:
-  dsn: 'root:13520@tcp(localhost:3306)/webook'
+    dsn: root:13520@tcp(localhost:3306)/webook
 
 redis:
-  addr: '127.0.0.1:6379'
-  password: '13520'
+    addr: 127.0.0.1:6379
+    password: "13520"
 
-#logger:
-#  level:
-#    l: -1 #debug/info/warn/error
-#  development: true
-#  encoding: 'console'
-#  outputPaths: [ 'stdout' ]
-#  errorOutputPaths: [ 'stderr' ]
+#web:
+#  logger:
+#    allowReqBody: false
+#    allowResBody: true
+#    maxReqLen: 2048
+#    maxResLen: 2048
+#    maxPathLen: 1024
+
+#etcdctl put /webook < config/dev.yaml

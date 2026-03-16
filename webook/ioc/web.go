@@ -65,16 +65,21 @@ func InitMiddlewares(
 	}
 }
 
+// ConfigChangeCallbacks 远程配置变更时调用
+var ConfigChangeCallbacks []func()
+
 func loggerMiddleware(l logger.LoggerX) gin.HandlerFunc {
-	return middleware.NewLoggerMiddlewareBuilder(func(ctx context.Context, val middleware.RequestLog) {
+	builder := middleware.NewLoggerMiddlewareBuilder(func(ctx context.Context, val middleware.RequestLog) {
 		l.Debug("HTTP request", logger.Field{
 			Key: "request",
 			Val: val,
 		})
 	}).
-		AllowReqBody().
-		AllowResBody().
-		Build()
+		AllowReqBody(true).
+		AllowResBody(true)
+	builder.LoadConfig()
+	ConfigChangeCallbacks = append(ConfigChangeCallbacks, builder.LoadConfig)
+	return builder.Build()
 }
 
 func loginJwtMiddleware(hdl jwt.JwtHandler) gin.HandlerFunc {

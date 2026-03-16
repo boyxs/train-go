@@ -17,3 +17,13 @@ logger:
   encoding: 'json'
   outputPaths: [ 'stdout' ]
   errorOutputPaths: [ 'stderr' ]
+
+#web:
+#  logger:
+#    allowReqBody: true
+#    allowResBody: true
+#    maxReqLen: 2048
+#    maxResLen: 2048
+#    maxPathLen: 1024
+
+#etcdctl put /webook < config/k8s.yaml
