@@ -12,10 +12,14 @@ redis:
 
 #web:
 #  logger:
-#    allowReqBody: false
+#    allowReqBody: true
 #    allowResBody: true
 #    maxReqLen: 2048
 #    maxResLen: 2048
 #    maxPathLen: 1024
 
-#etcdctl put /webook < config/dev.yaml
+#etcdctl --endpoints=127.0.0.1:2379 put /webook < config/dev.yaml
+
+#dev.yaml 开发 (development)
+#stg.yaml 预发布 (staging)
+#prd.yaml 生产 (production)
