@@ -24,8 +24,8 @@ func (as ArticleStatus) ToUint8() uint8 {
 }
 
 const (
-	ArticleStatusUnknown     = iota //未知状态
-	ArticleStatusUnpublished        //未发表
-	ArticleStatusPublished          //已发表
-	ArticleStatusPrivate            //仅自己可见
+	ArticleStatusUnknown     ArticleStatus = iota //未知状态
+	ArticleStatusUnpublished                      //未发表
+	ArticleStatusPublished                        //已发表
+	ArticleStatusPrivate                          //仅自己可见
 )
