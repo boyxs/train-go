@@ -9,23 +9,34 @@ import (
 
 type ArticleService interface {
 	Edit(ctx context.Context, article domain.Article) (int64, error)
-}
-type InternalArticleService struct {
-	repo repository.ArticleRepository
+	Publish(ctx context.Context, article domain.Article) (int64, error)
+	Withdraw(ctx context.Context, id int64, uid int64) error
 }
 
-func NewInternalArticleService(repo repository.ArticleRepository) ArticleService {
+type InternalArticleService struct {
+	authorRepo repository.ArticleAuthorRepository
+}
+
+func NewInternalArticleService(authorRepo repository.ArticleAuthorRepository) ArticleService {
 	return &InternalArticleService{
-		repo: repo,
+		authorRepo: authorRepo,
 	}
 }
 
-func (as *InternalArticleService) Edit(ctx context.Context, article domain.Article) (int64, error) {
-	// 默认状态
+func (s *InternalArticleService) Edit(ctx context.Context, article domain.Article) (int64, error) {
 	article.Status = domain.ArticleStatusUnpublished
 	if article.Id > 0 {
-		err := as.repo.Update(ctx, article)
+		err := s.authorRepo.Update(ctx, article)
 		return article.Id, err
 	}
-	return as.repo.Create(ctx, article)
+	return s.authorRepo.Create(ctx, article)
+}
+
+func (s *InternalArticleService) Publish(ctx context.Context, article domain.Article) (int64, error) {
+	article.Status = domain.ArticleStatusPublished
+	return s.authorRepo.Publish(ctx, article)
+}
+
+func (s *InternalArticleService) Withdraw(ctx context.Context, id int64, uid int64) error {
+	return s.authorRepo.Withdraw(ctx, id, uid)
 }

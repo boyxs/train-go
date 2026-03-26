@@ -20,13 +20,13 @@ func InitWebServer() *gin.Engine {
 		ioc.InitDB, ioc.InitRedis, ioc.InitLogger, ioc.InitTimezone,
 		//dao
 		dao.NewGormUserDAO,
-		dao.NewGormArticleDAO,
+		dao.NewGormArticleAuthorDAO,
 		//cache
 		cache.NewRedisUserCache, cache.NewRedisCodeCache,
 		//repository
 		repository.NewRedisUserRepository,
 		repository.NewRedisCodeRepository,
-		repository.NewRedisArticleRepository,
+		repository.NewCacheArticleAuthorRepository,
 		//service
 		ioc.InitSmsService,
 		ioc.InitWechatOAuth2Service,
