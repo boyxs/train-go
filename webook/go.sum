@@ -60,6 +60,8 @@ github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f h1:lO4WD4F/r
 github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f/go.mod h1:cuUVRXasLTGF7a8hSLbxyZXjz+1KgoB3wDUb6vlszIc=
 github.com/dlclark/regexp2 v1.11.5 h1:Q/sSnsKerHeCkc/jSTNq1oCm7KiVgUMZRDUoRu0JQZQ=
 github.com/dlclark/regexp2 v1.11.5/go.mod h1:DHkYz0B9wPfa6wondMfaivmHpzrQ3v9q8cnmRbL6yW8=
+github.com/dromara/carbon/v2 v2.6.9 h1:kx4D7qqLmNkKRLYo/2n1owtu/A1hfPs4WTGYC2tUFFA=
+github.com/dromara/carbon/v2 v2.6.9/go.mod h1:7GXqCUplwN1s1b4whGk2zX4+g4CMCoDIZzmjlyt0vLY=
 github.com/ecodeclub/ekit v0.0.10 h1:1At1FGjxJekawb2Q/euglAkorvDKhVkUx/D4p0pJQAU=
 github.com/ecodeclub/ekit v0.0.10/go.mod h1:uomRVSWotNUhEZ5uOwFOQvJuf28MQxlL4jYG+EfArY8=
 github.com/fatih/color v1.7.0/go.mod h1:Zm6kSWBoL9eyXnKyktHP6abPY2pDugNf5KwzbycvMj4=
@@ -115,6 +117,8 @@ github.com/gogo/protobuf v1.3.2 h1:Ov1cvc58UF3b5XjBnZv7+opcTcQFZebYjWzi34vdm4Q=
 github.com/gogo/protobuf v1.3.2/go.mod h1:P1XiOD3dCwIKUDQYPy72D8LYyHL2YPYrpS2s69NZV8Q=
 github.com/golang-jwt/jwt/v5 v5.3.1 h1:kYf81DTWFe7t+1VvL7eS+jKFVWaUnK9cB1qbwn63YCY=
 github.com/golang-jwt/jwt/v5 v5.3.1/go.mod h1:fxCRLWMO43lRc8nhHWY6LGqRcf+1gQWArsqaEUEa5bE=
+github.com/golang-module/carbon/v2 v2.6.9 h1:GtDPA0O5qaszAPs51whhpimtt3FEEeM90gRBuyWR1W4=
+github.com/golang-module/carbon/v2 v2.6.9/go.mod h1:2JsYhwO7UPnUr+1hfsELAP9qjgIWzNuEz89tA1v4sY0=
 github.com/golang/protobuf v1.2.0/go.mod h1:6lQm79b+lXiMfvg/cZm0SGofjICqVBUtrP5yJMmIC1U=
 github.com/golang/protobuf v1.3.1/go.mod h1:6lQm79b+lXiMfvg/cZm0SGofjICqVBUtrP5yJMmIC1U=
 github.com/golang/protobuf v1.3.2/go.mod h1:6lQm79b+lXiMfvg/cZm0SGofjICqVBUtrP5yJMmIC1U=

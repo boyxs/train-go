@@ -35,9 +35,6 @@ func NewGormUserDAO(db *gorm.DB) UserDAO {
 }
 
 func (ud *GormUserDAO) Insert(ctx context.Context, u User) error {
-	now := time.Now().UnixMilli() // 毫秒值
-	u.CreatedAt = now
-	u.UpdatedAt = now
 	err := ud.db.WithContext(ctx).Create(&u).Error
 	//if mysqlErr, ok := err.(*mysql.MySQLError); ok {}
 	var mysqlErr *mysql.MySQLError
@@ -54,7 +51,7 @@ func (ud *GormUserDAO) Insert(ctx context.Context, u User) error {
 }
 
 func (ud *GormUserDAO) Update(ctx context.Context, user User) (User, error) {
-	//now := time.Now().UnixMilli()
+	//now := time.Now()
 	err := ud.db.WithContext(ctx).
 		Model(&User{}).
 		Where("id = ?", user.Id).
@@ -103,15 +100,13 @@ type User struct {
 	Email         sql.NullString `gorm:"unique"`
 	Password      string         `gorm:"type:varchar(256)"`
 	Nickname      string         `gorm:"type:varchar(50)"`
-	Birthday      int64          `gorm:"column:birthday"`
+	Birthday      time.Time      `gorm:"column:birthday;type:datetime"`
 	AboutMe       string         `gorm:"type:text"`
 	Phone         sql.NullString `gorm:"unique"`
 	WechatOpenId  sql.NullString `gorm:"unique"`
 	WechatUnionId sql.NullString
-
-	// 自动生成时间戳
-	CreatedAt int64 `gorm:"autoCreateTime:milli"`
-	UpdatedAt int64 `gorm:"autoUpdateTime:milli"`
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
 }
 
 // TableName 重写表名

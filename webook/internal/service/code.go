@@ -25,6 +25,13 @@ type SmsCodeService struct {
 	sms  sms.SmsService
 }
 
+func NewSmsCodeService(repo repository.CodeRepository, sms sms.SmsService) CodeService {
+	return &SmsCodeService{
+		repo: repo,
+		sms:  sms,
+	}
+}
+
 func (cs *SmsCodeService) Send(ctx context.Context, biz string, phone string) error {
 	code := cs.genCode()
 	err := cs.repo.Store(ctx, biz, phone, code)
@@ -41,13 +48,6 @@ func (cs *SmsCodeService) Verify(ctx context.Context, biz string, phone string, 
 		return false, err
 	}
 	return ok, nil
-}
-
-func NewSmsCodeService(repo repository.CodeRepository, sms sms.SmsService) CodeService {
-	return &SmsCodeService{
-		repo: repo,
-		sms:  sms,
-	}
 }
 
 func (cs *SmsCodeService) genCode() string {

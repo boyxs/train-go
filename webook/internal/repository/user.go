@@ -3,9 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
-	"time"
 
-	"gitee.com/train-cloud/geektime-basic-go/internal/consts"
 	"gitee.com/train-cloud/geektime-basic-go/internal/domain"
 	"gitee.com/train-cloud/geektime-basic-go/internal/repository/cache"
 	"gitee.com/train-cloud/geektime-basic-go/internal/repository/dao"
@@ -103,10 +101,10 @@ func (ur *RedisUserRepository) toDomain(u dao.User) domain.User {
 		Phone:     u.Phone.String,
 		Password:  u.Password,
 		Nickname:  u.Nickname,
-		Birthday:  time.UnixMilli(u.Birthday).Format(consts.DateOnly),
+		Birthday:  u.Birthday,
 		AboutMe:   u.AboutMe,
-		CreatedAt: time.UnixMilli(u.CreatedAt).Format(consts.DateTimeFull),
-		UpdatedAt: time.UnixMilli(u.UpdatedAt).Format(consts.DateTimeFull),
+		CreatedAt: u.CreatedAt,
+		UpdatedAt: u.UpdatedAt,
 
 		WechatAuth: domain.WechatAuth{
 			OpenId:  u.WechatOpenId.String,
@@ -116,7 +114,6 @@ func (ur *RedisUserRepository) toDomain(u dao.User) domain.User {
 }
 
 func (ur *RedisUserRepository) toEntity(u domain.User) dao.User {
-	birthday, _ := time.ParseInLocation(consts.DateOnly, u.Birthday, time.Local)
 	return dao.User{
 		Id: u.Id,
 		Email: sql.NullString{
@@ -128,7 +125,7 @@ func (ur *RedisUserRepository) toEntity(u domain.User) dao.User {
 			Valid:  u.Phone != "",
 		},
 		Password: u.Password,
-		Birthday: birthday.UnixMilli(),
+		Birthday: u.Birthday,
 		AboutMe:  u.AboutMe,
 		Nickname: u.Nickname,
 

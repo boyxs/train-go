@@ -14,22 +14,25 @@ import (
 	"github.com/google/wire"
 )
 
+// 这个需要登录权限
 func InitWebServer() *gin.Engine {
 	wire.Build(
 		//infra
-		InitDB, InitRedis, ioc.InitLogger,
-		//dao
-		dao.NewGormUserDAO,
+		infraSvcProvider,
+		//provider
+		userSvcProvider,
+		articleSvcProvider,
 		//cache
-		cache.NewRedisUserCache, cache.NewRedisCodeCache,
+		cache.NewRedisCodeCache,
 		//repository
-		repository.NewRedisUserRepository, repository.NewRedisCodeRepository,
+		repository.NewRedisCodeRepository,
 		//service
 		ioc.InitSmsService,
 		ioc.InitWechatOAuth2Service,
-		service.NewInternalUserService, service.NewSmsCodeService,
+		service.NewSmsCodeService,
 		//handler
 		web.NewInternalUserHandler,
+		web.NewInternalArticleHandler,
 		web.NewOAuth2WechatHandler,
 		jwt.NewRedisJwtHandler,
 
@@ -38,3 +41,32 @@ func InitWebServer() *gin.Engine {
 	)
 	return gin.Default()
 }
+
+func InitArticleHandler() web.ArticleHandler {
+	wire.Build(
+		infraSvcProvider,
+		//userSvcProvider,
+		articleSvcProvider,
+		web.NewInternalArticleHandler,
+	)
+	return &web.InternalArticleHandler{}
+}
+
+var infraSvcProvider = wire.NewSet(
+	InitRedis,
+	InitDB,
+	InitLogger,
+)
+
+var userSvcProvider = wire.NewSet(
+	dao.NewGormUserDAO,
+	cache.NewRedisUserCache,
+	repository.NewRedisUserRepository,
+	service.NewInternalUserService,
+)
+
+var articleSvcProvider = wire.NewSet(
+	dao.NewGormArticleDAO,
+	repository.NewRedisArticleRepository,
+	service.NewInternalArticleService,
+)

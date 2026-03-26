@@ -28,6 +28,12 @@ type InternalUserService struct {
 	repo repository.UserRepository
 }
 
+func NewInternalUserService(repo repository.UserRepository) UserService {
+	return &InternalUserService{
+		repo: repo,
+	}
+}
+
 func (us *InternalUserService) Register(ctx context.Context, user domain.User) error {
 	// 加密处理
 	hash, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
@@ -110,10 +116,4 @@ func (us *InternalUserService) FindOrCreateByWechat(ctx context.Context, wechatA
 		return domain.User{}, err
 	}
 	return us.repo.FindByWechat(ctx, wechatAuth.OpenId)
-}
-
-func NewInternalUserService(repo repository.UserRepository) UserService {
-	return &InternalUserService{
-		repo: repo,
-	}
 }

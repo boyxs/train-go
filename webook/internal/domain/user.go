@@ -1,18 +1,16 @@
 package domain
 
+import "time"
+
 type User struct {
 	Id         int64
 	Email      string
 	Password   string
 	Nickname   string
-	Birthday   string
+	Birthday   time.Time
 	AboutMe    string
 	Phone      string
 	WechatAuth WechatAuth
-	// UTC 0 的时区
-	//CreatedAt time.Time
-	//UpdatedAt time.Time
-	// 字符串类型
-	CreatedAt string
-	UpdatedAt string
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
 }

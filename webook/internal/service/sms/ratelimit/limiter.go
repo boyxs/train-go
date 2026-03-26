@@ -16,6 +16,14 @@ type RateLimitSmsService struct {
 	key     string
 }
 
+func NewRateLimitSmsService(sms sms.SmsService, limiter ratelimit.Limiter) sms.SmsService {
+	return &RateLimitSmsService{
+		svc:     sms,
+		limiter: limiter,
+		key:     "sms-limiter",
+	}
+}
+
 func (r *RateLimitSmsService) Send(ctx context.Context, templateId string, args []string, phoneNumbers ...string) error {
 	limit, err := r.limiter.Limit(ctx, r.key)
 	if err != nil {
@@ -25,12 +33,4 @@ func (r *RateLimitSmsService) Send(ctx context.Context, templateId string, args 
 		return errLimited
 	}
 	return r.svc.Send(ctx, templateId, args, phoneNumbers...)
-}
-
-func NewRateLimitSmsService(sms sms.SmsService, limiter ratelimit.Limiter) sms.SmsService {
-	return &RateLimitSmsService{
-		svc:     sms,
-		limiter: limiter,
-		key:     "sms-limiter",
-	}
 }

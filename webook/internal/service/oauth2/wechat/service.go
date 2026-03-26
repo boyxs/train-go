@@ -19,6 +19,14 @@ type OAuth2Service struct {
 
 var redirectURI = url.PathEscape("https://yourdomain/oauth2/wechat/callback")
 
+func NewOAuth2Service(appId string, appSecret string) oauth2.OAuth2Service {
+	return &OAuth2Service{
+		appId:     appId,
+		appSecret: appSecret,
+		client:    http.DefaultClient,
+	}
+}
+
 func (os *OAuth2Service) AuthURL(ctx context.Context, state string) (string, error) {
 	authURLPattern := `https://open.weixin.qq.com/connect/qrconnect?appid=%s&redirect_uri=%s&response_type=code&scope=snsapi_login&state=%s#wechat_redirect`
 	return fmt.Sprintf(authURLPattern, os.appId, redirectURI, state), nil
@@ -45,14 +53,6 @@ func (os *OAuth2Service) VerifyCode(ctx context.Context, code string) (domain.We
 			fmt.Errorf("调用微信接口失败 errcode %d, errmsg %s", result.ErrCode, result.ErrMsg)
 	}
 	return domain.WechatAuth{UnionId: result.UnionId, OpenId: result.OpenId}, nil
-}
-
-func NewOAuth2Service(appId string, appSecret string) oauth2.OAuth2Service {
-	return &OAuth2Service{
-		appId:     appId,
-		appSecret: appSecret,
-		client:    http.DefaultClient,
-	}
 }
 
 type Result struct {

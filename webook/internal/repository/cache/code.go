@@ -30,6 +30,12 @@ type RedisCodeCache struct {
 	cmd redis.Cmdable
 }
 
+func NewRedisCodeCache(cmd redis.Cmdable) CodeCache {
+	return &RedisCodeCache{
+		cmd: cmd,
+	}
+}
+
 func (cc *RedisCodeCache) Store(ctx context.Context, biz string, phone string, code string) error {
 	result, err := cc.cmd.Eval(ctx, luaStoreCode, []string{cc.getKey(biz, phone)}, code).Int()
 	if err != nil {
@@ -59,12 +65,6 @@ func (cc *RedisCodeCache) Verify(ctx context.Context, biz string, phone string, 
 		return false, ErrCodeInvalid
 	default:
 		return true, nil
-	}
-}
-
-func NewRedisCodeCache(cmd redis.Cmdable) CodeCache {
-	return &RedisCodeCache{
-		cmd: cmd,
 	}
 }
 

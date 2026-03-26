@@ -15,14 +15,16 @@ import (
 	"gitee.com/train-cloud/geektime-basic-go/internal/web/jwt"
 	"gitee.com/train-cloud/geektime-basic-go/ioc"
 	"github.com/gin-gonic/gin"
+	"github.com/google/wire"
 )
 
 // Injectors from wire.go:
 
+// 这个需要登录权限
 func InitWebServer() *gin.Engine {
 	cmdable := InitRedis()
 	jwtHandler := jwt.NewRedisJwtHandler(cmdable)
-	loggerX := ioc.InitLogger()
+	loggerX := InitLogger()
 	v := ioc.InitMiddlewares(jwtHandler, loggerX, cmdable)
 	db := InitDB()
 	userDAO := dao.NewGormUserDAO(db)
@@ -34,8 +36,34 @@ func InitWebServer() *gin.Engine {
 	smsService := ioc.InitSmsService(cmdable, loggerX)
 	codeService := service.NewSmsCodeService(codeRepository, smsService)
 	userHandler := web.NewInternalUserHandler(jwtHandler, userService, codeService, loggerX)
+	articleDAO := dao.NewGormArticleDAO(db)
+	articleRepository := repository.NewRedisArticleRepository(articleDAO)
+	articleService := service.NewInternalArticleService(articleRepository)
+	articleHandler := web.NewInternalArticleHandler(articleService, loggerX)
 	oAuth2Service := ioc.InitWechatOAuth2Service()
 	oAuth2Handler := web.NewOAuth2WechatHandler(jwtHandler, oAuth2Service, userService)
-	engine := ioc.InitWebServer(v, userHandler, oAuth2Handler)
+	engine := ioc.InitWebServer(v, userHandler, articleHandler, oAuth2Handler)
 	return engine
 }
+
+func InitArticleHandler() web.ArticleHandler {
+	db := InitDB()
+	articleDAO := dao.NewGormArticleDAO(db)
+	articleRepository := repository.NewRedisArticleRepository(articleDAO)
+	articleService := service.NewInternalArticleService(articleRepository)
+	loggerX := InitLogger()
+	articleHandler := web.NewInternalArticleHandler(articleService, loggerX)
+	return articleHandler
+}
+
+// wire.go:
+
+var infraSvcProvider = wire.NewSet(
+	InitRedis,
+	InitDB,
+	InitLogger,
+)
+
+var userSvcProvider = wire.NewSet(dao.NewGormUserDAO, cache.NewRedisUserCache, repository.NewRedisUserRepository, service.NewInternalUserService)
+
+var articleSvcProvider = wire.NewSet(dao.NewGormArticleDAO, repository.NewRedisArticleRepository, service.NewInternalArticleService)

@@ -1,9 +1,28 @@
 {
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  },
   "permissions": {
     "allow": [
-      "Bash(go vet:*)",
-      "Bash(wire:*)",
-      "Bash(go build:*)"
+      "Bash(*)",
+      "Read(*)",
+      "Write(*)",
+      "Edit(*)",
+      "Glob(*)",
+      "Grep(*)",
+      "Agent(*)",
+      "Skill(*)",
+      "NotebookEdit(*)",
+      "WebFetch(*)",
+      "WebSearch(*)",
+      "TaskCreate(*)",
+      "TaskUpdate(*)",
+      "mcp__pencil",
+      "mcp__claude_ai_Notion__notion-search",
+      "mcp__claude_ai_Notion__notion-create-pages",
+      "mcp__claude_ai_Notion__notion-update-page",
+      "mcp__claude_ai_Notion__notion-fetch",
+      "mcp__plugin_claude-mem_mcp-search__search"
     ]
   }
 }

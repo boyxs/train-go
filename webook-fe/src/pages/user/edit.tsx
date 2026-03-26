@@ -11,7 +11,7 @@ const { TextArea } = Input;
 
 const onFinish = (values: any) => {
   if (values.birthday) {
-    values.birthday = (values.birthday as Dayjs).format('YYYY-MM-DD');
+    values.birthday = (values.birthday as Dayjs).valueOf();
   }
   axios
     .post('/user/edit', values)
@@ -64,7 +64,7 @@ function EditForm() {
     }
     return {
       nickname: data.Nickname,
-      birthday: data.Birthday ? dayjs(data.Birthday, 'YYYY-MM-DD') : dayjs(),
+      birthday: data.Birthday ? dayjs(data.Birthday) : dayjs(),
       aboutMe: data.AboutMe,
     };
   }, [data]);

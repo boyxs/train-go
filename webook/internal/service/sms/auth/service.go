@@ -12,6 +12,13 @@ type AuthSmsService struct {
 	key []byte
 }
 
+func NewAuthSmsService(svc sms.SmsService, key []byte) sms.SmsService {
+	return &AuthSmsService{
+		svc: svc,
+		key: key,
+	}
+}
+
 func (a *AuthSmsService) Send(ctx context.Context, tplToken string, args []string, phoneNumbers ...string) error {
 	var claims SmsClaims
 	_, err := jwt.ParseWithClaims(tplToken, &claims, func(t *jwt.Token) (any, error) {
@@ -21,13 +28,6 @@ func (a *AuthSmsService) Send(ctx context.Context, tplToken string, args []strin
 		return err
 	}
 	return a.svc.Send(ctx, claims.TemplateId, args, phoneNumbers...)
-}
-
-func NewAuthSmsService(svc sms.SmsService, key []byte) sms.SmsService {
-	return &AuthSmsService{
-		svc: svc,
-		key: key,
-	}
 }
 
 type SmsClaims struct {

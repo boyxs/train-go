@@ -21,6 +21,20 @@ type TimeoutFailoverSmsService struct {
 	beforeCAS func()
 }
 
+func NewTimeoutFailoverSmsService(svcs []sms.SmsService, threshold int32, l logger.LoggerX) sms.SmsService {
+	if len(svcs) == 0 {
+		panic("短信服务商列表不能为空")
+	}
+	if threshold <= 0 {
+		threshold = 3 //默认连续3次超时就切换
+	}
+	return &TimeoutFailoverSmsService{
+		svcs:      svcs,
+		threshold: threshold,
+		l:         l,
+	}
+}
+
 func (t *TimeoutFailoverSmsService) Send(ctx context.Context, templateId string, args []string, phoneNumbers ...string) error {
 	idx := atomic.LoadInt32(&t.idx)
 	cnt := atomic.LoadInt32(&t.cnt)
@@ -81,18 +95,4 @@ func (t *TimeoutFailoverSmsService) isCriticalError(err error) bool {
 		}
 	}
 	return false
-}
-
-func NewTimeoutFailoverSmsService(svcs []sms.SmsService, threshold int32, l logger.LoggerX) sms.SmsService {
-	if len(svcs) == 0 {
-		panic("短信服务商列表不能为空")
-	}
-	if threshold <= 0 {
-		threshold = 3 //默认连续3次超时就切换
-	}
-	return &TimeoutFailoverSmsService{
-		svcs:      svcs,
-		threshold: threshold,
-		l:         l,
-	}
 }

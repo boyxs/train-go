@@ -28,6 +28,26 @@ type OAuth2WechatHandler struct {
 	stateCookieName string
 }
 
+func NewOAuth2WechatHandler(
+	hdl myJwt.JwtHandler,
+	svc oauth2.OAuth2Service,
+	userSvc service.UserService,
+) OAuth2Handler {
+	return &OAuth2WechatHandler{
+		JwtHandler:      hdl,
+		svc:             svc,
+		userSvc:         userSvc,
+		key:             consts.WechatKey,
+		stateCookieName: consts.StateCookieName,
+	}
+}
+
+func (h *OAuth2WechatHandler) RegisterRoutes(server *gin.Engine) {
+	og := server.Group("/oauth2/wechat")
+	og.GET("/authurl", h.AuthURL)
+	og.Any("/callback", h.Callback)
+}
+
 func (h *OAuth2WechatHandler) AuthURL(ctx *gin.Context) {
 	state := uuid.New().String()
 	authURL, err := h.svc.AuthURL(ctx, state)
@@ -126,24 +146,4 @@ func (h *OAuth2WechatHandler) setStateCookie(ctx *gin.Context, state string) err
 type StateClaims struct {
 	jwt.RegisteredClaims
 	State string
-}
-
-func NewOAuth2WechatHandler(
-	hdl myJwt.JwtHandler,
-	svc oauth2.OAuth2Service,
-	userSvc service.UserService,
-) OAuth2Handler {
-	return &OAuth2WechatHandler{
-		JwtHandler:      hdl,
-		svc:             svc,
-		userSvc:         userSvc,
-		key:             consts.WechatKey,
-		stateCookieName: consts.StateCookieName,
-	}
-}
-
-func (h *OAuth2WechatHandler) RegisterRoutes(server *gin.Engine) {
-	og := server.Group("/oauth2/wechat")
-	og.GET("/authurl", h.AuthURL)
-	og.Any("/callback", h.Callback)
 }

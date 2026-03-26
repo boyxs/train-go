@@ -3,6 +3,7 @@ package web
 import (
 	"errors"
 	"net/http"
+	"time"
 
 	"gitee.com/train-cloud/geektime-basic-go/internal/consts"
 	"gitee.com/train-cloud/geektime-basic-go/internal/domain"
@@ -12,6 +13,8 @@ import (
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	jwt2 "github.com/golang-jwt/jwt/v5"
+	"github.com/golang-module/carbon/v2"
+
 	//"regexp" 此库不支持 (?=
 	regexp "github.com/dlclark/regexp2"
 )
@@ -280,7 +283,7 @@ func (h *InternalUserHandler) RefreshToken(ctx *gin.Context) {
 func (h *InternalUserHandler) Edit(ctx *gin.Context) {
 	type EditRequest struct {
 		Nickname string `json:"nickname"`
-		Birthday string `json:"birthday"`
+		Birthday int64  `json:"birthday"`
 		AboutMe  string `json:"aboutMe"`
 	}
 	var req EditRequest
@@ -293,10 +296,14 @@ func (h *InternalUserHandler) Edit(ctx *gin.Context) {
 		ctx.JSON(http.StatusUnauthorized, "请先登录")
 		return
 	}
+	t := time.UnixMilli(req.Birthday)
+	_ = time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
+	_ = time.Date(t.Year(), t.Month(), t.Day(), 23, 59, 59, 99999999, t.Location())
+	_ = carbon.CreateFromTimestampMilli(req.Birthday).StdTime()
 	user, err := h.userService.Edit(ctx, domain.User{
 		Id:       uc.Userid,
 		Nickname: req.Nickname,
-		Birthday: req.Birthday,
+		Birthday: t,
 		AboutMe:  req.AboutMe,
 	})
 	if err != nil {
@@ -370,7 +377,7 @@ func (h *InternalUserHandler) LogoutSS(ctx *gin.Context) {
 func (h *InternalUserHandler) EditSS(ctx *gin.Context) {
 	type EditRequest struct {
 		Nickname string `json:"nickname"`
-		Birthday string `json:"birthday"`
+		Birthday int64  `json:"birthday"`
 		AboutMe  string `json:"aboutMe"`
 	}
 	var req EditRequest
@@ -380,10 +387,11 @@ func (h *InternalUserHandler) EditSS(ctx *gin.Context) {
 	}
 	session := sessions.Default(ctx)
 	userid := session.Get("userid")
+	birthday := time.UnixMilli(req.Birthday)
 	user, err := h.userService.Edit(ctx, domain.User{
 		Id:       userid.(int64),
 		Nickname: req.Nickname,
-		Birthday: req.Birthday,
+		Birthday: birthday,
 		AboutMe:  req.AboutMe,
 	})
 	if err != nil {

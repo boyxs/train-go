@@ -4,7 +4,7 @@ package config
 
 var Config = config{
 	MySQL: MySQLConfig{
-		DSN: "root:13520@tcp(webook-mysql:3306)/webook",
+		DSN: "root:13520@tcp(webook-mysql:3306)/webook?parseTime=true&loc=UTC",
 	},
 	Redis: RedisConfig{
 		Addr:     "webook-redis:6379",

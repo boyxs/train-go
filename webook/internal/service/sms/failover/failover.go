@@ -15,6 +15,13 @@ type FailoverSmsService struct {
 	l    logger.LoggerX
 }
 
+func NewFailoverSmsService(svcs []sms.SmsService, l logger.LoggerX) sms.SmsService {
+	return &FailoverSmsService{
+		svcs: svcs,
+		l:    l,
+	}
+}
+
 // Send 严格轮询
 func (f *FailoverSmsService) Send(ctx context.Context, templateId string, args []string, phoneNumbers ...string) error {
 	svcs := f.svcs
@@ -40,11 +47,4 @@ func (f *FailoverSmsService) Send(ctx context.Context, templateId string, args [
 	}
 
 	return errors.New("轮询所有服务商均告失败")
-}
-
-func NewFailoverSmsService(svcs []sms.SmsService, l logger.LoggerX) sms.SmsService {
-	return &FailoverSmsService{
-		svcs: svcs,
-		l:    l,
-	}
 }

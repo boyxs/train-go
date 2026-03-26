@@ -9,7 +9,7 @@ import (
 	"gorm.io/gorm/logger"
 )
 
-func InitDB(l loggerx.LoggerX) *gorm.DB {
+func InitDB(_ TimezoneReady, l loggerx.LoggerX) *gorm.DB {
 	//adapter := &LoggerAdapter{fn: l.Debug}
 	adapter := loggerFunc(l.Debug)
 	gormConfig := gorm.Config{

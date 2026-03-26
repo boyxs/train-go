@@ -13,13 +13,21 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+var ErrTokenInvalid = errors.New("token invalid")
+
 type RedisJwtHandler struct {
 	cmd           redis.Cmdable
 	signingMethod jwt.SigningMethod
 	expiration    time.Duration
 }
 
-var ErrTokenInvalid = errors.New("token invalid")
+func NewRedisJwtHandler(cmd redis.Cmdable) JwtHandler {
+	return &RedisJwtHandler{
+		cmd:           cmd,
+		signingMethod: jwt.SigningMethodHS512,
+		expiration:    consts.ExpireTime,
+	}
+}
 
 func (h *RedisJwtHandler) SetLoginToken(ctx *gin.Context, userid int64) error {
 	ssid := uuid.New().String()
@@ -96,14 +104,6 @@ func (h *RedisJwtHandler) ClearToken(ctx *gin.Context) error {
 	uc := ctx.MustGet(consts.UserKey).(UserClaims)
 	//设置ssid强制让token失效，过期时间必须大于等于token有效时间
 	return h.cmd.Set(ctx, fmt.Sprintf(consts.UserSsidPattern, uc.Ssid), "", h.expiration).Err()
-}
-
-func NewRedisJwtHandler(cmd redis.Cmdable) JwtHandler {
-	return &RedisJwtHandler{
-		cmd:           cmd,
-		signingMethod: jwt.SigningMethodHS512,
-		expiration:    consts.ExpireTime,
-	}
 }
 
 type UserClaims struct {

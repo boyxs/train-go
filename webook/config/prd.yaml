@@ -4,7 +4,7 @@ etcd:
   type: 'yaml'
 
 mysql:
-  dsn: 'root:13520@tcp(webook-mysql:3306)/webook'
+  dsn: 'root:13520@tcp(webook-mysql:3306)/webook?parseTime=true&loc=UTC'
 
 redis:
   addr: 'webook-redis:6379'

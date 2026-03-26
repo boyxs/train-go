@@ -18,10 +18,9 @@ import (
 )
 
 func TestRedisUserRepository_FindById(t *testing.T) {
-	//模拟当前时间测试
-	mockNowMs := time.Now().UnixMilli()
-	mockNow := time.UnixMilli(mockNowMs)
+	mockNow := time.Now().UTC().Truncate(time.Millisecond)
 	userid := int64(101)
+	birthday, _ := time.ParseInLocation(consts.DateOnly, "2026-02-13", time.UTC)
 	testCases := []struct {
 		name string
 		mock func(ctrl *gomock.Controller) (dao.UserDAO, cache.UserCache)
@@ -39,7 +38,6 @@ func TestRedisUserRepository_FindById(t *testing.T) {
 				userCache := cachemocks.NewMockUserCache(ctrl)
 				userCache.EXPECT().Get(gomock.Any(), userid).
 					Return(domain.User{}, cache.ErrKeyNotExist)
-				birthday, _ := time.ParseInLocation(consts.DateOnly, "2026-02-13", time.Local)
 				userDAO.EXPECT().FindById(gomock.Any(), userid).
 					Return(dao.User{
 						Id: userid,
@@ -48,19 +46,19 @@ func TestRedisUserRepository_FindById(t *testing.T) {
 							Valid:  true,
 						},
 						Password:  "$2a$10$vWf3.tFGTv7OMhK5HZKrquNKqH5rBp1tlevur4a7HPVu0IizhkB0e",
-						Birthday:  birthday.UnixMilli(),
+						Birthday:  birthday,
 						AboutMe:   "say my name",
-						CreatedAt: mockNowMs,
-						UpdatedAt: mockNowMs,
+						CreatedAt: mockNow,
+						UpdatedAt: mockNow,
 					}, nil)
 				userCache.EXPECT().Set(gomock.Any(), domain.User{
 					Id:        userid,
 					Email:     "123456@qq.com",
 					Password:  "$2a$10$vWf3.tFGTv7OMhK5HZKrquNKqH5rBp1tlevur4a7HPVu0IizhkB0e",
-					Birthday:  "2026-02-13",
+					Birthday:  birthday,
 					AboutMe:   "say my name",
-					CreatedAt: mockNow.Format(consts.DateTimeFull),
-					UpdatedAt: mockNow.Format(consts.DateTimeFull),
+					CreatedAt: mockNow,
+					UpdatedAt: mockNow,
 				}).
 					Return(nil)
 				return userDAO, userCache
@@ -71,10 +69,10 @@ func TestRedisUserRepository_FindById(t *testing.T) {
 				Id:        userid,
 				Email:     "123456@qq.com",
 				Password:  "$2a$10$vWf3.tFGTv7OMhK5HZKrquNKqH5rBp1tlevur4a7HPVu0IizhkB0e",
-				Birthday:  "2026-02-13",
+				Birthday:  birthday,
 				AboutMe:   "say my name",
-				CreatedAt: mockNow.Format(consts.DateTimeFull),
-				UpdatedAt: mockNow.Format(consts.DateTimeFull),
+				CreatedAt: mockNow,
+				UpdatedAt: mockNow,
 			},
 			wantErr: nil,
 		},
@@ -87,10 +85,10 @@ func TestRedisUserRepository_FindById(t *testing.T) {
 						Id:        userid,
 						Email:     "123456@qq.com",
 						Password:  "$2a$10$vWf3.tFGTv7OMhK5HZKrquNKqH5rBp1tlevur4a7HPVu0IizhkB0e",
-						Birthday:  "2026-02-13",
+						Birthday:  birthday,
 						AboutMe:   "say my name",
-						CreatedAt: mockNow.Format(consts.DateTimeFull),
-						UpdatedAt: mockNow.Format(consts.DateTimeFull),
+						CreatedAt: mockNow,
+						UpdatedAt: mockNow,
 					}, nil)
 				return nil, userCache
 			},
@@ -100,10 +98,10 @@ func TestRedisUserRepository_FindById(t *testing.T) {
 				Id:        userid,
 				Email:     "123456@qq.com",
 				Password:  "$2a$10$vWf3.tFGTv7OMhK5HZKrquNKqH5rBp1tlevur4a7HPVu0IizhkB0e",
-				Birthday:  "2026-02-13",
+				Birthday:  birthday,
 				AboutMe:   "say my name",
-				CreatedAt: mockNow.Format(consts.DateTimeFull),
-				UpdatedAt: mockNow.Format(consts.DateTimeFull),
+				CreatedAt: mockNow,
+				UpdatedAt: mockNow,
 			},
 			wantErr: nil,
 		},
@@ -128,7 +126,6 @@ func TestRedisUserRepository_FindById(t *testing.T) {
 			mock: func(ctrl *gomock.Controller) (dao.UserDAO, cache.UserCache) {
 				userDAO := daomocks.NewMockUserDAO(ctrl)
 				userCache := cachemocks.NewMockUserCache(ctrl)
-				birthday, _ := time.ParseInLocation(consts.DateOnly, "2026-02-13", time.Local)
 				userCache.EXPECT().Get(gomock.Any(), userid).
 					Return(domain.User{}, cache.ErrKeyNotExist)
 				userDAO.EXPECT().FindById(gomock.Any(), userid).
@@ -139,19 +136,19 @@ func TestRedisUserRepository_FindById(t *testing.T) {
 							Valid:  true,
 						},
 						Password:  "$2a$10$vWf3.tFGTv7OMhK5HZKrquNKqH5rBp1tlevur4a7HPVu0IizhkB0e",
-						Birthday:  birthday.UnixMilli(),
+						Birthday:  birthday,
 						AboutMe:   "say my name",
-						CreatedAt: mockNowMs,
-						UpdatedAt: mockNowMs,
+						CreatedAt: mockNow,
+						UpdatedAt: mockNow,
 					}, nil)
 				userCache.EXPECT().Set(gomock.Any(), domain.User{
 					Id:        userid,
 					Email:     "123456@qq.com",
 					Password:  "$2a$10$vWf3.tFGTv7OMhK5HZKrquNKqH5rBp1tlevur4a7HPVu0IizhkB0e",
-					Birthday:  "2026-02-13",
+					Birthday:  birthday,
 					AboutMe:   "say my name",
-					CreatedAt: mockNow.Format(consts.DateTimeFull),
-					UpdatedAt: mockNow.Format(consts.DateTimeFull),
+					CreatedAt: mockNow,
+					UpdatedAt: mockNow,
 				}).
 					Return(errors.New("cache error"))
 				return userDAO, userCache
@@ -162,10 +159,10 @@ func TestRedisUserRepository_FindById(t *testing.T) {
 				Id:        userid,
 				Email:     "123456@qq.com",
 				Password:  "$2a$10$vWf3.tFGTv7OMhK5HZKrquNKqH5rBp1tlevur4a7HPVu0IizhkB0e",
-				Birthday:  "2026-02-13",
+				Birthday:  birthday,
 				AboutMe:   "say my name",
-				CreatedAt: mockNow.Format(consts.DateTimeFull),
-				UpdatedAt: mockNow.Format(consts.DateTimeFull),
+				CreatedAt: mockNow,
+				UpdatedAt: mockNow,
 			},
 			wantErr: nil, //这里没有返回错误，使用查出来的数据
 		},
