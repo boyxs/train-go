@@ -578,3 +578,427 @@ type Result[T any] struct {
 	Msg  string `json:"msg"`
 	Data T      `json:"data"`
 }
+
+func (h *ArticleHandlerSuite) TestArticleHandler_Detail() {
+	t := h.T()
+	mockNow := time.Now().UTC()
+	testCases := []struct {
+		name       string
+		before     func(t *testing.T)
+		req        string
+		wantCode   int
+		wantResult Result[domain.Article]
+	}{
+		{
+			name: "正常获取自己的文章",
+			before: func(t *testing.T) {
+				err := h.db.Create(&dao.Article{
+					Id: 100, Title: "我的标题", Content: "我的内容",
+					AuthorId: 1, Status: uint8(domain.ArticleStatusPublished),
+					CreatedAt: mockNow,
+				}).Error
+				assert.NoError(t, err)
+			},
+			req:      `{"id":100}`,
+			wantCode: http.StatusOK,
+			wantResult: Result[domain.Article]{
+				Data: domain.Article{
+					Id:      100,
+					Title:   "我的标题",
+					Content: "我的内容",
+					Author:  domain.Author{Id: 1},
+					Status:  domain.ArticleStatusPublished,
+				},
+			},
+		},
+		{
+			name:   "获取不存在的文章",
+			before: func(t *testing.T) {},
+			req:    `{"id":999}`,
+			wantCode: http.StatusOK,
+			wantResult: Result[domain.Article]{
+				Msg: "系统错误",
+			},
+		},
+		{
+			name: "获取他人文章",
+			before: func(t *testing.T) {
+				err := h.db.Create(&dao.Article{
+					Id: 101, Title: "他人标题", Content: "他人内容",
+					AuthorId: 9, Status: uint8(domain.ArticleStatusPublished),
+					CreatedAt: mockNow,
+				}).Error
+				assert.NoError(t, err)
+			},
+			req:      `{"id":101}`,
+			wantCode: http.StatusOK,
+			wantResult: Result[domain.Article]{
+				Msg: "系统错误",
+			},
+		},
+		{
+			name:   "id为零",
+			before: func(t *testing.T) {},
+			req:    `{"id":0}`,
+			wantCode: http.StatusOK,
+			wantResult: Result[domain.Article]{
+				Msg: "系统错误",
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tc.before(t)
+
+			req, err := http.NewRequest(http.MethodPost, "/article/detail",
+				bytes.NewBufferString(tc.req))
+			req.Header.Add("Content-Type", "application/json")
+			assert.NoError(t, err)
+			recorder := httptest.NewRecorder()
+
+			h.server.ServeHTTP(recorder, req)
+
+			assert.Equal(t, tc.wantCode, recorder.Code)
+			var result Result[domain.Article]
+			err = json.NewDecoder(recorder.Body).Decode(&result)
+			assert.NoError(t, err)
+			// 忽略时间字段
+			result.Data.CreatedAt = time.Time{}
+			result.Data.UpdatedAt = time.Time{}
+			assert.Equal(t, tc.wantResult, result)
+		})
+	}
+}
+
+func (h *ArticleHandlerSuite) TestArticleHandler_Page() {
+	t := h.T()
+	mockNow := time.Now().UTC()
+	testCases := []struct {
+		name       string
+		before     func(t *testing.T)
+		req        string
+		wantCode   int
+		wantResult Result[ArticleListData]
+	}{
+		{
+			name: "正常获取第一页",
+			before: func(t *testing.T) {
+				// 创建 3 篇文章
+				for i := int64(1); i <= 3; i++ {
+					err := h.db.Create(&dao.Article{
+						Id: i, Title: "标题", Content: "内容",
+						AuthorId: 1, Status: uint8(domain.ArticleStatusUnpublished),
+						CreatedAt: mockNow,
+					}).Error
+					assert.NoError(t, err)
+				}
+			},
+			req:      `{"page":1,"pageSize":2}`,
+			wantCode: http.StatusOK,
+			wantResult: Result[ArticleListData]{
+				Data: ArticleListData{
+					Total: 3,
+					List: []ArticleVO{
+						{Id: 3, Title: "标题", Status: uint8(domain.ArticleStatusUnpublished)},
+						{Id: 2, Title: "标题", Status: uint8(domain.ArticleStatusUnpublished)},
+					},
+				},
+			},
+		},
+		{
+			name:   "空列表",
+			before: func(t *testing.T) {},
+			req:    `{"page":1,"pageSize":10}`,
+			wantCode: http.StatusOK,
+			wantResult: Result[ArticleListData]{
+				Data: ArticleListData{
+					Total: 0,
+					List:  []ArticleVO{},
+				},
+			},
+		},
+		{
+			name: "第二页",
+			before: func(t *testing.T) {
+				for i := int64(1); i <= 3; i++ {
+					err := h.db.Create(&dao.Article{
+						Id: i, Title: "标题", Content: "内容",
+						AuthorId: 1, Status: uint8(domain.ArticleStatusUnpublished),
+						CreatedAt: mockNow,
+					}).Error
+					assert.NoError(t, err)
+				}
+			},
+			req:      `{"page":2,"pageSize":2}`,
+			wantCode: http.StatusOK,
+			wantResult: Result[ArticleListData]{
+				Data: ArticleListData{
+					Total: 3,
+					List: []ArticleVO{
+						{Id: 1, Title: "标题", Status: uint8(domain.ArticleStatusUnpublished)},
+					},
+				},
+			},
+		},
+		{
+			name: "默认分页参数",
+			before: func(t *testing.T) {
+				err := h.db.Create(&dao.Article{
+					Id: 1, Title: "标题", Content: "内容",
+					AuthorId: 1, Status: uint8(domain.ArticleStatusUnpublished),
+					CreatedAt: mockNow,
+				}).Error
+				assert.NoError(t, err)
+			},
+			req:      `{}`,
+			wantCode: http.StatusOK,
+			wantResult: Result[ArticleListData]{
+				Data: ArticleListData{
+					Total: 1,
+					List: []ArticleVO{
+						{Id: 1, Title: "标题", Status: uint8(domain.ArticleStatusUnpublished)},
+					},
+				},
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tc.before(t)
+			defer h.truncate("article", "published_article")
+
+			req, err := http.NewRequest(http.MethodPost, "/article/page",
+				bytes.NewBufferString(tc.req))
+			req.Header.Add("Content-Type", "application/json")
+			assert.NoError(t, err)
+			recorder := httptest.NewRecorder()
+
+			h.server.ServeHTTP(recorder, req)
+
+			assert.Equal(t, tc.wantCode, recorder.Code)
+			var result Result[ArticleListData]
+			err = json.NewDecoder(recorder.Body).Decode(&result)
+			assert.NoError(t, err)
+			// 忽略动态时间字段
+			for i := range result.Data.List {
+				result.Data.List[i].UpdatedAt = ""
+			}
+			assert.Equal(t, tc.wantResult, result)
+		})
+	}
+}
+
+// ArticleVO 列表接口返回的简化文章结构（不含 Content）
+type ArticleVO struct {
+	Id        int64  `json:"Id"`
+	Title     string `json:"Title"`
+	Status    uint8  `json:"Status"`
+	UpdatedAt string `json:"UpdatedAt,omitempty"`
+}
+
+type ArticleListData struct {
+	List  []ArticleVO `json:"list"`
+	Total int64       `json:"total"`
+}
+
+func (h *ArticleHandlerSuite) TestArticleHandler_List() {
+	t := h.T()
+	mockNow := time.Now().UTC()
+	testCases := []struct {
+		name       string
+		before     func(t *testing.T)
+		wantCode   int
+		wantResult Result[[]ArticleVO]
+	}{
+		{
+			name: "返回全部文章（按id降序）",
+			before: func(t *testing.T) {
+				for i := int64(1); i <= 3; i++ {
+					err := h.db.Create(&dao.Article{
+						Id: i, Title: "标题", Content: "内容",
+						AuthorId: 1, Status: uint8(domain.ArticleStatusUnpublished),
+						CreatedAt: mockNow,
+					}).Error
+					assert.NoError(t, err)
+				}
+				// 他人文章不应出现
+				err := h.db.Create(&dao.Article{
+					Id: 99, Title: "他人", Content: "内容",
+					AuthorId: 9, Status: uint8(domain.ArticleStatusPublished),
+					CreatedAt: mockNow,
+				}).Error
+				assert.NoError(t, err)
+			},
+			wantCode: http.StatusOK,
+			wantResult: Result[[]ArticleVO]{
+				Data: []ArticleVO{
+					{Id: 3, Title: "标题", Status: uint8(domain.ArticleStatusUnpublished)},
+					{Id: 2, Title: "标题", Status: uint8(domain.ArticleStatusUnpublished)},
+					{Id: 1, Title: "标题", Status: uint8(domain.ArticleStatusUnpublished)},
+				},
+			},
+		},
+		{
+			name:   "无文章返回空数组",
+			before: func(t *testing.T) {},
+			wantCode: http.StatusOK,
+			wantResult: Result[[]ArticleVO]{
+				Data: []ArticleVO{},
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tc.before(t)
+			defer h.truncate("article", "published_article")
+
+			req, err := http.NewRequest(http.MethodPost, "/article/list",
+				bytes.NewBufferString("{}"))
+			req.Header.Add("Content-Type", "application/json")
+			assert.NoError(t, err)
+			recorder := httptest.NewRecorder()
+
+			h.server.ServeHTTP(recorder, req)
+
+			assert.Equal(t, tc.wantCode, recorder.Code)
+			var result Result[[]ArticleVO]
+			err = json.NewDecoder(recorder.Body).Decode(&result)
+			assert.NoError(t, err)
+			for i := range result.Data {
+				result.Data[i].UpdatedAt = ""
+			}
+			assert.Equal(t, tc.wantResult, result)
+		})
+	}
+}
+
+func (h *ArticleHandlerSuite) TestArticleHandler_Delete() {
+	t := h.T()
+	mockNow := time.Now().UTC()
+	testCases := []struct {
+		name       string
+		before     func(t *testing.T)
+		after      func(t *testing.T)
+		req        string
+		wantCode   int
+		wantResult Result[any]
+	}{
+		{
+			name: "删除自己的草稿文章",
+			before: func(t *testing.T) {
+				err := h.db.Create(&dao.Article{
+					Id: 200, Title: "草稿", Content: "内容",
+					AuthorId: 1, Status: uint8(domain.ArticleStatusUnpublished),
+					CreatedAt: mockNow,
+				}).Error
+				assert.NoError(t, err)
+			},
+			after: func(t *testing.T) {
+				// 制作库已删除
+				var article dao.Article
+				err := h.db.Where("id = ?", 200).First(&article).Error
+				assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+			},
+			req:      `{"id":200}`,
+			wantCode: http.StatusOK,
+			wantResult: Result[any]{
+				Msg: "OK",
+			},
+		},
+		{
+			name: "删除自己的已发布文章",
+			before: func(t *testing.T) {
+				err := h.db.Create(&dao.Article{
+					Id: 201, Title: "已发布", Content: "内容",
+					AuthorId: 1, Status: uint8(domain.ArticleStatusPublished),
+					CreatedAt: mockNow,
+				}).Error
+				assert.NoError(t, err)
+				err = h.db.Create(&dao.PublishedArticle{
+					Id: 201, Title: "已发布", Content: "内容",
+					AuthorId: 1, Status: uint8(domain.ArticleStatusPublished),
+					CreatedAt: mockNow,
+				}).Error
+				assert.NoError(t, err)
+			},
+			after: func(t *testing.T) {
+				// 制作库已删除
+				var article dao.Article
+				err := h.db.Where("id = ?", 201).First(&article).Error
+				assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+				// 线上库也删除
+				var pub dao.PublishedArticle
+				err = h.db.Where("id = ?", 201).First(&pub).Error
+				assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+			},
+			req:      `{"id":201}`,
+			wantCode: http.StatusOK,
+			wantResult: Result[any]{
+				Msg: "OK",
+			},
+		},
+		{
+			name: "删除他人文章",
+			before: func(t *testing.T) {
+				err := h.db.Create(&dao.Article{
+					Id: 202, Title: "他人文章", Content: "内容",
+					AuthorId: 9, Status: uint8(domain.ArticleStatusPublished),
+					CreatedAt: mockNow,
+				}).Error
+				assert.NoError(t, err)
+			},
+			after: func(t *testing.T) {
+				// 制作库数据不变
+				var article dao.Article
+				err := h.db.Where("id = ?", 202).First(&article).Error
+				assert.NoError(t, err)
+				assert.Equal(t, "他人文章", article.Title)
+			},
+			req:      `{"id":202}`,
+			wantCode: http.StatusOK,
+			wantResult: Result[any]{
+				Msg: "系统错误",
+			},
+		},
+		{
+			name:   "删除不存在的文章",
+			before: func(t *testing.T) {},
+			after:  func(t *testing.T) {},
+			req:    `{"id":999}`,
+			wantCode: http.StatusOK,
+			wantResult: Result[any]{
+				Msg: "系统错误",
+			},
+		},
+		{
+			name:   "id为零",
+			before: func(t *testing.T) {},
+			after:  func(t *testing.T) {},
+			req:    `{"id":0}`,
+			wantCode: http.StatusOK,
+			wantResult: Result[any]{
+				Msg: "系统错误",
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tc.before(t)
+			defer tc.after(t)
+
+			req, err := http.NewRequest(http.MethodPost, "/article/delete",
+				bytes.NewBufferString(tc.req))
+			req.Header.Add("Content-Type", "application/json")
+			assert.NoError(t, err)
+			recorder := httptest.NewRecorder()
+
+			h.server.ServeHTTP(recorder, req)
+
+			assert.Equal(t, tc.wantCode, recorder.Code)
+			var result Result[any]
+			err = json.NewDecoder(recorder.Body).Decode(&result)
+			assert.NoError(t, err)
+			assert.Equal(t, tc.wantResult, result)
+		})
+	}
+}
