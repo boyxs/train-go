@@ -34,8 +34,8 @@ function ArticleEditPage({ articleId }: ArticleEditProps) {
     const article = articleRes?.data;
     if (article) {
       form.setFieldsValue({
-        title: article.Title,
-        content: article.Content,
+        title: article.title,
+        content: article.content,
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

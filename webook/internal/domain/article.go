@@ -3,18 +3,18 @@ package domain
 import "time"
 
 type Article struct {
-	Id        int64
-	Title     string
-	Content   string
-	Author    Author
-	Status    ArticleStatus
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	Id        int64         `json:"id"`
+	Title     string        `json:"title"`
+	Content   string        `json:"content"`
+	Author    Author        `json:"author"`
+	Status    ArticleStatus `json:"status"`
+	CreatedAt time.Time     `json:"createdAt"`
+	UpdatedAt time.Time     `json:"updatedAt"`
 }
 
 type Author struct {
-	Id   int64
-	Name string
+	Id   int64  `json:"id"`
+	Name string `json:"name"`
 }
 
 type ArticleStatus uint8

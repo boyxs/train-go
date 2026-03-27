@@ -6,3 +6,7 @@ go.work
 /webook/tag/repository/dao/gorm.db
 
 /webook/im/openim-docker/
+
+# next.js
+/.next/
+/out/

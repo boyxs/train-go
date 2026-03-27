@@ -32,7 +32,8 @@ func InitWebServer() *gin.Engine {
 		service.NewSmsCodeService,
 		//handler
 		web.NewInternalUserHandler,
-		web.NewInternalArticleHandler,
+		web.NewInternalArticleAuthorHandler,
+		web.NewInternalArticleReaderHandler,
 		web.NewOAuth2WechatHandler,
 		jwt.NewRedisJwtHandler,
 
@@ -42,14 +43,22 @@ func InitWebServer() *gin.Engine {
 	return gin.Default()
 }
 
-func InitArticleHandler() web.ArticleHandler {
+func InitArticleAuthorHandler() web.ArticleAuthorHandler {
 	wire.Build(
 		infraSvcProvider,
-		//userSvcProvider,
 		articleSvcProvider,
-		web.NewInternalArticleHandler,
+		web.NewInternalArticleAuthorHandler,
 	)
-	return &web.InternalArticleHandler{}
+	return &web.InternalArticleAuthorHandler{}
+}
+
+func InitArticleReaderHandler() web.ArticleReaderHandler {
+	wire.Build(
+		infraSvcProvider,
+		articleReaderSvcProvider,
+		web.NewInternalArticleReaderHandler,
+	)
+	return &web.InternalArticleReaderHandler{}
 }
 
 var infraSvcProvider = wire.NewSet(
@@ -67,6 +76,16 @@ var userSvcProvider = wire.NewSet(
 
 var articleSvcProvider = wire.NewSet(
 	dao.NewGormArticleAuthorDAO,
+	dao.NewGormArticleReaderDAO,
+	cache.NewRedisArticleCache,
 	repository.NewCacheArticleAuthorRepository,
-	service.NewInternalArticleService,
+	repository.NewCacheArticleReaderRepository,
+	service.NewInternalArticleAuthorService,
+	service.NewInternalArticleReaderService,
+)
+
+var articleReaderSvcProvider = wire.NewSet(
+	dao.NewGormArticleReaderDAO,
+	repository.NewCacheArticleReaderRepository,
+	service.NewInternalArticleReaderService,
 )

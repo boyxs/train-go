@@ -27,9 +27,9 @@ function EditProfilePage() {
   useEffect(() => {
     if (data) {
       form.setFieldsValue({
-        nickname: data.Nickname,
-        birthday: data.Birthday ? dayjs(data.Birthday) : undefined,
-        aboutMe: data.AboutMe,
+        nickname: data.nickname,
+        birthday: data.birthday ? dayjs(data.birthday) : undefined,
+        aboutMe: data.aboutMe,
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

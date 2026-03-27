@@ -99,14 +99,14 @@ function ArticleListPage() {
   const columns: ColumnsType<Article> = [
     {
       title: '标题',
-      dataIndex: 'Title',
+      dataIndex: 'title',
       key: 'title',
       ellipsis: true,
       render: (title: string) => <Text strong>{title}</Text>,
     },
     {
       title: '状态',
-      dataIndex: 'Status',
+      dataIndex: 'status',
       key: 'status',
       width: 100,
       render: (status: ArticleStatus) => {
@@ -116,7 +116,7 @@ function ArticleListPage() {
     },
     {
       title: '更新时间',
-      dataIndex: 'UpdatedAt',
+      dataIndex: 'updatedAt',
       key: 'updatedAt',
       width: 180,
     },
@@ -129,16 +129,16 @@ function ArticleListPage() {
           <Button
             type='link'
             size='small'
-            onClick={() => router.push(`/article/edit/${record.Id}`)}
+            onClick={() => router.push(`/article/edit/${record.id}`)}
           >
             编辑
           </Button>
-          {record.Status === ArticleStatus.Published && (
+          {record.status === ArticleStatus.Published && (
             <Button
               type='link'
               size='small'
               danger
-              onClick={() => confirmWithdraw(record.Id)}
+              onClick={() => confirmWithdraw(record.id)}
             >
               撤回
             </Button>
@@ -147,7 +147,7 @@ function ArticleListPage() {
             type='link'
             size='small'
             danger
-            onClick={() => confirmDelete(record.Id)}
+            onClick={() => confirmDelete(record.id)}
           >
             删除
           </Button>
@@ -158,15 +158,15 @@ function ArticleListPage() {
 
   // ===== 移动端卡片 =====
   const renderMobileCard = (article: Article) => {
-    const info = statusMap[article.Status] || statusMap[ArticleStatus.Unknown];
+    const info = statusMap[article.status] || statusMap[ArticleStatus.Unknown];
     return (
       <div
-        key={article.Id}
+        key={article.id}
         className='border-b border-gray-100 py-3 last:border-b-0'
       >
         <div className='flex items-start justify-between gap-2 mb-1'>
           <Text strong className='flex-1 truncate'>
-            {article.Title}
+            {article.title}
           </Text>
           <Tag color={info.color} className='shrink-0'>
             {info.label}
@@ -174,22 +174,22 @@ function ArticleListPage() {
         </div>
         <div className='flex items-center justify-between'>
           <Text type='secondary' className='text-xs'>
-            {article.UpdatedAt}
+            {article.updatedAt}
           </Text>
           <Space size={0}>
             <Button
               type='link'
               size='small'
-              onClick={() => router.push(`/article/edit/${article.Id}`)}
+              onClick={() => router.push(`/article/edit/${article.id}`)}
             >
               编辑
             </Button>
-            {article.Status === ArticleStatus.Published && (
+            {article.status === ArticleStatus.Published && (
               <Button
                 type='link'
                 size='small'
                 danger
-                onClick={() => confirmWithdraw(article.Id)}
+                onClick={() => confirmWithdraw(article.id)}
               >
                 撤回
               </Button>
@@ -198,7 +198,7 @@ function ArticleListPage() {
               type='link'
               size='small'
               danger
-              onClick={() => confirmDelete(article.Id)}
+              onClick={() => confirmDelete(article.id)}
             >
               删除
             </Button>
@@ -253,8 +253,9 @@ function ArticleListPage() {
               columns={columns}
               dataSource={articles}
               loading={loading}
-              rowKey='Id'
+              rowKey='id'
               size='small'
+              bordered
               pagination={paginationProps}
             />
           </div>

@@ -21,13 +21,15 @@ import (
 func InitWebServer(
 	middlewares []gin.HandlerFunc,
 	userHandler web.UserHandler,
-	articleHandler web.ArticleHandler,
+	articleHandler web.ArticleAuthorHandler,
+	articleReaderHandler web.ArticleReaderHandler,
 	oauth2Handler web.OAuth2Handler,
 ) *gin.Engine {
 	server := gin.Default()
 	server.Use(middlewares...)
 	userHandler.RegisterRoutes(server)
 	articleHandler.RegisterRoutes(server)
+	articleReaderHandler.RegisterRoutes(server)
 	oauth2Handler.RegisterRoutes(server)
 	return server
 }
@@ -93,6 +95,8 @@ func loginJwtMiddleware(hdl jwt.JwtHandler) gin.HandlerFunc {
 			"/user/login_sms",
 			"/oauth2/wechat/authurl",
 			"/oauth2/wechat/callback",
+			"/article/reader/detail",
+			"/article/reader/page",
 		).
 		Build()
 }

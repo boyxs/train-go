@@ -2,7 +2,6 @@
 
 import { LockOutlined, MailOutlined } from '@ant-design/icons';
 import { Button, Divider, Form, Input, message, Typography } from 'antd';
-import type { AxiosError } from 'axios';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import React from 'react';
@@ -19,13 +18,15 @@ const LoginForm: React.FC = () => {
   const onFinish = async (values: LoginReq) => {
     try {
       const res = await userApi.login(values);
-      message.success(typeof res.data === 'string' ? res.data : '登录成功');
-      const redirect = searchParams.get('redirect') || '/';
-      router.replace(redirect);
-    } catch (err) {
-      const axiosErr = err as AxiosError<string>;
-      const msg = axiosErr.response?.data;
-      message.error(typeof msg === 'string' && msg ? msg : '用户名或密码错误');
+      if (res.data.code === 0 || !res.data.code) {
+        message.success(res.data.msg || '登录成功');
+        const redirect = searchParams.get('redirect') || '/';
+        router.replace(redirect);
+      } else {
+        message.error(res.data.msg || '登录失败');
+      }
+    } catch {
+      message.error('系统错误');
     }
   };
 

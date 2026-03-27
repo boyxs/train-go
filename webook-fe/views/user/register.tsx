@@ -2,7 +2,6 @@
 
 import { LockOutlined, MailOutlined } from '@ant-design/icons';
 import { Button, Form, Input, message, Typography } from 'antd';
-import type { AxiosError } from 'axios';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import React from 'react';
@@ -18,12 +17,14 @@ const RegisterForm: React.FC = () => {
   const onFinish = async (values: RegisterReq) => {
     try {
       const res = await userApi.register(values);
-      message.success(typeof res.data === 'string' ? res.data : '注册成功');
-      router.push('/login');
-    } catch (err) {
-      const axiosErr = err as AxiosError<string>;
-      const msg = axiosErr.response?.data;
-      message.error(typeof msg === 'string' && msg ? msg : '注册失败');
+      if (res.data.code === 0 || !res.data.code) {
+        message.success(res.data.msg || '注册成功');
+        router.push('/login');
+      } else {
+        message.error(res.data.msg || '注册失败');
+      }
+    } catch {
+      message.error('系统错误');
     }
   };
 

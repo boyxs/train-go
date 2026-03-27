@@ -8,21 +8,21 @@ export enum ArticleStatus {
 
 // 对应后端 domain.Article
 export interface Article {
-  Id: number;
-  Title: string;
-  Content: string;
-  Author: {
-    Id: number;
-    Name: string;
+  id: number;
+  title: string;
+  content: string;
+  author: {
+    id: number;
+    name: string;
   };
-  Status: ArticleStatus;
-  CreatedAt: string;
-  UpdatedAt: string;
+  status: ArticleStatus;
+  createdAt: string;
+  updatedAt: string;
 }
 
-// POST /article/edit 和 POST /article/publish 共用
+// POST /article/edit 和 /article/publish
 export interface EditArticleReq {
-  id?: number; // 无 id 为新建，有 id 为编辑
+  id?: number;
   title: string;
   content: string;
 }

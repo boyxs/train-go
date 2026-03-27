@@ -6,6 +6,7 @@ import {
   HomeOutlined,
   LogoutOutlined,
   MenuOutlined,
+  ReadOutlined,
   UserOutlined,
 } from '@ant-design/icons';
 import { Avatar, Button, Drawer, Dropdown, Menu } from 'antd';
@@ -17,6 +18,7 @@ import { useAuth } from '@/hooks/useAuth';
 
 const menuItems: MenuProps['items'] = [
   { key: '/', icon: <HomeOutlined />, label: '首页' },
+  { key: '/feed', icon: <ReadOutlined />, label: '文章广场' },
   { key: '/article/list', icon: <FileTextOutlined />, label: '我的文章' },
   { key: '/article/edit', icon: <EditOutlined />, label: '写文章' },
 ];
