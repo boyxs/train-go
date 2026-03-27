@@ -47,6 +47,13 @@ func (h *InternalArticleHandler) Edit(ctx *gin.Context) {
 		ctx.AbortWithStatus(http.StatusBadRequest)
 		return
 	}
+	if req.Title == "" || req.Content == "" {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 4,
+			Msg:  "标题和内容不能为空",
+		})
+		return
+	}
 	uc := ctx.MustGet(consts.UserKey).(UserClaims)
 	id, err := h.svc.Edit(ctx, domain.Article{
 		Id:      req.Id,
