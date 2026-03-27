@@ -16,6 +16,11 @@ type ArticleAuthorDAO interface {
 	Update(ctx context.Context, article Article) error
 	Publish(ctx context.Context, author Article, reader PublishedArticle) (int64, error)
 	Withdraw(ctx context.Context, id int64, uid int64, fromStatus uint8, toStatus uint8) error
+	FindByIdAndAuthor(ctx context.Context, id int64, uid int64) (Article, error)
+	PageByAuthor(ctx context.Context, uid int64, offset int, limit int) ([]Article, error)
+	CountByAuthor(ctx context.Context, uid int64) (int64, error)
+	ListByAuthor(ctx context.Context, uid int64) ([]Article, error)
+	Delete(ctx context.Context, id int64, uid int64) error
 }
 
 type GormArticleAuthorDAO struct {
@@ -109,7 +114,65 @@ func (d *GormArticleAuthorDAO) Withdraw(ctx context.Context, id int64, uid int64
 			}
 		}
 		// 线上库: 删除（幂等，不存在也不报错）
-		return tx.Where("id = ?", id).Delete(&PublishedArticle{}).Error
+		return tx.Where("id = ? AND author_id = ?", id, uid).Delete(&PublishedArticle{}).Error
+	})
+}
+
+func (d *GormArticleAuthorDAO) FindByIdAndAuthor(ctx context.Context, id int64, uid int64) (Article, error) {
+	var article Article
+	err := d.db.WithContext(ctx).
+		Where("id = ? AND author_id = ?", id, uid).
+		First(&article).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return Article{}, ErrArticleNotFound
+		}
+		return Article{}, err
+	}
+	return article, nil
+}
+
+func (d *GormArticleAuthorDAO) PageByAuthor(ctx context.Context, uid int64, offset int, limit int) ([]Article, error) {
+	var articles []Article
+	err := d.db.WithContext(ctx).
+		Where("author_id = ?", uid).
+		Order("id DESC").
+		Offset(offset).Limit(limit).
+		Find(&articles).Error
+	return articles, err
+}
+
+func (d *GormArticleAuthorDAO) CountByAuthor(ctx context.Context, uid int64) (int64, error) {
+	var count int64
+	err := d.db.WithContext(ctx).
+		Model(&Article{}).
+		Where("author_id = ?", uid).
+		Count(&count).Error
+	return count, err
+}
+
+func (d *GormArticleAuthorDAO) ListByAuthor(ctx context.Context, uid int64) ([]Article, error) {
+	var articles []Article
+	err := d.db.WithContext(ctx).
+		Where("author_id = ?", uid).
+		Order("id DESC").
+		Limit(1000).
+		Find(&articles).Error
+	return articles, err
+}
+
+func (d *GormArticleAuthorDAO) Delete(ctx context.Context, id int64, uid int64) error {
+	return d.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// 制作库：删除（必须是本人的）
+		row := tx.Where("id = ? AND author_id = ?", id, uid).Delete(&Article{})
+		if row.Error != nil {
+			return row.Error
+		}
+		if row.RowsAffected == 0 {
+			return ErrArticleNotFound
+		}
+		// 线上库：删除（幂等）
+		return tx.Where("id = ? AND author_id = ?", id, uid).Delete(&PublishedArticle{}).Error
 	})
 }
 

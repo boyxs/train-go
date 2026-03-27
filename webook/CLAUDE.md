@@ -71,10 +71,10 @@ Handler (web) → Service → Repository → DAO (MySQL) / Cache (Redis)
 | 用户 | `UserRepository` | `repository/user.go` | `RedisUserRepository` |
 | 用户 | `UserDAO` | `dao/user.go` | `GormUserDAO` |
 | 用户 | `UserCache` | `cache/user.go` | `RedisUserCache` |
-| 文章 | `ArticleHandler` | `web/article.go` | `InternalArticleHandler` |
-| 文章 | `ArticleService` | `service/article.go` | `InternalArticleService` |
-| 文章 | `ArticleAuthorRepository` | `repository/article_author.go` | `CacheArticleAuthorRepository` |
-| 文章 | `ArticleAuthorDAO` | `dao/article_author.go` | `GormArticleAuthorDAO` |
+| 文章 | `ArticleHandler` | `web/article.go` | `InternalArticleHandler`（Edit/Publish/Withdraw/Detail/List） |
+| 文章 | `ArticleService` | `service/article.go` | `InternalArticleService`（Edit/Publish/Withdraw/Detail/List） |
+| 文章 | `ArticleAuthorRepository` | `repository/article_author.go` | `CacheArticleAuthorRepository`（CRUD + Publish/Withdraw） |
+| 文章 | `ArticleAuthorDAO` | `dao/article_author.go` | `GormArticleAuthorDAO`（含双库事务） |
 | 认证 | `JwtHandler` | `web/jwt/types.go` | `RedisJWTHandler` |
 | 验证码 | `CodeService` | `service/code.go` | `SmsCodeService` |
 | 短信 | `SmsService` | `service/sms/types.go` | memory / tencent / failover / ratelimit / auth |
@@ -86,6 +86,23 @@ Handler (web) → Service → Repository → DAO (MySQL) / Cache (Redis)
 - **User**: Id, Email, Password, Nickname, Birthday, AboutMe, Phone, WechatAuth, CreatedAt, UpdatedAt
 - **Article**: Id, Title, Content, Author{Id,Name}, Status(Unknown/Unpublished/Published/Private), CreatedAt, UpdatedAt
 - **PublishedArticle**: 线上库，和 Article 同构，独立表 `published_article`
+
+## 业务规则
+
+### 文章双库设计
+
+- **制作库**（`article` 表）— 作者视角，存所有文章（草稿、已发布、已撤回）
+- **线上库**（`published_article` 表）— 读者视角，只存已发布文章
+- **发布** = 制作库 upsert（状态→Published）+ 线上库 upsert（同一事务）
+- **撤回** = 幂等设计：只有 Published→Private，Unpublished/Private 不改状态，线上库 DELETE 幂等
+- **DAO 层不依赖 domain**：Withdraw 的状态判断通过 `fromStatus`/`toStatus` 参数传入，Publish 的状态随实体字段传入
+- **事务在 DAO 层**：`ArticleAuthorDAO.Publish/Withdraw` 用 `db.Transaction()` 保证原子性
+
+### 文章列表
+
+- 分页参数校验在 Service 层：page≤0 默认 1，pageSize≤0 或 >100 默认 10
+- 列表返回 `ArticleVO`（不含 Content），详情返回完整 `Article`
+- 列表按 `id DESC` 排序
 
 ## 认证
 
@@ -117,10 +134,34 @@ Wire 编译时 DI：
 
 ## 命名规范
 
-- 方法：`FindXx` / `PageXxs` / `ListXxs` / `CreateXx` / `UpdateXx` / `DeleteXx`
-- receiver：类型首字母小写（`func (s *Service) Run()`）
-- 文件和类型按业务角色命名：`article_author.go` / `ArticleAuthorDAO` / `article_reader.go`
+### 方法命名
+- 查询：`FindXx` / `FindByXx`（单条）、`PageXxs`（分页）、`ListXxs`（列表）、`CountXx`（计数）
+- 写入：`CreateXx` / `UpdateXx` / `DeleteXx` / `Upsert`
+- 业务：`Publish` / `Withdraw`（按业务动作命名，不用泛化的 `Process` / `Handle`）
 - 不用模糊命名（`FetchList` / `GetData`），按业务简洁表达
+
+### 类型和文件命名
+- receiver：类型首字母小写（`func (s *Service) Run()`）
+- 文件按**业务角色**命名，不按技术实现：`article_author.go`（不是 `article_dao.go`）
+- 接口按 `[实体][业务角色][层]` 命名：`ArticleAuthorDAO`、`ArticleAuthorRepository`
+- 实现按 `[技术限定][实体][业务角色][层]` 命名：`GormArticleAuthorDAO`、`CacheArticleAuthorRepository`
+- 业务角色是语义概念（author/reader），技术限定是实现细节（Gorm/Cache/Redis）
+
+### 命名体系示例
+
+```
+接口（业务语义）          实现（技术限定）              文件
+ArticleAuthorDAO       → GormArticleAuthorDAO       → dao/article_author.go
+ArticleAuthorRepository → CacheArticleAuthorRepository → repository/article_author.go
+ArticleReaderDAO       → GormArticleReaderDAO       → dao/article_reader.go（待实现）
+```
+
+| 维度 | 位置 | 示例 | 含义 |
+|------|------|------|------|
+| 实体 | 接口名第一段 | `Article`AuthorDAO | 操作的领域对象 |
+| 业务角色 | 接口名第二段 | Article`Author`DAO | 区分制作库/线上库 |
+| 层 | 接口名第三段 | ArticleAuthor`DAO` | 所在架构层 |
+| 技术限定 | 实现名前缀 | `Gorm`ArticleAuthorDAO | 区分不同技术实现 |
 
 ## 编码约束
 
