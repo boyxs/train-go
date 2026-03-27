@@ -195,6 +195,20 @@ func (h *ArticleHandlerSuite) TestArticleHandler_Edit() {
 				Msg: "系统错误",
 			},
 		},
+		{
+			name:   "编辑时标题为空",
+			before: func(t *testing.T) {},
+			after:  func(t *testing.T) {},
+			article: domain.Article{
+				Title:   "",
+				Content: "有内容",
+			},
+			wantCode: http.StatusOK,
+			wantResult: Result[int64]{
+				Code: 4,
+				Msg:  "标题和内容不能为空",
+			},
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -326,6 +340,36 @@ func (h *ArticleHandlerSuite) TestArticleHandler_Publish() {
 			wantCode: http.StatusOK,
 			wantResult: Result[any]{
 				Msg: "系统错误",
+			},
+		},
+		{
+			name:   "发布不存在的文章",
+			before: func(t *testing.T) {},
+			after: func(t *testing.T) {
+				// 制作库无数据
+				var article dao.Article
+				err := h.db.Where("id = ?", 999).First(&article).Error
+				assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+				// 线上库无数据
+				var pub dao.PublishedArticle
+				err = h.db.Where("id = ?", 999).First(&pub).Error
+				assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+			},
+			req:      `{"id":999,"title":"不存在","content":"不存在内容"}`,
+			wantCode: http.StatusOK,
+			wantResult: Result[any]{
+				Msg: "系统错误",
+			},
+		},
+		{
+			name:   "发布时标题为空",
+			before: func(t *testing.T) {},
+			after:  func(t *testing.T) {},
+			req:    `{"title":"","content":"有内容"}`,
+			wantCode: http.StatusOK,
+			wantResult: Result[any]{
+				Code: 4,
+				Msg:  "标题和内容不能为空",
 			},
 		},
 	}
