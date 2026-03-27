@@ -6,16 +6,15 @@ import (
 	"time"
 
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 var ErrArticleNotFound = errors.New("ID或创作者错误")
 
+// ArticleAuthorDAO 制作库 DAO，只操作 article 表
 type ArticleAuthorDAO interface {
 	Insert(ctx context.Context, article Article) (int64, error)
 	Update(ctx context.Context, article Article) error
-	Publish(ctx context.Context, author Article, reader PublishedArticle) (int64, error)
-	Withdraw(ctx context.Context, id int64, uid int64, fromStatus uint8, toStatus uint8) error
+	UpdateStatus(ctx context.Context, id int64, uid int64, fromStatus uint8, toStatus uint8) error
 	FindByIdAndAuthor(ctx context.Context, id int64, uid int64) (Article, error)
 	PageByAuthor(ctx context.Context, uid int64, offset int, limit int) ([]Article, error)
 	CountByAuthor(ctx context.Context, uid int64) (int64, error)
@@ -28,9 +27,7 @@ type GormArticleAuthorDAO struct {
 }
 
 func NewGormArticleAuthorDAO(db *gorm.DB) ArticleAuthorDAO {
-	return &GormArticleAuthorDAO{
-		db: db,
-	}
+	return &GormArticleAuthorDAO{db: db}
 }
 
 func (d *GormArticleAuthorDAO) Insert(ctx context.Context, article Article) (int64, error) {
@@ -56,66 +53,17 @@ func (d *GormArticleAuthorDAO) Update(ctx context.Context, article Article) erro
 	return nil
 }
 
-func (d *GormArticleAuthorDAO) Publish(ctx context.Context, author Article, reader PublishedArticle) (int64, error) {
-	var id int64
-	err := d.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		// 制作库: upsert
-		if author.Id > 0 {
-			row := tx.Model(&author).
-				Where("id = ? AND author_id = ?", author.Id, author.AuthorId).
-				Updates(map[string]any{
-					"title":   author.Title,
-					"content": author.Content,
-					"status":  author.Status,
-				})
-			if row.Error != nil {
-				return row.Error
-			}
-			if row.RowsAffected == 0 {
-				return ErrArticleNotFound
-			}
-			id = author.Id
-		} else {
-			if err := tx.Create(&author).Error; err != nil {
-				return err
-			}
-			id = author.Id
-		}
-
-		// 线上库: upsert（id 和制作库一致）
-		reader.Id = id
-		return tx.Clauses(clause.OnConflict{
-			DoUpdates: clause.AssignmentColumns([]string{
-				"title", "content", "status", "updated_at",
-			}),
-		}).Create(&reader).Error
-	})
-	return id, err
-}
-
-func (d *GormArticleAuthorDAO) Withdraw(ctx context.Context, id int64, uid int64, fromStatus uint8, toStatus uint8) error {
-	return d.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		// 先确认文章存在且是本人的
-		var article Article
-		err := tx.Where("id = ? AND author_id = ?", id, uid).First(&article).Error
-		if err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return ErrArticleNotFound
-			}
-			return err
-		}
-		// 只有 fromStatus 才改成 toStatus
-		if article.Status == fromStatus {
-			err = tx.Model(&Article{}).
-				Where("id = ?", id).
-				Updates(map[string]any{"status": toStatus}).Error
-			if err != nil {
-				return err
-			}
-		}
-		// 线上库: 删除（幂等，不存在也不报错）
-		return tx.Where("id = ? AND author_id = ?", id, uid).Delete(&PublishedArticle{}).Error
-	})
+// UpdateStatus 只更新状态（用于撤回等场景）
+func (d *GormArticleAuthorDAO) UpdateStatus(ctx context.Context, id int64, uid int64, fromStatus uint8, toStatus uint8) error {
+	row := d.db.WithContext(ctx).
+		Model(&Article{}).
+		Where("id = ? AND author_id = ? AND status = ?", id, uid, fromStatus).
+		Update("status", toStatus)
+	if row.Error != nil {
+		return row.Error
+	}
+	// RowsAffected=0 不算错（幂等：已经是目标状态）
+	return nil
 }
 
 func (d *GormArticleAuthorDAO) FindByIdAndAuthor(ctx context.Context, id int64, uid int64) (Article, error) {
@@ -162,18 +110,16 @@ func (d *GormArticleAuthorDAO) ListByAuthor(ctx context.Context, uid int64) ([]A
 }
 
 func (d *GormArticleAuthorDAO) Delete(ctx context.Context, id int64, uid int64) error {
-	return d.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		// 制作库：删除（必须是本人的）
-		row := tx.Where("id = ? AND author_id = ?", id, uid).Delete(&Article{})
-		if row.Error != nil {
-			return row.Error
-		}
-		if row.RowsAffected == 0 {
-			return ErrArticleNotFound
-		}
-		// 线上库：删除（幂等）
-		return tx.Where("id = ? AND author_id = ?", id, uid).Delete(&PublishedArticle{}).Error
-	})
+	row := d.db.WithContext(ctx).
+		Where("id = ? AND author_id = ?", id, uid).
+		Delete(&Article{})
+	if row.Error != nil {
+		return row.Error
+	}
+	if row.RowsAffected == 0 {
+		return ErrArticleNotFound
+	}
+	return nil
 }
 
 // Article 制作库模型

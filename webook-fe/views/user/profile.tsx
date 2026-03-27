@@ -47,25 +47,25 @@ function ProfilePage() {
             className='shrink-0'
             style={{ backgroundColor: '#1677ff', fontSize: 24 }}
           >
-            {data.Nickname?.[0]?.toUpperCase() ||
-              data.Email?.[0]?.toUpperCase() ||
+            {data.nickname?.[0]?.toUpperCase() ||
+              data.email?.[0]?.toUpperCase() ||
               '?'}
           </Avatar>
           <div className='flex-1 min-w-0 text-center md:text-left'>
             <Title level={4} style={{ margin: 0 }}>
-              {data.Nickname || '未设置昵称'}
+              {data.nickname || '未设置昵称'}
             </Title>
             <Space size='middle' className='mt-1' wrap>
-              {data.Email && (
+              {data.email && (
                 <Text type='secondary'>
                   <MailOutlined className='mr-1' />
-                  {data.Email}
+                  {data.email}
                 </Text>
               )}
-              {data.Phone && (
+              {data.phone && (
                 <Text type='secondary'>
                   <PhoneOutlined className='mr-1' />
-                  {data.Phone}
+                  {data.phone}
                 </Text>
               )}
             </Space>
@@ -82,19 +82,19 @@ function ProfilePage() {
         {/* 详细信息 */}
         <Descriptions column={1} bordered size='small'>
           <Descriptions.Item label='昵称'>
-            {data.Nickname || '-'}
+            {data.nickname || '-'}
           </Descriptions.Item>
           <Descriptions.Item label='邮箱'>
-            {data.Email || '-'}
+            {data.email || '-'}
           </Descriptions.Item>
           <Descriptions.Item label='手机'>
-            {data.Phone || '-'}
+            {data.phone || '-'}
           </Descriptions.Item>
           <Descriptions.Item label='生日'>
-            {data.Birthday ? dayjs(data.Birthday).format('YYYY-MM-DD') : '-'}
+            {data.birthday ? dayjs(data.birthday).format('YYYY-MM-DD') : '-'}
           </Descriptions.Item>
           <Descriptions.Item label='关于我'>
-            {data.AboutMe || '-'}
+            {data.aboutMe || '-'}
           </Descriptions.Item>
         </Descriptions>
       </Card>

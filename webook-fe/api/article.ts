@@ -43,3 +43,18 @@ export function withdrawArticle(data: WithdrawArticleReq) {
 export function deleteArticle(id: number) {
   return axios.post<Result>('/article/delete', { id });
 }
+
+// ===== 读者端（公开，不需要登录）=====
+
+// POST /article/reader/page — 公开文章分页
+export function pagePublishedArticles(params: Partial<PageReq> = {}) {
+  return axios.post<Result<PageResult<Article>>>(
+    '/article/reader/page',
+    params,
+  );
+}
+
+// POST /article/reader/detail — 公开文章详情
+export function findPublishedArticle(id: number) {
+  return axios.post<Result<Article>>('/article/reader/detail', { id });
+}

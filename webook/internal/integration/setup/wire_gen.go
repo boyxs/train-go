@@ -37,23 +37,42 @@ func InitWebServer() *gin.Engine {
 	codeService := service.NewSmsCodeService(codeRepository, smsService)
 	userHandler := web.NewInternalUserHandler(jwtHandler, userService, codeService, loggerX)
 	articleAuthorDAO := dao.NewGormArticleAuthorDAO(db)
-	articleAuthorRepository := repository.NewCacheArticleAuthorRepository(articleAuthorDAO)
-	articleService := service.NewInternalArticleService(articleAuthorRepository)
-	articleHandler := web.NewInternalArticleHandler(articleService, loggerX)
+	articleCache := cache.NewRedisArticleCache(cmdable)
+	articleAuthorRepository := repository.NewCacheArticleAuthorRepository(articleAuthorDAO, articleCache)
+	articleReaderDAO := dao.NewGormArticleReaderDAO(db)
+	articleReaderRepository := repository.NewCacheArticleReaderRepository(articleReaderDAO)
+	articleAuthorService := service.NewInternalArticleAuthorService(articleAuthorRepository, articleReaderRepository)
+	articleAuthorHandler := web.NewInternalArticleAuthorHandler(articleAuthorService, loggerX)
+	articleReaderService := service.NewInternalArticleReaderService(articleReaderRepository)
+	articleReaderHandler := web.NewInternalArticleReaderHandler(articleReaderService, loggerX)
 	oAuth2Service := ioc.InitWechatOAuth2Service()
 	oAuth2Handler := web.NewOAuth2WechatHandler(jwtHandler, oAuth2Service, userService)
-	engine := ioc.InitWebServer(v, userHandler, articleHandler, oAuth2Handler)
+	engine := ioc.InitWebServer(v, userHandler, articleAuthorHandler, articleReaderHandler, oAuth2Handler)
 	return engine
 }
 
-func InitArticleHandler() web.ArticleHandler {
+func InitArticleAuthorHandler() web.ArticleAuthorHandler {
 	db := InitDB()
 	articleAuthorDAO := dao.NewGormArticleAuthorDAO(db)
-	articleAuthorRepository := repository.NewCacheArticleAuthorRepository(articleAuthorDAO)
-	articleService := service.NewInternalArticleService(articleAuthorRepository)
+	cmdable := InitRedis()
+	articleCache := cache.NewRedisArticleCache(cmdable)
+	articleAuthorRepository := repository.NewCacheArticleAuthorRepository(articleAuthorDAO, articleCache)
+	articleReaderDAO := dao.NewGormArticleReaderDAO(db)
+	articleReaderRepository := repository.NewCacheArticleReaderRepository(articleReaderDAO)
+	articleAuthorService := service.NewInternalArticleAuthorService(articleAuthorRepository, articleReaderRepository)
 	loggerX := InitLogger()
-	articleHandler := web.NewInternalArticleHandler(articleService, loggerX)
-	return articleHandler
+	articleAuthorHandler := web.NewInternalArticleAuthorHandler(articleAuthorService, loggerX)
+	return articleAuthorHandler
+}
+
+func InitArticleReaderHandler() web.ArticleReaderHandler {
+	db := InitDB()
+	articleReaderDAO := dao.NewGormArticleReaderDAO(db)
+	articleReaderRepository := repository.NewCacheArticleReaderRepository(articleReaderDAO)
+	articleReaderService := service.NewInternalArticleReaderService(articleReaderRepository)
+	loggerX := InitLogger()
+	articleReaderHandler := web.NewInternalArticleReaderHandler(articleReaderService, loggerX)
+	return articleReaderHandler
 }
 
 // wire.go:
@@ -66,4 +85,6 @@ var infraSvcProvider = wire.NewSet(
 
 var userSvcProvider = wire.NewSet(dao.NewGormUserDAO, cache.NewRedisUserCache, repository.NewRedisUserRepository, service.NewInternalUserService)
 
-var articleSvcProvider = wire.NewSet(dao.NewGormArticleAuthorDAO, repository.NewCacheArticleAuthorRepository, service.NewInternalArticleService)
+var articleSvcProvider = wire.NewSet(dao.NewGormArticleAuthorDAO, dao.NewGormArticleReaderDAO, cache.NewRedisArticleCache, repository.NewCacheArticleAuthorRepository, repository.NewCacheArticleReaderRepository, service.NewInternalArticleAuthorService, service.NewInternalArticleReaderService)
+
+var articleReaderSvcProvider = wire.NewSet(dao.NewGormArticleReaderDAO, repository.NewCacheArticleReaderRepository, service.NewInternalArticleReaderService)

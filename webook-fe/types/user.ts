@@ -1,14 +1,13 @@
-// 对应后端 domain.User（GET /user/profile 直接返回，无 Result 包装）
-// 字段名 PascalCase — Go struct 无 json tag，默认导出 PascalCase
+// 对应后端 domain.User
 export interface Profile {
-  Id: number;
-  Email: string;
-  Nickname: string;
-  Birthday: string; // RFC3339 时间字符串
-  AboutMe: string;
-  Phone: string;
-  CreatedAt: string;
-  UpdatedAt: string;
+  id: number;
+  email: string;
+  nickname: string;
+  birthday: string;
+  aboutMe: string;
+  phone: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // POST /user/login
@@ -38,6 +37,6 @@ export interface SendCodeReq {
 // POST /user/edit
 export interface EditProfileReq {
   nickname: string;
-  birthday: number; // Unix 毫秒时间戳
+  birthday: number;
   aboutMe: string;
 }

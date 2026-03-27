@@ -4,14 +4,16 @@ import (
 	"context"
 
 	"gitee.com/train-cloud/geektime-basic-go/internal/domain"
+	"gitee.com/train-cloud/geektime-basic-go/internal/repository/cache"
 	"gitee.com/train-cloud/geektime-basic-go/internal/repository/dao"
+	"go.uber.org/zap"
 )
 
+// ArticleAuthorRepository 制作库 Repository
 type ArticleAuthorRepository interface {
 	Create(ctx context.Context, article domain.Article) (int64, error)
 	Update(ctx context.Context, article domain.Article) error
-	Publish(ctx context.Context, article domain.Article) (int64, error)
-	Withdraw(ctx context.Context, id int64, uid int64) error
+	UpdateStatus(ctx context.Context, id int64, uid int64, fromStatus uint8, toStatus uint8) error
 	FindById(ctx context.Context, id int64, uid int64) (domain.Article, error)
 	Page(ctx context.Context, uid int64, offset int, limit int) ([]domain.Article, int64, error)
 	List(ctx context.Context, uid int64) ([]domain.Article, error)
@@ -19,43 +21,49 @@ type ArticleAuthorRepository interface {
 }
 
 type CacheArticleAuthorRepository struct {
-	dao dao.ArticleAuthorDAO
+	dao   dao.ArticleAuthorDAO
+	cache cache.ArticleCache
 }
 
-func NewCacheArticleAuthorRepository(dao dao.ArticleAuthorDAO) ArticleAuthorRepository {
+func NewCacheArticleAuthorRepository(
+	dao dao.ArticleAuthorDAO,
+	cache cache.ArticleCache,
+) ArticleAuthorRepository {
 	return &CacheArticleAuthorRepository{
-		dao: dao,
+		dao:   dao,
+		cache: cache,
 	}
 }
 
 func (r *CacheArticleAuthorRepository) Create(ctx context.Context, article domain.Article) (int64, error) {
-	id, err := r.dao.Insert(ctx, r.toEntity(article))
-	if err != nil {
-		return 0, err
-	}
-	return id, nil
+	return r.dao.Insert(ctx, r.toEntity(article))
 }
 
 func (r *CacheArticleAuthorRepository) Update(ctx context.Context, article domain.Article) error {
-	return r.dao.Update(ctx, r.toEntity(article))
+	err := r.dao.Update(ctx, r.toEntity(article))
+	if err != nil {
+		return err
+	}
+	r.delCache(ctx, article.Author.Id, article.Id)
+	return nil
 }
 
-func (r *CacheArticleAuthorRepository) Publish(ctx context.Context, article domain.Article) (int64, error) {
-	return r.dao.Publish(ctx, r.toEntity(article), r.toReaderEntity(article))
-}
-
-func (r *CacheArticleAuthorRepository) Withdraw(ctx context.Context, id int64, uid int64) error {
-	return r.dao.Withdraw(ctx, id, uid,
-		domain.ArticleStatusPublished.ToUint8(),
-		domain.ArticleStatusPrivate.ToUint8())
+func (r *CacheArticleAuthorRepository) UpdateStatus(ctx context.Context, id int64, uid int64, fromStatus uint8, toStatus uint8) error {
+	return r.dao.UpdateStatus(ctx, id, uid, fromStatus, toStatus)
 }
 
 func (r *CacheArticleAuthorRepository) FindById(ctx context.Context, id int64, uid int64) (domain.Article, error) {
+	art, err := r.cache.Get(ctx, uid, id)
+	if err == nil {
+		return art, nil
+	}
 	article, err := r.dao.FindByIdAndAuthor(ctx, id, uid)
 	if err != nil {
 		return domain.Article{}, err
 	}
-	return r.toDomain(article), nil
+	result := r.toDomain(article)
+	r.setCache(ctx, result)
+	return result, nil
 }
 
 func (r *CacheArticleAuthorRepository) Page(ctx context.Context, uid int64, offset int, limit int) ([]domain.Article, int64, error) {
@@ -87,16 +95,33 @@ func (r *CacheArticleAuthorRepository) List(ctx context.Context, uid int64) ([]d
 }
 
 func (r *CacheArticleAuthorRepository) Delete(ctx context.Context, id int64, uid int64) error {
-	return r.dao.Delete(ctx, id, uid)
+	err := r.dao.Delete(ctx, id, uid)
+	if err != nil {
+		return err
+	}
+	r.delCache(ctx, uid, id)
+	return nil
+}
+
+func (r *CacheArticleAuthorRepository) delCache(ctx context.Context, uid int64, id int64) {
+	if err := r.cache.Del(ctx, uid, id); err != nil {
+		zap.L().Error("删除文章缓存失败", zap.Int64("uid", uid), zap.Int64("id", id), zap.Error(err))
+	}
+}
+
+func (r *CacheArticleAuthorRepository) setCache(ctx context.Context, article domain.Article) {
+	if err := r.cache.Set(ctx, article); err != nil {
+		zap.L().Error("设置文章缓存失败", zap.Int64("uid", article.Author.Id), zap.Int64("id", article.Id), zap.Error(err))
+	}
 }
 
 func (r *CacheArticleAuthorRepository) toDomain(a dao.Article) domain.Article {
 	return domain.Article{
-		Id:      a.Id,
-		Title:   a.Title,
-		Content: a.Content,
-		Author:  domain.Author{Id: a.AuthorId},
-		Status:  domain.ArticleStatus(a.Status),
+		Id:        a.Id,
+		Title:     a.Title,
+		Content:   a.Content,
+		Author:    domain.Author{Id: a.AuthorId},
+		Status:    domain.ArticleStatus(a.Status),
 		CreatedAt: a.CreatedAt,
 		UpdatedAt: a.UpdatedAt,
 	}
@@ -104,16 +129,6 @@ func (r *CacheArticleAuthorRepository) toDomain(a dao.Article) domain.Article {
 
 func (r *CacheArticleAuthorRepository) toEntity(a domain.Article) dao.Article {
 	return dao.Article{
-		Id:       a.Id,
-		Title:    a.Title,
-		Content:  a.Content,
-		AuthorId: a.Author.Id,
-		Status:   a.Status.ToUint8(),
-	}
-}
-
-func (r *CacheArticleAuthorRepository) toReaderEntity(a domain.Article) dao.PublishedArticle {
-	return dao.PublishedArticle{
 		Id:       a.Id,
 		Title:    a.Title,
 		Content:  a.Content,

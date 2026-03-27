@@ -10,14 +10,14 @@ import type {
 
 import axios from './request';
 
-// POST /user/register — 返回纯文本
+// POST /user/register — 返回 Result
 export function register(data: RegisterReq) {
-  return axios.post<string>('/user/register', data);
+  return axios.post<Result>('/user/register', data);
 }
 
-// POST /user/login — 返回纯文本
+// POST /user/login — 返回 Result
 export function login(data: LoginReq) {
-  return axios.post<string>('/user/login', data);
+  return axios.post<Result>('/user/login', data);
 }
 
 // POST /user/logout — 返回 Result

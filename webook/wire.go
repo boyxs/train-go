@@ -21,21 +21,25 @@ func InitWebServer() *gin.Engine {
 		//dao
 		dao.NewGormUserDAO,
 		dao.NewGormArticleAuthorDAO,
+		dao.NewGormArticleReaderDAO,
 		//cache
-		cache.NewRedisUserCache, cache.NewRedisCodeCache,
+		cache.NewRedisUserCache, cache.NewRedisCodeCache, cache.NewRedisArticleCache,
 		//repository
 		repository.NewRedisUserRepository,
 		repository.NewRedisCodeRepository,
 		repository.NewCacheArticleAuthorRepository,
+		repository.NewCacheArticleReaderRepository,
 		//service
 		ioc.InitSmsService,
 		ioc.InitWechatOAuth2Service,
 		service.NewInternalUserService,
 		service.NewSmsCodeService,
-		service.NewInternalArticleService,
+		service.NewInternalArticleAuthorService,
+		service.NewInternalArticleReaderService,
 		//handler
 		web.NewInternalUserHandler,
-		web.NewInternalArticleHandler,
+		web.NewInternalArticleAuthorHandler,
+		web.NewInternalArticleReaderHandler,
 		web.NewOAuth2WechatHandler,
 		jwt.NewRedisJwtHandler,
 

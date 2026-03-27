@@ -36,7 +36,7 @@ npm run lint:fix     # ESLint 自动修复
 
 Next.js App Router，路由组分为两组：
 
-- `(auth)/` — 公开页面（login、register），无 Layout 包裹
+- `(auth)/` — 公开页面（login、register、feed、article/[id]），无 AuthGuard
 - `(main)/` — 需登录页面，由 `AuthGuard` + `AppLayout` 包裹
 
 `app/` 目录只做路由映射，业务逻辑写在 `views/` 中。
@@ -47,86 +47,107 @@ Next.js App Router，路由组分为两组：
 webook-fe/
 ├── app/                    # Next.js App Router（仅路由映射）
 │   ├── layout.tsx          # 根 Layout
-│   ├── globals.css         # Tailwind 4 + 全局样式 + @layer 声明
+│   ├── globals.css         # Tailwind 4 + @layer + 滚动条
 │   ├── (auth)/             # 公开路由组
-│   │   ├── layout.tsx      # antd patch 导入
-│   │   ├── login/          # /login
-│   │   ├── register/       # /register
-│   │   └── ...
-│   └── (main)/             # 需登录路由组（AuthGuard + AppLayout）
-│       ├── layout.tsx      # AuthGuard + AppLayout + antd patch
-│       ├── page.tsx        # /（首页）
-│       ├── user/           # /user/profile、/user/edit
-│       └── article/        # /article/list、/article/edit、/article/edit/[id]
-├── types/                  # 共享类型定义（对应后端 domain）
-│   ├── common.ts           # Result<T>、PageReq、PageResult<T>
-│   ├── user.ts             # Profile、LoginReq、RegisterReq 等
-│   ├── article.ts          # Article、ArticleStatus、EditArticleReq 等
-│   └── index.ts            # 统一导出
-├── api/                    # API 请求函数 + 请求实例
-│   ├── request.ts          # Axios 实例 + Token 拦截器 + 401 刷新
-│   ├── user.ts             # 用户相关接口
-│   └── article.ts          # 文章相关接口
+│   └── (main)/             # 需登录路由组
+├── types/                  # 共享类型（对应后端 domain）
+├── api/                    # API 请求函数 + Axios 实例
 ├── utils/                  # 工具函数
-│   └── token.ts            # Token 存取（localStorage 统一入口）
 ├── hooks/                  # 自定义 Hooks
-│   ├── useAuth.ts          # 登录态管理、登出
-│   └── useRequest.ts       # 通用异步请求 hook
 ├── components/             # 可复用组件
-│   ├── layout/             # 布局组件
-│   │   ├── AppLayout.tsx   # Tailwind flex 布局（h-screen）
-│   │   ├── Header.tsx      # 桌面水平菜单 + 移动端 Drawer 抽屉
-│   │   └── AuthGuard.tsx   # 路由守卫（useSyncExternalStore）
-│   └── common/             # 通用 UI
-│       └── Loading.tsx     # 加载态组件
-├── views/                  # 页面（按业务模块分目录）
-│   ├── user/
-│   ├── article/
-│   └── home.tsx
-├── postcss.config.mjs      # Tailwind 4 PostCSS 配置
-├── next.config.ts           # Next.js 配置
-├── eslint.config.mjs        # ESLint 9 flat config + prettier
-├── tsconfig.json            # @/* → ./*（扁平结构，无 src/）
-└── .env.local               # NEXT_PUBLIC_API_BASE_URL
+│   ├── layout/             # AppLayout / Header / AuthGuard / PublicHeader
+│   └── common/             # Loading 等通用组件
+├── views/                  # 页面（按业务模块）
+├── postcss.config.mjs      # Tailwind 4 PostCSS
+├── eslint.config.mjs        # ESLint 9 flat config
+└── tsconfig.json            # @/* → ./*
 ```
 
 ## 分层规则
 
 | 层 | 位置 | 职责 | 规则 |
 |---|---|---|---|
-| 页面 | `views/` | 路由页面，组装组件 + 调用 API | 不含可复用逻辑 |
-| 组件 | `components/` | UI 复用单元 | 无副作用，通过 props 传数据 |
-| Hooks | `hooks/` | 状态逻辑复用 | 封装 API 调用 + 状态管理 |
-| API | `api/` | 请求函数 | 一个模块一个文件，返回类型化数据 |
-| Types | `types/` | TS 类型定义 | 和后端 domain 模型对应 |
-| Utils | `utils/` | 纯函数工具 | 无副作用 |
+| 页面 | `views/` | 组装组件 + 调用 API | 不含可复用逻辑 |
+| 组件 | `components/` | UI 复用单元 | 无副作用，props 传数据 |
+| Hooks | `hooks/` | 状态逻辑复用 | 封装 API + 状态 |
+| API | `api/` | 请求函数 | 一模块一文件，类型化返回 |
+| Types | `types/` | TS 类型 | 对应后端 domain |
+| Utils | `utils/` | 纯函数 | 无副作用 |
 
-### 依赖方向
+**依赖方向：** 页面 → 组件/Hooks/API → Utils/Types。**组件不直接调 API。**
 
-```
-页面 → 组件 / Hooks / API
-Hooks → API
-API → axios 实例
-组件 → props only（不直接调 API）
-```
+## 性能约束
 
-## 认证
+### 渲染性能
+- **Server Component 优先**：`app/` 目录下的 layout/page 默认是 Server Component，只在需要 state/effect/浏览器 API 时加 `'use client'`
+- **禁止在渲染路径中做重计算**：`useMemo`/`useCallback` 只在有实际性能问题时使用，不预防性添加
+- **列表渲染必须有 `key`**：用业务 ID（`article.Id`），不用数组 index
+- **大列表分页**：禁止一次性渲染超过 100 条数据，必须分页
 
-Token 存储统一在 `utils/token.ts`，刷新逻辑在 `api/request.ts`：
-- Access token → `localStorage['access-token']` → `x-access-token` header
-- Refresh token → `localStorage['refresh-token']` → `x-refresh-token` header
-- 401 → 自动刷新 → 重试请求队列 → 刷新失败跳转 `/login`
+### 网络性能
+- **API 请求集中在 `api/` 层**：禁止组件内直接写 `axios.get/post`
+- **请求去重**：`useRequest` hook 内置 cancelled flag 防止竞态
+- **401 自动刷新**：`api/request.ts` 拦截器处理，带请求队列去重，避免并发刷新
+- **超时**：全局 10s 超时（`timeout: 10_000`）
+- **分页请求参数校验**：前端传 page/pageSize，后端兜底校验
 
-## 样式方案
+### 打包性能
+- **Tailwind 4 + PostCSS**：Tree-shaking 自动生效，不需手动 purge
+- **antd 按需加载**：antd v5 自带 tree-shaking，直接 `import { Button } from 'antd'`
+- **禁止引入不使用的包**：每次 review 检查 `package.json` 是否有僵尸依赖
+- **图片用 `next/image`**（如有图片需求）
 
-- **布局**：Tailwind 类（`h-screen flex flex-col overflow-hidden`），不用 antd Layout 组件
-- **组件**：antd 组件（Menu、Table、Form、Card 等）
-- **响应式**：Tailwind 断点 `md:768px`，移动端优先
-  - Header：桌面水平菜单，移动端 Drawer 抽屉（`hidden md:flex` / `flex md:hidden`）
-  - 文章列表：桌面 Table，移动端卡片列表
-  - 表单：`layout='vertical'` 自适应
-- **Tailwind + antd 共存**：globals.css 中 `@layer` 声明控制优先级
-- **滚动条**：全局美化（6px 圆角灰色）
+## 安全约束
+
+### XSS 防护
+- React 默认转义 JSX 内的变量，**禁止使用 `dangerouslySetInnerHTML`**（除非在 layout.tsx 注入样式）
+- 用户输入不直接拼接 HTML
+
+### Token 安全
+- Token 存 localStorage（当前方案），**页面关闭不清除**
+- 刷新 Token 逻辑在 `api/request.ts`，401 时自动刷新
+- 登出必须调 `tokenUtil.clear()` 清除双 Token
+- **不把 Token 放在 URL 参数中**
+
+### 接口安全
+- 公开接口（`/article/reader/*`、`/login`、`/register`）不传 Token
+- 认证接口由 AuthGuard 保护，未登录自动跳转 `/login?redirect=`
+- 破坏性操作（删除、撤回）必须 `Modal.confirm` 二次确认
+
+## 状态管理
+
+当前无全局状态管理（无 Redux/Zustand），状态按以下方式管理：
+
+| 状态类型 | 方案 | 位置 |
+|---------|------|------|
+| 认证状态 | `localStorage` + `useSyncExternalStore` | `utils/token.ts` + `AuthGuard` |
+| 页面数据 | `useRequest` hook | 各 `views/` 页面 |
+| 表单状态 | `antd Form.useForm()` | 各表单页面 |
+| UI 状态（弹窗/抽屉） | `useState` | 组件内部 |
+| 跨 tab 同步 | `storage` 事件监听 | `AuthGuard`、`PublicHeader` |
+
+**规则：能用局部状态解决的，不上全局。** 后续如需全局状态，优先 Zustand（轻量）。
+
+## 样式约束
+
+### Tailwind + antd 共存
+- `globals.css` 中 `@layer tw-base, antd, tw-utilities` 控制优先级
+- 布局用 Tailwind 类（`h-screen flex flex-col overflow-hidden`），不用 antd Layout
+- antd 组件内部样式用 `style={{}}` 覆盖（antd CSS-in-JS 不接受 className）
+
+### 响应式
+- 断点：`md:768px`，移动端优先
+- Header：桌面 Menu + 移动端 Drawer（`hidden md:flex` / `flex md:hidden`）
+- Table：桌面 Table + 移动端卡片（`hidden md:block` / `block md:hidden`）
+- 表单：`layout='vertical'` 自适应
+- 公开页面用 `h-screen flex flex-col overflow-hidden` 锁定视口，内容区 `flex-1 overflow-auto`
+
+### 设计规范
+- **不用泛化的 AI 风格**：避免 Inter/Arial/Roboto、紫色渐变白底等通用配色
+- **配色**：主色 + 锐利强调色，不用均匀弱色板
+- **间距**：Tailwind spacing scale（4px 为基准），保持一致
+- **圆角**：统一 `rounded-lg`（8px）
+- **阴影**：hover 时用 `shadow-md`，静态不加阴影
 
 ## API 命名规范
 
@@ -134,52 +155,40 @@ Token 存储统一在 `utils/token.ts`，刷新逻辑在 `api/request.ts`：
 |------|------|------|
 | `find` | 单条查询 | `findProfile()` / `findArticle(id)` |
 | `page` | 分页查询 | `pageArticles(params)` |
-| `list` | 全量列表（不分页） | `listArticles()` |
-| `create` / `edit` | 新建或编辑 | `editArticle(data)` |
+| `list` | 全量列表 | `listArticles()` |
+| `edit` | 新建或编辑 | `editArticle(data)` |
 | `update` | 更新 | `updateProfile(data)` |
-| `delete` / `withdraw` | 删除或撤回 | `deleteArticle(id)` / `withdrawArticle(data)` |
+| `delete` / `withdraw` | 删除/撤回 | `deleteArticle(id)` |
 
-**命名规则：**
-- 业务查询/操作函数必须带实体名：`findArticle`、`pageArticles`、`editArticle`
-- 基础认证接口不加实体名：`login`、`register`、`logout`、`loginSms`、`sendSmsCode`
-- 页面通过 `import * as articleApi from '@/api/article'` 使用
-- 返回类型必须标注：`axios.post<Result<T>>()`
+**规则：** 业务函数带实体名（`findArticle`），认证函数不带（`login`）。
 
 ## UI 交互规范
 
-- 破坏性操作（删除、撤回）统一用 `Modal.confirm` 弹窗确认，不用 Popconfirm
-- 删除最后一页最后一条数据时自动回退到上一页
-- 表单校验用 antd `<Form>` + `rules`，密码确认用 `dependencies` + 自定义 validator
+- 破坏性操作统一 `Modal.confirm`，不用 Popconfirm
+- 删除最后一页最后一条时自动回退上一页
+- 表单校验用 antd `rules`，密码确认用 `dependencies` + validator
+- Loading 状态用 `<Loading />` 组件，不用裸 Spin
+- 空状态用 antd `<Empty>`，配 CTA 按钮
 
 ## 命名规范
 
 | 类型 | 格式 | 示例 |
 |------|------|------|
 | 页面文件 | 小写下划线 | `login_sms.tsx` |
-| 组件文件 | PascalCase | `ArticleCard.tsx` |
+| 组件文件 | PascalCase | `PublicHeader.tsx` |
 | Hook 文件 | camelCase | `useAuth.ts` |
-| API 文件 | 小写模块名 | `user.ts` / `article.ts` |
-| 类型文件 | 小写模块名 | `user.ts` / `article.ts` |
-| 组件名 | PascalCase | `ArticleCard` |
-| 函数名 | camelCase | `findProfile` / `pageArticles` |
-| 类型名 | PascalCase | `Profile` / `EditArticleReq` |
+| API 文件 | 小写模块名 | `article.ts` |
+| 组件名 | PascalCase | `AppLayout` |
+| 函数名 | camelCase | `pageArticles` |
+| 类型名 | PascalCase | `EditArticleReq` |
 | 常量 | UPPER_SNAKE | `ACCESS_KEY` |
 
 ## 编码约束
 
-- 组件必须是函数组件 + Hooks，禁止 class 组件
-- 禁止 `any` 类型（ESLint 当前关闭了此规则，新代码仍需遵守）
-- 禁止 `console.log` 残留（开发调试用完即删）
-- 表单用 Ant Design `<Form>` + `onFinish`，不手写 onChange
-- 路由跳转用 `next/navigation` 的 `useRouter`
-- 不在组件内直接写 `axios.get/post`，必须通过 `api/` 调用
-- `useSearchParams` 必须在 `<Suspense>` 内使用（Next.js 16 要求）
-- 样式优先用 Tailwind class，antd 组件保持默认样式
-
-## 已知技术债
-
-| 问题 | 位置 | 优先级 |
-|------|------|--------|
-| 后端部分接口返回纯文本 | `register`, `login` | 中 — 应统一为 Result JSON |
-| localStorage 存 token | `utils/token.ts` | 低 — 有 XSS 风险，后续可改 httpOnly cookie |
-| 无前端测试 | - | 低 — 后续按需补 |
+- 函数组件 + Hooks，禁止 class 组件
+- 禁止 `any`（新代码）
+- 禁止 `console.log` 残留
+- 禁止组件内直接调 `axios`
+- `useSearchParams` 必须在 `<Suspense>` 内
+- `useEffect` 内禁止同步 `setState`（React 19 规则）— 用 `useSyncExternalStore` 替代
+- 样式优先 Tailwind class，antd 组件用 style 覆盖

@@ -103,40 +103,39 @@ func (h *InternalUserHandler) Register(ctx *gin.Context) {
 
 	isEmail, err := h.emailRegexp.MatchString(req.Email)
 	if err != nil {
-		ctx.String(http.StatusOK, "系统错误")
+		ctx.JSON(http.StatusOK, Result{Code: 5, Msg: "系统错误"})
 		return
 	}
 	if !isEmail {
-		ctx.String(http.StatusOK, "非法邮箱格式")
+		ctx.JSON(http.StatusOK, Result{Code: 4, Msg: "非法邮箱格式"})
 		return
 	}
 	if req.Password != req.ConfirmPassword {
-		ctx.String(http.StatusOK, "两次输入密码不匹配")
+		ctx.JSON(http.StatusOK, Result{Code: 4, Msg: "两次输入密码不匹配"})
 		return
 	}
 	isPassword, err := h.passwordRegexp.MatchString(req.Password)
 	if err != nil {
-		ctx.String(http.StatusOK, "系统错误")
+		ctx.JSON(http.StatusOK, Result{Code: 5, Msg: "系统错误"})
 		return
 	}
 	if !isPassword {
-		ctx.String(http.StatusOK, "密码必须包含字母、数字、特殊字符，并且不少于八位")
+		ctx.JSON(http.StatusOK, Result{Code: 4, Msg: "密码必须包含字母、数字、特殊字符，并且不少于八位"})
 		return
 	}
-	//ctx.String(http.StatusOK, "注册成功")
 	err = h.userService.Register(ctx, domain.User{
 		Email:    req.Email,
 		Password: req.Password,
 	})
 	if errors.Is(err, service.ErrDuplicateEmail) {
-		ctx.String(http.StatusOK, "邮箱已被注册")
+		ctx.JSON(http.StatusOK, Result{Code: 4, Msg: "邮箱已被注册"})
 		return
 	}
 	if err != nil {
-		ctx.String(http.StatusOK, "系统异常")
+		ctx.JSON(http.StatusOK, Result{Code: 5, Msg: "系统异常"})
 		return
 	}
-	ctx.String(http.StatusOK, "注册成功")
+	ctx.JSON(http.StatusOK, Result{Msg: "注册成功"})
 }
 
 func (h *InternalUserHandler) SendLoginSMSCode(ctx *gin.Context) {
@@ -231,14 +230,14 @@ func (h *InternalUserHandler) Login(ctx *gin.Context) {
 	case nil:
 		err := h.SetLoginToken(ctx, user.Id)
 		if err != nil {
-			ctx.String(http.StatusInternalServerError, "系统异常")
+			ctx.JSON(http.StatusOK, Result{Code: 5, Msg: "系统异常"})
 			return
 		}
-		ctx.String(http.StatusOK, "登录成功")
+		ctx.JSON(http.StatusOK, Result{Msg: "登录成功"})
 	case service.ErrInvalidUserOrPassword:
-		ctx.String(http.StatusOK, "用户名或密码错误")
+		ctx.JSON(http.StatusOK, Result{Code: 4, Msg: "用户名或密码错误"})
 	default:
-		ctx.String(http.StatusOK, "系统错误")
+		ctx.JSON(http.StatusOK, Result{Code: 5, Msg: "系统错误"})
 	}
 }
 
