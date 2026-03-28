@@ -47,9 +47,10 @@ func (h *InternalArticleAuthorHandler) RegisterRoutes(server *gin.Engine) {
 
 func (h *InternalArticleAuthorHandler) Edit(ctx *gin.Context) {
 	type EditRequest struct {
-		Id      int64  `json:"id"`
-		Title   string `json:"title"`
-		Content string `json:"content"`
+		Id       int64  `json:"id"`
+		Title    string `json:"title"`
+		Abstract string `json:"abstract"`
+		Content  string `json:"content"`
 	}
 	var req EditRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -65,9 +66,10 @@ func (h *InternalArticleAuthorHandler) Edit(ctx *gin.Context) {
 	}
 	uc := ctx.MustGet(consts.UserKey).(UserClaims)
 	id, err := h.svc.Edit(ctx, domain.Article{
-		Id:      req.Id,
-		Title:   req.Title,
-		Content: req.Content,
+		Id:       req.Id,
+		Title:    req.Title,
+		Abstract: req.Abstract,
+		Content:  req.Content,
 		Author: domain.Author{
 			Id: uc.Userid,
 		},
@@ -88,9 +90,10 @@ func (h *InternalArticleAuthorHandler) Edit(ctx *gin.Context) {
 
 func (h *InternalArticleAuthorHandler) Publish(ctx *gin.Context) {
 	type PublishRequest struct {
-		Id      int64  `json:"id"`
-		Title   string `json:"title"`
-		Content string `json:"content"`
+		Id       int64  `json:"id"`
+		Title    string `json:"title"`
+		Abstract string `json:"abstract"`
+		Content  string `json:"content"`
 	}
 	var req PublishRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -106,9 +109,10 @@ func (h *InternalArticleAuthorHandler) Publish(ctx *gin.Context) {
 	}
 	uc := ctx.MustGet(consts.UserKey).(UserClaims)
 	_, err := h.svc.Publish(ctx, domain.Article{
-		Id:      req.Id,
-		Title:   req.Title,
-		Content: req.Content,
+		Id:       req.Id,
+		Title:    req.Title,
+		Abstract: req.Abstract,
+		Content:  req.Content,
 		Author: domain.Author{
 			Id: uc.Userid,
 		},
@@ -352,10 +356,14 @@ func (h *InternalArticleReaderHandler) Page(ctx *gin.Context) {
 	}
 	list := make([]ReaderArticleVO, 0, len(articles))
 	for _, a := range articles {
+		abstract := a.Abstract
+		if abstract == "" {
+			abstract = abstractFromContent(a.Content, 128)
+		}
 		list = append(list, ReaderArticleVO{
 			Id:        a.Id,
 			Title:     a.Title,
-			Abstract:  abstractFromContent(a.Content, 128),
+			Abstract:  abstract,
 			AuthorId:  a.Author.Id,
 			UpdatedAt: a.UpdatedAt.Format(time.DateTime),
 		})

@@ -1,7 +1,7 @@
 'use client';
 
 import { LockOutlined, MailOutlined } from '@ant-design/icons';
-import { Button, Form, Input, message, Typography } from 'antd';
+import { App, Button, Form, Input, Typography } from 'antd';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import React from 'react';
@@ -13,6 +13,7 @@ const { Title, Text } = Typography;
 
 const RegisterForm: React.FC = () => {
   const router = useRouter();
+  const { message } = App.useApp();
 
   const onFinish = async (values: RegisterReq) => {
     try {
@@ -81,6 +82,12 @@ const RegisterForm: React.FC = () => {
         <div className='text-center'>
           <Text type='secondary'>已有账号？</Text>{' '}
           <Link href='/login'>立即登录</Link>
+        </div>
+
+        <div className='text-center mt-3'>
+          <Link href='/feed' className='text-xs text-gray-400'>
+            先逛逛文章广场 →
+          </Link>
         </div>
       </div>
     </div>

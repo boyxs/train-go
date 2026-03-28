@@ -28,6 +28,7 @@ func (r *CacheArticleReaderRepository) Upsert(ctx context.Context, article domai
 		Id:       article.Id,
 		Title:    article.Title,
 		Content:  article.Content,
+		Abstract: article.Abstract,
 		AuthorId: article.Author.Id,
 		Status:   article.Status.ToUint8(),
 	})
@@ -63,10 +64,11 @@ func (r *CacheArticleReaderRepository) Page(ctx context.Context, offset int, lim
 
 func (r *CacheArticleReaderRepository) toDomain(a dao.PublishedArticle) domain.Article {
 	return domain.Article{
-		Id:      a.Id,
-		Title:   a.Title,
-		Content: a.Content,
-		Author:  domain.Author{Id: a.AuthorId},
+		Id:       a.Id,
+		Title:    a.Title,
+		Content:  a.Content,
+		Abstract: a.Abstract,
+		Author:   domain.Author{Id: a.AuthorId},
 		Status:  domain.ArticleStatus(a.Status),
 		CreatedAt: a.CreatedAt,
 		UpdatedAt: a.UpdatedAt,

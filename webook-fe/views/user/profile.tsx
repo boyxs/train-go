@@ -45,7 +45,7 @@ function ProfilePage() {
           <Avatar
             size={64}
             className='shrink-0'
-            style={{ backgroundColor: '#1677ff', fontSize: 24 }}
+            style={{ backgroundColor: '#0D9488', fontSize: 24 }}
           >
             {data.nickname?.[0]?.toUpperCase() ||
               data.email?.[0]?.toUpperCase() ||

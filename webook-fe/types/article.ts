@@ -11,6 +11,7 @@ export interface Article {
   id: number;
   title: string;
   content: string;
+  abstract: string;
   author: {
     id: number;
     name: string;
@@ -24,6 +25,7 @@ export interface Article {
 export interface EditArticleReq {
   id?: number;
   title: string;
+  abstract?: string;
   content: string;
 }
 

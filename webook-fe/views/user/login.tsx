@@ -1,7 +1,7 @@
 'use client';
 
 import { LockOutlined, MailOutlined } from '@ant-design/icons';
-import { Button, Divider, Form, Input, message, Typography } from 'antd';
+import { App, Button, Divider, Form, Input, Typography } from 'antd';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import React from 'react';
@@ -13,6 +13,7 @@ const { Title, Text } = Typography;
 
 const LoginForm: React.FC = () => {
   const router = useRouter();
+  const { message } = App.useApp();
   const searchParams = useSearchParams();
 
   const onFinish = async (values: LoginReq) => {
@@ -76,6 +77,12 @@ const LoginForm: React.FC = () => {
         <div className='text-center'>
           <Text type='secondary'>还没有账号？</Text>{' '}
           <Link href='/register'>立即注册</Link>
+        </div>
+
+        <div className='text-center mt-3'>
+          <Link href='/feed' className='text-xs text-gray-400'>
+            先逛逛文章广场 →
+          </Link>
         </div>
       </div>
     </div>

@@ -1,11 +1,7 @@
 'use client';
 
-import {
-  ClockCircleOutlined,
-  RightOutlined,
-  UserOutlined,
-} from '@ant-design/icons';
-import { Avatar, Empty, Pagination, Typography } from 'antd';
+import { RightOutlined } from '@ant-design/icons';
+import { Empty, Pagination, Typography } from 'antd';
 import Link from 'next/link';
 import React, { useState } from 'react';
 
@@ -16,6 +12,9 @@ import { useRequest } from '@/hooks/useRequest';
 import type { Article } from '@/types';
 
 const { Text } = Typography;
+
+// 彩色圆点循环
+const dotColors = ['#0D9488', '#6366F1', '#22C55E', '#FCD34D', '#D97706'];
 
 function ArticleFeedPage() {
   const [page, setPage] = useState(1);
@@ -43,63 +42,83 @@ function ArticleFeedPage() {
       <PublicHeader />
 
       <div className='flex-1 overflow-auto'>
-        <div className='max-w-3xl mx-auto px-4 py-4'>
+        <div className='mx-auto px-4 py-6' style={{ maxWidth: 768 }}>
           {articles.length === 0 && !loading ? (
-            <div className='bg-white rounded-lg p-8'>
+            <div className='bg-white rounded-xl p-8'>
               <Empty description='暂无公开文章' />
             </div>
           ) : (
             <>
-              {articles.map(
-                (article: Article & { abstract?: string }, idx: number) => (
+              <div className='flex flex-col gap-3'>
+                {articles.map((article: Article, idx: number) => (
                   <Link
                     key={article.id}
                     href={`/article/${article.id}`}
                     className='no-underline group block'
                   >
-                    <div
-                      className={`bg-white px-5 py-4 hover:bg-gray-50 transition-colors ${idx === 0 ? 'rounded-t-lg' : ''} ${idx === articles.length - 1 ? 'rounded-b-lg' : 'border-b border-gray-50'}`}
-                    >
+                    <div className='bg-white rounded-xl px-6 py-5 hover:bg-gray-50 transition-colors'>
                       {/* 标题 + 箭头 */}
                       <div className='flex items-start justify-between gap-3'>
                         <div className='flex-1 min-w-0'>
-                          <Text strong className='text-base'>
+                          <Text
+                            strong
+                            style={{ fontSize: 16 }}
+                            className='group-hover:text-[#0D9488] transition-colors'
+                          >
                             {article.title}
                           </Text>
 
                           {/* 摘要 */}
                           {article.abstract && (
-                            <div className='mt-1.5'>
-                              <Text type='secondary' className='text-sm'>
+                            <div className='mt-2'>
+                              <Text
+                                type='secondary'
+                                style={{
+                                  fontSize: 14,
+                                  lineHeight: '1.5',
+                                }}
+                              >
                                 {article.abstract}
                               </Text>
                             </div>
                           )}
 
                           {/* 元信息 */}
-                          <div className='flex items-center gap-3 mt-2 text-xs text-gray-400'>
-                            <span className='flex items-center gap-1'>
-                              <Avatar
-                                size={14}
-                                icon={<UserOutlined />}
-                                style={{ backgroundColor: '#1677ff' }}
+                          <div className='flex items-center gap-4 mt-3'>
+                            <span className='flex items-center gap-1.5 text-xs text-gray-400'>
+                              <span
+                                className='inline-block w-4 h-4 rounded-full shrink-0'
+                                style={{
+                                  backgroundColor:
+                                    dotColors[idx % dotColors.length],
+                                }}
                               />
                               作者
                             </span>
-                            <span className='flex items-center gap-1'>
-                              <ClockCircleOutlined />
+                            <span className='flex items-center gap-1.5 text-xs text-gray-400'>
+                              <svg
+                                width='12'
+                                height='12'
+                                viewBox='0 0 24 24'
+                                fill='none'
+                                stroke='currentColor'
+                                strokeWidth='2'
+                              >
+                                <circle cx='12' cy='12' r='10' />
+                                <polyline points='12 6 12 12 16 14' />
+                              </svg>
                               {article.updatedAt}
                             </span>
                           </div>
                         </div>
-                        <RightOutlined className='text-gray-300 group-hover:text-blue-400 mt-1.5 text-xs shrink-0' />
+                        <RightOutlined className='text-gray-300 group-hover:text-[#0D9488] mt-1 text-xs shrink-0' />
                       </div>
                     </div>
                   </Link>
-                ),
-              )}
+                ))}
+              </div>
 
-              <div className='flex justify-center mt-5'>
+              <div className='flex justify-center mt-6'>
                 <Pagination
                   current={page}
                   pageSize={pageSize}

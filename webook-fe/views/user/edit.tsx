@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, Card, DatePicker, Form, Input, message, Space } from 'antd';
+import { App, Button, Card, DatePicker, Form, Input, Space } from 'antd';
 import dayjs from 'dayjs';
 import type { Dayjs } from 'dayjs';
 import { useRouter } from 'next/navigation';
@@ -21,6 +21,7 @@ interface FormValues {
 function EditProfilePage() {
   const [form] = Form.useForm<FormValues>();
   const router = useRouter();
+  const { message } = App.useApp();
   const { data, loading } = useRequest(() => userApi.findProfile(), []);
 
   // 数据加载后填充表单（解决 initialValues 只读一次的问题）
