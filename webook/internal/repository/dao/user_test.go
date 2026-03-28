@@ -52,7 +52,7 @@ func TestGormUserDAO_Insert(t *testing.T) {
 			u: User{
 				Nickname: "Tommy",
 			},
-			wantErr: ErrDuplicateEmail,
+			wantErr: ErrDuplicateUser,
 		},
 		{
 			name: "数据库错误",

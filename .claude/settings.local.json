@@ -24,5 +24,9 @@
       "mcp__claude_ai_Notion__notion-fetch",
       "mcp__plugin_claude-mem_mcp-search__search"
     ]
-  }
+  },
+  "enabledMcpjsonServers": [
+    "pencil"
+  ],
+  "enableAllProjectMcpServers": true
 }

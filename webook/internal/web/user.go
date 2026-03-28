@@ -208,7 +208,7 @@ func (h *InternalUserHandler) LoginSMS(ctx *gin.Context) {
 	}
 	err = h.SetLoginToken(ctx, user.Id)
 	if err != nil {
-		ctx.String(http.StatusInternalServerError, "系统异常")
+		ctx.JSON(http.StatusOK, Result{Code: 5, Msg: "系统异常"})
 		return
 	}
 	ctx.JSON(http.StatusOK, Result{
@@ -319,7 +319,7 @@ func (h *InternalUserHandler) Profile(ctx *gin.Context) {
 	}
 	profile, err := h.userService.Profile(ctx, uc.Userid)
 	if err != nil {
-		ctx.String(http.StatusInternalServerError, "系统异常")
+		ctx.JSON(http.StatusOK, Result{Code: 5, Msg: "系统异常"})
 		return
 	}
 	ctx.JSON(http.StatusOK, profile)
@@ -349,14 +349,14 @@ func (h *InternalUserHandler) LoginSS(ctx *gin.Context) {
 		})
 		err := session.Save()
 		if err != nil {
-			ctx.String(http.StatusInternalServerError, "系统异常")
+			ctx.JSON(http.StatusOK, Result{Code: 5, Msg: "系统异常"})
 			return
 		}
-		ctx.String(http.StatusOK, "登录成功")
+		ctx.JSON(http.StatusOK, Result{Msg: "登录成功"})
 	case service.ErrInvalidUserOrPassword:
-		ctx.String(http.StatusOK, "用户名或密码错误")
+		ctx.JSON(http.StatusOK, Result{Code: 4, Msg: "用户名或密码错误"})
 	default:
-		ctx.String(http.StatusOK, "系统错误")
+		ctx.JSON(http.StatusOK, Result{Code: 5, Msg: "系统错误"})
 	}
 }
 
@@ -409,7 +409,7 @@ func (h *InternalUserHandler) ProfileSS(ctx *gin.Context) {
 	}
 	profile, err := h.userService.Profile(ctx, userid)
 	if err != nil {
-		ctx.String(http.StatusInternalServerError, "系统异常")
+		ctx.JSON(http.StatusOK, Result{Code: 5, Msg: "系统异常"})
 		return
 	}
 	ctx.JSON(http.StatusOK, profile)
