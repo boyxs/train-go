@@ -1,6 +1,7 @@
 'use client';
 
 import '@ant-design/v5-patch-for-react-19';
+import { App, ConfigProvider } from 'antd';
 import React from 'react';
 
 export default function AuthLayout({
@@ -8,5 +9,9 @@ export default function AuthLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <>{children}</>;
+  return (
+    <ConfigProvider theme={{ token: { colorPrimary: '#0D9488' } }}>
+      <App>{children}</App>
+    </ConfigProvider>
+  );
 }

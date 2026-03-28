@@ -11,7 +11,7 @@ import {
   Table,
   Tag,
   Typography,
-  message,
+  App,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useRouter } from 'next/navigation';
@@ -34,6 +34,7 @@ const statusMap: Record<ArticleStatus, { label: string; color: string }> = {
 
 function ArticleListPage() {
   const router = useRouter();
+  const { message } = App.useApp();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [refreshKey, setRefreshKey] = useState(0);

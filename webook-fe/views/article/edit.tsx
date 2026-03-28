@@ -1,7 +1,7 @@
 'use client';
 
 import { SendOutlined } from '@ant-design/icons';
-import { Button, Card, Form, Input, message, Space } from 'antd';
+import { App, Button, Card, Form, Input, Space } from 'antd';
 import { useRouter } from 'next/navigation';
 import React, { useEffect } from 'react';
 
@@ -18,6 +18,7 @@ interface ArticleEditProps {
 
 function ArticleEditPage({ articleId }: ArticleEditProps) {
   const [form] = Form.useForm<EditArticleReq>();
+  const { message } = App.useApp();
   const router = useRouter();
   const isEdit = !!articleId;
 
@@ -35,6 +36,7 @@ function ArticleEditPage({ articleId }: ArticleEditProps) {
     if (article) {
       form.setFieldsValue({
         title: article.title,
+        abstract: article.abstract,
         content: article.content,
       });
     }
@@ -82,6 +84,19 @@ function ArticleEditPage({ articleId }: ArticleEditProps) {
             ]}
           >
             <Input placeholder='请输入文章标题' showCount maxLength={100} />
+          </Form.Item>
+
+          <Form.Item
+            label='摘要（选填）'
+            name='abstract'
+            rules={[{ max: 256, message: '摘要不超过 256 个字符' }]}
+          >
+            <TextArea
+              placeholder='文章摘要，不填则自动截取正文'
+              autoSize={{ minRows: 2, maxRows: 4 }}
+              showCount
+              maxLength={256}
+            />
           </Form.Item>
 
           <Form.Item

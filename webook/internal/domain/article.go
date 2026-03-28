@@ -6,6 +6,7 @@ type Article struct {
 	Id        int64         `json:"id"`
 	Title     string        `json:"title"`
 	Content   string        `json:"content"`
+	Abstract  string        `json:"abstract"`
 	Author    Author        `json:"author"`
 	Status    ArticleStatus `json:"status"`
 	CreatedAt time.Time     `json:"createdAt"`

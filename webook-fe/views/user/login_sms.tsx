@@ -1,7 +1,7 @@
 'use client';
 
 import { MobileOutlined, SafetyOutlined } from '@ant-design/icons';
-import { Button, Form, Input, message, Typography } from 'antd';
+import { App, Button, Form, Input, Typography } from 'antd';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import React from 'react';
@@ -14,6 +14,7 @@ const { Title, Text } = Typography;
 const LoginSmsForm: React.FC = () => {
   const [form] = Form.useForm();
   const router = useRouter();
+  const { message } = App.useApp();
 
   const sendCode = async () => {
     const phone = form.getFieldValue('phone');

@@ -27,7 +27,7 @@ func NewGormArticleReaderDAO(db *gorm.DB) ArticleReaderDAO {
 func (d *GormArticleReaderDAO) Upsert(ctx context.Context, article PublishedArticle) error {
 	return d.db.WithContext(ctx).Clauses(clause.OnConflict{
 		DoUpdates: clause.AssignmentColumns([]string{
-			"title", "content", "status", "updated_at",
+			"title", "content", "abstract", "status", "updated_at",
 		}),
 	}).Create(&article).Error
 }
@@ -67,6 +67,7 @@ type PublishedArticle struct {
 	Id        int64     `gorm:"primaryKey"`
 	Title     string    `gorm:"type=varchar(4096)"`
 	Content   string    `gorm:"type=BLOB"`
+	Abstract  string    `gorm:"type=varchar(256)"`
 	AuthorId  int64     `gorm:"index"`
 	Status    uint8
 	CreatedAt time.Time

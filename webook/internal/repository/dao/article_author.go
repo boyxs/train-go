@@ -40,9 +40,10 @@ func (d *GormArticleAuthorDAO) Update(ctx context.Context, article Article) erro
 		Model(&article).
 		Where("id = ? AND author_id = ?", article.Id, article.AuthorId).
 		Updates(map[string]any{
-			"title":   article.Title,
-			"content": article.Content,
-			"status":  article.Status,
+			"title":    article.Title,
+			"content":  article.Content,
+			"abstract": article.Abstract,
+			"status":   article.Status,
 		})
 	if row.Error != nil {
 		return row.Error
@@ -127,6 +128,7 @@ type Article struct {
 	Id        int64     `gorm:"primaryKey,autoIncrement"`
 	Title     string    `gorm:"type=varchar(4096)"`
 	Content   string    `gorm:"type=BLOB"`
+	Abstract  string    `gorm:"type=varchar(256)"`
 	AuthorId  int64     `gorm:"index"`
 	Status    uint8
 	CreatedAt time.Time

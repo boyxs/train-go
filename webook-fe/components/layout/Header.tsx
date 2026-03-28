@@ -99,7 +99,7 @@ export const Header: React.FC = () => {
           <Avatar
             icon={<UserOutlined />}
             className='cursor-pointer'
-            style={{ backgroundColor: '#1677ff' }}
+            style={{ backgroundColor: '#0D9488' }}
           />
         </Dropdown>
       </div>
