@@ -113,7 +113,7 @@ func TestInternalUserHandler_Register(t *testing.T) {
 				return req
 			},
 			wantCode: http.StatusOK,
-			wantBody: "注册成功",
+			wantBody: `{"code":0,"msg":"注册成功","data":null}`,
 		},
 		{
 			name: "ShouldBindJSON 出错",
@@ -149,7 +149,7 @@ func TestInternalUserHandler_Register(t *testing.T) {
 				return req
 			},
 			wantCode: http.StatusOK,
-			wantBody: "非法邮箱格式",
+			wantBody: `{"code":4,"msg":"非法邮箱格式","data":null}`,
 		},
 		{
 			name: "两次输入密码不匹配",
@@ -168,7 +168,7 @@ func TestInternalUserHandler_Register(t *testing.T) {
 				return req
 			},
 			wantCode: http.StatusOK,
-			wantBody: "两次输入密码不匹配",
+			wantBody: `{"code":4,"msg":"两次输入密码不匹配","data":null}`,
 		},
 		{
 			name: "密码格式不对",
@@ -187,7 +187,7 @@ func TestInternalUserHandler_Register(t *testing.T) {
 				return req
 			},
 			wantCode: http.StatusOK,
-			wantBody: "密码必须包含字母、数字、特殊字符，并且不少于八位",
+			wantBody: `{"code":4,"msg":"密码必须包含字母、数字、特殊字符，并且不少于八位","data":null}`,
 		},
 		{
 			name: "邮箱已被注册",
@@ -211,7 +211,7 @@ func TestInternalUserHandler_Register(t *testing.T) {
 				return req
 			},
 			wantCode: http.StatusOK,
-			wantBody: "邮箱已被注册",
+			wantBody: `{"code":4,"msg":"邮箱已被注册","data":null}`,
 		},
 		{
 			name: "系统异常",
@@ -235,7 +235,7 @@ func TestInternalUserHandler_Register(t *testing.T) {
 				return req
 			},
 			wantCode: http.StatusOK,
-			wantBody: "系统异常",
+			wantBody: `{"code":5,"msg":"系统异常","data":null}`,
 		},
 	}
 	for _, tc := range testCases {
@@ -438,8 +438,8 @@ func TestInternalUserHandler_LoginSMS(t *testing.T) {
 				assert.NoError(t, err)
 				return req
 			},
-			wantCode: http.StatusInternalServerError,
-			wantBody: "系统异常",
+			wantCode:   http.StatusOK,
+			wantResult: Result{Code: 5, Msg: "系统异常"},
 		},
 	}
 	for _, tc := range testCases {

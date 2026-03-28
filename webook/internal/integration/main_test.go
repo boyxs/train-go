@@ -8,7 +8,7 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	viper.SetConfigFile("../../config/dev.yaml")
+	viper.SetConfigFile("../../config/test.yaml")
 	if err := viper.ReadInConfig(); err != nil {
 		panic(err)
 	}

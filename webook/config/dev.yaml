@@ -22,4 +22,4 @@ redis:
 
 #dev.yaml 开发 (development)
 #stg.yaml 预发布 (staging)
-#prd.yaml 生产 (production)
+#prod.yaml 生产 (production)

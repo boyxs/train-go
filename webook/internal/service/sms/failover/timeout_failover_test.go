@@ -193,6 +193,7 @@ func TestTimeoutFailoverSmsService_CAS_Else(t *testing.T) {
 		idx:       0,
 		cnt:       1,
 		threshold: 1,
+		l:         logger.NewNopLogger(),
 
 		beforeCAS: func() {
 			//每个 goroutine 到达 CAS 前先报到
