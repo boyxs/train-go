@@ -84,7 +84,7 @@ func (s *InteractionSuite) TestInteraction_ReadReport() {
 		name      string
 		before    func(t *testing.T)
 		req       string
-		readTimes int // 上报次数
+		viewTimes int // 上报次数
 		wantCode  int
 		after     func(t *testing.T) // 验证 DB
 	}{
@@ -92,7 +92,7 @@ func (s *InteractionSuite) TestInteraction_ReadReport() {
 			name:      "单次阅读上报",
 			before:    func(t *testing.T) {},
 			req:       `{"articleId":1}`,
-			readTimes: 1,
+			viewTimes: 1,
 			wantCode:  http.StatusOK,
 			after: func(t *testing.T) {
 				var intr dao.Interaction
@@ -105,7 +105,7 @@ func (s *InteractionSuite) TestInteraction_ReadReport() {
 			name:      "多次阅读累加",
 			before:    func(t *testing.T) {},
 			req:       `{"articleId":2}`,
-			readTimes: 3,
+			viewTimes: 3,
 			wantCode:  http.StatusOK,
 			after: func(t *testing.T) {
 				var intr dao.Interaction
@@ -125,7 +125,7 @@ func (s *InteractionSuite) TestInteraction_ReadReport() {
 				assert.NoError(t, err)
 			},
 			req:       `{"articleId":3}`,
-			readTimes: 2,
+			viewTimes: 2,
 			wantCode:  http.StatusOK,
 			after: func(t *testing.T) {
 				var intr dao.Interaction
@@ -140,7 +140,7 @@ func (s *InteractionSuite) TestInteraction_ReadReport() {
 			tc.before(t)
 			defer s.truncate("published_article", "interaction", "user_interaction")
 
-			for i := 0; i < tc.readTimes; i++ {
+			for i := 0; i < tc.viewTimes; i++ {
 				recorder := s.postJSON("/interaction/view", tc.req)
 				assert.Equal(t, tc.wantCode, recorder.Code)
 			}

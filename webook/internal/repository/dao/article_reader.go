@@ -25,6 +25,7 @@ func NewGormArticleReaderDAO(db *gorm.DB) ArticleReaderDAO {
 }
 
 func (d *GormArticleReaderDAO) Upsert(ctx context.Context, article PublishedArticle) error {
+	article.Abstract = ensureAbstract(article.Abstract, article.Content)
 	return d.db.WithContext(ctx).Clauses(clause.OnConflict{
 		DoUpdates: clause.AssignmentColumns([]string{
 			"title", "content", "abstract", "status", "updated_at",

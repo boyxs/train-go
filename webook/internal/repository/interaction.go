@@ -7,7 +7,7 @@ import (
 	"gitee.com/train-cloud/geektime-basic-go/internal/domain"
 	"gitee.com/train-cloud/geektime-basic-go/internal/repository/cache"
 	"gitee.com/train-cloud/geektime-basic-go/internal/repository/dao"
-	"go.uber.org/zap"
+	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
 	"gorm.io/gorm"
 )
 
@@ -24,10 +24,11 @@ type InteractionRepository interface {
 type CacheInteractionRepository struct {
 	dao   dao.InteractionDAO
 	cache cache.InteractionCache
+	l     logger.LoggerX
 }
 
-func NewCacheInteractionRepository(dao dao.InteractionDAO, cache cache.InteractionCache) InteractionRepository {
-	return &CacheInteractionRepository{dao: dao, cache: cache}
+func NewCacheInteractionRepository(dao dao.InteractionDAO, cache cache.InteractionCache, l logger.LoggerX) InteractionRepository {
+	return &CacheInteractionRepository{dao: dao, cache: cache, l: l}
 }
 
 func (r *CacheInteractionRepository) IncrReadCount(ctx context.Context, biz string, bizId int64) error {
@@ -36,8 +37,8 @@ func (r *CacheInteractionRepository) IncrReadCount(ctx context.Context, biz stri
 		return err
 	}
 	if cErr := r.cache.IncrReadCntIfPresent(ctx, biz, bizId); cErr != nil {
-		zap.L().Error("缓存增加阅读量失败",
-			zap.String("biz", biz), zap.Int64("bizId", bizId), zap.Error(cErr))
+		r.l.Error("缓存增加阅读量失败",
+			logger.String("biz", biz), logger.Int64("bizId", bizId), logger.Error(cErr))
 	}
 	return nil
 }
@@ -76,8 +77,8 @@ func (r *CacheInteractionRepository) CancelCollect(ctx context.Context, uid int6
 
 func (r *CacheInteractionRepository) delCache(ctx context.Context, biz string, bizId int64) {
 	if err := r.cache.Del(ctx, biz, bizId); err != nil {
-		zap.L().Error("删除互动缓存失败",
-			zap.String("biz", biz), zap.Int64("bizId", bizId), zap.Error(err))
+		r.l.Error("删除互动缓存失败",
+			logger.String("biz", biz), logger.Int64("bizId", bizId), logger.Error(err))
 	}
 }
 
@@ -102,8 +103,8 @@ func (r *CacheInteractionRepository) FindInteraction(ctx context.Context, uid in
 		CollectCount: daoIntr.CollectCount,
 	}
 	if cErr := r.cache.Set(ctx, result); cErr != nil {
-		zap.L().Error("回填互动缓存失败",
-			zap.String("biz", biz), zap.Int64("bizId", bizId), zap.Error(cErr))
+		r.l.Error("回填互动缓存失败",
+			logger.String("biz", biz), logger.Int64("bizId", bizId), logger.Error(cErr))
 	}
 	if uid > 0 {
 		r.fillUserState(ctx, uid, biz, bizId, &result)
@@ -132,8 +133,8 @@ func (r *CacheInteractionRepository) FindByBizIds(ctx context.Context, biz strin
 func (r *CacheInteractionRepository) fillUserState(ctx context.Context, uid int64, biz string, bizId int64, intr *domain.Interaction) {
 	ui, err := r.dao.FindUserInteraction(ctx, uid, biz, bizId)
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		zap.L().Error("查询用户互动状态失败",
-			zap.Int64("uid", uid), zap.String("biz", biz), zap.Int64("bizId", bizId), zap.Error(err))
+		r.l.Error("查询用户互动状态失败",
+			logger.Int64("uid", uid), logger.String("biz", biz), logger.Int64("bizId", bizId), logger.Error(err))
 		return
 	}
 	intr.Liked = ui.Liked

@@ -43,74 +43,78 @@ func (d *GormInteractionDAO) IncrReadCount(ctx context.Context, biz string, bizI
 
 func (d *GormInteractionDAO) UpsertLike(ctx context.Context, uid int64, biz string, bizId int64, liked bool) error {
 	now := time.Now()
-	err := d.db.WithContext(ctx).Clauses(clause.OnConflict{
-		DoUpdates: clause.Assignments(map[string]any{
-			"liked":      liked,
-			"updated_at": now,
-		}),
-	}).Create(&UserInteraction{
-		UserId:    uid,
-		BizId:     bizId,
-		Biz:       biz,
-		Liked:     liked,
-		CreatedAt: now,
-		UpdatedAt: now,
-	}).Error
-	if err != nil {
-		return err
-	}
-	delta := int64(1)
-	if !liked {
-		delta = -1
-	}
-	return d.db.WithContext(ctx).Clauses(clause.OnConflict{
-		DoUpdates: clause.Assignments(map[string]any{
-			"like_count": gorm.Expr("GREATEST(0, like_count + ?)", delta),
-			"updated_at": now,
-		}),
-	}).Create(&Interaction{
-		BizId:     bizId,
-		Biz:       biz,
-		LikeCount: max(0, delta),
-		CreatedAt: now,
-		UpdatedAt: now,
-	}).Error
+	return d.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		err := tx.Clauses(clause.OnConflict{
+			DoUpdates: clause.Assignments(map[string]any{
+				"liked":      liked,
+				"updated_at": now,
+			}),
+		}).Create(&UserInteraction{
+			UserId:    uid,
+			BizId:     bizId,
+			Biz:       biz,
+			Liked:     liked,
+			CreatedAt: now,
+			UpdatedAt: now,
+		}).Error
+		if err != nil {
+			return err
+		}
+		delta := int64(1)
+		if !liked {
+			delta = -1
+		}
+		return tx.Clauses(clause.OnConflict{
+			DoUpdates: clause.Assignments(map[string]any{
+				"like_count": gorm.Expr("GREATEST(0, like_count + ?)", delta),
+				"updated_at": now,
+			}),
+		}).Create(&Interaction{
+			BizId:     bizId,
+			Biz:       biz,
+			LikeCount: max(0, delta),
+			CreatedAt: now,
+			UpdatedAt: now,
+		}).Error
+	})
 }
 
 func (d *GormInteractionDAO) UpsertCollect(ctx context.Context, uid int64, biz string, bizId int64, collected bool) error {
 	now := time.Now()
-	err := d.db.WithContext(ctx).Clauses(clause.OnConflict{
-		DoUpdates: clause.Assignments(map[string]any{
-			"collected":  collected,
-			"updated_at": now,
-		}),
-	}).Create(&UserInteraction{
-		UserId:    uid,
-		BizId:     bizId,
-		Biz:       biz,
-		Collected: collected,
-		CreatedAt: now,
-		UpdatedAt: now,
-	}).Error
-	if err != nil {
-		return err
-	}
-	delta := int64(1)
-	if !collected {
-		delta = -1
-	}
-	return d.db.WithContext(ctx).Clauses(clause.OnConflict{
-		DoUpdates: clause.Assignments(map[string]any{
-			"collect_count": gorm.Expr("GREATEST(0, collect_count + ?)", delta),
-			"updated_at":    now,
-		}),
-	}).Create(&Interaction{
-		BizId:        bizId,
-		Biz:          biz,
-		CollectCount: max(0, delta),
-		CreatedAt:    now,
-		UpdatedAt:    now,
-	}).Error
+	return d.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		err := tx.Clauses(clause.OnConflict{
+			DoUpdates: clause.Assignments(map[string]any{
+				"collected":  collected,
+				"updated_at": now,
+			}),
+		}).Create(&UserInteraction{
+			UserId:    uid,
+			BizId:     bizId,
+			Biz:       biz,
+			Collected: collected,
+			CreatedAt: now,
+			UpdatedAt: now,
+		}).Error
+		if err != nil {
+			return err
+		}
+		delta := int64(1)
+		if !collected {
+			delta = -1
+		}
+		return tx.Clauses(clause.OnConflict{
+			DoUpdates: clause.Assignments(map[string]any{
+				"collect_count": gorm.Expr("GREATEST(0, collect_count + ?)", delta),
+				"updated_at":    now,
+			}),
+		}).Create(&Interaction{
+			BizId:        bizId,
+			Biz:          biz,
+			CollectCount: max(0, delta),
+			CreatedAt:    now,
+			UpdatedAt:    now,
+		}).Error
+	})
 }
 
 func (d *GormInteractionDAO) FindByBizId(ctx context.Context, biz string, bizId int64) (Interaction, error) {
@@ -136,8 +140,8 @@ func (d *GormInteractionDAO) FindUserInteraction(ctx context.Context, uid int64,
 // Interaction 互动聚合计数表（通用，biz+biz_id 标识业务对象）
 type Interaction struct {
 	Id           int64  `gorm:"primaryKey,autoIncrement"`
-	BizId        int64  `gorm:"uniqueIndex:uk_biz"`
 	Biz          string `gorm:"type:varchar(64);uniqueIndex:uk_biz"`
+	BizId        int64  `gorm:"uniqueIndex:uk_biz"`
 	ReadCount    int64
 	LikeCount    int64
 	CollectCount int64
@@ -152,9 +156,9 @@ func (Interaction) TableName() string {
 // UserInteraction 用户操作记录表（通用）
 type UserInteraction struct {
 	Id        int64  `gorm:"primaryKey,autoIncrement"`
-	UserId    int64  `gorm:"uniqueIndex:uk_user_biz"`
-	BizId     int64  `gorm:"uniqueIndex:uk_user_biz"`
 	Biz       string `gorm:"type:varchar(64);uniqueIndex:uk_user_biz"`
+	BizId     int64  `gorm:"uniqueIndex:uk_user_biz"`
+	UserId    int64  `gorm:"uniqueIndex:uk_user_biz"`
 	Liked     bool
 	Collected bool
 	CreatedAt time.Time

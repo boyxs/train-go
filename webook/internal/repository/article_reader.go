@@ -4,7 +4,9 @@ import (
 	"context"
 
 	"gitee.com/train-cloud/geektime-basic-go/internal/domain"
+	"gitee.com/train-cloud/geektime-basic-go/internal/repository/cache"
 	"gitee.com/train-cloud/geektime-basic-go/internal/repository/dao"
+	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
 )
 
 // ArticleReaderRepository 线上库 Repository
@@ -16,15 +18,17 @@ type ArticleReaderRepository interface {
 }
 
 type CacheArticleReaderRepository struct {
-	dao dao.ArticleReaderDAO
+	dao   dao.ArticleReaderDAO
+	cache cache.ArticleCache
+	l     logger.LoggerX
 }
 
-func NewCacheArticleReaderRepository(dao dao.ArticleReaderDAO) ArticleReaderRepository {
-	return &CacheArticleReaderRepository{dao: dao}
+func NewCacheArticleReaderRepository(dao dao.ArticleReaderDAO, c cache.ArticleCache, l logger.LoggerX) ArticleReaderRepository {
+	return &CacheArticleReaderRepository{dao: dao, cache: c, l: l}
 }
 
 func (r *CacheArticleReaderRepository) Upsert(ctx context.Context, article domain.Article) error {
-	return r.dao.Upsert(ctx, dao.PublishedArticle{
+	err := r.dao.Upsert(ctx, dao.PublishedArticle{
 		Id:       article.Id,
 		Title:    article.Title,
 		Content:  article.Content,
@@ -32,10 +36,26 @@ func (r *CacheArticleReaderRepository) Upsert(ctx context.Context, article domai
 		AuthorId: article.Author.Id,
 		Status:   article.Status.ToUint8(),
 	})
+	if err != nil {
+		return err
+	}
+	r.delFirstPageCache(ctx)
+	return nil
 }
 
 func (r *CacheArticleReaderRepository) Delete(ctx context.Context, id int64, uid int64) error {
-	return r.dao.Delete(ctx, id, uid)
+	err := r.dao.Delete(ctx, id, uid)
+	if err != nil {
+		return err
+	}
+	r.delFirstPageCache(ctx)
+	return nil
+}
+
+func (r *CacheArticleReaderRepository) delFirstPageCache(ctx context.Context) {
+	if err := r.cache.DelFirstPage(ctx); err != nil {
+		r.l.Error("删除首页缓存失败", logger.Error(err))
+	}
 }
 
 func (r *CacheArticleReaderRepository) FindById(ctx context.Context, id int64) (domain.Article, error) {
@@ -47,6 +67,15 @@ func (r *CacheArticleReaderRepository) FindById(ctx context.Context, id int64) (
 }
 
 func (r *CacheArticleReaderRepository) Page(ctx context.Context, offset int, limit int) ([]domain.Article, int64, error) {
+	// 首页走缓存
+	if offset == 0 {
+		arts, total, err := r.cache.GetFirstPage(ctx)
+		if err == nil {
+			return arts, total, nil
+		}
+	}
+
+	// 缓存 miss 或非首页，查 DB
 	articles, err := r.dao.Page(ctx, offset, limit)
 	if err != nil {
 		return nil, 0, err
@@ -59,6 +88,14 @@ func (r *CacheArticleReaderRepository) Page(ctx context.Context, offset int, lim
 	for _, a := range articles {
 		result = append(result, r.toDomain(a))
 	}
+
+	// 首页回填缓存
+	if offset == 0 {
+		if cErr := r.cache.SetFirstPage(ctx, result, count); cErr != nil {
+			r.l.Error("回填首页缓存失败", logger.Error(cErr))
+		}
+	}
+
 	return result, count, nil
 }
 
