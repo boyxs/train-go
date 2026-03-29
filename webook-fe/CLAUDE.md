@@ -51,6 +51,7 @@ webook-fe/
 │   ├── (auth)/             # 公开路由组
 │   └── (main)/             # 需登录路由组
 ├── types/                  # 共享类型（对应后端 domain）
+├── constants/              # 常量（storage key、HTTP header 等）
 ├── api/                    # API 请求函数 + Axios 实例
 ├── utils/                  # 工具函数
 ├── hooks/                  # 自定义 Hooks
@@ -72,6 +73,7 @@ webook-fe/
 | Hooks | `hooks/` | 状态逻辑复用 | 封装 API + 状态 |
 | API | `api/` | 请求函数 | 一模块一文件，类型化返回 |
 | Types | `types/` | TS 类型 | 对应后端 domain |
+| Constants | `constants/` | 常量 | UPPER_SNAKE，按领域分文件（storage/http） |
 | Utils | `utils/` | 纯函数 | 无副作用 |
 
 **依赖方向：** 页面 → 组件/Hooks/API → Utils/Types。**组件不直接调 API。**

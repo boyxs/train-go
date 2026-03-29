@@ -1,8 +1,9 @@
-const ACCESS_KEY = 'access-token';
-const REFRESH_KEY = 'refresh-token';
+import { STORAGE_KEYS } from '@/constants/storage';
 
-export const ACCESS_HEADER = 'x-access-token';
-export const REFRESH_HEADER = 'x-refresh-token';
+export { ACCESS_HEADER, REFRESH_HEADER } from '@/constants/http';
+
+const ACCESS_KEY = STORAGE_KEYS.ACCESS_TOKEN;
+const REFRESH_KEY = STORAGE_KEYS.REFRESH_TOKEN;
 
 export const tokenUtil = {
   getAccess: () => localStorage.getItem(ACCESS_KEY),

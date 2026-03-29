@@ -6,8 +6,8 @@
     "dev": "next dev -p 5173 -H localhost",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint \"{app,api,types,hooks,utils,components,views}/**/*.{ts,tsx}\"",
-    "lint:fix": "eslint \"{app,api,types,hooks,utils,components,views}/**/*.{ts,tsx}\" --fix"
+    "lint": "eslint \"{app,api,types,constants,hooks,utils,components,views}/**/*.{ts,tsx}\"",
+    "lint:fix": "eslint \"{app,api,types,constants,hooks,utils,components,views}/**/*.{ts,tsx}\" --fix"
   },
   "dependencies": {
     "@ant-design/cssinjs": "^1.24.0",
