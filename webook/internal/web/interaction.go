@@ -60,7 +60,7 @@ func (h *InternalInteractionHandler) Like(ctx *gin.Context) {
 		err = h.svc.CancelLike(ctx, uc.Userid, h.biz, req.ArticleId)
 	}
 	if err != nil {
-		ctx.JSON(http.StatusOK, Result{Msg: "系统错误"})
+		ctx.JSON(http.StatusOK, Result{Code: 5, Msg: "系统错误"})
 		h.l.Error("点赞操作失败",
 			logger.Int64("uid", uc.Userid),
 			logger.Int64("bizId", req.ArticleId),
@@ -84,7 +84,7 @@ func (h *InternalInteractionHandler) Collect(ctx *gin.Context) {
 		err = h.svc.CancelCollect(ctx, uc.Userid, h.biz, req.ArticleId)
 	}
 	if err != nil {
-		ctx.JSON(http.StatusOK, Result{Msg: "系统错误"})
+		ctx.JSON(http.StatusOK, Result{Code: 5, Msg: "系统错误"})
 		h.l.Error("收藏操作失败",
 			logger.Int64("uid", uc.Userid),
 			logger.Int64("bizId", req.ArticleId),
@@ -106,7 +106,7 @@ func (h *InternalInteractionHandler) Detail(ctx *gin.Context) {
 	}
 	intr, err := h.svc.FindInteraction(ctx, uid, h.biz, req.ArticleId)
 	if err != nil {
-		ctx.JSON(http.StatusOK, Result{Msg: "系统错误"})
+		ctx.JSON(http.StatusOK, Result{Code: 5, Msg: "系统错误"})
 		h.l.Error("获取互动数据失败",
 			logger.Int64("bizId", req.ArticleId),
 			logger.Error(err))

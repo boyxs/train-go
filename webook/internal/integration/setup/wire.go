@@ -97,6 +97,7 @@ var articleSvcProvider = wire.NewSet(
 
 var articleReaderSvcProvider = wire.NewSet(
 	dao.NewGormArticleReaderDAO,
+	cache.NewRedisArticleCache,
 	repository.NewCacheArticleReaderRepository,
 	service.NewInternalArticleReaderService,
 	interactionSvcProvider,

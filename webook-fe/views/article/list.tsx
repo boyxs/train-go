@@ -5,7 +5,6 @@ import {
   Button,
   Card,
   Empty,
-  Modal,
   Pagination,
   Space,
   Table,
@@ -34,7 +33,7 @@ const statusMap: Record<ArticleStatus, { label: string; color: string }> = {
 
 function ArticleListPage() {
   const router = useRouter();
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -57,7 +56,7 @@ function ArticleListPage() {
   const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
 
   const confirmWithdraw = (id: number) => {
-    Modal.confirm({
+    modal.confirm({
       title: '确认撤回',
       icon: <ExclamationCircleOutlined />,
       content: '撤回后文章将从线上移除，可重新发布。',
@@ -77,7 +76,7 @@ function ArticleListPage() {
   };
 
   const confirmDelete = (id: number) => {
-    Modal.confirm({
+    modal.confirm({
       title: '确认删除',
       icon: <ExclamationCircleOutlined />,
       content: '删除后无法恢复，确定要永久删除这篇文章吗？',

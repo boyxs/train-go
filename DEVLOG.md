@@ -4,6 +4,18 @@
 
 ## 2026-03-29
 
+### 读者端首页分页缓存 + 代码质量修复
+
+**变更内容**:
+- 读者端分页首页缓存（方案 C：只缓存第一页，TTL 3min）
+- DAO 层 Insert/Update/Upsert 自动补充 abstract（`ensureAbstract`）
+- 互动模块：logger 注入替代 `zap.L()`、事务包裹、错误码补充
+- 前端 `Modal.confirm` → `modal.confirm`（antd 规范）
+- SQL 补充 abstract 列和数据
+- mock.mk 修复 article mock 生成路径
+
+**影响范围**: `repository/cache/article.go`、`repository/article_reader.go`、`dao/article_author.go`、`dao/article_reader.go`、`dao/interaction.go`、`repository/interaction.go`、`web/interaction.go`、`webook-fe/views/article/list.tsx`、`scripts/webook.sql`
+
 ### 点赞/收藏功能（第2期互动模块）
 
 **变更内容**: 新增文章互动功能，包含阅读量上报、点赞、收藏，前后端全栈实现

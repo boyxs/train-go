@@ -16,6 +16,9 @@ type ArticleCache interface {
 	Get(ctx context.Context, uid int64, id int64) (domain.Article, error)
 	Set(ctx context.Context, article domain.Article) error
 	Del(ctx context.Context, uid int64, id int64) error
+	GetFirstPage(ctx context.Context) ([]domain.Article, int64, error)
+	SetFirstPage(ctx context.Context, articles []domain.Article, total int64) error
+	DelFirstPage(ctx context.Context) error
 }
 
 type RedisArticleCache struct {
@@ -52,6 +55,41 @@ func (ac *RedisArticleCache) Set(ctx context.Context, article domain.Article) er
 
 func (ac *RedisArticleCache) Del(ctx context.Context, uid int64, id int64) error {
 	return ac.cmd.Del(ctx, ac.getKey(uid, id)).Err()
+}
+
+// firstPageData 首页缓存结构，包含列表和总数
+type firstPageData struct {
+	Articles []domain.Article `json:"articles"`
+	Total    int64            `json:"total"`
+}
+
+func (ac *RedisArticleCache) GetFirstPage(ctx context.Context) ([]domain.Article, int64, error) {
+	data, err := ac.cmd.Get(ctx, consts.ReaderFirstPageKey).Result()
+	if err != nil {
+		return nil, 0, err
+	}
+	var page firstPageData
+	err = json.Unmarshal([]byte(data), &page)
+	return page.Articles, page.Total, err
+}
+
+func (ac *RedisArticleCache) SetFirstPage(ctx context.Context, articles []domain.Article, total int64) error {
+	// 拷贝一份，清空 Content 减小体积，不污染调用方数据
+	cp := make([]domain.Article, len(articles))
+	copy(cp, articles)
+	for i := range cp {
+		cp[i].Content = ""
+	}
+	data, err := json.Marshal(firstPageData{Articles: cp, Total: total})
+	if err != nil {
+		return err
+	}
+	jitter := time.Duration(rand.Int63n(int64(time.Minute)))
+	return ac.cmd.Set(ctx, consts.ReaderFirstPageKey, data, consts.FirstPageTTL+jitter).Err()
+}
+
+func (ac *RedisArticleCache) DelFirstPage(ctx context.Context) error {
+	return ac.cmd.Del(ctx, consts.ReaderFirstPageKey).Err()
 }
 
 func (ac *RedisArticleCache) getKey(uid int64, id int64) string {

@@ -9,11 +9,13 @@ mockgen:
 	@mockgen -source=./internal/service/code.go -package=svcmocks -destination=./internal/service/mocks/code_mock.go
 	#repository
 	@mockgen -source=./internal/repository/user.go -package=repomocks -destination=./internal/repository/mocks/user_mock.go
-	@mockgen -source=./internal/repository/article.go -package=repomocks -destination=./internal/repository/mocks/article_mock.go
+	@mockgen -source=./internal/repository/article_author.go -package=repomocks -destination=./internal/repository/mocks/article_author_mock.go
+	@mockgen -source=./internal/repository/article_reader.go -package=repomocks -destination=./internal/repository/mocks/article_reader_mock.go
 	@mockgen -source=./internal/repository/code.go -package=repomocks -destination=./internal/repository/mocks/code_mock.go
 	#dao
 	@mockgen -source=./internal/repository/dao/user.go -package=daomocks -destination=./internal/repository/dao/mocks/user_mock.go
-	@mockgen -source=./internal/repository/dao/article.go -package=daomocks -destination=./internal/repository/dao/mocks/article_mock.go
+	@mockgen -source=./internal/repository/dao/article_author.go -package=daomocks -destination=./internal/repository/dao/mocks/article_author_mock.go
+	@mockgen -source=./internal/repository/dao/article_reader.go -package=daomocks -destination=./internal/repository/dao/mocks/article_reader_mock.go
 	@mockgen -source=./internal/repository/cache/user.go -package=cachemocks -destination=./internal/repository/cache/mocks/user_mock.go
 	@mockgen -source=./internal/repository/cache/article.go -package=cachemocks -destination=./internal/repository/cache/mocks/article_mock.go
 	@mockgen -source=./internal/repository/cache/code.go -package=cachemocks -destination=./internal/repository/cache/mocks/code_mock.go

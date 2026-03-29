@@ -26,7 +26,12 @@ const (
 )
 
 var (
-	InteractionTTL = 24 * time.Hour
+	InteractionTTL  = 24 * time.Hour
+	FirstPageTTL    = 3 * time.Minute
+)
+
+const (
+	ReaderFirstPageKey = "article:reader:first_page"
 )
 
 // 2006 年 1 月 2 日 下午 3 点 4 分 5 秒 减 7 小时时区

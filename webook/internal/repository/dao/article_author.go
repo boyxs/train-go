@@ -31,11 +31,13 @@ func NewGormArticleAuthorDAO(db *gorm.DB) ArticleAuthorDAO {
 }
 
 func (d *GormArticleAuthorDAO) Insert(ctx context.Context, article Article) (int64, error) {
+	article.Abstract = ensureAbstract(article.Abstract, article.Content)
 	err := d.db.WithContext(ctx).Create(&article).Error
 	return article.Id, err
 }
 
 func (d *GormArticleAuthorDAO) Update(ctx context.Context, article Article) error {
+	article.Abstract = ensureAbstract(article.Abstract, article.Content)
 	row := d.db.WithContext(ctx).
 		Model(&article).
 		Where("id = ? AND author_id = ?", article.Id, article.AuthorId).
@@ -137,4 +139,16 @@ type Article struct {
 
 func (Article) TableName() string {
 	return "article"
+}
+
+// ensureAbstract 若 abstract 为空，自动从 content 截取前 128 字符
+func ensureAbstract(abstract, content string) string {
+	if abstract != "" {
+		return abstract
+	}
+	r := []rune(content)
+	if len(r) <= 128 {
+		return content
+	}
+	return string(r[:128]) + "..."
 }
