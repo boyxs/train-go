@@ -133,6 +133,7 @@ func (d *GormInteractionDAO) FindUserInteraction(ctx context.Context, uid int64,
 	var ui UserInteraction
 	err := d.db.WithContext(ctx).
 		Where("user_id = ? AND biz = ? AND biz_id = ?", uid, biz, bizId).
+		Order("id DESC").
 		First(&ui).Error
 	return ui, err
 }

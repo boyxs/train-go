@@ -65,7 +65,7 @@ function ArticleReadPage({ articleId }: ArticleReadProps) {
         articleId: id,
         liked: newLiked,
       });
-      if (result.data.code === 0 || !result.data.code) {
+      if (result.data.code === 0) {
         // 基于当前 intr 快照更新，而非 intrOverride（首次可能为 null）
         const base = intr;
         setIntrOverride({
@@ -91,7 +91,7 @@ function ArticleReadPage({ articleId }: ArticleReadProps) {
         articleId: id,
         collected: newCollected,
       });
-      if (result.data.code === 0 || !result.data.code) {
+      if (result.data.code === 0) {
         const base = intr;
         setIntrOverride({
           ...base,
