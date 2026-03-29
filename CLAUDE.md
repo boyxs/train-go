@@ -59,6 +59,15 @@ work/
 | POST | `/article/reader/page` | 公开文章分页 | 否 |
 | POST | `/article/reader/detail` | 公开文章详情 | 否 |
 
+### 互动模块（通用 biz+bizId 设计）
+
+| Method | 路径 | 说明 | 认证 |
+|--------|------|------|------|
+| POST | `/interaction/view` | 浏览上报 | 否 |
+| POST | `/interaction/detail` | 互动详情（计数+用户状态） | 可选（有 token 解析 uid，无 token uid=0） |
+| POST | `/interaction/like` | 点赞/取消 | JWT |
+| POST | `/interaction/collect` | 收藏/取消 | JWT |
+
 ## Commit 格式
 
 ```

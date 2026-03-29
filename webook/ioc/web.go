@@ -23,6 +23,7 @@ func InitWebServer(
 	userHandler web.UserHandler,
 	articleHandler web.ArticleAuthorHandler,
 	articleReaderHandler web.ArticleReaderHandler,
+	interactionHandler web.InteractionHandler,
 	oauth2Handler web.OAuth2Handler,
 ) *gin.Engine {
 	server := gin.Default()
@@ -30,6 +31,7 @@ func InitWebServer(
 	userHandler.RegisterRoutes(server)
 	articleHandler.RegisterRoutes(server)
 	articleReaderHandler.RegisterRoutes(server)
+	interactionHandler.RegisterRoutes(server)
 	oauth2Handler.RegisterRoutes(server)
 	return server
 }
@@ -88,7 +90,7 @@ func loggerMiddleware(l logger.LoggerX) gin.HandlerFunc {
 
 func loginJwtMiddleware(hdl jwt.JwtHandler) gin.HandlerFunc {
 	return middleware.NewLoginJwtMiddlewareBuilder(hdl).
-		IgnorePaths("/user/register",
+		IgnoredPaths("/user/register",
 			"/user/login",
 			"/user/refresh_token",
 			"/user/login_sms/code/send",
@@ -97,6 +99,10 @@ func loginJwtMiddleware(hdl jwt.JwtHandler) gin.HandlerFunc {
 			"/oauth2/wechat/callback",
 			"/article/reader/detail",
 			"/article/reader/page",
+			"/interaction/view",
+		).
+		OptionalPaths(
+			"/interaction/detail",
 		).
 		Build()
 }

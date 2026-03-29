@@ -34,6 +34,7 @@ func InitWebServer() *gin.Engine {
 		web.NewInternalUserHandler,
 		web.NewInternalArticleAuthorHandler,
 		web.NewInternalArticleReaderHandler,
+		web.NewInternalInteractionHandler,
 		web.NewOAuth2WechatHandler,
 		jwt.NewRedisJwtHandler,
 
@@ -61,6 +62,15 @@ func InitArticleReaderHandler() web.ArticleReaderHandler {
 	return &web.InternalArticleReaderHandler{}
 }
 
+func InitInteractionHandler() web.InteractionHandler {
+	wire.Build(
+		infraSvcProvider,
+		interactionSvcProvider,
+		web.NewInternalInteractionHandler,
+	)
+	return &web.InternalInteractionHandler{}
+}
+
 var infraSvcProvider = wire.NewSet(
 	InitRedis,
 	InitDB,
@@ -82,10 +92,19 @@ var articleSvcProvider = wire.NewSet(
 	repository.NewCacheArticleReaderRepository,
 	service.NewInternalArticleAuthorService,
 	service.NewInternalArticleReaderService,
+	interactionSvcProvider,
 )
 
 var articleReaderSvcProvider = wire.NewSet(
 	dao.NewGormArticleReaderDAO,
 	repository.NewCacheArticleReaderRepository,
 	service.NewInternalArticleReaderService,
+	interactionSvcProvider,
+)
+
+var interactionSvcProvider = wire.NewSet(
+	dao.NewGormInteractionDAO,
+	cache.NewRedisInteractionCache,
+	repository.NewCacheInteractionRepository,
+	service.NewInternalInteractionService,
 )

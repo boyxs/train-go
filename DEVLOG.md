@@ -2,6 +2,33 @@
 
 <!-- 新功能前插在此，日期降序 -->
 
+## 2026-03-29
+
+### 点赞/收藏功能（第2期互动模块）
+
+**变更内容**: 新增文章互动功能，包含阅读量上报、点赞、收藏，前后端全栈实现
+**影响范围**:
+- 后端：domain/interaction.go（新），dao/interaction.go（新，`interaction`+`user_interaction` 两张表），repository/interaction.go（新），service/interaction.go（新），web/interaction.go（新），ioc/web.go，wire.go，wire_gen.go，init_table.go
+- 前端：types/interaction.ts（新），api/interaction.ts（新），views/article/read.tsx（更新），types/index.ts（更新）
+
+**新增接口**:
+- `POST /interaction/read` — 阅读上报（公开，无需登录）
+- `POST /interaction/get` — 获取聚合计数+用户状态（公开，登录后有 liked/collected 状态）
+- `POST /interaction/like` — 点赞/取消点赞（需登录）
+- `POST /interaction/collect` — 收藏/取消收藏（需登录）
+
+**技术决策**:
+- 聚合计数独立表 `interaction`（article_id unique），避免污染 published_article
+- 用户操作记录独立表 `user_interaction`（user_id+article_id 联合唯一索引）
+- 计数用 `GREATEST(0, count + delta)` 防止下界越零
+- 前端乐观更新：点赞/收藏立即更新本地状态，失败时显示错误提示
+- 阅读上报在文章内容加载完成后触发，失败静默处理不影响阅读体验
+- `/interaction/read` 和 `/interaction/get` 加入 JWT 白名单（允许匿名访问）
+
+**会话**: 260329-like-collect
+
+---
+
 ## 2026-03-26
 
 ### 文章发布/撤回功能

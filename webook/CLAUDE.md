@@ -119,12 +119,18 @@ Handler (web) → Service → Repository → DAO (MySQL) / Cache (Redis)
 | 短信 | `SmsService` | `service/sms/types.go` | memory / tencent / failover / ratelimit / auth |
 | OAuth2 | `OAuth2Service` | `service/oauth2/types.go` | `WechatService` |
 | 限流 | `Limiter` | `pkg/ratelimit/types.go` | `RedisSlidingWindowLimiter` |
+| 互动 | `InteractionHandler` | `web/interaction.go` | `InternalInteractionHandler` |
+| 互动 | `InteractionService` | `service/interaction.go` | `InternalInteractionService` |
+| 互动 | `InteractionRepository` | `repository/interaction.go` | `CacheInteractionRepository` |
+| 互动 | `InteractionDAO` | `dao/interaction.go` | `GormInteractionDAO` |
+| 互动 | `InteractionCache` | `cache/interaction.go` | `RedisInteractionCache` |
 
 ## 领域模型
 
 - **User**: Id, Email, Password, Nickname, Birthday, AboutMe, Phone, WechatAuth, CreatedAt, UpdatedAt
 - **Article**: Id, Title, Content, Author{Id,Name}, Status(Unknown/Unpublished/Published/Private), CreatedAt, UpdatedAt
 - **PublishedArticle**: 线上库，和 Article 同构，独立表 `published_article`
+- **Interaction**: BizId, Biz, ReadCount, LikeCount, CollectCount, Liked, Collected（通用 biz+bizId 设计，不绑定单一业务）
 
 ## 业务规则
 

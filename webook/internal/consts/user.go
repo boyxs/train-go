@@ -22,6 +22,11 @@ const (
 	UserPattern        = "user:%d"
 	UserSsidPattern    = "user:ssid:%s"
 	ArticlePattern     = "article:author:%d:%d" // article:author:{uid}:{id}
+	InteractionPattern = "interaction:%s:%d" // interaction:{biz}:{bizId}
+)
+
+var (
+	InteractionTTL = 24 * time.Hour
 )
 
 // 2006 年 1 月 2 日 下午 3 点 4 分 5 秒 减 7 小时时区

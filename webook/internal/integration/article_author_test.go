@@ -26,7 +26,7 @@ type ArticleAuthorHandlerSuite struct {
 }
 
 func (h *ArticleAuthorHandlerSuite) TearDownTest() {
-	h.truncate("article", "published_article")
+	h.truncate("article", "published_article", "interaction")
 }
 
 func (h *ArticleAuthorHandlerSuite) truncate(tables ...string) {
@@ -587,7 +587,7 @@ func (h *ArticleAuthorHandlerSuite) TestArticleAuthorHandler_Detail() {
 		before     func(t *testing.T)
 		req        string
 		wantCode   int
-		wantResult Result[domain.Article]
+		wantResult Result[AuthorDetailVO]
 	}{
 		{
 			name: "正常获取自己的文章",
@@ -601,13 +601,13 @@ func (h *ArticleAuthorHandlerSuite) TestArticleAuthorHandler_Detail() {
 			},
 			req:      `{"id":100}`,
 			wantCode: http.StatusOK,
-			wantResult: Result[domain.Article]{
-				Data: domain.Article{
+			wantResult: Result[AuthorDetailVO]{
+				Data: AuthorDetailVO{
 					Id:      100,
 					Title:   "我的标题",
 					Content: "我的内容",
-					Author:  domain.Author{Id: 1},
-					Status:  domain.ArticleStatusPublished,
+					Status:  uint8(domain.ArticleStatusPublished),
+					ReadCnt: 0,
 				},
 			},
 		},
@@ -616,7 +616,7 @@ func (h *ArticleAuthorHandlerSuite) TestArticleAuthorHandler_Detail() {
 			before: func(t *testing.T) {},
 			req:    `{"id":999}`,
 			wantCode: http.StatusOK,
-			wantResult: Result[domain.Article]{
+			wantResult: Result[AuthorDetailVO]{
 				Msg: "系统错误",
 			},
 		},
@@ -632,7 +632,7 @@ func (h *ArticleAuthorHandlerSuite) TestArticleAuthorHandler_Detail() {
 			},
 			req:      `{"id":101}`,
 			wantCode: http.StatusOK,
-			wantResult: Result[domain.Article]{
+			wantResult: Result[AuthorDetailVO]{
 				Msg: "系统错误",
 			},
 		},
@@ -641,7 +641,7 @@ func (h *ArticleAuthorHandlerSuite) TestArticleAuthorHandler_Detail() {
 			before: func(t *testing.T) {},
 			req:    `{"id":0}`,
 			wantCode: http.StatusOK,
-			wantResult: Result[domain.Article]{
+			wantResult: Result[AuthorDetailVO]{
 				Msg: "系统错误",
 			},
 		},
@@ -659,12 +659,12 @@ func (h *ArticleAuthorHandlerSuite) TestArticleAuthorHandler_Detail() {
 			h.server.ServeHTTP(recorder, req)
 
 			assert.Equal(t, tc.wantCode, recorder.Code)
-			var result Result[domain.Article]
+			var result Result[AuthorDetailVO]
 			err = json.NewDecoder(recorder.Body).Decode(&result)
 			assert.NoError(t, err)
 			// 忽略时间字段
-			result.Data.CreatedAt = time.Time{}
-			result.Data.UpdatedAt = time.Time{}
+			result.Data.CreatedAt = ""
+			result.Data.UpdatedAt = ""
 			assert.Equal(t, tc.wantResult, result)
 		})
 	}
@@ -793,7 +793,20 @@ type ArticleVO struct {
 	Id        int64  `json:"id"`
 	Title     string `json:"title"`
 	Status    uint8  `json:"status"`
+	ReadCnt   int64  `json:"readCnt"`
 	UpdatedAt string `json:"updatedAt,omitempty"`
+}
+
+// AuthorDetailVO 作者视角文章详情
+type AuthorDetailVO struct {
+	Id        int64  `json:"id"`
+	Title     string `json:"title"`
+	Content   string `json:"content"`
+	Abstract  string `json:"abstract"`
+	Status    uint8  `json:"status"`
+	ReadCnt   int64  `json:"readCnt"`
+	CreatedAt string `json:"createdAt"`
+	UpdatedAt string `json:"updatedAt"`
 }
 
 type ArticleListData struct {
