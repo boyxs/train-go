@@ -122,4 +122,38 @@ INSERT INTO `user` VALUES (1, NULL, '2026-03-27 14:23:52.248', NULL, '3236447743
 INSERT INTO `user` VALUES (101, NULL, NULL, NULL, '123456@qq.com', '$2a$10$QAS0Xqqoe3DtBxzVev5NzOl02HLq2rJJrf4dJ3aOyyVxHIQ.J8FNW', 'tommy', NULL, 'say my name', NULL, NULL, NULL);
 INSERT INTO `user` VALUES (102, NULL, NULL, NULL, NULL, '', 'tommy', NULL, 'say my name', '18608261234', NULL, NULL);
 
+-- ----------------------------
+-- Table structure for interaction
+-- ----------------------------
+DROP TABLE IF EXISTS `interaction`;
+CREATE TABLE `interaction`  (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `biz` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL DEFAULT '',
+  `biz_id` bigint NOT NULL DEFAULT 0,
+  `read_count` bigint NOT NULL DEFAULT 0,
+  `like_count` bigint NOT NULL DEFAULT 0,
+  `collect_count` bigint NOT NULL DEFAULT 0,
+  `created_at` datetime(3) NULL DEFAULT NULL,
+  `updated_at` datetime(3) NULL DEFAULT NULL,
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE INDEX `uk_biz`(`biz` ASC, `biz_id` ASC) USING BTREE
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
+
+-- ----------------------------
+-- Table structure for user_interaction
+-- ----------------------------
+DROP TABLE IF EXISTS `user_interaction`;
+CREATE TABLE `user_interaction`  (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `biz` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL DEFAULT '',
+  `biz_id` bigint NOT NULL DEFAULT 0,
+  `user_id` bigint NOT NULL DEFAULT 0,
+  `liked` tinyint(1) NOT NULL DEFAULT 0,
+  `collected` tinyint(1) NOT NULL DEFAULT 0,
+  `created_at` datetime(3) NULL DEFAULT NULL,
+  `updated_at` datetime(3) NULL DEFAULT NULL,
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE INDEX `uk_user_biz`(`biz` ASC, `biz_id` ASC, `user_id` ASC) USING BTREE
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
+
 SET FOREIGN_KEY_CHECKS = 1;
