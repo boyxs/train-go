@@ -3,22 +3,27 @@
 import { RightOutlined } from '@ant-design/icons';
 import { Empty, Pagination, Typography } from 'antd';
 import Link from 'next/link';
-import React, { useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import React from 'react';
 
 import * as articleApi from '@/api/article';
 import { Loading } from '@/components/common/Loading';
 import { PublicHeader } from '@/components/layout/PublicHeader';
+import { STORAGE_KEYS } from '@/constants/storage';
 import { useRequest } from '@/hooks/useRequest';
+import { useScrollRestore } from '@/hooks/useScrollRestore';
 import type { Article } from '@/types';
 
 const { Text } = Typography;
 
-// 彩色圆点循环
 const dotColors = ['#0D9488', '#6366F1', '#22C55E', '#FCD34D', '#D97706'];
 
 function ArticleFeedPage() {
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const page = Number(searchParams.get('page')) || 1;
+  const pageSize = Number(searchParams.get('pageSize')) || 10;
 
   const { data: listRes, loading } = useRequest(
     () => articleApi.pagePublishedArticles({ page, pageSize }),
@@ -27,6 +32,21 @@ function ArticleFeedPage() {
 
   const articles = listRes?.data?.list ?? [];
   const total = listRes?.data?.total ?? 0;
+
+  const [scrollRef, setScroll, resetScroll] = useScrollRestore(
+    STORAGE_KEYS.SCROLL_FEED,
+    !loading && articles.length > 0,
+  );
+
+  const handlePageChange = (p: number, ps: number) => {
+    resetScroll();
+    const params = new URLSearchParams();
+    params.set('page', String(p));
+    if (ps !== 10) {
+      params.set('pageSize', String(ps));
+    }
+    router.push(`/feed?${params.toString()}`);
+  };
 
   if (loading && articles.length === 0) {
     return (
@@ -41,7 +61,7 @@ function ArticleFeedPage() {
     <div className='h-screen flex flex-col overflow-hidden bg-[#f5f5f5]'>
       <PublicHeader />
 
-      <div className='flex-1 overflow-auto'>
+      <div className='flex-1 overflow-auto' ref={scrollRef}>
         <div className='mx-auto px-4 py-6' style={{ maxWidth: 768 }}>
           {articles.length === 0 && !loading ? (
             <div className='bg-white rounded-xl p-8'>
@@ -55,9 +75,9 @@ function ArticleFeedPage() {
                     key={article.id}
                     href={`/article/${article.id}`}
                     className='no-underline group block'
+                    onClick={setScroll}
                   >
                     <div className='bg-white rounded-xl px-6 py-5 hover:bg-gray-50 transition-colors'>
-                      {/* 标题 + 箭头 */}
                       <div className='flex items-start justify-between gap-3'>
                         <div className='flex-1 min-w-0'>
                           <Text
@@ -68,7 +88,6 @@ function ArticleFeedPage() {
                             {article.title}
                           </Text>
 
-                          {/* 摘要 */}
                           {article.abstract && (
                             <div className='mt-2'>
                               <Text
@@ -83,7 +102,6 @@ function ArticleFeedPage() {
                             </div>
                           )}
 
-                          {/* 元信息 */}
                           <div className='flex items-center gap-4 mt-3'>
                             <span className='flex items-center gap-1.5 text-xs text-gray-400'>
                               <span
@@ -128,10 +146,7 @@ function ArticleFeedPage() {
                   showQuickJumper
                   pageSizeOptions={['10', '20', '50']}
                   size='small'
-                  onChange={(p, ps) => {
-                    setPage(p);
-                    setPageSize(ps);
-                  }}
+                  onChange={handlePageChange}
                 />
               </div>
             </>
