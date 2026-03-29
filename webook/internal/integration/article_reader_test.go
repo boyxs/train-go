@@ -24,7 +24,7 @@ type ArticleReaderHandlerSuite struct {
 }
 
 func (h *ArticleReaderHandlerSuite) TearDownTest() {
-	h.truncate("article", "published_article")
+	h.truncate("article", "published_article", "interaction")
 }
 
 func (h *ArticleReaderHandlerSuite) truncate(tables ...string) {
@@ -172,7 +172,7 @@ func (h *ArticleReaderHandlerSuite) TestArticleReaderHandler_Detail() {
 		before     func(t *testing.T)
 		req        string
 		wantCode   int
-		wantResult Result[domain.Article]
+		wantResult Result[ReaderDetailVO]
 	}{
 		{
 			name: "正常获取已发布文章",
@@ -186,13 +186,14 @@ func (h *ArticleReaderHandlerSuite) TestArticleReaderHandler_Detail() {
 			},
 			req:      `{"id":300}`,
 			wantCode: http.StatusOK,
-			wantResult: Result[domain.Article]{
-				Data: domain.Article{
-					Id:      300,
-					Title:   "公开标题",
-					Content: "公开内容",
-					Author:  domain.Author{Id: 1},
-					Status:  domain.ArticleStatusPublished,
+			wantResult: Result[ReaderDetailVO]{
+				Data: ReaderDetailVO{
+					Id:       300,
+					Title:    "公开标题",
+					Content:  "公开内容",
+					Abstract: "公开内容",
+					AuthorId: 1,
+					ReadCnt:  0,
 				},
 			},
 		},
@@ -201,7 +202,7 @@ func (h *ArticleReaderHandlerSuite) TestArticleReaderHandler_Detail() {
 			before: func(t *testing.T) {},
 			req:    `{"id":999}`,
 			wantCode: http.StatusOK,
-			wantResult: Result[domain.Article]{
+			wantResult: Result[ReaderDetailVO]{
 				Msg: "文章不存在",
 			},
 		},
@@ -210,7 +211,7 @@ func (h *ArticleReaderHandlerSuite) TestArticleReaderHandler_Detail() {
 			before: func(t *testing.T) {},
 			req:    `{"id":0}`,
 			wantCode: http.StatusOK,
-			wantResult: Result[domain.Article]{
+			wantResult: Result[ReaderDetailVO]{
 				Msg: "文章不存在",
 			},
 		},
@@ -218,7 +219,7 @@ func (h *ArticleReaderHandlerSuite) TestArticleReaderHandler_Detail() {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.before(t)
-			defer h.truncate("published_article")
+			defer h.truncate("published_article", "interaction")
 
 			req, err := http.NewRequest(http.MethodPost, "/article/reader/detail",
 				bytes.NewBufferString(tc.req))
@@ -229,11 +230,10 @@ func (h *ArticleReaderHandlerSuite) TestArticleReaderHandler_Detail() {
 			h.server.ServeHTTP(recorder, req)
 
 			assert.Equal(t, tc.wantCode, recorder.Code)
-			var result Result[domain.Article]
+			var result Result[ReaderDetailVO]
 			err = json.NewDecoder(recorder.Body).Decode(&result)
 			assert.NoError(t, err)
-			result.Data.CreatedAt = time.Time{}
-			result.Data.UpdatedAt = time.Time{}
+			result.Data.UpdatedAt = ""
 			assert.Equal(t, tc.wantResult, result)
 		})
 	}
@@ -243,6 +243,17 @@ type ReaderArticleVO struct {
 	Id        int64  `json:"id"`
 	Title     string `json:"title"`
 	AuthorId  int64  `json:"authorId"`
+	ReadCnt   int64  `json:"readCnt"`
+	UpdatedAt string `json:"updatedAt,omitempty"`
+}
+
+type ReaderDetailVO struct {
+	Id        int64  `json:"id"`
+	Title     string `json:"title"`
+	Content   string `json:"content"`
+	Abstract  string `json:"abstract"`
+	AuthorId  int64  `json:"authorId"`
+	ReadCnt   int64  `json:"readCnt"`
 	UpdatedAt string `json:"updatedAt,omitempty"`
 }
 

@@ -14,70 +14,75 @@ import (
 
 type LoginJwtMiddlewareBuilder struct {
 	myJwt.JwtHandler
-	// 使用切片存储放行路径列表
-	ignorePaths map[string]struct{}
+	ignoredPaths  map[string]struct{}
+	optionalPaths map[string]struct{}
 }
 
 func NewLoginJwtMiddlewareBuilder(hdl myJwt.JwtHandler) *LoginJwtMiddlewareBuilder {
 	return &LoginJwtMiddlewareBuilder{
-		ignorePaths: make(map[string]struct{}),
-		JwtHandler:  hdl,
+		JwtHandler:    hdl,
+		ignoredPaths:  make(map[string]struct{}),
+		optionalPaths: make(map[string]struct{}),
 	}
 }
 
-func (l *LoginJwtMiddlewareBuilder) IgnorePaths(paths ...string) *LoginJwtMiddlewareBuilder {
+func (l *LoginJwtMiddlewareBuilder) IgnoredPaths(paths ...string) *LoginJwtMiddlewareBuilder {
 	for _, path := range paths {
-		l.ignorePaths[path] = struct{}{}
+		l.ignoredPaths[path] = struct{}{}
+	}
+	return l
+}
+
+func (l *LoginJwtMiddlewareBuilder) OptionalPaths(paths ...string) *LoginJwtMiddlewareBuilder {
+	for _, path := range paths {
+		l.optionalPaths[path] = struct{}{}
 	}
 	return l
 }
 
 func (l *LoginJwtMiddlewareBuilder) Build() gin.HandlerFunc {
-	// &errors.errorString{s:"gob: type not registered for interface: time.Time"}
 	gob.Register(time.Now())
 	return func(ctx *gin.Context) {
-		// 需要放行的路径列表
-		if _, ok := l.ignorePaths[ctx.Request.URL.Path]; ok {
+		path := ctx.Request.URL.Path
+		// 1. 公开路径——完全放行
+		if _, ok := l.ignoredPaths[path]; ok {
 			return
 		}
-		tokenStr := l.ExtractToken(ctx)
-		if tokenStr == "" {
-			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		// 2. 尝试解析 token
+		uc, ok := l.tryParseToken(ctx)
+		// 3. 可选认证——成功设置 UserKey，失败放行
+		if _, optional := l.optionalPaths[path]; optional {
+			if ok {
+				ctx.Set(consts.UserKey, uc)
+			}
 			return
 		}
-		var uc web.UserClaims
-		token, err := jwt.ParseWithClaims(tokenStr, &uc, func(token *jwt.Token) (any, error) {
-			return consts.AccessKey, nil
-		})
-		if err != nil {
+		// 4. 必须认证——失败 401
+		if !ok {
 			ctx.AbortWithStatus(http.StatusUnauthorized)
 			return
 		}
-		if token == nil || !token.Valid {
-			ctx.AbortWithStatus(http.StatusUnauthorized)
-			return
-		}
-		if uc.UserAgent != ctx.GetHeader(consts.UserAgent) {
-			// 后期我们讲到了监控告警的时候，这个地方要埋点
-			// 能够进来这个分支的，大概率是攻击者
-			ctx.AbortWithStatus(http.StatusUnauthorized)
-			return
-		}
-		if err = l.CheckSession(ctx, uc.Ssid); err != nil {
-			ctx.AbortWithStatus(http.StatusUnauthorized)
-			return
-		}
-		//expiresAt := uc.ExpiresAt
-		// 每10秒刷新一次
-		//if expiresAt.Sub(time.Now()) < consts.RefreshThreshold {
-		//	uc.ExpiresAt = jwt.NewNumericDate(time.Now().Add(consts.ExpireTime))
-		//	tokenStr, err := token.SignedString(consts.AccessKey)
-		//	if err != nil {
-		//		// 这里续约失败，仅需要记录日志
-		//		zap.L().Error("续约 access token 失败", zap.Error(err))
-		//	}
-		//	ctx.Header(consts.AccessHeader, tokenStr)
-		//}
 		ctx.Set(consts.UserKey, uc)
 	}
+}
+
+func (l *LoginJwtMiddlewareBuilder) tryParseToken(ctx *gin.Context) (web.UserClaims, bool) {
+	tokenStr := l.ExtractToken(ctx)
+	if tokenStr == "" {
+		return web.UserClaims{}, false
+	}
+	var uc web.UserClaims
+	token, err := jwt.ParseWithClaims(tokenStr, &uc, func(token *jwt.Token) (any, error) {
+		return consts.AccessKey, nil
+	})
+	if err != nil || token == nil || !token.Valid {
+		return web.UserClaims{}, false
+	}
+	if uc.UserAgent != ctx.GetHeader(consts.UserAgent) {
+		return web.UserClaims{}, false
+	}
+	if err = l.CheckSession(ctx, uc.Ssid); err != nil {
+		return web.UserClaims{}, false
+	}
+	return uc, true
 }

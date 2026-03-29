@@ -23,14 +23,16 @@ type ArticleAuthorHandler interface {
 }
 
 type InternalArticleAuthorHandler struct {
-	svc service.ArticleAuthorService
-	l   logger.LoggerX
+	svc     service.ArticleAuthorService
+	intrSvc service.InteractionService
+	l       logger.LoggerX
 }
 
-func NewInternalArticleAuthorHandler(svc service.ArticleAuthorService, l logger.LoggerX) ArticleAuthorHandler {
+func NewInternalArticleAuthorHandler(svc service.ArticleAuthorService, intrSvc service.InteractionService, l logger.LoggerX) ArticleAuthorHandler {
 	return &InternalArticleAuthorHandler{
-		svc: svc,
-		l:   l,
+		svc:     svc,
+		intrSvc: intrSvc,
+		l:       l,
 	}
 }
 
@@ -177,8 +179,26 @@ func (h *InternalArticleAuthorHandler) Detail(ctx *gin.Context) {
 			logger.Error(err))
 		return
 	}
+	var readCnt int64
+	intr, intrErr := h.intrSvc.FindInteraction(ctx, 0, domain.BizArticle, req.Id)
+	if intrErr != nil {
+		h.l.Error("获取文章互动数据失败",
+			logger.Int64("article_id", req.Id),
+			logger.Error(intrErr))
+	} else {
+		readCnt = intr.ReadCount
+	}
 	ctx.JSON(http.StatusOK, Result{
-		Data: article,
+		Data: AuthorDetailVO{
+			Id:        article.Id,
+			Title:     article.Title,
+			Content:   article.Content,
+			Abstract:  article.Abstract,
+			Status:    article.Status.ToUint8(),
+			ReadCnt:   readCnt,
+			CreatedAt: article.CreatedAt.Format(consts.DateTime),
+			UpdatedAt: article.UpdatedAt.Format(consts.DateTime),
+		},
 	})
 }
 
@@ -187,6 +207,30 @@ type ArticleVO struct {
 	Id        int64  `json:"id"`
 	Title     string `json:"title"`
 	Status    uint8  `json:"status"`
+	ReadCnt   int64  `json:"readCnt"`
+	UpdatedAt string `json:"updatedAt"`
+}
+
+// AuthorDetailVO 作者视角文章详情
+type AuthorDetailVO struct {
+	Id        int64  `json:"id"`
+	Title     string `json:"title"`
+	Content   string `json:"content"`
+	Abstract  string `json:"abstract"`
+	Status    uint8  `json:"status"`
+	ReadCnt   int64  `json:"readCnt"`
+	CreatedAt string `json:"createdAt"`
+	UpdatedAt string `json:"updatedAt"`
+}
+
+// ReaderDetailVO 读者视角文章详情
+type ReaderDetailVO struct {
+	Id        int64  `json:"id"`
+	Title     string `json:"title"`
+	Content   string `json:"content"`
+	Abstract  string `json:"abstract"`
+	AuthorId  int64  `json:"authorId"`
+	ReadCnt   int64  `json:"readCnt"`
 	UpdatedAt string `json:"updatedAt"`
 }
 
@@ -211,12 +255,23 @@ func (h *InternalArticleAuthorHandler) Page(ctx *gin.Context) {
 			logger.Error(err))
 		return
 	}
+	// 批量查阅读量
+	ids := make([]int64, 0, len(articles))
+	for _, a := range articles {
+		ids = append(ids, a.Id)
+	}
+	intrMap, intrErr := h.intrSvc.FindByBizIds(ctx, domain.BizArticle, ids)
+	if intrErr != nil {
+		h.l.Error("批量获取文章互动数据失败", logger.Error(intrErr))
+		intrMap = map[int64]domain.Interaction{}
+	}
 	list := make([]ArticleVO, 0, len(articles))
 	for _, a := range articles {
 		list = append(list, ArticleVO{
 			Id:        a.Id,
 			Title:     a.Title,
 			Status:    a.Status.ToUint8(),
+			ReadCnt:   intrMap[a.Id].ReadCount,
 			UpdatedAt: a.UpdatedAt.Format(time.DateTime),
 		})
 	}
@@ -287,12 +342,13 @@ type ArticleReaderHandler interface {
 }
 
 type InternalArticleReaderHandler struct {
-	svc service.ArticleReaderService
-	l   logger.LoggerX
+	svc     service.ArticleReaderService
+	intrSvc service.InteractionService
+	l       logger.LoggerX
 }
 
-func NewInternalArticleReaderHandler(svc service.ArticleReaderService, l logger.LoggerX) ArticleReaderHandler {
-	return &InternalArticleReaderHandler{svc: svc, l: l}
+func NewInternalArticleReaderHandler(svc service.ArticleReaderService, intrSvc service.InteractionService, l logger.LoggerX) ArticleReaderHandler {
+	return &InternalArticleReaderHandler{svc: svc, intrSvc: intrSvc, l: l}
 }
 
 func (h *InternalArticleReaderHandler) RegisterRoutes(server *gin.Engine) {
@@ -307,6 +363,7 @@ type ReaderArticleVO struct {
 	Title     string `json:"title"`
 	Abstract  string `json:"abstract"`
 	AuthorId  int64  `json:"authorId"`
+	ReadCnt   int64  `json:"readCnt"`
 	UpdatedAt string `json:"updatedAt"`
 }
 
@@ -335,7 +392,29 @@ func (h *InternalArticleReaderHandler) Detail(ctx *gin.Context) {
 			logger.Error(err))
 		return
 	}
-	ctx.JSON(http.StatusOK, Result{Data: article})
+	// 阅读量由前端 /interaction/read 上报，handler 内只查不写
+	var readCnt int64
+	intr, intrErr := h.intrSvc.FindInteraction(ctx, 0, domain.BizArticle, req.Id)
+	if intrErr != nil {
+		h.l.Error("获取文章互动数据失败",
+			logger.Int64("article_id", req.Id),
+			logger.Error(intrErr))
+	} else {
+		readCnt = intr.ReadCount
+	}
+	abstract := article.Abstract
+	if abstract == "" {
+		abstract = abstractFromContent(article.Content, 128)
+	}
+	ctx.JSON(http.StatusOK, Result{Data: ReaderDetailVO{
+		Id:        article.Id,
+		Title:     article.Title,
+		Content:   article.Content,
+		Abstract:  abstract,
+		AuthorId:  article.Author.Id,
+		ReadCnt:   readCnt,
+		UpdatedAt: article.UpdatedAt.Format(time.DateTime),
+	}})
 }
 
 func (h *InternalArticleReaderHandler) Page(ctx *gin.Context) {
@@ -354,6 +433,16 @@ func (h *InternalArticleReaderHandler) Page(ctx *gin.Context) {
 		h.l.Error("获取公开文章列表失败", logger.Error(err))
 		return
 	}
+	// 批量查阅读量
+	ids := make([]int64, 0, len(articles))
+	for _, a := range articles {
+		ids = append(ids, a.Id)
+	}
+	intrMap, intrErr := h.intrSvc.FindByBizIds(ctx, domain.BizArticle, ids)
+	if intrErr != nil {
+		h.l.Error("批量获取文章互动数据失败", logger.Error(intrErr))
+		intrMap = map[int64]domain.Interaction{}
+	}
 	list := make([]ReaderArticleVO, 0, len(articles))
 	for _, a := range articles {
 		abstract := a.Abstract
@@ -365,6 +454,7 @@ func (h *InternalArticleReaderHandler) Page(ctx *gin.Context) {
 			Title:     a.Title,
 			Abstract:  abstract,
 			AuthorId:  a.Author.Id,
+			ReadCnt:   intrMap[a.Id].ReadCount,
 			UpdatedAt: a.UpdatedAt.Format(time.DateTime),
 		})
 	}
