@@ -1,3 +1,4 @@
+import { AntdRegistry } from '@ant-design/nextjs-registry';
 import type { Metadata } from 'next';
 import React from 'react';
 
@@ -15,7 +16,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang='zh-CN'>
-      <body>{children}</body>
+      <body>
+        <AntdRegistry>{children}</AntdRegistry>
+      </body>
     </html>
   );
 }
