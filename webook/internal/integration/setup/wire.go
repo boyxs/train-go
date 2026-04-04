@@ -22,6 +22,7 @@ func InitWebServer() *gin.Engine {
 		//provider
 		userSvcProvider,
 		articleSvcProvider,
+		chatSvcProvider,
 		//cache
 		cache.NewRedisCodeCache,
 		//repository
@@ -36,6 +37,7 @@ func InitWebServer() *gin.Engine {
 		web.NewInternalArticleReaderHandler,
 		web.NewInternalInteractionHandler,
 		web.NewOAuth2WechatHandler,
+		web.NewInternalChatHandler,
 		jwt.NewRedisJwtHandler,
 
 		ioc.InitMiddlewares,
@@ -69,6 +71,15 @@ func InitInteractionHandler() web.InteractionHandler {
 		web.NewInternalInteractionHandler,
 	)
 	return &web.InternalInteractionHandler{}
+}
+
+func InitChatHandler() web.ChatHandler {
+	wire.Build(
+		infraSvcProvider,
+		chatSvcProvider,
+		web.NewInternalChatHandler,
+	)
+	return &web.InternalChatHandler{}
 }
 
 var infraSvcProvider = wire.NewSet(
@@ -108,4 +119,17 @@ var interactionSvcProvider = wire.NewSet(
 	cache.NewRedisInteractionCache,
 	repository.NewCacheInteractionRepository,
 	service.NewInternalInteractionService,
+)
+
+var chatSvcProvider = wire.NewSet(
+	ioc.InitLLMConfig,
+	ioc.InitLLMClient,
+	ioc.InitChatLimiter,
+	dao.NewGormConversationDAO,
+	dao.NewGormMessageDAO,
+	cache.NewRedisConversationCache,
+	cache.NewRedisMessageCache,
+	repository.NewCacheConversationRepository,
+	repository.NewCacheMessageRepository,
+	service.NewChatService,
 )

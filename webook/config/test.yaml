@@ -4,3 +4,12 @@ mysql:
 redis:
     addr: 127.0.0.1:6379
     password: "13520"
+
+llm:
+    providers:
+        - name: deepseek
+          apiKey: "your-api-key"
+          baseUrl: "https://api.deepseek.com"
+          model: "deepseek-chat"
+          maxTokens: 2048
+          timeout: 60
