@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 /* antd 和 Tailwind 共存：声明 layer 优先级 */
 @layer tw-base, antd, tw-utilities;
@@ -25,4 +26,10 @@
 
 *::-webkit-scrollbar-thumb:hover {
   background: #999;
+}
+
+/* AI 回复加载动画 — 三点跳动 */
+@keyframes dotBounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30% { transform: translateY(-4px); opacity: 1; }
 }

@@ -25,6 +25,7 @@ func InitWebServer(
 	articleReaderHandler web.ArticleReaderHandler,
 	interactionHandler web.InteractionHandler,
 	oauth2Handler web.OAuth2Handler,
+	chatHandler web.ChatHandler,
 ) *gin.Engine {
 	server := gin.Default()
 	server.Use(middlewares...)
@@ -33,6 +34,7 @@ func InitWebServer(
 	articleReaderHandler.RegisterRoutes(server)
 	interactionHandler.RegisterRoutes(server)
 	oauth2Handler.RegisterRoutes(server)
+	chatHandler.RegisterRoutes(server)
 	return server
 }
 
@@ -48,7 +50,7 @@ func InitMiddlewares(
 		cors.New(cors.Config{
 			AllowOrigins: []string{"http://localhost:3000"},
 			//AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"},
-			AllowHeaders:     []string{"Content-Type", "Content-Length", "Authorization"},
+			AllowHeaders:     []string{"Content-Type", "Content-Length", "Authorization", consts.AccessHeader},
 			ExposeHeaders:    []string{consts.AccessHeader, consts.RefreshHeader},
 			AllowCredentials: true,
 			AllowOriginFunc: func(origin string) bool {
