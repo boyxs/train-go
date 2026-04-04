@@ -1,0 +1,23 @@
+package consts
+
+import "time"
+
+// 缓存 TTL
+var (
+	CacheTTL       = time.Minute * 30
+	InteractionTTL = 24 * time.Hour
+	FirstPageTTL   = 3 * time.Minute
+)
+
+// Redis 键模式
+const (
+	UserPattern        = "user:%d"                 // user:{uid}
+	UserSsidPattern    = "user:ssid:%s"            // user:ssid:{ssid}
+	ArticlePattern     = "article:author:%d:%d"    // article:author:{uid}:{id}
+	InteractionPattern = "interaction:%s:%d"        // interaction:{biz}:{bizId}
+	ReaderFirstPageKey = "article:reader:first_page"
+
+	ChatConvPattern      = "chat:conv:list:%d"  // chat:conv:list:{uid}
+	ChatMsgPattern       = "chat:msg:list:%d"   // chat:msg:list:{convId}
+	ChatRateLimitPattern = "chat:ratelimit:%d"   // chat:ratelimit:{uid}
+)
