@@ -7,11 +7,13 @@ mockgen:
 	@mockgen -source=./internal/service/user.go -package=svcmocks -destination=./internal/service/mocks/user_mock.go
 	@mockgen -source=./internal/service/article.go -package=svcmocks -destination=./internal/service/mocks/article_mock.go
 	@mockgen -source=./internal/service/code.go -package=svcmocks -destination=./internal/service/mocks/code_mock.go
+	@mockgen -source=./internal/service/article_search.go -package=svcmocks -destination=./internal/service/mocks/article_search_mock.go
 	#repository
 	@mockgen -source=./internal/repository/user.go -package=repomocks -destination=./internal/repository/mocks/user_mock.go
 	@mockgen -source=./internal/repository/article_author.go -package=repomocks -destination=./internal/repository/mocks/article_author_mock.go
 	@mockgen -source=./internal/repository/article_reader.go -package=repomocks -destination=./internal/repository/mocks/article_reader_mock.go
 	@mockgen -source=./internal/repository/code.go -package=repomocks -destination=./internal/repository/mocks/code_mock.go
+	@mockgen -source=./internal/repository/article_search.go -package=repomocks -destination=./internal/repository/mocks/article_search_mock.go
 	#dao
 	@mockgen -source=./internal/repository/dao/user.go -package=daomocks -destination=./internal/repository/dao/mocks/user_mock.go
 	@mockgen -source=./internal/repository/dao/article_author.go -package=daomocks -destination=./internal/repository/dao/mocks/article_author_mock.go
@@ -28,6 +30,7 @@ mockgen:
 	@mockgen -source=./internal/repository/chat_message.go -package=repomocks -destination=./internal/repository/mocks/chat_message_mock.go
 	#ai
 	@mockgen -source=./internal/service/ai/llm.go -package=aimocks -destination=./internal/service/ai/mocks/llm_mock.go
+	@mockgen -source=./internal/service/ai/embedding.go -package=aimocks -destination=./internal/service/ai/mocks/embedding_mock.go
 	#update dependencies
 	@go mod tidy
 
@@ -39,4 +42,4 @@ build:
 	#@GOOS=linux GOARCH=amd64 go build -tags=dev -o webook .
 	@GOOS=windows GOARCH=amd64 go build -tags=dev -o webook .
 
-# make mock
+# make -f mk/mock.mk mockgen

@@ -3,9 +3,9 @@ package dao
 import (
 	"context"
 	"errors"
-	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/plugin/soft_delete"
 )
 
 var ErrArticleNotFound = errors.New("ID或创作者错误")
@@ -86,6 +86,7 @@ func (d *GormArticleAuthorDAO) FindByIdAndAuthor(ctx context.Context, id int64, 
 func (d *GormArticleAuthorDAO) PageByAuthor(ctx context.Context, uid int64, offset int, limit int) ([]Article, error) {
 	var articles []Article
 	err := d.db.WithContext(ctx).
+		Select("id, title, abstract, author_id, status, created_at, updated_at").
 		Where("author_id = ?", uid).
 		Order("id DESC").
 		Offset(offset).Limit(limit).
@@ -105,6 +106,7 @@ func (d *GormArticleAuthorDAO) CountByAuthor(ctx context.Context, uid int64) (in
 func (d *GormArticleAuthorDAO) ListByAuthor(ctx context.Context, uid int64) ([]Article, error) {
 	var articles []Article
 	err := d.db.WithContext(ctx).
+		Select("id, title, abstract, author_id, status, created_at, updated_at").
 		Where("author_id = ?", uid).
 		Order("id DESC").
 		Limit(1000).
@@ -127,14 +129,15 @@ func (d *GormArticleAuthorDAO) Delete(ctx context.Context, id int64, uid int64) 
 
 // Article 制作库模型
 type Article struct {
-	Id        int64     `gorm:"primaryKey,autoIncrement"`
-	Title     string    `gorm:"type=varchar(4096)"`
-	Content   string    `gorm:"type=BLOB"`
-	Abstract  string    `gorm:"type=varchar(256)"`
-	AuthorId  int64     `gorm:"index"`
+	Id        int64                 `gorm:"primaryKey,autoIncrement"`
+	Title     string                `gorm:"type=varchar(4096)"`
+	Content   string                `gorm:"type=BLOB"`
+	Abstract  string                `gorm:"type=varchar(256)"`
+	AuthorId  int64                 `gorm:"index"`
 	Status    uint8
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	CreatedAt int64                 `gorm:"autoCreateTime:milli"`
+	UpdatedAt int64                 `gorm:"autoUpdateTime:milli"`
+	DeletedAt soft_delete.DeletedAt `gorm:"softDelete:milli"`
 }
 
 func (Article) TableName() string {

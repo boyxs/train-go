@@ -58,7 +58,7 @@ func TestArticleAuthorHandler(t *testing.T) {
 
 func (h *ArticleAuthorHandlerSuite) TestArticleAuthorHandler_Edit() {
 	t := h.T()
-	mockNow := time.Now().UTC()
+	mockNow := time.Now().UnixMilli()
 	testCases := []struct {
 		name       string
 		before     func(t *testing.T)
@@ -238,7 +238,7 @@ func (h *ArticleAuthorHandlerSuite) TestArticleAuthorHandler_Edit() {
 
 func (h *ArticleAuthorHandlerSuite) TestArticleAuthorHandler_Publish() {
 	t := h.T()
-	mockNow := time.Now().UTC()
+	mockNow := time.Now().UnixMilli()
 	testCases := []struct {
 		name       string
 		before     func(t *testing.T)
@@ -397,7 +397,7 @@ func (h *ArticleAuthorHandlerSuite) TestArticleAuthorHandler_Publish() {
 
 func (h *ArticleAuthorHandlerSuite) TestArticleAuthorHandler_Withdraw() {
 	t := h.T()
-	mockNow := time.Now().UTC()
+	mockNow := time.Now().UnixMilli()
 	testCases := []struct {
 		name       string
 		before     func(t *testing.T)
@@ -581,7 +581,7 @@ type Result[T any] struct {
 
 func (h *ArticleAuthorHandlerSuite) TestArticleAuthorHandler_Detail() {
 	t := h.T()
-	mockNow := time.Now().UTC()
+	mockNow := time.Now().UnixMilli()
 	testCases := []struct {
 		name       string
 		before     func(t *testing.T)
@@ -663,8 +663,8 @@ func (h *ArticleAuthorHandlerSuite) TestArticleAuthorHandler_Detail() {
 			err = json.NewDecoder(recorder.Body).Decode(&result)
 			assert.NoError(t, err)
 			// 忽略时间字段
-			result.Data.CreatedAt = ""
-			result.Data.UpdatedAt = ""
+			result.Data.CreatedAt = 0
+			result.Data.UpdatedAt = 0
 			assert.Equal(t, tc.wantResult, result)
 		})
 	}
@@ -672,7 +672,7 @@ func (h *ArticleAuthorHandlerSuite) TestArticleAuthorHandler_Detail() {
 
 func (h *ArticleAuthorHandlerSuite) TestArticleAuthorHandler_Page() {
 	t := h.T()
-	mockNow := time.Now().UTC()
+	mockNow := time.Now().UnixMilli()
 	testCases := []struct {
 		name       string
 		before     func(t *testing.T)
@@ -781,7 +781,7 @@ func (h *ArticleAuthorHandlerSuite) TestArticleAuthorHandler_Page() {
 			assert.NoError(t, err)
 			// 忽略动态时间字段
 			for i := range result.Data.List {
-				result.Data.List[i].UpdatedAt = ""
+				result.Data.List[i].UpdatedAt = 0
 			}
 			assert.Equal(t, tc.wantResult, result)
 		})
@@ -794,7 +794,7 @@ type ArticleVO struct {
 	Title     string `json:"title"`
 	Status    uint8  `json:"status"`
 	ReadCnt   int64  `json:"readCnt"`
-	UpdatedAt string `json:"updatedAt,omitempty"`
+	UpdatedAt int64  `json:"updatedAt,omitempty"`
 }
 
 // AuthorDetailVO 作者视角文章详情
@@ -805,8 +805,8 @@ type AuthorDetailVO struct {
 	Abstract  string `json:"abstract"`
 	Status    uint8  `json:"status"`
 	ReadCnt   int64  `json:"readCnt"`
-	CreatedAt string `json:"createdAt"`
-	UpdatedAt string `json:"updatedAt"`
+	CreatedAt int64  `json:"createdAt"`
+	UpdatedAt int64  `json:"updatedAt"`
 }
 
 type ArticleListData struct {
@@ -816,7 +816,7 @@ type ArticleListData struct {
 
 func (h *ArticleAuthorHandlerSuite) TestArticleAuthorHandler_List() {
 	t := h.T()
-	mockNow := time.Now().UTC()
+	mockNow := time.Now().UnixMilli()
 	testCases := []struct {
 		name       string
 		before     func(t *testing.T)
@@ -878,7 +878,7 @@ func (h *ArticleAuthorHandlerSuite) TestArticleAuthorHandler_List() {
 			err = json.NewDecoder(recorder.Body).Decode(&result)
 			assert.NoError(t, err)
 			for i := range result.Data {
-				result.Data[i].UpdatedAt = ""
+				result.Data[i].UpdatedAt = 0
 			}
 			assert.Equal(t, tc.wantResult, result)
 		})
@@ -887,7 +887,7 @@ func (h *ArticleAuthorHandlerSuite) TestArticleAuthorHandler_List() {
 
 func (h *ArticleAuthorHandlerSuite) TestArticleAuthorHandler_Delete() {
 	t := h.T()
-	mockNow := time.Now().UTC()
+	mockNow := time.Now().UnixMilli()
 	testCases := []struct {
 		name       string
 		before     func(t *testing.T)

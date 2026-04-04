@@ -1,8 +1,8 @@
 export interface Conversation {
   id: number;
   title: string;
-  createdAt: string;
-  updatedAt: string;
+  createdAt: number;
+  updatedAt: number;
 }
 
 export interface Message {
@@ -12,7 +12,7 @@ export interface Message {
   content: string;
   toolCalls?: string;
   tokenUsed?: number;
-  createdAt: string;
+  createdAt: number;
 }
 
 // SSE 事件类型

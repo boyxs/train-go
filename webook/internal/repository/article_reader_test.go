@@ -17,7 +17,7 @@ import (
 )
 
 func TestCacheArticleReaderRepository_Page(t *testing.T) {
-	mockNow := time.Now()
+	mockNow := time.Now().UnixMilli()
 	testCases := []struct {
 		name     string
 		mock     func(ctrl *gomock.Controller) (dao.ArticleReaderDAO, *cachemocks.MockArticleCache)

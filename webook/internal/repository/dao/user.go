@@ -5,9 +5,9 @@ import (
 	"database/sql"
 	"errors"
 	"strings"
-	"time"
 
 	"github.com/go-sql-driver/mysql"
+	"gorm.io/plugin/soft_delete"
 	"gorm.io/gorm"
 )
 
@@ -100,13 +100,14 @@ type User struct {
 	Email         sql.NullString `gorm:"unique"`
 	Password      string         `gorm:"type:varchar(256)"`
 	Nickname      string         `gorm:"type:varchar(50)"`
-	Birthday      time.Time      `gorm:"column:birthday;type:datetime"`
+	Birthday      int64          `gorm:"column:birthday"`
 	AboutMe       string         `gorm:"type:text"`
 	Phone         sql.NullString `gorm:"unique"`
 	WechatOpenId  sql.NullString `gorm:"unique"`
 	WechatUnionId sql.NullString
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	CreatedAt     int64                 `gorm:"autoCreateTime:milli"`
+	UpdatedAt     int64                 `gorm:"autoUpdateTime:milli"`
+	DeletedAt     soft_delete.DeletedAt `gorm:"softDelete:milli"`
 }
 
 // TableName 重写表名

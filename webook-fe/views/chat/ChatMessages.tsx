@@ -1,7 +1,8 @@
 'use client';
 
-import { LoadingOutlined, RobotOutlined } from '@ant-design/icons';
+import { LoadingOutlined } from '@ant-design/icons';
 import { Spin } from 'antd';
+import { Bot } from 'lucide-react';
 import React, { useCallback, useLayoutEffect, useRef } from 'react';
 
 import type { Message } from '@/types/chat';
@@ -99,8 +100,8 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
   if (messages.length === 0) {
     return (
       <div className='flex-1 flex flex-col items-center justify-end pb-6 px-5 bg-[#FAFAFA]'>
-        <div className='w-12 h-12 rounded-2xl bg-gradient-to-br from-[#0D9488] to-[#0F766E] flex items-center justify-center shadow-sm mb-3'>
-          <RobotOutlined style={{ fontSize: 22, color: '#fff' }} />
+        <div className='w-12 h-12 rounded-2xl bg-[#F3F4F6] flex items-center justify-center shadow-sm mb-3'>
+          <Bot size={24} color='#0D9488' />
         </div>
         <div className='text-[15px] font-semibold text-[#1A1A1A] mb-1'>
           小微书 AI 客服

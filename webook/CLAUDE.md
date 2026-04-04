@@ -11,9 +11,11 @@ go build ./...                        # 编译
 go vet ./...                          # 静态分析
 go test ./...                         # 全量测试
 go test ./internal/integration/...    # 集成测试（需 MySQL + Redis）
-wire ./...                            # 重新生成 Wire
-wire ./internal/integration/setup/... # 集成测试 Wire
-make -f win.mk mockgen                # 重新生成 Mock
+wire ./...                            # 重新生成主 wire_gen.go
+wire ./internal/integration/setup/... # 重新生成集成测试 wire_gen.go
+make -f mk/mock.mk mockgen           # 重新生成 Mock
+make -f mk/es.mk help                # ES 管理命令
+make -f mk/infra.mk help             # 基础设施管理
 ```
 
 ## 导航

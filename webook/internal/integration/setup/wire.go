@@ -38,6 +38,7 @@ func InitWebServer() *gin.Engine {
 		web.NewInternalInteractionHandler,
 		web.NewOAuth2WechatHandler,
 		web.NewInternalChatHandler,
+		web.NewInternalArticleSearchHandler,
 		jwt.NewRedisJwtHandler,
 
 		ioc.InitMiddlewares,
@@ -95,6 +96,15 @@ var userSvcProvider = wire.NewSet(
 	service.NewInternalUserService,
 )
 
+var searchSvcProvider = wire.NewSet(
+	ioc.InitESClient,
+	ioc.InitEmbeddingConfig,
+	ioc.InitEmbeddingClient,
+	dao.NewElasticArticleDAO,
+	repository.NewESArticleSearchRepository,
+	service.NewArticleSearchService,
+)
+
 var articleSvcProvider = wire.NewSet(
 	dao.NewGormArticleAuthorDAO,
 	dao.NewGormArticleReaderDAO,
@@ -104,6 +114,7 @@ var articleSvcProvider = wire.NewSet(
 	service.NewInternalArticleAuthorService,
 	service.NewInternalArticleReaderService,
 	interactionSvcProvider,
+	searchSvcProvider,
 )
 
 var articleReaderSvcProvider = wire.NewSet(

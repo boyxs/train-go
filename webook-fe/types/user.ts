@@ -3,11 +3,11 @@ export interface Profile {
   id: number;
   email: string;
   nickname: string;
-  birthday: string;
+  birthday: number;
   aboutMe: string;
   phone: string;
-  createdAt: string;
-  updatedAt: string;
+  createdAt: number;
+  updatedAt: number;
 }
 
 // POST /user/login

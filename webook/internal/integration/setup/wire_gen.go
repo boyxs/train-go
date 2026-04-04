@@ -41,7 +41,13 @@ func InitWebServer() *gin.Engine {
 	articleAuthorRepository := repository.NewCacheArticleAuthorRepository(articleAuthorDAO, articleCache)
 	articleReaderDAO := dao.NewGormArticleReaderDAO(db)
 	articleReaderRepository := repository.NewCacheArticleReaderRepository(articleReaderDAO, articleCache, loggerX)
-	articleAuthorService := service.NewInternalArticleAuthorService(articleAuthorRepository, articleReaderRepository)
+	typedClient := ioc.InitESClient()
+	articleSearchDAO := dao.NewElasticArticleDAO(typedClient)
+	articleSearchRepository := repository.NewESArticleSearchRepository(articleSearchDAO)
+	embeddingConfig := ioc.InitEmbeddingConfig()
+	embeddingClient := ioc.InitEmbeddingClient(embeddingConfig, cmdable)
+	articleSearchService := service.NewArticleSearchService(articleSearchRepository, embeddingClient, loggerX)
+	articleAuthorService := service.NewInternalArticleAuthorService(articleAuthorRepository, articleReaderRepository, articleSearchService, loggerX)
 	interactionDAO := dao.NewGormInteractionDAO(db)
 	interactionCache := cache.NewRedisInteractionCache(cmdable)
 	interactionRepository := repository.NewCacheInteractionRepository(interactionDAO, interactionCache, loggerX)
@@ -63,7 +69,8 @@ func InitWebServer() *gin.Engine {
 	chatService := service.NewChatService(conversationRepository, messageRepository, llmClient, loggerX)
 	limiter := ioc.InitChatLimiter(cmdable)
 	chatHandler := web.NewInternalChatHandler(chatService, loggerX, limiter)
-	engine := ioc.InitWebServer(v, userHandler, articleAuthorHandler, articleReaderHandler, interactionHandler, oAuth2Handler, chatHandler)
+	articleSearchHandler := web.NewInternalArticleSearchHandler(articleSearchService, loggerX)
+	engine := ioc.InitWebServer(v, userHandler, articleAuthorHandler, articleReaderHandler, interactionHandler, oAuth2Handler, chatHandler, articleSearchHandler)
 	return engine
 }
 
@@ -76,7 +83,13 @@ func InitArticleAuthorHandler() web.ArticleAuthorHandler {
 	articleReaderDAO := dao.NewGormArticleReaderDAO(db)
 	loggerX := InitLogger()
 	articleReaderRepository := repository.NewCacheArticleReaderRepository(articleReaderDAO, articleCache, loggerX)
-	articleAuthorService := service.NewInternalArticleAuthorService(articleAuthorRepository, articleReaderRepository)
+	typedClient := ioc.InitESClient()
+	articleSearchDAO := dao.NewElasticArticleDAO(typedClient)
+	articleSearchRepository := repository.NewESArticleSearchRepository(articleSearchDAO)
+	embeddingConfig := ioc.InitEmbeddingConfig()
+	embeddingClient := ioc.InitEmbeddingClient(embeddingConfig, cmdable)
+	articleSearchService := service.NewArticleSearchService(articleSearchRepository, embeddingClient, loggerX)
+	articleAuthorService := service.NewInternalArticleAuthorService(articleAuthorRepository, articleReaderRepository, articleSearchService, loggerX)
 	interactionDAO := dao.NewGormInteractionDAO(db)
 	interactionCache := cache.NewRedisInteractionCache(cmdable)
 	interactionRepository := repository.NewCacheInteractionRepository(interactionDAO, interactionCache, loggerX)
@@ -141,7 +154,11 @@ var infraSvcProvider = wire.NewSet(
 
 var userSvcProvider = wire.NewSet(dao.NewGormUserDAO, cache.NewRedisUserCache, repository.NewRedisUserRepository, service.NewInternalUserService)
 
-var articleSvcProvider = wire.NewSet(dao.NewGormArticleAuthorDAO, dao.NewGormArticleReaderDAO, cache.NewRedisArticleCache, repository.NewCacheArticleAuthorRepository, repository.NewCacheArticleReaderRepository, service.NewInternalArticleAuthorService, service.NewInternalArticleReaderService, interactionSvcProvider)
+var searchSvcProvider = wire.NewSet(ioc.InitESClient, ioc.InitEmbeddingConfig, ioc.InitEmbeddingClient, dao.NewElasticArticleDAO, repository.NewESArticleSearchRepository, service.NewArticleSearchService)
+
+var articleSvcProvider = wire.NewSet(dao.NewGormArticleAuthorDAO, dao.NewGormArticleReaderDAO, cache.NewRedisArticleCache, repository.NewCacheArticleAuthorRepository, repository.NewCacheArticleReaderRepository, service.NewInternalArticleAuthorService, service.NewInternalArticleReaderService, interactionSvcProvider,
+	searchSvcProvider,
+)
 
 var articleReaderSvcProvider = wire.NewSet(dao.NewGormArticleReaderDAO, cache.NewRedisArticleCache, repository.NewCacheArticleReaderRepository, service.NewInternalArticleReaderService, interactionSvcProvider)
 

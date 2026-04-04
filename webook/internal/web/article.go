@@ -2,7 +2,6 @@ package web
 
 import (
 	"net/http"
-	"time"
 
 	"gitee.com/train-cloud/geektime-basic-go/internal/consts"
 	"gitee.com/train-cloud/geektime-basic-go/internal/domain"
@@ -196,8 +195,8 @@ func (h *InternalArticleAuthorHandler) Detail(ctx *gin.Context) {
 			Abstract:  article.Abstract,
 			Status:    article.Status.ToUint8(),
 			ReadCnt:   readCnt,
-			CreatedAt: article.CreatedAt.Format(consts.DateTime),
-			UpdatedAt: article.UpdatedAt.Format(consts.DateTime),
+			CreatedAt: article.CreatedAt,
+			UpdatedAt: article.UpdatedAt,
 		},
 	})
 }
@@ -208,7 +207,8 @@ type ArticleVO struct {
 	Title     string `json:"title"`
 	Status    uint8  `json:"status"`
 	ReadCnt   int64  `json:"readCnt"`
-	UpdatedAt string `json:"updatedAt"`
+	CreatedAt int64  `json:"createdAt"`
+	UpdatedAt int64  `json:"updatedAt"`
 }
 
 // AuthorDetailVO 作者视角文章详情
@@ -219,8 +219,8 @@ type AuthorDetailVO struct {
 	Abstract  string `json:"abstract"`
 	Status    uint8  `json:"status"`
 	ReadCnt   int64  `json:"readCnt"`
-	CreatedAt string `json:"createdAt"`
-	UpdatedAt string `json:"updatedAt"`
+	CreatedAt int64  `json:"createdAt"`
+	UpdatedAt int64  `json:"updatedAt"`
 }
 
 // ReaderDetailVO 读者视角文章详情
@@ -231,7 +231,8 @@ type ReaderDetailVO struct {
 	Abstract  string `json:"abstract"`
 	AuthorId  int64  `json:"authorId"`
 	ReadCnt   int64  `json:"readCnt"`
-	UpdatedAt string `json:"updatedAt"`
+	CreatedAt int64  `json:"createdAt"`
+	UpdatedAt int64  `json:"updatedAt"`
 }
 
 func (h *InternalArticleAuthorHandler) Page(ctx *gin.Context) {
@@ -272,7 +273,8 @@ func (h *InternalArticleAuthorHandler) Page(ctx *gin.Context) {
 			Title:     a.Title,
 			Status:    a.Status.ToUint8(),
 			ReadCnt:   intrMap[a.Id].ReadCount,
-			UpdatedAt: a.UpdatedAt.Format(time.DateTime),
+			CreatedAt: a.CreatedAt,
+			UpdatedAt: a.UpdatedAt,
 		})
 	}
 	ctx.JSON(http.StatusOK, Result{
@@ -301,7 +303,8 @@ func (h *InternalArticleAuthorHandler) List(ctx *gin.Context) {
 			Id:        a.Id,
 			Title:     a.Title,
 			Status:    a.Status.ToUint8(),
-			UpdatedAt: a.UpdatedAt.Format(time.DateTime),
+			CreatedAt: a.CreatedAt,
+			UpdatedAt: a.UpdatedAt,
 		})
 	}
 	ctx.JSON(http.StatusOK, Result{
@@ -364,7 +367,8 @@ type ReaderArticleVO struct {
 	Abstract  string `json:"abstract"`
 	AuthorId  int64  `json:"authorId"`
 	ReadCnt   int64  `json:"readCnt"`
-	UpdatedAt string `json:"updatedAt"`
+	CreatedAt int64  `json:"createdAt"`
+	UpdatedAt int64  `json:"updatedAt"`
 }
 
 func abstractFromContent(content string, maxLen int) string {
@@ -413,7 +417,8 @@ func (h *InternalArticleReaderHandler) Detail(ctx *gin.Context) {
 		Abstract:  abstract,
 		AuthorId:  article.Author.Id,
 		ReadCnt:   readCnt,
-		UpdatedAt: article.UpdatedAt.Format(time.DateTime),
+		CreatedAt: article.CreatedAt,
+		UpdatedAt: article.UpdatedAt,
 	}})
 }
 
@@ -455,7 +460,8 @@ func (h *InternalArticleReaderHandler) Page(ctx *gin.Context) {
 			Abstract:  abstract,
 			AuthorId:  a.Author.Id,
 			ReadCnt:   intrMap[a.Id].ReadCount,
-			UpdatedAt: a.UpdatedAt.Format(time.DateTime),
+			CreatedAt: a.CreatedAt,
+			UpdatedAt: a.UpdatedAt,
 		})
 	}
 	ctx.JSON(http.StatusOK, Result{

@@ -2,6 +2,7 @@
 
 import { RightOutlined } from '@ant-design/icons';
 import { Empty, Pagination, Typography } from 'antd';
+import dayjs from 'dayjs';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import React from 'react';
@@ -125,7 +126,9 @@ function ArticleFeedPage() {
                                 <circle cx='12' cy='12' r='10' />
                                 <polyline points='12 6 12 12 16 14' />
                               </svg>
-                              {article.updatedAt}
+                              {dayjs(article.createdAt).format(
+                                'YYYY-MM-DD HH:mm',
+                              )}
                             </span>
                           </div>
                         </div>

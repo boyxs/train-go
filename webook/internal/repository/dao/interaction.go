@@ -26,23 +26,20 @@ func NewGormInteractionDAO(db *gorm.DB) InteractionDAO {
 }
 
 func (d *GormInteractionDAO) IncrReadCount(ctx context.Context, biz string, bizId int64) error {
-	now := time.Now()
 	return d.db.WithContext(ctx).Clauses(clause.OnConflict{
 		DoUpdates: clause.Assignments(map[string]any{
 			"read_count": gorm.Expr("read_count + 1"),
-			"updated_at": now,
+			"updated_at": time.Now().UnixMilli(),
 		}),
 	}).Create(&Interaction{
 		BizId:     bizId,
 		Biz:       biz,
 		ReadCount: 1,
-		CreatedAt: now,
-		UpdatedAt: now,
 	}).Error
 }
 
 func (d *GormInteractionDAO) UpsertLike(ctx context.Context, uid int64, biz string, bizId int64, liked bool) error {
-	now := time.Now()
+	now := time.Now().UnixMilli()
 	return d.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		err := tx.Clauses(clause.OnConflict{
 			DoUpdates: clause.Assignments(map[string]any{
@@ -50,12 +47,10 @@ func (d *GormInteractionDAO) UpsertLike(ctx context.Context, uid int64, biz stri
 				"updated_at": now,
 			}),
 		}).Create(&UserInteraction{
-			UserId:    uid,
-			BizId:     bizId,
-			Biz:       biz,
-			Liked:     liked,
-			CreatedAt: now,
-			UpdatedAt: now,
+			UserId: uid,
+			BizId:  bizId,
+			Biz:    biz,
+			Liked:  liked,
 		}).Error
 		if err != nil {
 			return err
@@ -73,14 +68,12 @@ func (d *GormInteractionDAO) UpsertLike(ctx context.Context, uid int64, biz stri
 			BizId:     bizId,
 			Biz:       biz,
 			LikeCount: max(0, delta),
-			CreatedAt: now,
-			UpdatedAt: now,
 		}).Error
 	})
 }
 
 func (d *GormInteractionDAO) UpsertCollect(ctx context.Context, uid int64, biz string, bizId int64, collected bool) error {
-	now := time.Now()
+	now := time.Now().UnixMilli()
 	return d.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		err := tx.Clauses(clause.OnConflict{
 			DoUpdates: clause.Assignments(map[string]any{
@@ -92,8 +85,6 @@ func (d *GormInteractionDAO) UpsertCollect(ctx context.Context, uid int64, biz s
 			BizId:     bizId,
 			Biz:       biz,
 			Collected: collected,
-			CreatedAt: now,
-			UpdatedAt: now,
 		}).Error
 		if err != nil {
 			return err
@@ -111,8 +102,6 @@ func (d *GormInteractionDAO) UpsertCollect(ctx context.Context, uid int64, biz s
 			BizId:        bizId,
 			Biz:          biz,
 			CollectCount: max(0, delta),
-			CreatedAt:    now,
-			UpdatedAt:    now,
 		}).Error
 	})
 }
@@ -146,8 +135,8 @@ type Interaction struct {
 	ReadCount    int64
 	LikeCount    int64
 	CollectCount int64
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	CreatedAt    int64 `gorm:"autoCreateTime:milli"`
+	UpdatedAt    int64 `gorm:"autoUpdateTime:milli"`
 }
 
 func (Interaction) TableName() string {
@@ -162,8 +151,8 @@ type UserInteraction struct {
 	UserId    int64  `gorm:"uniqueIndex:uk_user_biz"`
 	Liked     bool
 	Collected bool
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	CreatedAt int64 `gorm:"autoCreateTime:milli"`
+	UpdatedAt int64 `gorm:"autoUpdateTime:milli"`
 }
 
 func (UserInteraction) TableName() string {

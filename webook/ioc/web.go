@@ -26,6 +26,7 @@ func InitWebServer(
 	interactionHandler web.InteractionHandler,
 	oauth2Handler web.OAuth2Handler,
 	chatHandler web.ChatHandler,
+	searchHandler web.ArticleSearchHandler,
 ) *gin.Engine {
 	server := gin.Default()
 	server.Use(middlewares...)
@@ -35,6 +36,7 @@ func InitWebServer(
 	interactionHandler.RegisterRoutes(server)
 	oauth2Handler.RegisterRoutes(server)
 	chatHandler.RegisterRoutes(server)
+	searchHandler.RegisterRoutes(server)
 	return server
 }
 
