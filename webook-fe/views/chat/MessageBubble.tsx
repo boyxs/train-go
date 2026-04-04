@@ -1,6 +1,7 @@
 'use client';
 
-import { RobotOutlined, UserOutlined } from '@ant-design/icons';
+import { UserOutlined } from '@ant-design/icons';
+import { Bot } from 'lucide-react';
 import React from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -41,16 +42,14 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     >
       {/* 头像 */}
       <div
-        className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
-          isUser
-            ? 'bg-[#0D9488]'
-            : 'bg-gradient-to-br from-[#0D9488] to-[#0F766E]'
+        className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${
+          isUser ? 'bg-[#0D9488]' : 'bg-[#F3F4F6]'
         }`}
       >
         {isUser ? (
           <UserOutlined style={{ fontSize: 14, color: '#fff' }} />
         ) : (
-          <RobotOutlined style={{ fontSize: 14, color: '#fff' }} />
+          <Bot size={16} color='#0D9488' />
         )}
       </div>
 

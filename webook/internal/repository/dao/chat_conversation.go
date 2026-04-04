@@ -2,7 +2,6 @@ package dao
 
 import (
 	"context"
-	"time"
 
 	"gorm.io/gorm"
 )
@@ -24,9 +23,7 @@ func NewGormConversationDAO(db *gorm.DB) ConversationDAO {
 }
 
 func (d *GormConversationDAO) Create(ctx context.Context, conv Conversation) (Conversation, error) {
-	now := time.Now()
-	conv.CreatedAt = now
-	conv.UpdatedAt = now
+	// CreatedAt/UpdatedAt 由 GORM autoCreateTime:milli / autoUpdateTime:milli 自动填充
 	err := d.db.WithContext(ctx).Create(&conv).Error
 	return conv, err
 }
@@ -53,8 +50,7 @@ func (d *GormConversationDAO) UpdateTitle(ctx context.Context, uid int64, convId
 		Model(&Conversation{}).
 		Where("id = ? AND user_id = ?", convId, uid).
 		Updates(map[string]any{
-			"title":      title,
-			"updated_at": time.Now(),
+			"title": title,
 		}).Error
 }
 
@@ -78,8 +74,8 @@ type Conversation struct {
 	Id        int64  `gorm:"primaryKey,autoIncrement"`
 	UserId    int64  `gorm:"index:idx_user_updated;not null"`
 	Title     string `gorm:"type:varchar(128);not null;default:''"`
-	CreatedAt time.Time
-	UpdatedAt time.Time `gorm:"index:idx_user_updated"`
+	CreatedAt int64  `gorm:"autoCreateTime:milli"`
+	UpdatedAt int64  `gorm:"autoUpdateTime:milli;index:idx_user_updated"`
 }
 
 func (Conversation) TableName() string {

@@ -115,14 +115,14 @@ func (s *ChatSuite) TestCreateConversation() {
 }
 
 func (s *ChatSuite) TestListConversations() {
-	now := time.Now()
+	now := time.Now().UnixMilli()
 	// 预插入 3 条对话
 	for i := 0; i < 3; i++ {
 		err := s.db.Create(&dao.Conversation{
 			UserId:    1,
 			Title:     "对话",
-			CreatedAt: now.Add(time.Duration(i) * time.Second),
-			UpdatedAt: now.Add(time.Duration(i) * time.Second),
+			CreatedAt: now + int64(i)*1000,
+			UpdatedAt: now + int64(i)*1000,
 		}).Error
 		s.Require().NoError(err)
 	}
@@ -157,7 +157,7 @@ func (s *ChatSuite) TestListConversations_Empty() {
 }
 
 func (s *ChatSuite) TestDeleteConversation() {
-	now := time.Now()
+	now := time.Now().UnixMilli()
 	// 预插入对话
 	conv := dao.Conversation{UserId: 1, Title: "待删除", CreatedAt: now, UpdatedAt: now}
 	err := s.db.Create(&conv).Error
@@ -193,7 +193,7 @@ func (s *ChatSuite) TestDeleteConversation() {
 }
 
 func (s *ChatSuite) TestDeleteConversation_NotOwner() {
-	now := time.Now()
+	now := time.Now().UnixMilli()
 	// uid=1 创建对话
 	conv := dao.Conversation{UserId: 1, Title: "不属于你", CreatedAt: now, UpdatedAt: now}
 	err := s.db.Create(&conv).Error
@@ -223,7 +223,7 @@ func (s *ChatSuite) TestDeleteConversation_NotOwner() {
 }
 
 func (s *ChatSuite) TestListMessages() {
-	now := time.Now()
+	now := time.Now().UnixMilli()
 	// 预插入对话
 	conv := dao.Conversation{UserId: 1, Title: "测试", CreatedAt: now, UpdatedAt: now}
 	err := s.db.Create(&conv).Error
@@ -235,7 +235,7 @@ func (s *ChatSuite) TestListMessages() {
 			ConversationId: conv.Id,
 			Role:           "user",
 			Content:        "消息",
-			CreatedAt:      now.Add(time.Duration(i) * time.Second),
+			CreatedAt:      now + int64(i)*1000,
 		}).Error
 		s.Require().NoError(err)
 	}
@@ -259,7 +259,7 @@ func (s *ChatSuite) TestListMessages() {
 }
 
 func (s *ChatSuite) TestListMessages_NotOwner() {
-	now := time.Now()
+	now := time.Now().UnixMilli()
 	// uid=1 创建对话
 	conv := dao.Conversation{UserId: 1, Title: "测试", CreatedAt: now, UpdatedAt: now}
 	err := s.db.Create(&conv).Error
@@ -283,7 +283,7 @@ func (s *ChatSuite) TestSendMessage_SSE() {
 	}
 
 	// 创建对话
-	now := time.Now()
+	now := time.Now().UnixMilli()
 	conv := dao.Conversation{UserId: 1, Title: "SSE测试", CreatedAt: now, UpdatedAt: now}
 	err := s.db.Create(&conv).Error
 	s.Require().NoError(err)
@@ -311,7 +311,7 @@ func (s *ChatSuite) TestSendMessage_EmptyContent() {
 }
 
 func (s *ChatSuite) TestSendMessage_TooLong() {
-	now := time.Now()
+	now := time.Now().UnixMilli()
 	conv := dao.Conversation{UserId: 1, Title: "测试", CreatedAt: now, UpdatedAt: now}
 	err := s.db.Create(&conv).Error
 	s.Require().NoError(err)
@@ -330,7 +330,7 @@ func (s *ChatSuite) TestSendMessage_TooLong() {
 }
 
 func (s *ChatSuite) TestRateLimit() {
-	now := time.Now()
+	now := time.Now().UnixMilli()
 	conv := dao.Conversation{UserId: 99, Title: "限流测试", CreatedAt: now, UpdatedAt: now}
 	err := s.db.Create(&conv).Error
 	s.Require().NoError(err)

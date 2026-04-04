@@ -5,6 +5,7 @@ import (
 
 	"gitee.com/train-cloud/geektime-basic-go/internal/domain"
 	"gitee.com/train-cloud/geektime-basic-go/internal/repository"
+	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
 )
 
 // ===== 作者端 =====
@@ -22,15 +23,21 @@ type ArticleAuthorService interface {
 type InternalArticleAuthorService struct {
 	authorRepo repository.ArticleAuthorRepository
 	readerRepo repository.ArticleReaderRepository
+	searchSvc  ArticleSearchService
+	l          logger.LoggerX
 }
 
 func NewInternalArticleAuthorService(
 	authorRepo repository.ArticleAuthorRepository,
 	readerRepo repository.ArticleReaderRepository,
+	searchSvc ArticleSearchService,
+	l logger.LoggerX,
 ) ArticleAuthorService {
 	return &InternalArticleAuthorService{
 		authorRepo: authorRepo,
 		readerRepo: readerRepo,
+		searchSvc:  searchSvc,
+		l:          l,
 	}
 }
 
@@ -61,21 +68,38 @@ func (s *InternalArticleAuthorService) Publish(ctx context.Context, article doma
 	if err != nil {
 		return 0, err
 	}
+	// 从 DB 回查完整数据（含 AuthorName / CreatedAt），再写入 ES
+	go func(articleId, uid int64) {
+		complete, err := s.authorRepo.FindById(context.Background(), articleId, uid)
+		if err != nil {
+			s.l.Error("索引文章：回查完整数据失败",
+				logger.Int64("articleId", articleId), logger.Error(err))
+			return
+		}
+		if err := s.searchSvc.IndexArticle(context.Background(), complete); err != nil {
+			s.l.Error("索引文章失败", logger.Int64("articleId", articleId), logger.Error(err))
+		}
+	}(id, article.Author.Id)
 	return id, nil
 }
 
 func (s *InternalArticleAuthorService) Withdraw(ctx context.Context, id int64, uid int64) error {
-	_, err := s.authorRepo.FindById(ctx, id, uid)
-	if err != nil {
-		return err
-	}
-	err = s.authorRepo.UpdateStatus(ctx, id, uid,
+	// UpdateStatus 自带权限校验（WHERE author_id=uid AND status=from），RowsAffected=0 即失败
+	err := s.authorRepo.UpdateStatus(ctx, id, uid,
 		domain.ArticleStatusPublished.ToUint8(),
 		domain.ArticleStatusPrivate.ToUint8())
 	if err != nil {
 		return err
 	}
-	return s.readerRepo.Delete(ctx, id, uid)
+	if err := s.readerRepo.Delete(ctx, id, uid); err != nil {
+		return err
+	}
+	go func() {
+		if err := s.searchSvc.RemoveArticle(context.Background(), id); err != nil {
+			s.l.Error("移除搜索索引失败", logger.Int64("articleId", id), logger.Error(err))
+		}
+	}()
+	return nil
 }
 
 func (s *InternalArticleAuthorService) Detail(ctx context.Context, id int64, uid int64) (domain.Article, error) {
@@ -98,11 +122,18 @@ func (s *InternalArticleAuthorService) List(ctx context.Context, uid int64) ([]d
 }
 
 func (s *InternalArticleAuthorService) Delete(ctx context.Context, id int64, uid int64) error {
-	err := s.authorRepo.Delete(ctx, id, uid)
-	if err != nil {
+	if err := s.authorRepo.Delete(ctx, id, uid); err != nil {
 		return err
 	}
-	return s.readerRepo.Delete(ctx, id, uid)
+	if err := s.readerRepo.Delete(ctx, id, uid); err != nil {
+		return err
+	}
+	go func() {
+		if err := s.searchSvc.RemoveArticle(context.Background(), id); err != nil {
+			s.l.Error("移除搜索索引失败", logger.Int64("articleId", id), logger.Error(err))
+		}
+	}()
+	return nil
 }
 
 // ===== 读者端 =====

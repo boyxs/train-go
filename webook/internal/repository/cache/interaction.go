@@ -60,16 +60,16 @@ func (c *RedisInteractionCache) Get(ctx context.Context, biz string, bizId int64
 
 func (c *RedisInteractionCache) Set(ctx context.Context, intr domain.Interaction) error {
 	key := c.key(intr.Biz, intr.BizId)
-	err := c.cmd.HSet(ctx, key,
+	jitter := time.Duration(rand.Int63n(int64(5 * time.Minute)))
+	pipe := c.cmd.Pipeline()
+	pipe.HSet(ctx, key,
 		"read_cnt", intr.ReadCount,
 		"like_cnt", intr.LikeCount,
 		"collect_cnt", intr.CollectCount,
-	).Err()
-	if err != nil {
-		return err
-	}
-	jitter := time.Duration(rand.Int63n(int64(5 * time.Minute)))
-	return c.cmd.Expire(ctx, key, consts.InteractionTTL+jitter).Err()
+	)
+	pipe.Expire(ctx, key, consts.InteractionTTL+jitter)
+	_, err := pipe.Exec(ctx)
+	return err
 }
 
 func (c *RedisInteractionCache) Del(ctx context.Context, biz string, bizId int64) error {

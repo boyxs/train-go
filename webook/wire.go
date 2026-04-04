@@ -14,7 +14,17 @@ import (
 	"github.com/google/wire"
 )
 
-// chatProviderSet Chat 模块的 Wire Provider 集合
+// searchProviderSet 搜索模块的 Wire Provider 集合（不含 Handler）
+var searchProviderSet = wire.NewSet(
+	ioc.InitESClient,
+	ioc.InitEmbeddingConfig,
+	ioc.InitEmbeddingClient,
+	dao.NewElasticArticleDAO,
+	repository.NewESArticleSearchRepository,
+	service.NewArticleSearchService,
+)
+
+// chatProviderSet Chat 模块的 Wire Provider 集合（不含 Handler）
 var chatProviderSet = wire.NewSet(
 	ioc.InitLLMConfig,
 	ioc.InitLLMClient,
@@ -26,7 +36,6 @@ var chatProviderSet = wire.NewSet(
 	repository.NewCacheConversationRepository,
 	repository.NewCacheMessageRepository,
 	service.NewChatService,
-	web.NewInternalChatHandler,
 )
 
 func InitWebServer() *gin.Engine {
@@ -61,9 +70,13 @@ func InitWebServer() *gin.Engine {
 		web.NewInternalArticleReaderHandler,
 		web.NewInternalInteractionHandler,
 		web.NewOAuth2WechatHandler,
+		web.NewInternalChatHandler,
+		web.NewInternalArticleSearchHandler,
 		jwt.NewRedisJwtHandler,
 		// chat 模块
 		chatProviderSet,
+		// 搜索模块
+		searchProviderSet,
 
 		ioc.InitMiddlewares,
 		ioc.InitWebServer,

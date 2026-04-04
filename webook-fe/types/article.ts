@@ -17,8 +17,8 @@ export interface Article {
     name: string;
   };
   status: ArticleStatus;
-  createdAt: string;
-  updatedAt: string;
+  createdAt: number;
+  updatedAt: number;
 }
 
 // POST /article/edit 和 /article/publish

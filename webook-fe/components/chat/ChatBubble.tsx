@@ -6,9 +6,9 @@ import {
   ExpandOutlined,
   HistoryOutlined,
   PlusOutlined,
-  RobotOutlined,
 } from '@ant-design/icons';
 import { App, Button, Drawer } from 'antd';
+import { Bot } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import React, { useRef, useState } from 'react';
 
@@ -99,7 +99,7 @@ export const ChatBubble: React.FC = () => {
         title={
           <div className='flex items-center justify-between'>
             <div className='flex items-center gap-2'>
-              <RobotOutlined style={{ color: '#0D9488' }} />
+              <Bot size={16} color='#0D9488' />
               <span>AI 客服</span>
             </div>
             <div className='flex items-center gap-0.5'>

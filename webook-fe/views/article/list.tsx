@@ -13,6 +13,7 @@ import {
   App,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
+import dayjs from 'dayjs';
 import { useRouter } from 'next/navigation';
 import React, { useCallback, useState } from 'react';
 
@@ -119,6 +120,7 @@ function ArticleListPage() {
       dataIndex: 'updatedAt',
       key: 'updatedAt',
       width: 180,
+      render: (v: number) => dayjs(v).format('YYYY-MM-DD HH:mm'),
     },
     {
       title: '操作',
@@ -174,7 +176,7 @@ function ArticleListPage() {
         </div>
         <div className='flex items-center justify-between'>
           <Text type='secondary' className='text-xs'>
-            {article.updatedAt}
+            {dayjs(article.updatedAt).format('YYYY-MM-DD HH:mm')}
           </Text>
           <Space size={0}>
             <Button

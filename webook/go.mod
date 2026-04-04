@@ -6,6 +6,7 @@ require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/dlclark/regexp2 v1.11.5
 	github.com/ecodeclub/ekit v0.0.10
+	github.com/elastic/go-elasticsearch/v8 v8.19.3
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/gin-contrib/cors v1.7.6
 	github.com/gin-contrib/sessions v1.0.4
@@ -26,6 +27,7 @@ require (
 	golang.org/x/net v0.50.0
 	gorm.io/driver/mysql v1.6.0
 	gorm.io/gorm v1.31.1
+	gorm.io/plugin/soft_delete v1.2.1
 )
 
 require (
@@ -39,6 +41,7 @@ require (
 	github.com/coreos/go-semver v0.3.1 // indirect
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
 	github.com/dromara/carbon/v2 v2.6.9 // indirect
+	github.com/elastic/elastic-transport-go/v8 v8.8.0 // indirect
 	github.com/fatih/color v1.16.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect

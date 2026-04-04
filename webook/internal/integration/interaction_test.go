@@ -117,7 +117,7 @@ func (s *InteractionSuite) TestInteraction_ReadReport() {
 		{
 			name: "已有计数基础上累加",
 			before: func(t *testing.T) {
-				now := time.Now()
+				now := time.Now().UnixMilli()
 				err := s.db.Create(&dao.Interaction{
 					BizId: 3, Biz: "article", ReadCount: 10,
 					CreatedAt: now, UpdatedAt: now,
@@ -151,7 +151,7 @@ func (s *InteractionSuite) TestInteraction_ReadReport() {
 
 func (s *InteractionSuite) TestInteraction_ReaderDetailReadCnt() {
 	t := s.T()
-	mockNow := time.Now().UTC()
+	mockNow := time.Now().UnixMilli()
 	testCases := []struct {
 		name       string
 		before     func(t *testing.T)
@@ -228,7 +228,7 @@ func (s *InteractionSuite) TestInteraction_ReaderDetailReadCnt() {
 
 func (s *InteractionSuite) TestInteraction_ReaderPageReadCnt() {
 	t := s.T()
-	mockNow := time.Now().UTC()
+	mockNow := time.Now().UnixMilli()
 	testCases := []struct {
 		name       string
 		before     func(t *testing.T)

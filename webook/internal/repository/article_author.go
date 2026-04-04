@@ -49,7 +49,11 @@ func (r *CacheArticleAuthorRepository) Update(ctx context.Context, article domai
 }
 
 func (r *CacheArticleAuthorRepository) UpdateStatus(ctx context.Context, id int64, uid int64, fromStatus uint8, toStatus uint8) error {
-	return r.dao.UpdateStatus(ctx, id, uid, fromStatus, toStatus)
+	err := r.dao.UpdateStatus(ctx, id, uid, fromStatus, toStatus)
+	if err == nil {
+		r.delCache(ctx, uid, id)
+	}
+	return err
 }
 
 func (r *CacheArticleAuthorRepository) FindById(ctx context.Context, id int64, uid int64) (domain.Article, error) {

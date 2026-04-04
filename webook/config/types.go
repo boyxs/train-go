@@ -26,3 +26,11 @@ type LLMProviderConfig struct {
 	MaxTokens int
 	Timeout   int // 秒
 }
+
+type EmbeddingConfig struct {
+	BaseUrl string
+	ApiKey  string
+	Model   string
+	Dims    int
+	Timeout int // 秒
+}

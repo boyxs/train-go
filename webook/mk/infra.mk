@@ -10,16 +10,16 @@ INFO := [-]
 
 help:
 	@echo "Infrastructure Management Commands:"
-	@echo "  make -f infra.mk all         - Deploy all components"
-	@echo "  make -f infra.mk mysql       - Deploy/Restart MySQL"
-	@echo "  make -f infra.mk redis       - Deploy/Restart Redis"
-	@echo "  make -f infra.mk status      - Check pods status"
+	@echo "  make -f mk/infra.mk all         - Deploy all components"
+	@echo "  make -f mk/infra.mk mysql       - Deploy/Restart MySQL"
+	@echo "  make -f mk/infra.mk redis       - Deploy/Restart Redis"
+	@echo "  make -f mk/infra.mk status      - Check pods status"
 
 # --- One-click Deployment ---
 all:
 	@echo "$(STEP) Starting full infrastructure deployment..."
-	@$(MAKE) -f infra.mk mysql
-	@$(MAKE) -f infra.mk redis
+	@$(MAKE) -f mk/infra.mk mysql
+	@$(MAKE) -f mk/infra.mk redis
 	@echo "$(STEP) Done: All components deployed."
 
 # --- MySQL Target ---
@@ -76,4 +76,4 @@ clean:
 	@$(KUBECTL) delete -f k8s/k8s-mysql-deployment.yaml,k8s/k8s-mysql-service.yaml,k8s/k8s-redis-deployment.yaml,k8s/k8s-redis-service.yaml,k8s/k8s-etcd-deployment.yaml,k8s/k8s-etcd-service.yaml -n $(NAMESPACE) --ignore-not-found
 	@echo "$(INFO) Cleanup complete."
 
-# make -f infra.mk xxx
+# make -f mk/infra.mk xxx

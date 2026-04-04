@@ -2,10 +2,10 @@ package dao
 
 import (
 	"context"
-	"time"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+	"gorm.io/plugin/soft_delete"
 )
 
 type ArticleReaderDAO interface {
@@ -51,6 +51,7 @@ func (d *GormArticleReaderDAO) FindById(ctx context.Context, id int64) (Publishe
 func (d *GormArticleReaderDAO) Page(ctx context.Context, offset int, limit int) ([]PublishedArticle, error) {
 	var articles []PublishedArticle
 	err := d.db.WithContext(ctx).
+		Select("id, title, abstract, author_id, status, created_at, updated_at").
 		Order("id DESC").
 		Offset(offset).Limit(limit).
 		Find(&articles).Error
@@ -65,14 +66,15 @@ func (d *GormArticleReaderDAO) Count(ctx context.Context) (int64, error) {
 
 // PublishedArticle 线上库模型
 type PublishedArticle struct {
-	Id        int64     `gorm:"primaryKey"`
-	Title     string    `gorm:"type=varchar(4096)"`
-	Content   string    `gorm:"type=BLOB"`
-	Abstract  string    `gorm:"type=varchar(256)"`
-	AuthorId  int64     `gorm:"index"`
+	Id        int64                 `gorm:"primaryKey"`
+	Title     string                `gorm:"type=varchar(4096)"`
+	Content   string                `gorm:"type=BLOB"`
+	Abstract  string                `gorm:"type=varchar(256)"`
+	AuthorId  int64                 `gorm:"index"`
 	Status    uint8
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	CreatedAt int64                 `gorm:"autoCreateTime:milli"`
+	UpdatedAt int64                 `gorm:"autoUpdateTime:milli"`
+	DeletedAt soft_delete.DeletedAt `gorm:"softDelete:milli"`
 }
 
 func (PublishedArticle) TableName() string {

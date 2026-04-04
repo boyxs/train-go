@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"time"
 
 	"gitee.com/train-cloud/geektime-basic-go/internal/consts"
@@ -36,7 +37,8 @@ func (uc *RedisUserCache) Set(ctx context.Context, u domain.User) error {
 	if err != nil {
 		return err
 	}
-	return uc.cmd.Set(ctx, uc.getKey(u.Id), data, uc.expiration).Err()
+	jitter := time.Duration(rand.Intn(300)) * time.Second // 0~5min 随机抖动
+	return uc.cmd.Set(ctx, uc.getKey(u.Id), data, uc.expiration+jitter).Err()
 
 }
 

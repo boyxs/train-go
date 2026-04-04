@@ -33,6 +33,16 @@ llm:
           maxTokens: 2048
           timeout: 60
 
+es:
+    addr: "http://localhost:9200"
+
+embedding:
+    baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    apiKey: "sk-ef23911b061943b681584ac467c4cd28"
+    model: "text-embedding-v3"
+    dims: 1024
+    timeout: 30
+
 #etcdctl --endpoints=127.0.0.1:2379 put /webook < config/dev.yaml
 
 #dev.yaml 开发 (development)

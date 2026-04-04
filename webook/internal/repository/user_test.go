@@ -18,9 +18,10 @@ import (
 )
 
 func TestRedisUserRepository_FindById(t *testing.T) {
-	mockNow := time.Now().UTC().Truncate(time.Millisecond)
+	mockNow := time.Now().UnixMilli()
 	userid := int64(101)
-	birthday, _ := time.ParseInLocation(consts.DateOnly, "2026-02-13", time.UTC)
+	birthdayTime, _ := time.ParseInLocation(consts.DateOnly, "2026-02-13", time.UTC)
+	birthday := birthdayTime.UnixMilli()
 	testCases := []struct {
 		name string
 		mock func(ctrl *gomock.Controller) (dao.UserDAO, cache.UserCache)

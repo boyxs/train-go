@@ -40,6 +40,9 @@ func (r *CacheArticleReaderRepository) Upsert(ctx context.Context, article domai
 		return err
 	}
 	r.delFirstPageCache(ctx)
+	if cErr := r.cache.DelPub(ctx, article.Id); cErr != nil {
+		r.l.Error("Upsert 后清除公开文章缓存失败", logger.Int64("id", article.Id), logger.Error(cErr))
+	}
 	return nil
 }
 
@@ -49,6 +52,9 @@ func (r *CacheArticleReaderRepository) Delete(ctx context.Context, id int64, uid
 		return err
 	}
 	r.delFirstPageCache(ctx)
+	if cErr := r.cache.DelPub(ctx, id); cErr != nil {
+		r.l.Error("删除公开文章缓存失败", logger.Int64("id", id), logger.Error(cErr))
+	}
 	return nil
 }
 
@@ -59,11 +65,19 @@ func (r *CacheArticleReaderRepository) delFirstPageCache(ctx context.Context) {
 }
 
 func (r *CacheArticleReaderRepository) FindById(ctx context.Context, id int64) (domain.Article, error) {
+	art, err := r.cache.GetPub(ctx, id)
+	if err == nil {
+		return art, nil
+	}
 	pub, err := r.dao.FindById(ctx, id)
 	if err != nil {
 		return domain.Article{}, err
 	}
-	return r.toDomain(pub), nil
+	result := r.toDomain(pub)
+	if cErr := r.cache.SetPub(ctx, result); cErr != nil {
+		r.l.Error("回填公开文章缓存失败", logger.Int64("id", id), logger.Error(cErr))
+	}
+	return result, nil
 }
 
 func (r *CacheArticleReaderRepository) Page(ctx context.Context, offset int, limit int) ([]domain.Article, int64, error) {

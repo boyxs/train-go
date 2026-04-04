@@ -7,11 +7,12 @@ import {
   LogoutOutlined,
   MenuOutlined,
   ReadOutlined,
-  RobotOutlined,
+  SearchOutlined,
   UserOutlined,
 } from '@ant-design/icons';
-import { Avatar, Button, Drawer, Dropdown, Menu } from 'antd';
+import { Avatar, Button, Drawer, Dropdown, Input, Menu } from 'antd';
 import type { MenuProps } from 'antd';
+import { Bot } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import React, { useState } from 'react';
 
@@ -22,7 +23,8 @@ const menuItems: MenuProps['items'] = [
   { key: '/feed', icon: <ReadOutlined />, label: '文章广场' },
   { key: '/article/list', icon: <FileTextOutlined />, label: '我的文章' },
   { key: '/article/edit', icon: <EditOutlined />, label: '写文章' },
-  { key: '/chat', icon: <RobotOutlined />, label: 'AI 客服' },
+  { key: '/search', icon: <SearchOutlined />, label: '搜索' },
+  { key: '/chat', icon: <Bot size={14} />, label: 'AI 客服' },
 ];
 
 export const Header: React.FC = () => {
@@ -88,7 +90,7 @@ export const Header: React.FC = () => {
         小微书
       </div>
 
-      {/* 桌面端：水平菜单 + 头像下拉 */}
+      {/* 桌面端：水平菜单 + 搜索框 + 头像下拉 */}
       <div className='hidden md:flex flex-1 items-center'>
         <Menu
           mode='horizontal'
@@ -96,6 +98,17 @@ export const Header: React.FC = () => {
           items={menuItems}
           onClick={({ key }) => router.push(key)}
           style={{ flex: 1, border: 'none' }}
+        />
+        <Input.Search
+          placeholder='搜索文章...'
+          size='small'
+          style={{ width: 180, marginRight: 16 }}
+          onSearch={(val) => {
+            const q = val.trim();
+            if (q) {
+              router.push(`/search?q=${encodeURIComponent(q)}`);
+            }
+          }}
         />
         <Dropdown menu={{ items: dropdownItems }} placement='bottomRight'>
           <Avatar

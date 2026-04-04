@@ -1,11 +1,8 @@
 'use client';
 
-import {
-  ArrowLeftOutlined,
-  MenuOutlined,
-  RobotOutlined,
-} from '@ant-design/icons';
+import { ArrowLeftOutlined, MenuOutlined } from '@ant-design/icons';
 import { App, Button, Drawer } from 'antd';
+import { Bot } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import React, { useEffect, useState } from 'react';
 
@@ -97,7 +94,7 @@ function ChatPage() {
         </div>
         {/* 移动端居中标题 */}
         <div className='flex md:hidden items-center gap-1.5'>
-          <RobotOutlined style={{ color: '#0D9488' }} />
+          <Bot size={16} color='#0D9488' />
           <span className='text-sm font-semibold text-[#1A1A1A]'>AI 客服</span>
         </div>
         <div className='flex items-center gap-3'>

@@ -1,7 +1,5 @@
 package domain
 
-import "time"
-
 type Article struct {
 	Id        int64         `json:"id"`
 	Title     string        `json:"title"`
@@ -9,8 +7,8 @@ type Article struct {
 	Abstract  string        `json:"abstract"`
 	Author    Author        `json:"author"`
 	Status    ArticleStatus `json:"status"`
-	CreatedAt time.Time     `json:"createdAt"`
-	UpdatedAt time.Time     `json:"updatedAt"`
+	CreatedAt int64         `json:"createdAt"`
+	UpdatedAt int64         `json:"updatedAt"`
 }
 
 type Author struct {

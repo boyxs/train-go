@@ -159,7 +159,7 @@ function ArticleReadPage({ articleId }: ArticleReadProps) {
               <div className='flex items-center gap-2 text-gray-400 text-sm'>
                 <ClockCircleOutlined />
                 <Text type='secondary'>
-                  {dayjs(article.updatedAt).format('YYYY-MM-DD HH:mm')}
+                  {dayjs(article.createdAt).format('YYYY-MM-DD HH:mm')}
                 </Text>
               </div>
 

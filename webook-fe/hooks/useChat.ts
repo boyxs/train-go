@@ -113,14 +113,14 @@ export function useChat(conversationId: number | null) {
         conversationId,
         role: 'user',
         content: content.trim(),
-        createdAt: new Date().toISOString(),
+        createdAt: Date.now(),
       };
       const aiMsg: Message = {
         id: tempIdRef.current--,
         conversationId,
         role: 'assistant',
         content: '',
-        createdAt: new Date().toISOString(),
+        createdAt: Date.now(),
       };
 
       setPendingMessages((prev) => [...prev, userMsg, aiMsg]);

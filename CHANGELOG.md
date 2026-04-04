@@ -2,6 +2,18 @@
 
 <!-- 新功能前插在此，日期降序 -->
 
+## [2026-04-05] 搜索优化 + 时间 int64 统一 + 性能修复
+
+**变更内容**: 搜索功能全链路优化、时间字段统一为 int64 毫秒时间戳、多项性能和缓存修复
+**影响范围**: DAO/domain/repository/service/web 全层 + 前端 types/views + ES mapping + SQL schema
+**技术决策**:
+- 时间用 int64 而非 time.Time：消除时区歧义，全链路零转换，前端 dayjs 格式化
+- 搜索用 script_score 替代顶层 kNN：避免 kNN OR 合并返回全部文档
+- Embedding 加 Redis 缓存（装饰器模式）：相同查询不重复调 API
+- Wire/Mock 禁止手动改生成文件，统一用命令生成
+**待办**: FindByBizIds 批量缓存、ES kNN+RRF 混合搜索（需 ES 8.8+）
+**会话**: 250404-搜索优化-时间统一
+
 ## [2026-04-04] 安全修复：Chat 越权删除消息 + 越权取消生成
 
 **变更内容**: 修复 3 处安全 / 架构问题

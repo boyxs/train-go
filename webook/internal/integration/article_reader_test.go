@@ -50,7 +50,7 @@ func TestArticleReaderHandler(t *testing.T) {
 
 func (h *ArticleReaderHandlerSuite) TestArticleReaderHandler_Page() {
 	t := h.T()
-	mockNow := time.Now().UTC()
+	mockNow := time.Now().UnixMilli()
 	testCases := []struct {
 		name       string
 		before     func(t *testing.T)
@@ -166,7 +166,7 @@ func (h *ArticleReaderHandlerSuite) TestArticleReaderHandler_Page() {
 
 func (h *ArticleReaderHandlerSuite) TestArticleReaderHandler_Detail() {
 	t := h.T()
-	mockNow := time.Now().UTC()
+	mockNow := time.Now().UnixMilli()
 	testCases := []struct {
 		name       string
 		before     func(t *testing.T)
