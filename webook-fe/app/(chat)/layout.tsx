@@ -4,11 +4,9 @@ import '@ant-design/v5-patch-for-react-19';
 import { App, ConfigProvider } from 'antd';
 import React from 'react';
 
-import { ChatBubble } from '@/components/chat/ChatBubble';
-import { AppLayout } from '@/components/layout/AppLayout';
 import { AuthGuard } from '@/components/layout/AuthGuard';
 
-export default function MainLayout({
+export default function ChatLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -17,8 +15,9 @@ export default function MainLayout({
     <ConfigProvider theme={{ token: { colorPrimary: '#0D9488' } }}>
       <App>
         <AuthGuard>
-          <AppLayout>{children}</AppLayout>
-          <ChatBubble />
+          <div className='h-screen flex flex-col overflow-hidden'>
+            {children}
+          </div>
         </AuthGuard>
       </App>
     </ConfigProvider>

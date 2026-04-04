@@ -156,4 +156,32 @@ CREATE TABLE `user_interaction`  (
   UNIQUE INDEX `uk_user_biz`(`biz` ASC, `biz_id` ASC, `user_id` ASC) USING BTREE
 ) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
 
+-- ----------------------------
+-- Table structure for conversation (AI 客服对话)
+-- ----------------------------
+CREATE TABLE IF NOT EXISTS `conversation` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `user_id` bigint NOT NULL,
+  `title` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL DEFAULT '',
+  `created_at` datetime(3) NOT NULL,
+  `updated_at` datetime(3) NOT NULL,
+  PRIMARY KEY (`id`) USING BTREE,
+  INDEX `idx_user_updated` (`user_id` ASC, `updated_at` DESC) USING BTREE
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
+
+-- ----------------------------
+-- Table structure for message (AI 客服消息)
+-- ----------------------------
+CREATE TABLE IF NOT EXISTS `message` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `conversation_id` bigint NOT NULL,
+  `role` varchar(16) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
+  `content` text CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
+  `tool_calls` json NULL,
+  `token_used` int NOT NULL DEFAULT 0,
+  `created_at` datetime(3) NOT NULL,
+  PRIMARY KEY (`id`) USING BTREE,
+  INDEX `idx_conv_created` (`conversation_id` ASC, `created_at` ASC) USING BTREE
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
+
 SET FOREIGN_KEY_CHECKS = 1;

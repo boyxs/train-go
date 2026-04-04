@@ -10,3 +10,11 @@ export type {
 export type { Article, EditArticleReq, WithdrawArticleReq } from './article';
 export { ArticleStatus } from './article';
 export type { Interaction, LikeReq, CollectReq } from './interaction';
+export type {
+  Conversation,
+  Message,
+  ChatDeltaEvent,
+  ChatToolCallEvent,
+  ChatDoneEvent,
+  ChatErrorEvent,
+} from './chat';

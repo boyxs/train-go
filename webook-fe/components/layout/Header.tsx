@@ -7,6 +7,7 @@ import {
   LogoutOutlined,
   MenuOutlined,
   ReadOutlined,
+  RobotOutlined,
   UserOutlined,
 } from '@ant-design/icons';
 import { Avatar, Button, Drawer, Dropdown, Menu } from 'antd';
@@ -21,6 +22,7 @@ const menuItems: MenuProps['items'] = [
   { key: '/feed', icon: <ReadOutlined />, label: '文章广场' },
   { key: '/article/list', icon: <FileTextOutlined />, label: '我的文章' },
   { key: '/article/edit', icon: <EditOutlined />, label: '写文章' },
+  { key: '/chat', icon: <RobotOutlined />, label: 'AI 客服' },
 ];
 
 export const Header: React.FC = () => {
