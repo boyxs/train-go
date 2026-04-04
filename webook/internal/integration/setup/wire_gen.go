@@ -52,7 +52,18 @@ func InitWebServer() *gin.Engine {
 	interactionHandler := web.NewInternalInteractionHandler(interactionService, loggerX)
 	oAuth2Service := ioc.InitWechatOAuth2Service()
 	oAuth2Handler := web.NewOAuth2WechatHandler(jwtHandler, oAuth2Service, userService)
-	engine := ioc.InitWebServer(v, userHandler, articleAuthorHandler, articleReaderHandler, interactionHandler, oAuth2Handler)
+	conversationDAO := dao.NewGormConversationDAO(db)
+	conversationCache := cache.NewRedisConversationCache(cmdable)
+	conversationRepository := repository.NewCacheConversationRepository(conversationDAO, conversationCache, loggerX)
+	messageDAO := dao.NewGormMessageDAO(db)
+	messageCache := cache.NewRedisMessageCache(cmdable)
+	messageRepository := repository.NewCacheMessageRepository(messageDAO, messageCache, loggerX)
+	llmConfig := ioc.InitLLMConfig()
+	llmClient := ioc.InitLLMClient(llmConfig, loggerX)
+	chatService := service.NewChatService(conversationRepository, messageRepository, llmClient, loggerX)
+	limiter := ioc.InitChatLimiter(cmdable)
+	chatHandler := web.NewInternalChatHandler(chatService, loggerX, limiter)
+	engine := ioc.InitWebServer(v, userHandler, articleAuthorHandler, articleReaderHandler, interactionHandler, oAuth2Handler, chatHandler)
 	return engine
 }
 
@@ -102,6 +113,24 @@ func InitInteractionHandler() web.InteractionHandler {
 	return interactionHandler
 }
 
+func InitChatHandler() web.ChatHandler {
+	db := InitDB()
+	conversationDAO := dao.NewGormConversationDAO(db)
+	cmdable := InitRedis()
+	conversationCache := cache.NewRedisConversationCache(cmdable)
+	loggerX := InitLogger()
+	conversationRepository := repository.NewCacheConversationRepository(conversationDAO, conversationCache, loggerX)
+	messageDAO := dao.NewGormMessageDAO(db)
+	messageCache := cache.NewRedisMessageCache(cmdable)
+	messageRepository := repository.NewCacheMessageRepository(messageDAO, messageCache, loggerX)
+	llmConfig := ioc.InitLLMConfig()
+	llmClient := ioc.InitLLMClient(llmConfig, loggerX)
+	chatService := service.NewChatService(conversationRepository, messageRepository, llmClient, loggerX)
+	limiter := ioc.InitChatLimiter(cmdable)
+	chatHandler := web.NewInternalChatHandler(chatService, loggerX, limiter)
+	return chatHandler
+}
+
 // wire.go:
 
 var infraSvcProvider = wire.NewSet(
@@ -117,3 +146,5 @@ var articleSvcProvider = wire.NewSet(dao.NewGormArticleAuthorDAO, dao.NewGormArt
 var articleReaderSvcProvider = wire.NewSet(dao.NewGormArticleReaderDAO, cache.NewRedisArticleCache, repository.NewCacheArticleReaderRepository, service.NewInternalArticleReaderService, interactionSvcProvider)
 
 var interactionSvcProvider = wire.NewSet(dao.NewGormInteractionDAO, cache.NewRedisInteractionCache, repository.NewCacheInteractionRepository, service.NewInternalInteractionService)
+
+var chatSvcProvider = wire.NewSet(ioc.InitLLMConfig, ioc.InitLLMClient, ioc.InitChatLimiter, dao.NewGormConversationDAO, dao.NewGormMessageDAO, cache.NewRedisConversationCache, cache.NewRedisMessageCache, repository.NewCacheConversationRepository, repository.NewCacheMessageRepository, service.NewChatService)

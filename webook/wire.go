@@ -14,6 +14,21 @@ import (
 	"github.com/google/wire"
 )
 
+// chatProviderSet Chat 模块的 Wire Provider 集合
+var chatProviderSet = wire.NewSet(
+	ioc.InitLLMConfig,
+	ioc.InitLLMClient,
+	ioc.InitChatLimiter,
+	dao.NewGormConversationDAO,
+	dao.NewGormMessageDAO,
+	cache.NewRedisConversationCache,
+	cache.NewRedisMessageCache,
+	repository.NewCacheConversationRepository,
+	repository.NewCacheMessageRepository,
+	service.NewChatService,
+	web.NewInternalChatHandler,
+)
+
 func InitWebServer() *gin.Engine {
 	wire.Build(
 		//infra
@@ -47,6 +62,8 @@ func InitWebServer() *gin.Engine {
 		web.NewInternalInteractionHandler,
 		web.NewOAuth2WechatHandler,
 		jwt.NewRedisJwtHandler,
+		// chat 模块
+		chatProviderSet,
 
 		ioc.InitMiddlewares,
 		ioc.InitWebServer,

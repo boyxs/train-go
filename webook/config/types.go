@@ -13,3 +13,16 @@ type RedisConfig struct {
 	Addr     string
 	Password string
 }
+
+type LLMConfig struct {
+	Providers []LLMProviderConfig
+}
+
+type LLMProviderConfig struct {
+	Name      string
+	ApiKey    string
+	BaseUrl   string
+	Model     string
+	MaxTokens int
+	Timeout   int // 秒
+}

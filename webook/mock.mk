@@ -23,6 +23,11 @@ mockgen:
 	@mockgen -package=redismocks -destination=./internal/repository/cache/redismocks/cmdable_mock.go github.com/redis/go-redis/v9 Cmdable
 	#sms
 	@mockgen -source=./internal/service/sms/types.go -package=smsmocks -destination=./internal/service/sms/mocks/sms_mock.go
+	#chat repository
+	@mockgen -source=./internal/repository/chat_conversation.go -package=repomocks -destination=./internal/repository/mocks/chat_conversation_mock.go
+	@mockgen -source=./internal/repository/chat_message.go -package=repomocks -destination=./internal/repository/mocks/chat_message_mock.go
+	#ai
+	@mockgen -source=./internal/service/ai/llm.go -package=aimocks -destination=./internal/service/ai/mocks/llm_mock.go
 	#update dependencies
 	@go mod tidy
 

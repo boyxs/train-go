@@ -15,6 +15,7 @@ import (
 	"gitee.com/train-cloud/geektime-basic-go/internal/web/jwt"
 	"gitee.com/train-cloud/geektime-basic-go/ioc"
 	"github.com/gin-gonic/gin"
+	"github.com/google/wire"
 )
 
 import (
@@ -55,6 +56,22 @@ func InitWebServer() *gin.Engine {
 	interactionHandler := web.NewInternalInteractionHandler(interactionService, loggerX)
 	oAuth2Service := ioc.InitWechatOAuth2Service()
 	oAuth2Handler := web.NewOAuth2WechatHandler(jwtHandler, oAuth2Service, userService)
-	engine := ioc.InitWebServer(v, userHandler, articleAuthorHandler, articleReaderHandler, interactionHandler, oAuth2Handler)
+	conversationDAO := dao.NewGormConversationDAO(db)
+	conversationCache := cache.NewRedisConversationCache(cmdable)
+	conversationRepository := repository.NewCacheConversationRepository(conversationDAO, conversationCache, loggerX)
+	messageDAO := dao.NewGormMessageDAO(db)
+	messageCache := cache.NewRedisMessageCache(cmdable)
+	messageRepository := repository.NewCacheMessageRepository(messageDAO, messageCache, loggerX)
+	llmConfig := ioc.InitLLMConfig()
+	llmClient := ioc.InitLLMClient(llmConfig, loggerX)
+	chatService := service.NewChatService(conversationRepository, messageRepository, llmClient, loggerX)
+	limiter := ioc.InitChatLimiter(cmdable)
+	chatHandler := web.NewInternalChatHandler(chatService, loggerX, limiter)
+	engine := ioc.InitWebServer(v, userHandler, articleAuthorHandler, articleReaderHandler, interactionHandler, oAuth2Handler, chatHandler)
 	return engine
 }
+
+// wire.go:
+
+// chatProviderSet Chat 模块的 Wire Provider 集合
+var chatProviderSet = wire.NewSet(ioc.InitLLMConfig, ioc.InitLLMClient, ioc.InitChatLimiter, dao.NewGormConversationDAO, dao.NewGormMessageDAO, cache.NewRedisConversationCache, cache.NewRedisMessageCache, repository.NewCacheConversationRepository, repository.NewCacheMessageRepository, service.NewChatService, web.NewInternalChatHandler)
