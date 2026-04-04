@@ -12,7 +12,7 @@
 - `message` / `notification` / `modal` 必须通过 `App.useApp()` 获取实例，禁止静态导入
 - 布局层（layout.tsx）必须包裹 `<ConfigProvider><App>...</App></ConfigProvider>`
 - 主题色通过 ConfigProvider `token.colorPrimary` 统一控制，组件内不硬编码色值
-- 手动用色时引用 `.claude/rules/design-tokens.md` 中的 Token
+- 手动用色时通过 ConfigProvider 的 `theme.token` 获取，保持全局一致
 
 ## 3. 破坏性操作
 
