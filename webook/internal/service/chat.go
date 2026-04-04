@@ -70,7 +70,10 @@ func (s *chatService) DeleteConversation(ctx context.Context, uid int64, convId 
 func (s *chatService) ListMessages(ctx context.Context, uid int64, convId int64, beforeId int64, limit int) ([]domain.Message, error) {
 	_, err := s.convRepo.Find(ctx, uid, convId)
 	if err != nil {
-		return nil, ErrConversationNotFound
+		if isNotFound(err) {
+			return nil, ErrConversationNotFound
+		}
+		return nil, err
 	}
 	if limit <= 0 || limit > 50 {
 		limit = 20
@@ -85,7 +88,10 @@ func (s *chatService) SendMessage(ctx context.Context, uid int64, convId int64, 
 	// 1. 校验对话归属
 	_, err := s.convRepo.Find(ctx, uid, convId)
 	if err != nil {
-		return nil, ErrConversationNotFound
+		if isNotFound(err) {
+			return nil, ErrConversationNotFound
+		}
+		return nil, fmt.Errorf("查询对话失败: %w", err)
 	}
 
 	// 2. 校验消息长度
@@ -111,13 +117,13 @@ func (s *chatService) SendMessage(ctx context.Context, uid int64, convId int64, 
 
 	// 5. 创建可取消的 context
 	streamCtx, cancel := context.WithCancel(ctx)
-	s.cancel.Store(convId, cancel)
+	s.cancel.Store(cancelKey(uid, convId), cancel)
 
 	// 6. 调用 LLM 流式接口
 	llmCh, err := s.llm.ChatStream(streamCtx, messages, nil)
 	if err != nil {
 		cancel()
-		s.cancel.Delete(convId)
+		s.cancel.Delete(cancelKey(uid, convId))
 		return nil, fmt.Errorf("调用 LLM 失败: %w", err)
 	}
 
@@ -129,10 +135,15 @@ func (s *chatService) SendMessage(ctx context.Context, uid int64, convId int64, 
 }
 
 func (s *chatService) StopGeneration(ctx context.Context, uid int64, convId int64) error {
-	if cancelFn, ok := s.cancel.LoadAndDelete(convId); ok {
+	if cancelFn, ok := s.cancel.LoadAndDelete(cancelKey(uid, convId)); ok {
 		cancelFn.(context.CancelFunc)()
 	}
 	return nil
+}
+
+// cancelKey 生成 uid:convId 复合 key，防止越权取消他人的生成
+func cancelKey(uid, convId int64) string {
+	return fmt.Sprintf("%d:%d", uid, convId)
 }
 
 // buildPrompt 构建系统提示词 + 最近历史
@@ -161,7 +172,7 @@ func (s *chatService) buildPrompt(ctx context.Context, convId int64) ([]ai.ChatM
 // forwardStream 读取 LLM channel，转发到事件 channel，完成后保存 AI 回复
 func (s *chatService) forwardStream(ctx context.Context, convId int64, uid int64, llmCh <-chan ai.StreamChunk, eventCh chan<- domain.ChatEvent) {
 	defer close(eventCh)
-	defer s.cancel.Delete(convId)
+	defer s.cancel.Delete(cancelKey(uid, convId))
 
 	var fullContent strings.Builder
 
@@ -263,6 +274,11 @@ func (s *chatService) autoTitle(convId int64, uid int64, reply string) {
 			logger.Int64("convId", convId),
 			logger.Error(err))
 	}
+}
+
+// isNotFound 判断是否"记录不存在"错误（通过 repository 层错误链，不直接依赖 GORM）
+func isNotFound(err error) bool {
+	return errors.Is(err, repository.ErrRecordNotFound)
 }
 
 // truncateRunes 截取前 n 个 rune，去除换行

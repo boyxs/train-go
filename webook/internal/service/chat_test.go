@@ -35,7 +35,7 @@ func TestChatService_SendMessage(t *testing.T) {
 				msgRepo := repomocks.NewMockMessageRepository(ctrl)
 				llm := aimocks.NewMockLLMClient(ctrl)
 				convRepo.EXPECT().Find(gomock.Any(), int64(1), int64(999)).
-					Return(domain.Conversation{}, errors.New("not found"))
+					Return(domain.Conversation{}, repository.ErrRecordNotFound)
 				return convRepo, msgRepo, llm
 			},
 			wantErr: ErrConversationNotFound,

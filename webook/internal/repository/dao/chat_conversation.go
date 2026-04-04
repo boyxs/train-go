@@ -60,10 +60,16 @@ func (d *GormConversationDAO) UpdateTitle(ctx context.Context, uid int64, convId
 
 func (d *GormConversationDAO) Delete(ctx context.Context, uid int64, convId int64) error {
 	return d.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("conversation_id = ?", convId).Delete(&Message{}).Error; err != nil {
-			return err
+		// 先校验归属：只删属于 uid 的对话，防止越权删除他人消息
+		res := tx.Where("id = ? AND user_id = ?", convId, uid).Delete(&Conversation{})
+		if res.Error != nil {
+			return res.Error
 		}
-		return tx.Where("id = ? AND user_id = ?", convId, uid).Delete(&Conversation{}).Error
+		if res.RowsAffected == 0 {
+			return gorm.ErrRecordNotFound
+		}
+		// 归属已确认，再清理消息
+		return tx.Where("conversation_id = ?", convId).Delete(&Message{}).Error
 	})
 }
 

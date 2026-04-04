@@ -2,6 +2,16 @@
 
 <!-- 新功能前插在此，日期降序 -->
 
+## [2026-04-04] 安全修复：Chat 越权删除消息 + 越权取消生成
+
+**变更内容**: 修复 3 处安全 / 架构问题
+**影响范围**: `dao/chat_conversation.go` · `service/chat.go` · `service/chat_test.go`
+**技术决策**:
+1. `Delete` 事务先删 Conversation（uid 校验 + RowsAffected）再删 Messages，防越权删他人消息
+2. `cancel` map 改用 `uid:convId` 复合 key，防任意用户 `/chat/stop` 取消他人生成
+3. `isNotFound` 改用 `repository.ErrRecordNotFound`，service 层不再直接依赖 GORM
+**会话**: 260404-chat-security-fix
+
 ## [2026-04-04] AI 客服多 LLM 故障转移 + 项目治理
 
 **变更内容**: 新增 Kimi LLM 提供方，实现 FailoverClient（轮询）+ TimeoutFailoverClient（粘性超时切换）双策略故障转移；前端 SSE 超时断开 + 业务错误即断；consts 按领域拆分；CLAUDE.md 精简为导航+规则
