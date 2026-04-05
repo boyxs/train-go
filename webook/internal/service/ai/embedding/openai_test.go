@@ -1,4 +1,4 @@
-package ai_test
+package embedding_test
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"gitee.com/train-cloud/geektime-basic-go/config"
-	"gitee.com/train-cloud/geektime-basic-go/internal/service/ai"
+	"gitee.com/train-cloud/geektime-basic-go/internal/service/ai/embedding"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -21,7 +21,7 @@ func newEmbedServer(statusCode int, body any) *httptest.Server {
 	}))
 }
 
-func TestOpenAIEmbeddingClient_Embed(t *testing.T) {
+func TestOpenAIClient_Embed(t *testing.T) {
 	testCases := []struct {
 		name       string
 		text       string
@@ -87,14 +87,14 @@ func TestOpenAIEmbeddingClient_Embed(t *testing.T) {
 			wantErr: "empty",
 		},
 		{
-			name: "text 为空字符串",
-			text: "",
+			name:    "text 为空字符串",
+			text:    "",
+			wantErr: "text 不能为空",
 			serverResp: func() *httptest.Server {
 				return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 					w.WriteHeader(http.StatusOK)
 				}))
 			},
-			wantErr: "text 不能为空",
 		},
 		{
 			name: "ctx 已取消",
@@ -113,7 +113,7 @@ func TestOpenAIEmbeddingClient_Embed(t *testing.T) {
 			srv := tc.serverResp()
 			defer srv.Close()
 
-			client := ai.NewOpenAIEmbeddingClient(config.EmbeddingConfig{
+			client := embedding.NewOpenAIClient(config.EmbeddingConfig{
 				BaseUrl: srv.URL,
 				ApiKey:  "test-key",
 				Model:   "text-embedding-v3",

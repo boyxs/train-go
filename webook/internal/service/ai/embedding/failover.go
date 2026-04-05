@@ -1,4 +1,4 @@
-package ai
+package embedding
 
 import (
 	"context"
@@ -8,20 +8,20 @@ import (
 	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
 )
 
-// FailoverEmbeddingClient 顺序尝试多个 EmbeddingClient，第一个成功即返回
-type FailoverEmbeddingClient struct {
+// FailoverClient 顺序尝试多个 Client，第一个成功即返回
+type FailoverClient struct {
 	clients []EmbeddingClient
 	l       logger.LoggerX
 }
 
-func NewFailoverEmbeddingClient(clients []EmbeddingClient, l logger.LoggerX) EmbeddingClient {
+func NewFailoverClient(clients []EmbeddingClient, l logger.LoggerX) EmbeddingClient {
 	if len(clients) == 0 {
 		panic("Embedding 提供方列表不能为空")
 	}
-	return &FailoverEmbeddingClient{clients: clients, l: l}
+	return &FailoverClient{clients: clients, l: l}
 }
 
-func (f *FailoverEmbeddingClient) Embed(ctx context.Context, text string) ([]float32, error) {
+func (f *FailoverClient) Embed(ctx context.Context, text string) ([]float32, error) {
 	var lastErr error
 	for i, c := range f.clients {
 		vec, err := c.Embed(ctx, text)

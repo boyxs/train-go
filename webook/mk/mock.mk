@@ -30,7 +30,8 @@ mockgen:
 	@mockgen -source=./internal/repository/chat_message.go -package=repomocks -destination=./internal/repository/mocks/chat_message_mock.go
 	#ai
 	@mockgen -source=./internal/service/ai/llm.go -package=aimocks -destination=./internal/service/ai/mocks/llm_mock.go
-	@mockgen -source=./internal/service/ai/embedding.go -package=aimocks -destination=./internal/service/ai/mocks/embedding_mock.go
+	#embedding
+	@mockgen -source=./internal/service/ai/embedding/types.go -package=embmocks -destination=./internal/service/ai/embedding/mocks/embedding_mock.go
 	#update dependencies
 	@go mod tidy
 

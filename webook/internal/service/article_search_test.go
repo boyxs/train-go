@@ -8,7 +8,7 @@ import (
 	"gitee.com/train-cloud/geektime-basic-go/internal/domain"
 	"gitee.com/train-cloud/geektime-basic-go/internal/repository"
 	repomocks "gitee.com/train-cloud/geektime-basic-go/internal/repository/mocks"
-	aimocks "gitee.com/train-cloud/geektime-basic-go/internal/service/ai/mocks"
+	embmocks "gitee.com/train-cloud/geektime-basic-go/internal/service/ai/embedding/mocks"
 	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -28,7 +28,7 @@ func TestSearchService_Search(t *testing.T) {
 		query    string
 		page     int
 		size     int
-		mock     func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *aimocks.MockEmbeddingClient)
+		mock     func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *embmocks.MockEmbeddingClient)
 		wantList []domain.Article
 		wantTotal int64
 		wantErr  string
@@ -38,9 +38,9 @@ func TestSearchService_Search(t *testing.T) {
 			query: "健身饮食",
 			page:  1,
 			size:  10,
-			mock: func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *aimocks.MockEmbeddingClient) {
+			mock: func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *embmocks.MockEmbeddingClient) {
 				repo := repomocks.NewMockArticleSearchRepository(ctrl)
-				embed := aimocks.NewMockEmbeddingClient(ctrl)
+				embed := embmocks.NewMockEmbeddingClient(ctrl)
 				embed.EXPECT().Embed(gomock.Any(), "健身饮食").Return(stubVec, nil)
 				repo.EXPECT().Search(gomock.Any(), "健身饮食", stubVec, 0, 10).
 					Return(articles, int64(2), nil)
@@ -54,9 +54,9 @@ func TestSearchService_Search(t *testing.T) {
 			query: "量子力学",
 			page:  1,
 			size:  10,
-			mock: func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *aimocks.MockEmbeddingClient) {
+			mock: func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *embmocks.MockEmbeddingClient) {
 				repo := repomocks.NewMockArticleSearchRepository(ctrl)
-				embed := aimocks.NewMockEmbeddingClient(ctrl)
+				embed := embmocks.NewMockEmbeddingClient(ctrl)
 				embed.EXPECT().Embed(gomock.Any(), "量子力学").Return(stubVec, nil)
 				repo.EXPECT().Search(gomock.Any(), "量子力学", stubVec, 0, 10).
 					Return(nil, int64(0), nil)
@@ -70,9 +70,9 @@ func TestSearchService_Search(t *testing.T) {
 			query: "test",
 			page:  1,
 			size:  10,
-			mock: func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *aimocks.MockEmbeddingClient) {
+			mock: func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *embmocks.MockEmbeddingClient) {
 				repo := repomocks.NewMockArticleSearchRepository(ctrl)
-				embed := aimocks.NewMockEmbeddingClient(ctrl)
+				embed := embmocks.NewMockEmbeddingClient(ctrl)
 				embed.EXPECT().Embed(gomock.Any(), "test").Return(nil, errors.New("embed error"))
 				return repo, embed
 			},
@@ -83,9 +83,9 @@ func TestSearchService_Search(t *testing.T) {
 			query: "test",
 			page:  1,
 			size:  10,
-			mock: func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *aimocks.MockEmbeddingClient) {
+			mock: func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *embmocks.MockEmbeddingClient) {
 				repo := repomocks.NewMockArticleSearchRepository(ctrl)
-				embed := aimocks.NewMockEmbeddingClient(ctrl)
+				embed := embmocks.NewMockEmbeddingClient(ctrl)
 				embed.EXPECT().Embed(gomock.Any(), "test").Return(stubVec, nil)
 				repo.EXPECT().Search(gomock.Any(), "test", stubVec, 0, 10).
 					Return(nil, int64(0), errors.New("es down"))
@@ -98,8 +98,8 @@ func TestSearchService_Search(t *testing.T) {
 			query: "   ",
 			page:  1,
 			size:  10,
-			mock: func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *aimocks.MockEmbeddingClient) {
-				return repomocks.NewMockArticleSearchRepository(ctrl), aimocks.NewMockEmbeddingClient(ctrl)
+			mock: func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *embmocks.MockEmbeddingClient) {
+				return repomocks.NewMockArticleSearchRepository(ctrl), embmocks.NewMockEmbeddingClient(ctrl)
 			},
 			wantErr: "搜索内容不能为空",
 		},
@@ -108,9 +108,9 @@ func TestSearchService_Search(t *testing.T) {
 			query: "test",
 			page:  0,
 			size:  10,
-			mock: func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *aimocks.MockEmbeddingClient) {
+			mock: func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *embmocks.MockEmbeddingClient) {
 				repo := repomocks.NewMockArticleSearchRepository(ctrl)
-				embed := aimocks.NewMockEmbeddingClient(ctrl)
+				embed := embmocks.NewMockEmbeddingClient(ctrl)
 				embed.EXPECT().Embed(gomock.Any(), "test").Return(stubVec, nil)
 				// page=0 → offset=0，等同 page=1
 				repo.EXPECT().Search(gomock.Any(), "test", stubVec, 0, 10).
@@ -123,9 +123,9 @@ func TestSearchService_Search(t *testing.T) {
 			query: "test",
 			page:  1,
 			size:  0,
-			mock: func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *aimocks.MockEmbeddingClient) {
+			mock: func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *embmocks.MockEmbeddingClient) {
 				repo := repomocks.NewMockArticleSearchRepository(ctrl)
-				embed := aimocks.NewMockEmbeddingClient(ctrl)
+				embed := embmocks.NewMockEmbeddingClient(ctrl)
 				embed.EXPECT().Embed(gomock.Any(), "test").Return(stubVec, nil)
 				repo.EXPECT().Search(gomock.Any(), "test", stubVec, 0, 10).
 					Return(nil, int64(0), nil)
@@ -137,9 +137,9 @@ func TestSearchService_Search(t *testing.T) {
 			query: "test",
 			page:  1,
 			size:  999,
-			mock: func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *aimocks.MockEmbeddingClient) {
+			mock: func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *embmocks.MockEmbeddingClient) {
 				repo := repomocks.NewMockArticleSearchRepository(ctrl)
-				embed := aimocks.NewMockEmbeddingClient(ctrl)
+				embed := embmocks.NewMockEmbeddingClient(ctrl)
 				embed.EXPECT().Embed(gomock.Any(), "test").Return(stubVec, nil)
 				repo.EXPECT().Search(gomock.Any(), "test", stubVec, 0, 50).
 					Return(nil, int64(0), nil)
@@ -181,15 +181,15 @@ func TestSearchService_IndexArticle(t *testing.T) {
 	testCases := []struct {
 		name    string
 		article domain.Article
-		mock    func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *aimocks.MockEmbeddingClient)
+		mock    func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *embmocks.MockEmbeddingClient)
 		wantErr bool
 	}{
 		{
 			name:    "成功索引",
 			article: article,
-			mock: func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *aimocks.MockEmbeddingClient) {
+			mock: func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *embmocks.MockEmbeddingClient) {
 				repo := repomocks.NewMockArticleSearchRepository(ctrl)
-				embed := aimocks.NewMockEmbeddingClient(ctrl)
+				embed := embmocks.NewMockEmbeddingClient(ctrl)
 				embed.EXPECT().Embed(gomock.Any(), "健身饮食 如何科学饮食").Return(stubVec, nil)
 				repo.EXPECT().Index(gomock.Any(), article, stubVec).Return(nil)
 				return repo, embed
@@ -198,9 +198,9 @@ func TestSearchService_IndexArticle(t *testing.T) {
 		{
 			name:    "abstract 为空只 embed title",
 			article: articleNoAbstract,
-			mock: func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *aimocks.MockEmbeddingClient) {
+			mock: func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *embmocks.MockEmbeddingClient) {
 				repo := repomocks.NewMockArticleSearchRepository(ctrl)
-				embed := aimocks.NewMockEmbeddingClient(ctrl)
+				embed := embmocks.NewMockEmbeddingClient(ctrl)
 				embed.EXPECT().Embed(gomock.Any(), "无摘要文章").Return(stubVec, nil)
 				repo.EXPECT().Index(gomock.Any(), articleNoAbstract, stubVec).Return(nil)
 				return repo, embed
@@ -209,9 +209,9 @@ func TestSearchService_IndexArticle(t *testing.T) {
 		{
 			name:    "embed 失败只记日志不报错",
 			article: article,
-			mock: func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *aimocks.MockEmbeddingClient) {
+			mock: func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *embmocks.MockEmbeddingClient) {
 				repo := repomocks.NewMockArticleSearchRepository(ctrl)
-				embed := aimocks.NewMockEmbeddingClient(ctrl)
+				embed := embmocks.NewMockEmbeddingClient(ctrl)
 				embed.EXPECT().Embed(gomock.Any(), gomock.Any()).Return(nil, errors.New("embed down"))
 				return repo, embed
 			},
@@ -220,9 +220,9 @@ func TestSearchService_IndexArticle(t *testing.T) {
 		{
 			name:    "repo.Index 失败只记日志不报错",
 			article: article,
-			mock: func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *aimocks.MockEmbeddingClient) {
+			mock: func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *embmocks.MockEmbeddingClient) {
 				repo := repomocks.NewMockArticleSearchRepository(ctrl)
-				embed := aimocks.NewMockEmbeddingClient(ctrl)
+				embed := embmocks.NewMockEmbeddingClient(ctrl)
 				embed.EXPECT().Embed(gomock.Any(), gomock.Any()).Return(stubVec, nil)
 				repo.EXPECT().Index(gomock.Any(), article, stubVec).Return(errors.New("es down"))
 				return repo, embed
@@ -252,15 +252,15 @@ func TestSearchService_RemoveArticle(t *testing.T) {
 	testCases := []struct {
 		name    string
 		id      int64
-		mock    func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *aimocks.MockEmbeddingClient)
+		mock    func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *embmocks.MockEmbeddingClient)
 		wantErr string
 	}{
 		{
 			name: "成功删除",
 			id:   1,
-			mock: func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *aimocks.MockEmbeddingClient) {
+			mock: func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *embmocks.MockEmbeddingClient) {
 				repo := repomocks.NewMockArticleSearchRepository(ctrl)
-				embed := aimocks.NewMockEmbeddingClient(ctrl)
+				embed := embmocks.NewMockEmbeddingClient(ctrl)
 				repo.EXPECT().Remove(gomock.Any(), int64(1)).Return(nil)
 				return repo, embed
 			},
@@ -268,9 +268,9 @@ func TestSearchService_RemoveArticle(t *testing.T) {
 		{
 			name: "repo 失败透传错误",
 			id:   1,
-			mock: func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *aimocks.MockEmbeddingClient) {
+			mock: func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *embmocks.MockEmbeddingClient) {
 				repo := repomocks.NewMockArticleSearchRepository(ctrl)
-				embed := aimocks.NewMockEmbeddingClient(ctrl)
+				embed := embmocks.NewMockEmbeddingClient(ctrl)
 				repo.EXPECT().Remove(gomock.Any(), int64(1)).Return(errors.New("es down"))
 				return repo, embed
 			},
@@ -279,9 +279,9 @@ func TestSearchService_RemoveArticle(t *testing.T) {
 		{
 			name: "文档不存在幂等返回 nil",
 			id:   999,
-			mock: func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *aimocks.MockEmbeddingClient) {
+			mock: func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *embmocks.MockEmbeddingClient) {
 				repo := repomocks.NewMockArticleSearchRepository(ctrl)
-				embed := aimocks.NewMockEmbeddingClient(ctrl)
+				embed := embmocks.NewMockEmbeddingClient(ctrl)
 				repo.EXPECT().Remove(gomock.Any(), int64(999)).Return(repository.ErrSearchDocNotFound)
 				return repo, embed
 			},

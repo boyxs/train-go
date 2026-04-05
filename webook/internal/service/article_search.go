@@ -8,7 +8,7 @@ import (
 
 	"gitee.com/train-cloud/geektime-basic-go/internal/domain"
 	"gitee.com/train-cloud/geektime-basic-go/internal/repository"
-	"gitee.com/train-cloud/geektime-basic-go/internal/service/ai"
+	"gitee.com/train-cloud/geektime-basic-go/internal/service/ai/embedding"
 	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
 )
 
@@ -28,11 +28,11 @@ type ArticleSearchService interface {
 
 type InternalArticleSearchService struct {
 	repo  repository.ArticleSearchRepository
-	embed ai.EmbeddingClient
+	embed embedding.EmbeddingClient
 	l     logger.LoggerX
 }
 
-func NewArticleSearchService(repo repository.ArticleSearchRepository, embed ai.EmbeddingClient, l logger.LoggerX) ArticleSearchService {
+func NewArticleSearchService(repo repository.ArticleSearchRepository, embed embedding.EmbeddingClient, l logger.LoggerX) ArticleSearchService {
 	return &InternalArticleSearchService{repo: repo, embed: embed, l: l}
 }
 

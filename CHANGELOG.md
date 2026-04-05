@@ -2,6 +2,12 @@
 
 <!-- 新功能前插在此，日期降序 -->
 
+## [2026-04-05] Embedding 分包 + 分页状态保持
+
+**变更内容**: ai/embedding 拆为独立子包，缓存移到 cache 层；文章列表分页同步 URL，编辑返回不丢页码
+**影响范围**: `service/ai/embedding/`（新子包）· `cache/embedding.go`（缓存归位）· `views/article/list.tsx` · `views/article/edit.tsx`
+**技术决策**: 子包按能力拆分（LLM vs Embedding），接口用完整名 `EmbeddingClient` 避免歧义；分页用 URL searchParams 而非 state，支持刷新保留
+
 ## [2026-04-05] 本地 Ollama Embedding + 收费模型降级
 
 **变更内容**: 向量化优先走本地 Ollama bge-m3，失败自动降级到阿里百炼收费 API
