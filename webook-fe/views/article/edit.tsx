@@ -58,7 +58,7 @@ function ArticleEditPage({ articleId }: ArticleEditProps) {
       const res = await apiFn(data);
       if (res.data.code === 0 || !res.data.code) {
         message.success(successMsg);
-        router.push('/article/list');
+        router.back();
       } else {
         message.error(res.data.msg || '操作失败');
       }
