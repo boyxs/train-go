@@ -18,7 +18,7 @@ Q   ?= Go并发
         status mapping \
         create-index delete-index reset-index \
         list count get upsert delete-doc \
-        search search-vec-debug
+        search analyze plugins
 
 # ── 帮助 ────────────────────────────────────────────────────
 
@@ -41,6 +41,8 @@ help:
 	@echo ""
 	@echo "  搜索调试"
 	@echo "    search  Q=关键词  BM25 全文搜索（不含向量，用于调试）"
+	@echo "    analyze Q=文本    查看分词结果（默认 standard 分词器）"
+	@echo "    plugins           查看已安装的 ES 插件"
 	@echo ""
 
 # ── 索引管理 ────────────────────────────────────────────────
@@ -108,6 +110,21 @@ search:
 	@curl -s -X POST "$(ES_HOST)/$(ES_INDEX)/_search" \
 	  -H "Content-Type: application/json" \
 	  -d '{"query":{"bool":{"minimum_should_match":1,"should":[{"match":{"title":"$(Q)"}},{"match":{"abstract":"$(Q)"}}],"filter":{"term":{"status":2}}}},"size":10,"_source":["id","title","abstract","status","author_name"]}'
+	@echo ""
+
+# ── 工具 ────────────────────────────────────────────────────
+
+# 查看分词结果: make -f mk/es.mk analyze Q="Go并发编程"
+analyze:
+	@echo "$(STEP) 分词结果: \"$(Q)\""
+	@curl -s -X POST "$(ES_HOST)/$(ES_INDEX)/_analyze" \
+	  -H "Content-Type: application/json" \
+	  -d '{"text":"$(Q)"}'
+	@echo ""
+
+plugins:
+	@echo "$(STEP) ES 已安装插件:"
+	@curl -s "$(ES_HOST)/_cat/plugins?v"
 	@echo ""
 
 # make -f mk/es.mk <target>

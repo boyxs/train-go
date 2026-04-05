@@ -17,6 +17,7 @@ import (
 // searchProviderSet 搜索模块的 Wire Provider 集合（不含 Handler）
 var searchProviderSet = wire.NewSet(
 	ioc.InitESClient,
+	ioc.InitOllamaEmbeddingConfig,
 	ioc.InitEmbeddingConfig,
 	ioc.InitEmbeddingClient,
 	dao.NewElasticArticleDAO,
