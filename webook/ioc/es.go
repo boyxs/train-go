@@ -8,6 +8,7 @@ import (
 
 	"gitee.com/train-cloud/geektime-basic-go/config"
 	"gitee.com/train-cloud/geektime-basic-go/internal/service/ai"
+	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/redis/go-redis/v9"
 	"github.com/spf13/viper"
@@ -79,7 +80,34 @@ func InitEmbeddingConfig() config.EmbeddingConfig {
 	return cfg
 }
 
-func InitEmbeddingClient(cfg config.EmbeddingConfig, cmd redis.Cmdable) ai.EmbeddingClient {
-	raw := ai.NewOpenAIEmbeddingClient(cfg)
+func InitOllamaEmbeddingConfig() config.OllamaEmbeddingConfig {
+	var cfg config.OllamaEmbeddingConfig
+	if err := viper.UnmarshalKey("ollama", &cfg); err != nil {
+		// Ollama 可选，读取失败返回零值，不 panic
+		return config.OllamaEmbeddingConfig{}
+	}
+	return cfg
+}
+
+func InitEmbeddingClient(
+	ollamaCfg config.OllamaEmbeddingConfig,
+	embCfg config.EmbeddingConfig,
+	cmd redis.Cmdable,
+	l logger.LoggerX,
+) ai.EmbeddingClient {
+	// 收费 API 作为兜底（必须有）
+	openaiClient := ai.NewOpenAIEmbeddingClient(embCfg)
+
+	var raw ai.EmbeddingClient
+	if ollamaCfg.BaseUrl != "" {
+		// 本地 Ollama 优先，降级到收费
+		ollamaClient := ai.NewOllamaEmbeddingClient(ollamaCfg)
+		raw = ai.NewFailoverEmbeddingClient(
+			[]ai.EmbeddingClient{ollamaClient, openaiClient}, l,
+		)
+	} else {
+		raw = openaiClient
+	}
+
 	return ai.NewCachedEmbeddingClient(raw, cmd)
 }

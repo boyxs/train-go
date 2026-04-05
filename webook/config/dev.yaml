@@ -36,6 +36,11 @@ llm:
 es:
     addr: "http://localhost:9200"
 
+ollama:
+    baseUrl: "http://localhost:11434"
+    model: "bge-m3"
+    timeout: 5
+
 embedding:
     baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1"
     apiKey: "sk-ef23911b061943b681584ac467c4cd28"

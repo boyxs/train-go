@@ -48,8 +48,9 @@ func InitWebServer() *gin.Engine {
 	typedClient := ioc.InitESClient()
 	articleSearchDAO := dao.NewElasticArticleDAO(typedClient)
 	articleSearchRepository := repository.NewESArticleSearchRepository(articleSearchDAO)
+	ollamaEmbeddingConfig := ioc.InitOllamaEmbeddingConfig()
 	embeddingConfig := ioc.InitEmbeddingConfig()
-	embeddingClient := ioc.InitEmbeddingClient(embeddingConfig, cmdable)
+	embeddingClient := ioc.InitEmbeddingClient(ollamaEmbeddingConfig, embeddingConfig, cmdable, loggerX)
 	articleSearchService := service.NewArticleSearchService(articleSearchRepository, embeddingClient, loggerX)
 	articleAuthorService := service.NewInternalArticleAuthorService(articleAuthorRepository, articleReaderRepository, articleSearchService, loggerX)
 	interactionDAO := dao.NewGormInteractionDAO(db)
@@ -81,7 +82,7 @@ func InitWebServer() *gin.Engine {
 // wire.go:
 
 // searchProviderSet 搜索模块的 Wire Provider 集合（不含 Handler）
-var searchProviderSet = wire.NewSet(ioc.InitESClient, ioc.InitEmbeddingConfig, ioc.InitEmbeddingClient, dao.NewElasticArticleDAO, repository.NewESArticleSearchRepository, service.NewArticleSearchService)
+var searchProviderSet = wire.NewSet(ioc.InitESClient, ioc.InitOllamaEmbeddingConfig, ioc.InitEmbeddingConfig, ioc.InitEmbeddingClient, dao.NewElasticArticleDAO, repository.NewESArticleSearchRepository, service.NewArticleSearchService)
 
 // chatProviderSet Chat 模块的 Wire Provider 集合（不含 Handler）
 var chatProviderSet = wire.NewSet(ioc.InitLLMConfig, ioc.InitLLMClient, ioc.InitChatLimiter, dao.NewGormConversationDAO, dao.NewGormMessageDAO, cache.NewRedisConversationCache, cache.NewRedisMessageCache, repository.NewCacheConversationRepository, repository.NewCacheMessageRepository, service.NewChatService)

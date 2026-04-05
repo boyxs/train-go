@@ -44,8 +44,9 @@ func InitWebServer() *gin.Engine {
 	typedClient := ioc.InitESClient()
 	articleSearchDAO := dao.NewElasticArticleDAO(typedClient)
 	articleSearchRepository := repository.NewESArticleSearchRepository(articleSearchDAO)
+	ollamaEmbeddingConfig := ioc.InitOllamaEmbeddingConfig()
 	embeddingConfig := ioc.InitEmbeddingConfig()
-	embeddingClient := ioc.InitEmbeddingClient(embeddingConfig, cmdable)
+	embeddingClient := ioc.InitEmbeddingClient(ollamaEmbeddingConfig, embeddingConfig, cmdable, loggerX)
 	articleSearchService := service.NewArticleSearchService(articleSearchRepository, embeddingClient, loggerX)
 	articleAuthorService := service.NewInternalArticleAuthorService(articleAuthorRepository, articleReaderRepository, articleSearchService, loggerX)
 	interactionDAO := dao.NewGormInteractionDAO(db)
@@ -86,8 +87,9 @@ func InitArticleAuthorHandler() web.ArticleAuthorHandler {
 	typedClient := ioc.InitESClient()
 	articleSearchDAO := dao.NewElasticArticleDAO(typedClient)
 	articleSearchRepository := repository.NewESArticleSearchRepository(articleSearchDAO)
+	ollamaEmbeddingConfig := ioc.InitOllamaEmbeddingConfig()
 	embeddingConfig := ioc.InitEmbeddingConfig()
-	embeddingClient := ioc.InitEmbeddingClient(embeddingConfig, cmdable)
+	embeddingClient := ioc.InitEmbeddingClient(ollamaEmbeddingConfig, embeddingConfig, cmdable, loggerX)
 	articleSearchService := service.NewArticleSearchService(articleSearchRepository, embeddingClient, loggerX)
 	articleAuthorService := service.NewInternalArticleAuthorService(articleAuthorRepository, articleReaderRepository, articleSearchService, loggerX)
 	interactionDAO := dao.NewGormInteractionDAO(db)
@@ -154,7 +156,7 @@ var infraSvcProvider = wire.NewSet(
 
 var userSvcProvider = wire.NewSet(dao.NewGormUserDAO, cache.NewRedisUserCache, repository.NewRedisUserRepository, service.NewInternalUserService)
 
-var searchSvcProvider = wire.NewSet(ioc.InitESClient, ioc.InitEmbeddingConfig, ioc.InitEmbeddingClient, dao.NewElasticArticleDAO, repository.NewESArticleSearchRepository, service.NewArticleSearchService)
+var searchSvcProvider = wire.NewSet(ioc.InitESClient, ioc.InitOllamaEmbeddingConfig, ioc.InitEmbeddingConfig, ioc.InitEmbeddingClient, dao.NewElasticArticleDAO, repository.NewESArticleSearchRepository, service.NewArticleSearchService)
 
 var articleSvcProvider = wire.NewSet(dao.NewGormArticleAuthorDAO, dao.NewGormArticleReaderDAO, cache.NewRedisArticleCache, repository.NewCacheArticleAuthorRepository, repository.NewCacheArticleReaderRepository, service.NewInternalArticleAuthorService, service.NewInternalArticleReaderService, interactionSvcProvider,
 	searchSvcProvider,

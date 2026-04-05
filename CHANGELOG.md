@@ -2,6 +2,13 @@
 
 <!-- 新功能前插在此，日期降序 -->
 
+## [2026-04-05] 本地 Ollama Embedding + 收费模型降级
+
+**变更内容**: 向量化优先走本地 Ollama bge-m3，失败自动降级到阿里百炼收费 API
+**影响范围**: `ai/ollama_embedding.go` · `ai/failover_embedding.go` · `ioc/es.go` · `config/`
+**技术决策**: 复用 `EmbeddingClient` 接口 + `FailoverEmbeddingClient` 顺序尝试，外层 `CachedEmbeddingClient` 不变
+**会话**: 260405-embedding-ollama-failover
+
 ## [2026-04-05] 搜索优化 + 时间 int64 统一 + 性能修复
 
 **变更内容**: 搜索功能全链路优化、时间字段统一为 int64 毫秒时间戳、多项性能和缓存修复

@@ -98,6 +98,7 @@ var userSvcProvider = wire.NewSet(
 
 var searchSvcProvider = wire.NewSet(
 	ioc.InitESClient,
+	ioc.InitOllamaEmbeddingConfig,
 	ioc.InitEmbeddingConfig,
 	ioc.InitEmbeddingClient,
 	dao.NewElasticArticleDAO,

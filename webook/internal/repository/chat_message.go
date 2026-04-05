@@ -39,12 +39,10 @@ func (r *CacheMessageRepository) Insert(ctx context.Context, msg domain.Message)
 
 func (r *CacheMessageRepository) ListRecent(ctx context.Context, convId int64, limit int) ([]domain.Message, error) {
 	// Cache-Aside：最新消息热路径，优先走缓存
+	// 缓存条数必须 >= limit，否则回源（buildPrompt 要 40 条，缓存可能只有 10 条）
 	msgs, err := r.cache.GetList(ctx, convId)
-	if err == nil && len(msgs) > 0 {
-		if len(msgs) > limit {
-			msgs = msgs[len(msgs)-limit:]
-		}
-		return msgs, nil
+	if err == nil && len(msgs) >= limit {
+		return msgs[len(msgs)-limit:], nil
 	}
 
 	entities, err := r.dao.ListRecent(ctx, convId, limit)

@@ -34,3 +34,9 @@ type EmbeddingConfig struct {
 	Dims    int
 	Timeout int // 秒
 }
+
+type OllamaEmbeddingConfig struct {
+	BaseUrl string // 默认 http://localhost:11434
+	Model   string // 默认 bge-m3
+	Timeout int    // 秒，默认 5
+}
