@@ -52,20 +52,15 @@ export function useConversations() {
   }, []);
 
   // 删除对话
-  const remove = useCallback(
-    async (id: number): Promise<boolean> => {
-      const res = await chatApi.deleteConversation(id);
-      if (res.data.code === 0) {
-        setConversations((prev) => prev.filter((c) => c.id !== id));
-        if (activeId === id) {
-          setActiveId(null);
-        }
-        return true;
-      }
-      return false;
-    },
-    [activeId],
-  );
+  const remove = useCallback(async (id: number): Promise<boolean> => {
+    const res = await chatApi.deleteConversation(id);
+    if (res.data.code === 0) {
+      setConversations((prev) => prev.filter((c) => c.id !== id));
+      setActiveId((prev) => (prev === id ? null : prev));
+      return true;
+    }
+    return false;
+  }, []);
 
   // 选中对话
   const select = useCallback((id: number) => {
