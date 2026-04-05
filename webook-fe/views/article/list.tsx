@@ -14,7 +14,7 @@ import {
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import React, { useCallback, useState } from 'react';
 
 import * as articleApi from '@/api/article';
@@ -34,9 +34,13 @@ const statusMap: Record<ArticleStatus, { label: string; color: string }> = {
 
 function ArticleListPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { message, modal } = App.useApp();
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+
+  const initPage = Number(searchParams.get('page')) || 1;
+  const initSize = Number(searchParams.get('pageSize')) || 10;
+  const [page, setPage] = useState(initPage);
+  const [pageSize, setPageSize] = useState(initSize);
   const [refreshKey, setRefreshKey] = useState(0);
 
   const { data: listRes, loading } = useRequest(
@@ -49,10 +53,12 @@ function ArticleListPage() {
 
   const refreshAfterRemove = useCallback(() => {
     if (articles.length <= 1 && page > 1) {
-      setPage((p) => p - 1);
+      const newPage = page - 1;
+      setPage(newPage);
+      router.replace(`/article/list?page=${newPage}&pageSize=${pageSize}`);
     }
     setRefreshKey((k) => k + 1);
-  }, [articles.length, page]);
+  }, [articles.length, page, pageSize, router]);
 
   const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
 
@@ -232,6 +238,7 @@ function ArticleListPage() {
     onChange: (p: number, ps: number) => {
       setPage(p);
       setPageSize(ps);
+      router.replace(`/article/list?page=${p}&pageSize=${ps}`);
     },
   };
 

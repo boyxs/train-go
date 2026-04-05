@@ -211,6 +211,12 @@ SELECT id, biz, biz_id, read_count, like_count, collect_count,
   FROM_UNIXTIME(updated_at / 1000) AS updated_at
 FROM interaction;
 
+CREATE OR REPLACE VIEW v_user_interaction AS
+SELECT id, biz, biz_id, user_id, liked, collected,
+  FROM_UNIXTIME(created_at / 1000) AS created_at,
+  FROM_UNIXTIME(updated_at / 1000) AS updated_at
+FROM user_interaction;
+
 CREATE OR REPLACE VIEW v_user AS
 SELECT id, email, nickname,
   FROM_UNIXTIME(birthday / 1000) AS birthday,
