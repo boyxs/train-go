@@ -64,11 +64,16 @@ export function useChat(conversationId: number | null) {
 
   // 上滑加载更早的消息
   const loadingMoreRef = useRef(false);
+  const hasMoreRef = useRef(hasMore);
+  hasMoreRef.current = hasMore;
+  const serverMessagesRef = useRef(serverMessages);
+  serverMessagesRef.current = serverMessages;
+
   const loadMore = useCallback(async () => {
-    if (!conversationId || !hasMore || loadingMoreRef.current) {
+    if (!conversationId || !hasMoreRef.current || loadingMoreRef.current) {
       return;
     }
-    const oldest = serverMessages[0];
+    const oldest = serverMessagesRef.current[0];
     if (!oldest) {
       return;
     }
@@ -94,7 +99,7 @@ export function useChat(conversationId: number | null) {
     } finally {
       loadingMoreRef.current = false;
     }
-  }, [conversationId, hasMore, serverMessages]);
+  }, [conversationId]);
 
   const messages = useMemo(
     () => [...serverMessages, ...pendingMessages],

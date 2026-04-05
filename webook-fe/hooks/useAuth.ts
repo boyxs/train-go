@@ -7,9 +7,7 @@ import { tokenUtil } from '@/utils/token';
 export function useAuth() {
   const router = useRouter();
 
-  const isLoggedIn = useCallback((): boolean => {
-    return tokenUtil.hasToken();
-  }, []);
+  const isLoggedIn = tokenUtil.hasToken;
 
   const logout = useCallback(async () => {
     try {
