@@ -1,4 +1,4 @@
-package ai
+package cache
 
 import (
 	"context"
@@ -6,24 +6,28 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"log"
 	"math/rand"
 	"time"
 
+	"gitee.com/train-cloud/geektime-basic-go/internal/consts"
+	"gitee.com/train-cloud/geektime-basic-go/internal/service/ai/embedding"
+	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
 	"github.com/redis/go-redis/v9"
 )
 
-// CachedEmbeddingClient 对 EmbeddingClient 加 Redis 缓存，相同 text 不重复调 API
+// CachedEmbeddingClient 对 embedding.EmbeddingClient 加 Redis 缓存，相同 text 不重复调 API
 type CachedEmbeddingClient struct {
-	delegate EmbeddingClient
+	delegate embedding.EmbeddingClient
 	cmd      redis.Cmdable
+	l        logger.LoggerX
 	ttl      time.Duration
 }
 
-func NewCachedEmbeddingClient(delegate EmbeddingClient, cmd redis.Cmdable) EmbeddingClient {
+func NewCachedEmbeddingClient(delegate embedding.EmbeddingClient, cmd redis.Cmdable, l logger.LoggerX) embedding.EmbeddingClient {
 	return &CachedEmbeddingClient{
 		delegate: delegate,
 		cmd:      cmd,
+		l:        l,
 		ttl:      time.Hour,
 	}
 }
@@ -46,11 +50,13 @@ func (c *CachedEmbeddingClient) Embed(ctx context.Context, text string) ([]float
 		return nil, err
 	}
 
-	// 回填缓存（失败不影响返回，仅记日志）
+	// 回填缓存（失败不影响返回）
 	if buf, jsonErr := json.Marshal(vec); jsonErr == nil {
 		jitter := time.Duration(rand.Int63n(int64(10 * time.Minute)))
 		if setErr := c.cmd.Set(ctx, key, buf, c.ttl+jitter).Err(); setErr != nil {
-			log.Printf("[EmbeddingCache] 回填缓存失败: key=%s, err=%v", key, setErr)
+			c.l.Error("回填 embedding 缓存失败",
+				logger.String("key", key),
+				logger.Error(setErr))
 		}
 	}
 
@@ -59,5 +65,5 @@ func (c *CachedEmbeddingClient) Embed(ctx context.Context, text string) ([]float
 
 func (c *CachedEmbeddingClient) cacheKey(text string) string {
 	h := sha256.Sum256([]byte(text))
-	return fmt.Sprintf("embed:query:%s", hex.EncodeToString(h[:8]))
+	return fmt.Sprintf(consts.EmbeddingCachePattern, hex.EncodeToString(h[:8]))
 }

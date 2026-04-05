@@ -1,4 +1,4 @@
-package ai
+package embedding
 
 import (
 	"bytes"
@@ -13,14 +13,14 @@ import (
 	"gitee.com/train-cloud/geektime-basic-go/config"
 )
 
-// OllamaEmbeddingClient 调用本地 Ollama /api/embeddings 接口
-type OllamaEmbeddingClient struct {
+// OllamaClient 调用本地 Ollama /api/embeddings 接口
+type OllamaClient struct {
 	cfg    config.OllamaEmbeddingConfig
 	url    string
 	client *http.Client
 }
 
-func NewOllamaEmbeddingClient(cfg config.OllamaEmbeddingConfig) *OllamaEmbeddingClient {
+func NewOllamaClient(cfg config.OllamaEmbeddingConfig) *OllamaClient {
 	if cfg.BaseUrl == "" {
 		cfg.BaseUrl = "http://localhost:11434"
 	}
@@ -31,7 +31,7 @@ func NewOllamaEmbeddingClient(cfg config.OllamaEmbeddingConfig) *OllamaEmbedding
 	if timeout == 0 {
 		timeout = 5 * time.Second
 	}
-	return &OllamaEmbeddingClient{
+	return &OllamaClient{
 		cfg: cfg,
 		url: strings.TrimRight(cfg.BaseUrl, "/") + "/api/embeddings",
 		client: &http.Client{
@@ -54,7 +54,7 @@ type ollamaEmbedResponse struct {
 	Embedding []float32 `json:"embedding"`
 }
 
-func (c *OllamaEmbeddingClient) Embed(ctx context.Context, text string) ([]float32, error) {
+func (c *OllamaClient) Embed(ctx context.Context, text string) ([]float32, error) {
 	if strings.TrimSpace(text) == "" {
 		return nil, fmt.Errorf("[ollama/%s] text 不能为空", c.cfg.Model)
 	}

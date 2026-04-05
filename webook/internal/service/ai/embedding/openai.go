@@ -1,4 +1,4 @@
-package ai
+package embedding
 
 import (
 	"bytes"
@@ -13,20 +13,20 @@ import (
 	"gitee.com/train-cloud/geektime-basic-go/config"
 )
 
-// OpenAIEmbeddingClient 兼容 OpenAI Embedding 协议（阿里百炼、SiliconFlow 等）
-type OpenAIEmbeddingClient struct {
+// OpenAIClient 兼容 OpenAI Embedding 协议（阿里百炼、SiliconFlow 等）
+type OpenAIClient struct {
 	name   string
 	cfg    config.EmbeddingConfig
 	url    string
 	client *http.Client
 }
 
-func NewOpenAIEmbeddingClient(cfg config.EmbeddingConfig) *OpenAIEmbeddingClient {
+func NewOpenAIClient(cfg config.EmbeddingConfig) *OpenAIClient {
 	timeout := time.Duration(cfg.Timeout) * time.Second
 	if timeout == 0 {
 		timeout = 30 * time.Second
 	}
-	return &OpenAIEmbeddingClient{
+	return &OpenAIClient{
 		name: cfg.Model,
 		cfg:  cfg,
 		url:  strings.TrimRight(cfg.BaseUrl, "/") + "/embeddings",
@@ -53,7 +53,7 @@ type embedResponse struct {
 	} `json:"data"`
 }
 
-func (c *OpenAIEmbeddingClient) Embed(ctx context.Context, text string) ([]float32, error) {
+func (c *OpenAIClient) Embed(ctx context.Context, text string) ([]float32, error) {
 	if strings.TrimSpace(text) == "" {
 		return nil, fmt.Errorf("[%s] text 不能为空", c.name)
 	}

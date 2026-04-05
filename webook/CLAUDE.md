@@ -33,6 +33,8 @@ Handler (web/) → Service (service/) → Repository (repository/) → DAO (dao/
 | `internal/repository/cache/` | Redis 缓存 | 缓存键、TTL |
 | `internal/domain/` | 领域模型 | 业务实体定义 |
 | `internal/consts/` | 共享常量 | Token Key、TTL、Redis 键模式 |
+| `internal/service/ai/` | LLM 聊天（流式） | LLMClient 接口、Failover、TimeoutFailover |
+| `internal/service/ai/embedding/` | 文本向量化 | EmbeddingClient 接口、OpenAI/Ollama/Failover |
 | `pkg/` | 跨项目工具 | 限流器、日志接口、Gin 中间件 |
 | `ioc/` | Wire Provider | 基础设施初始化 |
 | `config/` | 环境配置 | YAML 配置项 |
@@ -45,6 +47,9 @@ Handler (web/) → Service (service/) → Repository (repository/) → DAO (dao/
 - 每层通过接口解耦，Wire 负责注入实现
 - Repository 层实现 Cache-Aside：查询先缓存 → miss 回源 DAO → 回填；写入后清缓存
 - 事务在 DAO 层（`db.Transaction()`），Service 层不感知数据库细节
+- **缓存只能在 `cache/` 层**：Service 层禁止直接操作 Redis（包括装饰器缓存）
+- **子包按能力拆分**：同一目录下两种独立能力（如 LLM 聊天 vs 文本向量化）必须拆子包，不平铺
+- **接口命名避免歧义**：子包内接口用完整名（`EmbeddingClient` 而非 `Client`），调用方读 `embedding.EmbeddingClient` 一眼能分清
 
 ## 命名规范
 

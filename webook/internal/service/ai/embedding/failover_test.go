@@ -1,29 +1,29 @@
-package ai_test
+package embedding_test
 
 import (
 	"context"
 	"errors"
 	"testing"
 
-	"gitee.com/train-cloud/geektime-basic-go/internal/service/ai"
-	aimocks "gitee.com/train-cloud/geektime-basic-go/internal/service/ai/mocks"
+	"gitee.com/train-cloud/geektime-basic-go/internal/service/ai/embedding"
+	embmocks "gitee.com/train-cloud/geektime-basic-go/internal/service/ai/embedding/mocks"
 	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 )
 
-func TestFailoverEmbeddingClient_Embed(t *testing.T) {
+func TestFailoverClient_Embed(t *testing.T) {
 	wantVec := []float32{0.1, 0.2, 0.3}
 
 	t.Run("第一个成功直接返回", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		c0 := aimocks.NewMockEmbeddingClient(ctrl)
+		c0 := embmocks.NewMockEmbeddingClient(ctrl)
 		c0.EXPECT().Embed(gomock.Any(), "hello").Return(wantVec, nil)
 
-		f := ai.NewFailoverEmbeddingClient([]ai.EmbeddingClient{c0}, logger.NewNopLogger())
+		f := embedding.NewFailoverClient([]embedding.EmbeddingClient{c0}, logger.NewNopLogger())
 		vec, err := f.Embed(context.Background(), "hello")
 		require.NoError(t, err)
 		assert.Equal(t, wantVec, vec)
@@ -33,12 +33,12 @@ func TestFailoverEmbeddingClient_Embed(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		c0 := aimocks.NewMockEmbeddingClient(ctrl)
-		c1 := aimocks.NewMockEmbeddingClient(ctrl)
+		c0 := embmocks.NewMockEmbeddingClient(ctrl)
+		c1 := embmocks.NewMockEmbeddingClient(ctrl)
 		c0.EXPECT().Embed(gomock.Any(), "hello").Return(nil, errors.New("connection refused"))
 		c1.EXPECT().Embed(gomock.Any(), "hello").Return(wantVec, nil)
 
-		f := ai.NewFailoverEmbeddingClient([]ai.EmbeddingClient{c0, c1}, logger.NewNopLogger())
+		f := embedding.NewFailoverClient([]embedding.EmbeddingClient{c0, c1}, logger.NewNopLogger())
 		vec, err := f.Embed(context.Background(), "hello")
 		require.NoError(t, err)
 		assert.Equal(t, wantVec, vec)
@@ -48,12 +48,12 @@ func TestFailoverEmbeddingClient_Embed(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		c0 := aimocks.NewMockEmbeddingClient(ctrl)
-		c1 := aimocks.NewMockEmbeddingClient(ctrl)
+		c0 := embmocks.NewMockEmbeddingClient(ctrl)
+		c1 := embmocks.NewMockEmbeddingClient(ctrl)
 		c0.EXPECT().Embed(gomock.Any(), "hello").Return(nil, errors.New("fail-0"))
 		c1.EXPECT().Embed(gomock.Any(), "hello").Return(nil, errors.New("fail-1"))
 
-		f := ai.NewFailoverEmbeddingClient([]ai.EmbeddingClient{c0, c1}, logger.NewNopLogger())
+		f := embedding.NewFailoverClient([]embedding.EmbeddingClient{c0, c1}, logger.NewNopLogger())
 		_, err := f.Embed(context.Background(), "hello")
 		assert.ErrorContains(t, err, "所有 Embedding 提供方均失败")
 	})
@@ -62,12 +62,11 @@ func TestFailoverEmbeddingClient_Embed(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		c0 := aimocks.NewMockEmbeddingClient(ctrl)
-		c1 := aimocks.NewMockEmbeddingClient(ctrl)
+		c0 := embmocks.NewMockEmbeddingClient(ctrl)
+		c1 := embmocks.NewMockEmbeddingClient(ctrl)
 		c0.EXPECT().Embed(gomock.Any(), "hello").Return(nil, context.Canceled)
-		// c1 不应被调用
 
-		f := ai.NewFailoverEmbeddingClient([]ai.EmbeddingClient{c0, c1}, logger.NewNopLogger())
+		f := embedding.NewFailoverClient([]embedding.EmbeddingClient{c0, c1}, logger.NewNopLogger())
 		_, err := f.Embed(context.Background(), "hello")
 		assert.ErrorIs(t, err, context.Canceled)
 	})
