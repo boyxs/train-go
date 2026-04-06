@@ -78,6 +78,7 @@ func InitChatHandler() web.ChatHandler {
 	wire.Build(
 		infraSvcProvider,
 		chatSvcProvider,
+		searchSvcProvider,
 		web.NewInternalChatHandler,
 	)
 	return &web.InternalChatHandler{}

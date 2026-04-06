@@ -2,6 +2,14 @@
 
 <!-- 新功能前插在此，日期降序 -->
 
+## [2026-04-06] Chat RAG — 基于文章内容的知识问答
+
+**变更内容**: 聊天接入 RAG，用户提问时自动检索平台文章，将相关内容注入 prompt，AI 基于文章回答并附带可点击链接
+**影响范围**: `service/chat.go`（RAG 逻辑）· `wire.go`（DI 注入 ArticleSearchService）· `views/chat/MessageBubble.tsx`（链接新标签页打开）· `views/article/read.tsx`（返回按钮兼容新标签页）· `.gitignore`（排除 .next 构建产物）
+**技术决策**: 复用已有 ArticleSearchService（hybrid BM25 + 向量），top-3 召回注入 system message；直接提供完整 Markdown 链接防止 LLM 编造 ID；检索失败静默降级不阻塞对话
+**待办**: 阶段 B Function Calling（search_articles / list_favorites / hot_articles）
+**会话**: 260406-chat-RAG
+
 ## [2026-04-05] Embedding 分包 + 分页状态保持
 
 **变更内容**: ai/embedding 拆为独立子包，缓存移到 cache 层；文章列表分页同步 URL，编辑返回不丢页码

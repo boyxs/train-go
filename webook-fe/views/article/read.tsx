@@ -144,7 +144,9 @@ function ArticleReadPage({ articleId }: ArticleReadProps) {
           <Button
             type='text'
             icon={<ArrowLeftOutlined />}
-            onClick={() => router.back()}
+            onClick={() =>
+              window.history.length > 1 ? router.back() : router.push('/feed')
+            }
             className='mb-3'
           >
             返回列表

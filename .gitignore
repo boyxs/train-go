@@ -9,4 +9,5 @@ go.work
 
 # next.js
 /.next/
+**/.next/
 /out/

@@ -11,6 +11,7 @@ import (
 	repomocks "gitee.com/train-cloud/geektime-basic-go/internal/repository/mocks"
 	"gitee.com/train-cloud/geektime-basic-go/internal/service/ai"
 	aimocks "gitee.com/train-cloud/geektime-basic-go/internal/service/ai/mocks"
+	svcmocks "gitee.com/train-cloud/geektime-basic-go/internal/service/mocks"
 	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -22,7 +23,7 @@ func TestChatService_SendMessage(t *testing.T) {
 		uid     int64
 		convId  int64
 		content string
-		mock    func(ctrl *gomock.Controller) (repository.ConversationRepository, repository.MessageRepository, ai.LLMClient)
+		mock    func(ctrl *gomock.Controller) (repository.ConversationRepository, repository.MessageRepository, ai.LLMClient, ArticleSearchService)
 		wantErr error
 	}{
 		{
@@ -30,13 +31,14 @@ func TestChatService_SendMessage(t *testing.T) {
 			uid:     1,
 			convId:  999,
 			content: "hello",
-			mock: func(ctrl *gomock.Controller) (repository.ConversationRepository, repository.MessageRepository, ai.LLMClient) {
+			mock: func(ctrl *gomock.Controller) (repository.ConversationRepository, repository.MessageRepository, ai.LLMClient, ArticleSearchService) {
 				convRepo := repomocks.NewMockConversationRepository(ctrl)
 				msgRepo := repomocks.NewMockMessageRepository(ctrl)
 				llm := aimocks.NewMockLLMClient(ctrl)
+				search := svcmocks.NewMockArticleSearchService(ctrl)
 				convRepo.EXPECT().Find(gomock.Any(), int64(1), int64(999)).
 					Return(domain.Conversation{}, repository.ErrRecordNotFound)
-				return convRepo, msgRepo, llm
+				return convRepo, msgRepo, llm, search
 			},
 			wantErr: ErrConversationNotFound,
 		},
@@ -45,13 +47,14 @@ func TestChatService_SendMessage(t *testing.T) {
 			uid:     1,
 			convId:  1,
 			content: string(make([]rune, 2001)),
-			mock: func(ctrl *gomock.Controller) (repository.ConversationRepository, repository.MessageRepository, ai.LLMClient) {
+			mock: func(ctrl *gomock.Controller) (repository.ConversationRepository, repository.MessageRepository, ai.LLMClient, ArticleSearchService) {
 				convRepo := repomocks.NewMockConversationRepository(ctrl)
 				msgRepo := repomocks.NewMockMessageRepository(ctrl)
 				llm := aimocks.NewMockLLMClient(ctrl)
+				search := svcmocks.NewMockArticleSearchService(ctrl)
 				convRepo.EXPECT().Find(gomock.Any(), int64(1), int64(1)).
 					Return(domain.Conversation{Id: 1, UserId: 1}, nil)
-				return convRepo, msgRepo, llm
+				return convRepo, msgRepo, llm, search
 			},
 			wantErr: ErrMessageTooLong,
 		},
@@ -60,22 +63,23 @@ func TestChatService_SendMessage(t *testing.T) {
 			uid:     1,
 			convId:  1,
 			content: "hello",
-			mock: func(ctrl *gomock.Controller) (repository.ConversationRepository, repository.MessageRepository, ai.LLMClient) {
+			mock: func(ctrl *gomock.Controller) (repository.ConversationRepository, repository.MessageRepository, ai.LLMClient, ArticleSearchService) {
 				convRepo := repomocks.NewMockConversationRepository(ctrl)
 				msgRepo := repomocks.NewMockMessageRepository(ctrl)
 				llm := aimocks.NewMockLLMClient(ctrl)
+				search := svcmocks.NewMockArticleSearchService(ctrl)
 				convRepo.EXPECT().Find(gomock.Any(), int64(1), int64(1)).
 					Return(domain.Conversation{Id: 1, UserId: 1}, nil)
-				// 保存用户消息
 				msgRepo.EXPECT().Insert(gomock.Any(), gomock.Any()).
 					Return(domain.Message{Id: 1}, nil)
-				// buildPrompt
 				msgRepo.EXPECT().ListRecent(gomock.Any(), int64(1), maxHistoryRounds*2).
 					Return([]domain.Message{{Role: "user", Content: "hello"}}, nil)
-				// LLM 失败
+				// RAG 检索（正常返回空）
+				search.EXPECT().Search(gomock.Any(), "hello", 1, ragTopK).
+					Return(nil, int64(0), nil)
 				llm.EXPECT().ChatStream(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(nil, errors.New("all providers down"))
-				return convRepo, msgRepo, llm
+				return convRepo, msgRepo, llm, search
 			},
 			wantErr: errors.New("调用 LLM 失败"),
 		},
@@ -86,8 +90,8 @@ func TestChatService_SendMessage(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			convRepo, msgRepo, llm := tc.mock(ctrl)
-			svc := NewChatService(convRepo, msgRepo, llm, logger.NewNopLogger())
+			convRepo, msgRepo, llm, search := tc.mock(ctrl)
+			svc := NewChatService(convRepo, msgRepo, llm, search, logger.NewNopLogger())
 
 			_, err := svc.SendMessage(context.Background(), tc.uid, tc.convId, tc.content)
 			if tc.wantErr != nil {
@@ -272,4 +276,148 @@ func TestChatService_ForwardStream_ErrorNoContent(t *testing.T) {
 
 	assert.Len(t, events, 1)
 	assert.Equal(t, "error", events[0].Type)
+}
+
+func TestChatService_SendMessage_RAGWithArticles(t *testing.T) {
+	// 检索到文章 → LLM 收到的 messages 中应包含文章上下文
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	convRepo := repomocks.NewMockConversationRepository(ctrl)
+	msgRepo := repomocks.NewMockMessageRepository(ctrl)
+	llm := aimocks.NewMockLLMClient(ctrl)
+	search := svcmocks.NewMockArticleSearchService(ctrl)
+
+	convRepo.EXPECT().Find(gomock.Any(), int64(1), int64(1)).
+		Return(domain.Conversation{Id: 1, UserId: 1}, nil)
+	msgRepo.EXPECT().Insert(gomock.Any(), gomock.Any()).
+		Return(domain.Message{Id: 1}, nil)
+	msgRepo.EXPECT().ListRecent(gomock.Any(), int64(1), maxHistoryRounds*2).
+		Return([]domain.Message{{Role: "user", Content: "Go并发怎么写"}}, nil)
+
+	// RAG 返回 2 篇文章
+	search.EXPECT().Search(gomock.Any(), "Go并发怎么写", 1, ragTopK).
+		Return([]domain.Article{
+			{Id: 10, Title: "Go 并发入门", Abstract: "goroutine 和 channel", Author: domain.Author{Name: "张三"}},
+			{Id: 20, Title: "并发模式", Abstract: "常见并发设计模式", Author: domain.Author{Name: "李四"}},
+		}, int64(2), nil)
+
+	// 验证 LLM 收到的 messages 包含 RAG 上下文
+	llm.EXPECT().ChatStream(gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(ctx context.Context, messages []ai.ChatMessage, tools []ai.Tool) (<-chan ai.StreamChunk, error) {
+			// messages[0] = system prompt, messages[1] = RAG context, messages[2] = user msg
+			assert.GreaterOrEqual(t, len(messages), 3)
+			ragMsg := messages[1]
+			assert.Equal(t, "system", ragMsg.Role)
+			assert.Contains(t, ragMsg.Content, "[Go 并发入门](/article/10)")
+			assert.Contains(t, ragMsg.Content, "goroutine 和 channel")
+			assert.Contains(t, ragMsg.Content, "[并发模式](/article/20)")
+			assert.Contains(t, ragMsg.Content, "常见并发设计模式")
+
+			ch := make(chan ai.StreamChunk, 1)
+			ch <- ai.StreamChunk{Type: "done"}
+			close(ch)
+			return ch, nil
+		})
+
+	svc := NewChatService(convRepo, msgRepo, llm, search, logger.NewNopLogger())
+	_, err := svc.SendMessage(context.Background(), 1, 1, "Go并发怎么写")
+	assert.NoError(t, err)
+}
+
+func TestChatService_SendMessage_RAGNoResults(t *testing.T) {
+	// 检索无结果 → prompt 中不应出现 RAG 上下文消息
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	convRepo := repomocks.NewMockConversationRepository(ctrl)
+	msgRepo := repomocks.NewMockMessageRepository(ctrl)
+	llm := aimocks.NewMockLLMClient(ctrl)
+	search := svcmocks.NewMockArticleSearchService(ctrl)
+
+	convRepo.EXPECT().Find(gomock.Any(), int64(1), int64(1)).
+		Return(domain.Conversation{Id: 1, UserId: 1}, nil)
+	msgRepo.EXPECT().Insert(gomock.Any(), gomock.Any()).
+		Return(domain.Message{Id: 1}, nil)
+	msgRepo.EXPECT().ListRecent(gomock.Any(), int64(1), maxHistoryRounds*2).
+		Return([]domain.Message{{Role: "user", Content: "你好"}}, nil)
+
+	// 检索无结果
+	search.EXPECT().Search(gomock.Any(), "你好", 1, ragTopK).
+		Return(nil, int64(0), nil)
+
+	// 验证只有 system prompt + 历史消息，无 RAG 上下文
+	llm.EXPECT().ChatStream(gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(ctx context.Context, messages []ai.ChatMessage, tools []ai.Tool) (<-chan ai.StreamChunk, error) {
+			assert.Len(t, messages, 2) // system + user
+			assert.Equal(t, "system", messages[0].Role)
+			assert.Equal(t, "user", messages[1].Role)
+
+			ch := make(chan ai.StreamChunk, 1)
+			ch <- ai.StreamChunk{Type: "done"}
+			close(ch)
+			return ch, nil
+		})
+
+	svc := NewChatService(convRepo, msgRepo, llm, search, logger.NewNopLogger())
+	_, err := svc.SendMessage(context.Background(), 1, 1, "你好")
+	assert.NoError(t, err)
+}
+
+func TestChatService_SendMessage_RAGSearchFail(t *testing.T) {
+	// 检索失败 → 静默降级，不影响对话
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	convRepo := repomocks.NewMockConversationRepository(ctrl)
+	msgRepo := repomocks.NewMockMessageRepository(ctrl)
+	llm := aimocks.NewMockLLMClient(ctrl)
+	search := svcmocks.NewMockArticleSearchService(ctrl)
+
+	convRepo.EXPECT().Find(gomock.Any(), int64(1), int64(1)).
+		Return(domain.Conversation{Id: 1, UserId: 1}, nil)
+	msgRepo.EXPECT().Insert(gomock.Any(), gomock.Any()).
+		Return(domain.Message{Id: 1}, nil)
+	msgRepo.EXPECT().ListRecent(gomock.Any(), int64(1), maxHistoryRounds*2).
+		Return([]domain.Message{{Role: "user", Content: "文章推荐"}}, nil)
+
+	// 检索失败
+	search.EXPECT().Search(gomock.Any(), "文章推荐", 1, ragTopK).
+		Return(nil, int64(0), errors.New("ES connection refused"))
+
+	// 即使检索失败，LLM 仍被调用（降级为无 RAG）
+	llm.EXPECT().ChatStream(gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(ctx context.Context, messages []ai.ChatMessage, tools []ai.Tool) (<-chan ai.StreamChunk, error) {
+			assert.Len(t, messages, 2) // system + user，无 RAG
+			ch := make(chan ai.StreamChunk, 1)
+			ch <- ai.StreamChunk{Type: "done"}
+			close(ch)
+			return ch, nil
+		})
+
+	svc := NewChatService(convRepo, msgRepo, llm, search, logger.NewNopLogger())
+	_, err := svc.SendMessage(context.Background(), 1, 1, "文章推荐")
+	assert.NoError(t, err)
+}
+
+func TestInjectArticleContext(t *testing.T) {
+	svc := &chatService{}
+	messages := []ai.ChatMessage{
+		{Role: "system", Content: "你是助手"},
+		{Role: "user", Content: "有什么好文章"},
+	}
+	articles := []domain.Article{
+		{Id: 42, Title: "Go 测试指南", Abstract: "表格驱动测试", Author: domain.Author{Name: "王五"}},
+	}
+
+	result := svc.injectArticleContext(messages, articles)
+
+	// system + RAG context + user = 3 条
+	assert.Len(t, result, 3)
+	assert.Equal(t, "system", result[0].Role)
+	assert.Equal(t, "system", result[1].Role)
+	assert.Contains(t, result[1].Content, "[Go 测试指南](/article/42)")
+	assert.Contains(t, result[1].Content, "王五")
+	assert.Contains(t, result[1].Content, "表格驱动测试")
+	assert.Equal(t, "user", result[2].Role)
 }
