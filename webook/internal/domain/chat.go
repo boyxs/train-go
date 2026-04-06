@@ -26,3 +26,18 @@ type ChatEvent struct {
 	Content string `json:"content"`
 	Data    any    `json:"data,omitempty"`
 }
+
+// ArticleCard 工具结果中携带的文章摘要（SSE tool_result 事件）
+type ArticleCard struct {
+	Id       int64  `json:"id"`
+	Title    string `json:"title"`
+	Abstract string `json:"abstract"`
+}
+
+// ToolResultData tool_result SSE 事件中的结构化数据
+type ToolResultData struct {
+	CallId   string        `json:"callId"`
+	Name     string        `json:"name"`
+	Articles []ArticleCard `json:"articles,omitempty"`
+	Error    string        `json:"error,omitempty"`
+}

@@ -37,6 +37,7 @@ var chatProviderSet = wire.NewSet(
 	repository.NewCacheConversationRepository,
 	repository.NewCacheMessageRepository,
 	service.NewChatService,
+	service.NewChatToolExecutor,
 )
 
 func InitWebServer() *gin.Engine {

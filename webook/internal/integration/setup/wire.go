@@ -79,6 +79,7 @@ func InitChatHandler() web.ChatHandler {
 		infraSvcProvider,
 		chatSvcProvider,
 		searchSvcProvider,
+		articleReaderSvcProvider,
 		web.NewInternalChatHandler,
 	)
 	return &web.InternalChatHandler{}
@@ -145,4 +146,5 @@ var chatSvcProvider = wire.NewSet(
 	repository.NewCacheConversationRepository,
 	repository.NewCacheMessageRepository,
 	service.NewChatService,
+	service.NewChatToolExecutor,
 )

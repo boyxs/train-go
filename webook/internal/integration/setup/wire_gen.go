@@ -67,7 +67,8 @@ func InitWebServer() *gin.Engine {
 	messageRepository := repository.NewCacheMessageRepository(messageDAO, messageCache, loggerX)
 	llmConfig := ioc.InitLLMConfig()
 	llmClient := ioc.InitLLMClient(llmConfig, loggerX)
-	chatService := service.NewChatService(conversationRepository, messageRepository, llmClient, articleSearchService, loggerX)
+	toolExecutor := service.NewChatToolExecutor(articleSearchService, articleReaderService, interactionRepository, loggerX)
+	chatService := service.NewChatService(conversationRepository, messageRepository, llmClient, articleSearchService, toolExecutor, loggerX)
 	limiter := ioc.InitChatLimiter(cmdable)
 	chatHandler := web.NewInternalChatHandler(chatService, loggerX, limiter)
 	articleSearchHandler := web.NewInternalArticleSearchHandler(articleSearchService, loggerX)
@@ -147,7 +148,15 @@ func InitChatHandler() web.ChatHandler {
 	embeddingConfig := ioc.InitEmbeddingConfig()
 	embeddingClient := ioc.InitEmbeddingClient(ollamaEmbeddingConfig, embeddingConfig, cmdable, loggerX)
 	articleSearchService := service.NewArticleSearchService(articleSearchRepository, embeddingClient, loggerX)
-	chatService := service.NewChatService(conversationRepository, messageRepository, llmClient, articleSearchService, loggerX)
+	articleReaderDAO := dao.NewGormArticleReaderDAO(db)
+	articleCache := cache.NewRedisArticleCache(cmdable)
+	articleReaderRepository := repository.NewCacheArticleReaderRepository(articleReaderDAO, articleCache, loggerX)
+	articleReaderService := service.NewInternalArticleReaderService(articleReaderRepository)
+	interactionDAO := dao.NewGormInteractionDAO(db)
+	interactionCache := cache.NewRedisInteractionCache(cmdable)
+	interactionRepository := repository.NewCacheInteractionRepository(interactionDAO, interactionCache, loggerX)
+	toolExecutor := service.NewChatToolExecutor(articleSearchService, articleReaderService, interactionRepository, loggerX)
+	chatService := service.NewChatService(conversationRepository, messageRepository, llmClient, articleSearchService, toolExecutor, loggerX)
 	limiter := ioc.InitChatLimiter(cmdable)
 	chatHandler := web.NewInternalChatHandler(chatService, loggerX, limiter)
 	return chatHandler
@@ -173,4 +182,4 @@ var articleReaderSvcProvider = wire.NewSet(dao.NewGormArticleReaderDAO, cache.Ne
 
 var interactionSvcProvider = wire.NewSet(dao.NewGormInteractionDAO, cache.NewRedisInteractionCache, repository.NewCacheInteractionRepository, service.NewInternalInteractionService)
 
-var chatSvcProvider = wire.NewSet(ioc.InitLLMConfig, ioc.InitLLMClient, ioc.InitChatLimiter, dao.NewGormConversationDAO, dao.NewGormMessageDAO, cache.NewRedisConversationCache, cache.NewRedisMessageCache, repository.NewCacheConversationRepository, repository.NewCacheMessageRepository, service.NewChatService)
+var chatSvcProvider = wire.NewSet(ioc.InitLLMConfig, ioc.InitLLMClient, ioc.InitChatLimiter, dao.NewGormConversationDAO, dao.NewGormMessageDAO, cache.NewRedisConversationCache, cache.NewRedisMessageCache, repository.NewCacheConversationRepository, repository.NewCacheMessageRepository, service.NewChatService, service.NewChatToolExecutor)

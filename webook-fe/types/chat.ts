@@ -22,8 +22,22 @@ export interface ChatDeltaEvent {
 }
 
 export interface ChatToolCallEvent {
+  id: string;
   name: string;
   args: Record<string, unknown>;
+}
+
+export interface ArticleCard {
+  id: number;
+  title: string;
+  abstract: string;
+}
+
+export interface ChatToolResultEvent {
+  callId: string;
+  name: string;
+  articles?: ArticleCard[];
+  error?: string;
 }
 
 export interface ChatDoneEvent {
@@ -34,4 +48,12 @@ export interface ChatDoneEvent {
 export interface ChatErrorEvent {
   code: number;
   msg: string;
+}
+
+/** 消息中附带的工具状态（用于前端展示） */
+export interface MessageToolState {
+  callId: string;
+  name: string;
+  status: 'running' | 'done' | 'error';
+  result?: ChatToolResultEvent;
 }

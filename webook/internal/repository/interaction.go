@@ -19,6 +19,10 @@ type InteractionRepository interface {
 	CancelCollect(ctx context.Context, uid int64, biz string, bizId int64) error
 	FindInteraction(ctx context.Context, uid int64, biz string, bizId int64) (domain.Interaction, error)
 	FindByBizIds(ctx context.Context, biz string, bizIds []int64) ([]domain.Interaction, error)
+	// ListCollectedBizIds 查询用户收藏的 bizId 列表，按收藏时间降序
+	ListCollectedBizIds(ctx context.Context, uid int64, biz string, limit int) ([]int64, error)
+	// ListHotBizIds 查询热门 bizId 列表，按互动加权分降序
+	ListHotBizIds(ctx context.Context, biz string, limit int) ([]int64, error)
 }
 
 type CacheInteractionRepository struct {
@@ -128,6 +132,14 @@ func (r *CacheInteractionRepository) FindByBizIds(ctx context.Context, biz strin
 		})
 	}
 	return result, nil
+}
+
+func (r *CacheInteractionRepository) ListCollectedBizIds(ctx context.Context, uid int64, biz string, limit int) ([]int64, error) {
+	return r.dao.ListCollectedBizIds(ctx, uid, biz, limit)
+}
+
+func (r *CacheInteractionRepository) ListHotBizIds(ctx context.Context, biz string, limit int) ([]int64, error) {
+	return r.dao.ListHotBizIds(ctx, biz, limit)
 }
 
 func (r *CacheInteractionRepository) fillUserState(ctx context.Context, uid int64, biz string, bizId int64, intr *domain.Interaction) {

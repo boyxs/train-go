@@ -1,13 +1,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import * as chatApi from '@/api/chat';
-import type { Message } from '@/types/chat';
+import type {
+  ChatToolResultEvent,
+  Message,
+  MessageToolState,
+} from '@/types/chat';
+
+/** 扩展 Message，附带工具调用状态（仅 pending 阶段使用） */
+interface PendingMessage extends Message {
+  toolStates?: MessageToolState[];
+}
 
 const PAGE_SIZE = 10;
 
 export function useChat(conversationId: number | null) {
   const [serverMessages, setServerMessages] = useState<Message[]>([]);
-  const [pendingMessages, setPendingMessages] = useState<Message[]>([]);
+  const [pendingMessages, setPendingMessages] = useState<PendingMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [streaming, setStreaming] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -102,7 +111,7 @@ export function useChat(conversationId: number | null) {
   }, [conversationId]);
 
   const messages = useMemo(
-    () => [...serverMessages, ...pendingMessages],
+    () => [...serverMessages, ...pendingMessages] as PendingMessage[],
     [serverMessages, pendingMessages],
   );
 
@@ -144,6 +153,43 @@ export function useChat(conversationId: number | null) {
                 updated[updated.length - 1] = {
                   ...last,
                   content: last.content + text,
+                };
+              }
+              return updated;
+            });
+          },
+          onToolCall: (data) => {
+            // 标记工具调用开始，前端显示 "正在查询..."
+            setPendingMessages((prev) => {
+              const updated = [...prev];
+              const last = updated[updated.length - 1];
+              if (last.role === 'assistant') {
+                const prevStates = last.toolStates ?? [];
+                updated[updated.length - 1] = {
+                  ...last,
+                  toolStates: [
+                    ...prevStates,
+                    { callId: data.id, name: data.name, status: 'running' },
+                  ],
+                };
+              }
+              return updated;
+            });
+          },
+          onToolResult: (rawData) => {
+            const data = rawData as ChatToolResultEvent;
+            // 更新对应 callId 的工具状态为 done，存入结果
+            setPendingMessages((prev) => {
+              const updated = [...prev];
+              const last = updated[updated.length - 1];
+              if (last.role === 'assistant' && last.toolStates) {
+                updated[updated.length - 1] = {
+                  ...last,
+                  toolStates: last.toolStates.map((s) =>
+                    s.callId === data.callId
+                      ? { ...s, status: data.error ? 'error' : 'done', result: data }
+                      : s,
+                  ),
                 };
               }
               return updated;
@@ -208,5 +254,16 @@ export function useChat(conversationId: number | null) {
     send,
     stop,
     loadMore,
+  } as {
+    messages: PendingMessage[];
+    loading: boolean;
+    streaming: boolean;
+    hasMore: boolean;
+    error: string | null;
+    send: (content: string) => void;
+    stop: () => void;
+    loadMore: () => void;
   };
 }
+
+export type { PendingMessage };
