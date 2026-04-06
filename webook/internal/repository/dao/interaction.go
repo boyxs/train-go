@@ -15,6 +15,10 @@ type InteractionDAO interface {
 	FindByBizId(ctx context.Context, biz string, bizId int64) (Interaction, error)
 	FindByBizIds(ctx context.Context, biz string, bizIds []int64) ([]Interaction, error)
 	FindUserInteraction(ctx context.Context, uid int64, biz string, bizId int64) (UserInteraction, error)
+	// ListCollectedBizIds 查询用户收藏的 bizId 列表，按收藏时间降序
+	ListCollectedBizIds(ctx context.Context, uid int64, biz string, limit int) ([]int64, error)
+	// ListHotBizIds 查询热门 bizId 列表，按 read_count + like_count*3 + collect_count*5 降序
+	ListHotBizIds(ctx context.Context, biz string, limit int) ([]int64, error)
 }
 
 type GormInteractionDAO struct {
@@ -125,6 +129,30 @@ func (d *GormInteractionDAO) FindUserInteraction(ctx context.Context, uid int64,
 		Order("id DESC").
 		First(&ui).Error
 	return ui, err
+}
+
+func (d *GormInteractionDAO) ListCollectedBizIds(ctx context.Context, uid int64, biz string, limit int) ([]int64, error) {
+	var ids []int64
+	err := d.db.WithContext(ctx).
+		Model(&UserInteraction{}).
+		Select("biz_id").
+		Where("user_id = ? AND biz = ? AND collected = ?", uid, biz, true).
+		Order("updated_at DESC").
+		Limit(limit).
+		Pluck("biz_id", &ids).Error
+	return ids, err
+}
+
+func (d *GormInteractionDAO) ListHotBizIds(ctx context.Context, biz string, limit int) ([]int64, error) {
+	var ids []int64
+	err := d.db.WithContext(ctx).
+		Model(&Interaction{}).
+		Select("biz_id").
+		Where("biz = ?", biz).
+		Order("read_count + like_count * 3 + collect_count * 5 DESC").
+		Limit(limit).
+		Pluck("biz_id", &ids).Error
+	return ids, err
 }
 
 // Interaction 互动聚合计数表（通用，biz+biz_id 标识业务对象）

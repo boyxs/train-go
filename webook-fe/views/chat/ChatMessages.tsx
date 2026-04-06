@@ -5,12 +5,12 @@ import { Spin } from 'antd';
 import { Bot } from 'lucide-react';
 import React, { useCallback, useLayoutEffect, useRef } from 'react';
 
-import type { Message } from '@/types/chat';
+import type { PendingMessage } from '@/hooks/useChat';
 
 import { MessageBubble } from './MessageBubble';
 
 interface ChatMessagesProps {
-  messages: Message[];
+  messages: PendingMessage[];
   loading: boolean;
   streaming: boolean;
   hasMore?: boolean;

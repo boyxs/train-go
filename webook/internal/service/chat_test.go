@@ -91,7 +91,7 @@ func TestChatService_SendMessage(t *testing.T) {
 			defer ctrl.Finish()
 
 			convRepo, msgRepo, llm, search := tc.mock(ctrl)
-			svc := NewChatService(convRepo, msgRepo, llm, search, logger.NewNopLogger())
+			svc := NewChatService(convRepo, msgRepo, llm, search, nil, logger.NewNopLogger())
 
 			_, err := svc.SendMessage(context.Background(), tc.uid, tc.convId, tc.content)
 			if tc.wantErr != nil {
@@ -103,13 +103,14 @@ func TestChatService_SendMessage(t *testing.T) {
 	}
 }
 
-func TestChatService_ForwardStream_Done(t *testing.T) {
+func TestChatService_RunStream_TextOnly(t *testing.T) {
 	// LLM 正常完成：delta + done → 保存完整回复
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	msgRepo := repomocks.NewMockMessageRepository(ctrl)
 	convRepo := repomocks.NewMockConversationRepository(ctrl)
+	llm := aimocks.NewMockLLMClient(ctrl)
 
 	// 保存 AI 回复
 	msgRepo.EXPECT().Insert(gomock.Any(), gomock.Any()).
@@ -127,6 +128,7 @@ func TestChatService_ForwardStream_Done(t *testing.T) {
 	svc := &chatService{
 		convRepo: convRepo,
 		msgRepo:  msgRepo,
+		llm:      llm,
 		l:        logger.NewNopLogger(),
 	}
 
@@ -138,7 +140,7 @@ func TestChatService_ForwardStream_Done(t *testing.T) {
 
 	eventCh := make(chan domain.ChatEvent, 10)
 	ctx := context.Background()
-	svc.forwardStream(ctx, 1, 1, llmCh, eventCh)
+	svc.runStream(ctx, 1, 1, []ai.ChatMessage{{Role: "user", Content: "hi"}}, llmCh, eventCh)
 
 	// 收集事件
 	var events []domain.ChatEvent
@@ -152,13 +154,14 @@ func TestChatService_ForwardStream_Done(t *testing.T) {
 	assert.Equal(t, "done", events[2].Type)
 }
 
-func TestChatService_ForwardStream_CtxCancel(t *testing.T) {
+func TestChatService_RunStream_CtxCancel(t *testing.T) {
 	// 前端断开（ctx 取消）→ 保存已有部分回复，goroutine 退出不泄漏
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	msgRepo := repomocks.NewMockMessageRepository(ctrl)
 	convRepo := repomocks.NewMockConversationRepository(ctrl)
+	llm := aimocks.NewMockLLMClient(ctrl)
 
 	// 部分回复应被保存
 	msgRepo.EXPECT().Insert(gomock.Any(), gomock.Any()).
@@ -174,6 +177,7 @@ func TestChatService_ForwardStream_CtxCancel(t *testing.T) {
 	svc := &chatService{
 		convRepo: convRepo,
 		msgRepo:  msgRepo,
+		llm:      llm,
 		l:        logger.NewNopLogger(),
 	}
 
@@ -186,7 +190,7 @@ func TestChatService_ForwardStream_CtxCancel(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		svc.forwardStream(ctx, 1, 1, llmCh, eventCh)
+		svc.runStream(ctx, 1, 1, []ai.ChatMessage{{Role: "user", Content: "hi"}}, llmCh, eventCh)
 		close(done)
 	}()
 
@@ -202,17 +206,18 @@ func TestChatService_ForwardStream_CtxCancel(t *testing.T) {
 	case <-done:
 		// OK
 	case <-time.After(2 * time.Second):
-		t.Fatal("forwardStream goroutine 未退出，泄漏")
+		t.Fatal("runStream goroutine 未退出，泄漏")
 	}
 }
 
-func TestChatService_ForwardStream_Error(t *testing.T) {
+func TestChatService_RunStream_Error(t *testing.T) {
 	// LLM 发送 error 事件 → 保存已有部分回复
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	msgRepo := repomocks.NewMockMessageRepository(ctrl)
 	convRepo := repomocks.NewMockConversationRepository(ctrl)
+	llm := aimocks.NewMockLLMClient(ctrl)
 
 	// 有部分内容，应保存
 	msgRepo.EXPECT().Insert(gomock.Any(), gomock.Any()).
@@ -226,6 +231,7 @@ func TestChatService_ForwardStream_Error(t *testing.T) {
 	svc := &chatService{
 		convRepo: convRepo,
 		msgRepo:  msgRepo,
+		llm:      llm,
 		l:        logger.NewNopLogger(),
 	}
 
@@ -235,7 +241,7 @@ func TestChatService_ForwardStream_Error(t *testing.T) {
 	close(llmCh)
 
 	eventCh := make(chan domain.ChatEvent, 10)
-	svc.forwardStream(context.Background(), 1, 1, llmCh, eventCh)
+	svc.runStream(context.Background(), 1, 1, []ai.ChatMessage{{Role: "user", Content: "hi"}}, llmCh, eventCh)
 
 	var events []domain.ChatEvent
 	for e := range eventCh {
@@ -247,18 +253,20 @@ func TestChatService_ForwardStream_Error(t *testing.T) {
 	assert.Equal(t, "error", events[1].Type)
 }
 
-func TestChatService_ForwardStream_ErrorNoContent(t *testing.T) {
+func TestChatService_RunStream_ErrorNoContent(t *testing.T) {
 	// LLM 立即发 error，无内容 → 不保存空回复
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	msgRepo := repomocks.NewMockMessageRepository(ctrl)
 	convRepo := repomocks.NewMockConversationRepository(ctrl)
+	llm := aimocks.NewMockLLMClient(ctrl)
 	// 不应调用 Insert（空内容不保存）
 
 	svc := &chatService{
 		convRepo: convRepo,
 		msgRepo:  msgRepo,
+		llm:      llm,
 		l:        logger.NewNopLogger(),
 	}
 
@@ -267,7 +275,7 @@ func TestChatService_ForwardStream_ErrorNoContent(t *testing.T) {
 	close(llmCh)
 
 	eventCh := make(chan domain.ChatEvent, 10)
-	svc.forwardStream(context.Background(), 1, 1, llmCh, eventCh)
+	svc.runStream(context.Background(), 1, 1, []ai.ChatMessage{{Role: "user", Content: "hi"}}, llmCh, eventCh)
 
 	var events []domain.ChatEvent
 	for e := range eventCh {
@@ -320,7 +328,7 @@ func TestChatService_SendMessage_RAGWithArticles(t *testing.T) {
 			return ch, nil
 		})
 
-	svc := NewChatService(convRepo, msgRepo, llm, search, logger.NewNopLogger())
+	svc := NewChatService(convRepo, msgRepo, llm, search, nil, logger.NewNopLogger())
 	_, err := svc.SendMessage(context.Background(), 1, 1, "Go并发怎么写")
 	assert.NoError(t, err)
 }
@@ -359,7 +367,7 @@ func TestChatService_SendMessage_RAGNoResults(t *testing.T) {
 			return ch, nil
 		})
 
-	svc := NewChatService(convRepo, msgRepo, llm, search, logger.NewNopLogger())
+	svc := NewChatService(convRepo, msgRepo, llm, search, nil, logger.NewNopLogger())
 	_, err := svc.SendMessage(context.Background(), 1, 1, "你好")
 	assert.NoError(t, err)
 }
@@ -395,7 +403,7 @@ func TestChatService_SendMessage_RAGSearchFail(t *testing.T) {
 			return ch, nil
 		})
 
-	svc := NewChatService(convRepo, msgRepo, llm, search, logger.NewNopLogger())
+	svc := NewChatService(convRepo, msgRepo, llm, search, nil, logger.NewNopLogger())
 	_, err := svc.SendMessage(context.Background(), 1, 1, "文章推荐")
 	assert.NoError(t, err)
 }
@@ -420,4 +428,98 @@ func TestInjectArticleContext(t *testing.T) {
 	assert.Contains(t, result[1].Content, "王五")
 	assert.Contains(t, result[1].Content, "表格驱动测试")
 	assert.Equal(t, "user", result[2].Role)
+}
+
+// mockToolExecutor 简单的测试用 ToolExecutor
+type mockToolExecutor struct {
+	defs    []ai.Tool
+	results map[string]domain.ToolResultData
+}
+
+func (m *mockToolExecutor) Definitions() []ai.Tool { return m.defs }
+func (m *mockToolExecutor) Execute(_ context.Context, _ int64, name string, _ map[string]any) (domain.ToolResultData, error) {
+	if r, ok := m.results[name]; ok {
+		return r, nil
+	}
+	return domain.ToolResultData{Name: name, Error: "工具不存在"}, nil
+}
+
+func TestChatService_RunStream_WithToolCall(t *testing.T) {
+	// LLM 第一轮返回 tool_call → executor 执行 → 第二轮返回文本 → done
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	msgRepo := repomocks.NewMockMessageRepository(ctrl)
+	convRepo := repomocks.NewMockConversationRepository(ctrl)
+	llm := aimocks.NewMockLLMClient(ctrl)
+
+	executor := &mockToolExecutor{
+		defs: []ai.Tool{{Name: "get_hot_articles"}},
+		results: map[string]domain.ToolResultData{
+			"get_hot_articles": {
+				Name: "get_hot_articles",
+				Articles: []domain.ArticleCard{
+					{Id: 1, Title: "Go 入门", Abstract: "基础知识"},
+				},
+			},
+		},
+	}
+
+	// 第一轮：LLM 返回 tool_call
+	firstCh := make(chan ai.StreamChunk, 2)
+	firstCh <- ai.StreamChunk{
+		Type: "tool_call",
+		ToolCalls: []ai.StreamToolCall{
+			{Id: "call_001", Name: "get_hot_articles", Args: map[string]any{"limit": float64(5)}},
+		},
+	}
+	close(firstCh)
+
+	// 第二轮：LLM 返回文本 + done
+	secondCh := make(chan ai.StreamChunk, 3)
+	secondCh <- ai.StreamChunk{Type: "text", Content: "以下是热门文章"}
+	secondCh <- ai.StreamChunk{Type: "done"}
+	close(secondCh)
+
+	// 第一次 ChatStream 在 SendMessage 中调用，第二次在 runStream 工具调用后调用
+	llm.EXPECT().ChatStream(gomock.Any(), gomock.Any(), gomock.Any()).Return(secondCh, nil)
+
+	// 保存 AI 最终回复
+	msgRepo.EXPECT().Insert(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(ctx context.Context, msg domain.Message) (domain.Message, error) {
+			assert.Equal(t, "assistant", msg.Role)
+			assert.Equal(t, "以下是热门文章", msg.Content)
+			return domain.Message{Id: 200}, nil
+		})
+	msgRepo.EXPECT().ListRecent(gomock.Any(), int64(1), 3).
+		Return([]domain.Message{{}, {}}, nil)
+	convRepo.EXPECT().UpdateTitle(gomock.Any(), int64(1), int64(1), gomock.Any()).Return(nil)
+
+	svc := &chatService{
+		convRepo: convRepo,
+		msgRepo:  msgRepo,
+		llm:      llm,
+		executor: executor,
+		l:        logger.NewNopLogger(),
+	}
+
+	eventCh := make(chan domain.ChatEvent, 20)
+	msgs := []ai.ChatMessage{{Role: "user", Content: "推荐文章"}}
+	svc.runStream(context.Background(), 1, 1, msgs, firstCh, eventCh)
+
+	var events []domain.ChatEvent
+	for e := range eventCh {
+		events = append(events, e)
+	}
+
+	// 期望：tool_call + tool_result + delta + done
+	assert.GreaterOrEqual(t, len(events), 4)
+	types := make([]string, len(events))
+	for i, e := range events {
+		types[i] = e.Type
+	}
+	assert.Contains(t, types, "tool_call")
+	assert.Contains(t, types, "tool_result")
+	assert.Contains(t, types, "delta")
+	assert.Contains(t, types, "done")
 }

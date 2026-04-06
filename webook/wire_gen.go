@@ -71,7 +71,8 @@ func InitWebServer() *gin.Engine {
 	messageRepository := repository.NewCacheMessageRepository(messageDAO, messageCache, loggerX)
 	llmConfig := ioc.InitLLMConfig()
 	llmClient := ioc.InitLLMClient(llmConfig, loggerX)
-	chatService := service.NewChatService(conversationRepository, messageRepository, llmClient, articleSearchService, loggerX)
+	toolExecutor := service.NewChatToolExecutor(articleSearchService, articleReaderService, interactionRepository, loggerX)
+	chatService := service.NewChatService(conversationRepository, messageRepository, llmClient, articleSearchService, toolExecutor, loggerX)
 	limiter := ioc.InitChatLimiter(cmdable)
 	chatHandler := web.NewInternalChatHandler(chatService, loggerX, limiter)
 	articleSearchHandler := web.NewInternalArticleSearchHandler(articleSearchService, loggerX)
@@ -85,4 +86,4 @@ func InitWebServer() *gin.Engine {
 var searchProviderSet = wire.NewSet(ioc.InitESClient, ioc.InitOllamaEmbeddingConfig, ioc.InitEmbeddingConfig, ioc.InitEmbeddingClient, dao.NewElasticArticleDAO, repository.NewESArticleSearchRepository, service.NewArticleSearchService)
 
 // chatProviderSet Chat 模块的 Wire Provider 集合（不含 Handler）
-var chatProviderSet = wire.NewSet(ioc.InitLLMConfig, ioc.InitLLMClient, ioc.InitChatLimiter, dao.NewGormConversationDAO, dao.NewGormMessageDAO, cache.NewRedisConversationCache, cache.NewRedisMessageCache, repository.NewCacheConversationRepository, repository.NewCacheMessageRepository, service.NewChatService)
+var chatProviderSet = wire.NewSet(ioc.InitLLMConfig, ioc.InitLLMClient, ioc.InitChatLimiter, dao.NewGormConversationDAO, dao.NewGormMessageDAO, cache.NewRedisConversationCache, cache.NewRedisMessageCache, repository.NewCacheConversationRepository, repository.NewCacheMessageRepository, service.NewChatService, service.NewChatToolExecutor)
