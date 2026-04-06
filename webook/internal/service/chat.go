@@ -18,12 +18,16 @@ const (
 	maxMessageLength = 2000
 	maxHistoryRounds = 20
 	titleMaxRunes    = 20
+	ragTopK          = 3
 	systemPrompt     = `你是小微书平台的 AI 助手。你的职责是帮助用户解答平台使用问题、推荐文章内容。
 规则：
 1. 只回答与小微书平台相关的问题
 2. 不回答涉及政治、暴力、色情的内容
 3. 回答简洁友好，使用中文
-4. 如果不确定，坦诚告知用户`
+4. 如果不确定，坦诚告知用户
+5. 如果系统提供了相关文章，优先基于文章内容回答，并在回答中引用来源
+6. 引用时直接复制系统提供的 Markdown 链接，不要自己编造链接
+7. 如果提供的文章与问题无关，忽略它们，用自己的知识回答`
 )
 
 var (
@@ -44,12 +48,13 @@ type chatService struct {
 	convRepo repository.ConversationRepository
 	msgRepo  repository.MessageRepository
 	llm      ai.LLMClient
+	search   ArticleSearchService
 	l        logger.LoggerX
 	cancel   sync.Map // convId -> context.CancelFunc
 }
 
-func NewChatService(convRepo repository.ConversationRepository, msgRepo repository.MessageRepository, llm ai.LLMClient, l logger.LoggerX) ChatService {
-	return &chatService{convRepo: convRepo, msgRepo: msgRepo, llm: llm, l: l}
+func NewChatService(convRepo repository.ConversationRepository, msgRepo repository.MessageRepository, llm ai.LLMClient, search ArticleSearchService, l logger.LoggerX) ChatService {
+	return &chatService{convRepo: convRepo, msgRepo: msgRepo, llm: llm, search: search, l: l}
 }
 
 func (s *chatService) CreateConversation(ctx context.Context, uid int64) (domain.Conversation, error) {
@@ -115,6 +120,11 @@ func (s *chatService) SendMessage(ctx context.Context, uid int64, convId int64, 
 		return nil, fmt.Errorf("构建 prompt 失败: %w", err)
 	}
 
+	// 4.1 RAG：检索相关文章，注入上下文
+	if articles := s.searchArticles(ctx, content); len(articles) > 0 {
+		messages = s.injectArticleContext(messages, articles)
+	}
+
 	// 5. 创建可取消的 context
 	streamCtx, cancel := context.WithCancel(ctx)
 	s.cancel.Store(cancelKey(uid, convId), cancel)
@@ -167,6 +177,37 @@ func (s *chatService) buildPrompt(ctx context.Context, convId int64) ([]ai.ChatM
 	}
 
 	return messages, nil
+}
+
+// searchArticles 检索相关文章，失败静默降级
+func (s *chatService) searchArticles(ctx context.Context, query string) []domain.Article {
+	//如果es查询慢导致整体响应时间长可加上
+	//ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	//defer cancel()
+	articles, _, err := s.search.Search(ctx, query, 1, ragTopK)
+	if err != nil {
+		s.l.Warn("RAG 检索失败，降级为无 RAG",
+			logger.String("query", query),
+			logger.Error(err))
+		return nil
+	}
+	return articles
+}
+
+// injectArticleContext 将检索到的文章注入 prompt，插入到 system prompt 之后
+func (s *chatService) injectArticleContext(messages []ai.ChatMessage, articles []domain.Article) []ai.ChatMessage {
+	var buf strings.Builder
+	buf.WriteString("以下是平台相关文章，请基于这些内容回答用户问题。引用时直接使用提供的 Markdown 链接。\n\n")
+	for i, a := range articles {
+		fmt.Fprintf(&buf, "[%d] [%s](/article/%d) — %s（作者：%s）\n\n",
+			i+1, a.Title, a.Id, a.Abstract, a.Author.Name)
+	}
+
+	result := make([]ai.ChatMessage, 0, len(messages)+1)
+	result = append(result, messages[0]) // 原 system prompt
+	result = append(result, ai.ChatMessage{Role: "system", Content: buf.String()})
+	result = append(result, messages[1:]...) // 历史消息
+	return result
 }
 
 // forwardStream 读取 LLM channel，转发到事件 channel，完成后保存 AI 回复

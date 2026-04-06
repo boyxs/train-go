@@ -71,7 +71,7 @@ func InitWebServer() *gin.Engine {
 	messageRepository := repository.NewCacheMessageRepository(messageDAO, messageCache, loggerX)
 	llmConfig := ioc.InitLLMConfig()
 	llmClient := ioc.InitLLMClient(llmConfig, loggerX)
-	chatService := service.NewChatService(conversationRepository, messageRepository, llmClient, loggerX)
+	chatService := service.NewChatService(conversationRepository, messageRepository, llmClient, articleSearchService, loggerX)
 	limiter := ioc.InitChatLimiter(cmdable)
 	chatHandler := web.NewInternalChatHandler(chatService, loggerX, limiter)
 	articleSearchHandler := web.NewInternalArticleSearchHandler(articleSearchService, loggerX)

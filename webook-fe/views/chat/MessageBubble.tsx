@@ -65,7 +65,21 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               <TypingDots />
             ) : (
               <div className='prose prose-sm max-w-none text-[#1A1A1A] prose-headings:text-[#1A1A1A] prose-headings:font-semibold prose-headings:mt-3 prose-headings:mb-1.5 prose-p:my-1.5 prose-p:leading-relaxed prose-code:text-[#0D9488] prose-code:bg-[#F3F4F6] prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-[13px] prose-code:before:content-none prose-code:after:content-none prose-pre:bg-[#1E1E1E] prose-pre:text-[#D4D4D4] prose-pre:rounded-lg prose-pre:text-[13px] prose-a:text-[#0D9488] prose-a:no-underline hover:prose-a:underline prose-strong:text-[#1A1A1A] prose-li:my-0.5 prose-li:marker:text-[#9CA3AF] prose-ul:my-1.5 prose-ol:my-1.5 prose-blockquote:border-l-[#0D9488] prose-blockquote:text-[#6B7280] prose-blockquote:my-2'>
-                <Markdown remarkPlugins={[remarkGfm]}>
+                <Markdown
+                  remarkPlugins={[remarkGfm]}
+                  components={{
+                    a: ({ children, href, ...props }) => (
+                      <a
+                        href={href}
+                        target='_blank'
+                        rel='noopener noreferrer'
+                        {...props}
+                      >
+                        {children}
+                      </a>
+                    ),
+                  }}
+                >
                   {message.content || ''}
                 </Markdown>
                 {streaming && !isEmpty && <TypingDots />}
