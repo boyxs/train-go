@@ -12,6 +12,8 @@ import (
 type MessageRepository interface {
 	Insert(ctx context.Context, msg domain.Message) (domain.Message, error)
 	ListRecent(ctx context.Context, convId int64, limit int) ([]domain.Message, error)
+	// ListRecentLite 同 ListRecent 但不含 tool_calls，用于构建 prompt
+	ListRecentLite(ctx context.Context, convId int64, limit int) ([]domain.Message, error)
 	ListBefore(ctx context.Context, convId int64, beforeId int64, limit int) ([]domain.Message, error)
 	ListAll(ctx context.Context, convId int64) ([]domain.Message, error)
 }
@@ -56,6 +58,14 @@ func (r *CacheMessageRepository) ListRecent(ctx context.Context, convId int64, l
 		r.l.Error("回填消息缓存失败", logger.Int64("convId", convId), logger.Error(setErr))
 	}
 	return result, nil
+}
+
+func (r *CacheMessageRepository) ListRecentLite(ctx context.Context, convId int64, limit int) ([]domain.Message, error) {
+	entities, err := r.dao.ListRecentLite(ctx, convId, limit)
+	if err != nil {
+		return nil, err
+	}
+	return r.toDomainSlice(entities), nil
 }
 
 func (r *CacheMessageRepository) ListBefore(ctx context.Context, convId int64, beforeId int64, limit int) ([]domain.Message, error) {

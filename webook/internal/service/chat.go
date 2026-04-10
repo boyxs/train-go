@@ -23,6 +23,12 @@ const (
 	ragTopK          = 3
 	maxToolRounds    = 5 // 工具调用最大轮次，防止无限循环
 	systemPrompt     = `你是小微书平台的 AI 助手。你的职责是帮助用户解答平台使用问题、推荐文章内容。
+
+你有以下工具可用，必须在合适的场景调用：
+- search_articles：用户搜索文章、询问技术问题时，必须调用此工具搜索平台文章
+- get_hot_articles：用户请求推荐、热门文章、排行榜时，必须调用此工具
+- get_my_favorites：用户询问自己的收藏时，必须调用此工具
+
 规则：
 1. 只回答与小微书平台相关的问题
 2. 不回答涉及政治、暴力、色情的内容
@@ -30,8 +36,10 @@ const (
 4. 如果不确定，坦诚告知用户
 5. 如果系统提供了相关文章，优先基于文章内容回答，并在回答中引用来源
 6. 引用时直接复制系统提供的 Markdown 链接，不要自己编造链接
-7. 如果提供的文章与问题无关，忽略它们，用自己的知识回答
-8. 热门文章、用户收藏等实时数据每次必须重新调用对应工具获取，不能复用历史对话中出现过的数据`
+7. 涉及文章推荐、热门、收藏的问题，必须调用对应工具获取实时数据
+8. 每次都必须重新调用工具获取最新数据，不能复用历史对话中出现过的数据
+9. 工具返回结果后，基于结果回答用户，不要编造内容
+10. 平台使用类问题（如"怎么发文章"）不需要调工具，直接回答即可`
 )
 
 var (
@@ -48,7 +56,7 @@ type ChatService interface {
 	StopGeneration(ctx context.Context, uid int64, convId int64) error
 }
 
-type chatService struct {
+type AIChatService struct {
 	convRepo repository.ConversationRepository
 	msgRepo  repository.MessageRepository
 	llm      ai.LLMClient
@@ -58,7 +66,7 @@ type chatService struct {
 	cancel   sync.Map // convId -> context.CancelFunc
 }
 
-func NewChatService(
+func NewAIChatService(
 	convRepo repository.ConversationRepository,
 	msgRepo repository.MessageRepository,
 	llm ai.LLMClient,
@@ -66,7 +74,7 @@ func NewChatService(
 	executor ToolExecutor,
 	l logger.LoggerX,
 ) ChatService {
-	return &chatService{
+	return &AIChatService{
 		convRepo: convRepo,
 		msgRepo:  msgRepo,
 		llm:      llm,
@@ -76,22 +84,22 @@ func NewChatService(
 	}
 }
 
-func (s *chatService) CreateConversation(ctx context.Context, uid int64) (domain.Conversation, error) {
+func (s *AIChatService) CreateConversation(ctx context.Context, uid int64) (domain.Conversation, error) {
 	return s.convRepo.Create(ctx, domain.Conversation{
 		UserId: uid,
 		Title:  "新对话",
 	})
 }
 
-func (s *chatService) ListConversations(ctx context.Context, uid int64) ([]domain.Conversation, error) {
+func (s *AIChatService) ListConversations(ctx context.Context, uid int64) ([]domain.Conversation, error) {
 	return s.convRepo.List(ctx, uid)
 }
 
-func (s *chatService) DeleteConversation(ctx context.Context, uid int64, convId int64) error {
+func (s *AIChatService) DeleteConversation(ctx context.Context, uid int64, convId int64) error {
 	return s.convRepo.Delete(ctx, uid, convId)
 }
 
-func (s *chatService) ListMessages(ctx context.Context, uid int64, convId int64, beforeId int64, limit int) ([]domain.Message, error) {
+func (s *AIChatService) ListMessages(ctx context.Context, uid int64, convId int64, beforeId int64, limit int) ([]domain.Message, error) {
 	_, err := s.convRepo.Find(ctx, uid, convId)
 	if err != nil {
 		if isNotFound(err) {
@@ -108,7 +116,7 @@ func (s *chatService) ListMessages(ctx context.Context, uid int64, convId int64,
 	return s.msgRepo.ListRecent(ctx, convId, limit)
 }
 
-func (s *chatService) SendMessage(ctx context.Context, uid int64, convId int64, content string) (<-chan domain.ChatEvent, error) {
+func (s *AIChatService) SendMessage(ctx context.Context, uid int64, convId int64, content string) (<-chan domain.ChatEvent, error) {
 	// 1. 校验对话归属
 	_, err := s.convRepo.Find(ctx, uid, convId)
 	if err != nil {
@@ -148,7 +156,7 @@ func (s *chatService) SendMessage(ctx context.Context, uid int64, convId int64, 
 	streamCtx, cancel := context.WithCancel(ctx)
 	s.cancel.Store(cancelKey(uid, convId), cancel)
 
-	// 6. 首次调用 LLM（同步检测连接错误）
+	// 6. 首次调用 LLM
 	var tools []ai.Tool
 	if s.executor != nil {
 		tools = s.executor.Definitions()
@@ -167,7 +175,7 @@ func (s *chatService) SendMessage(ctx context.Context, uid int64, convId int64, 
 	return eventCh, nil
 }
 
-func (s *chatService) StopGeneration(ctx context.Context, uid int64, convId int64) error {
+func (s *AIChatService) StopGeneration(ctx context.Context, uid int64, convId int64) error {
 	if cancelFn, ok := s.cancel.LoadAndDelete(cancelKey(uid, convId)); ok {
 		cancelFn.(context.CancelFunc)()
 	}
@@ -181,8 +189,8 @@ func cancelKey(uid, convId int64) string {
 
 // buildPrompt 构建系统提示词 + 最近历史
 // 只取最近 maxHistoryRounds*2 条，不全量加载
-func (s *chatService) buildPrompt(ctx context.Context, convId int64) ([]ai.ChatMessage, error) {
-	recentMsgs, err := s.msgRepo.ListRecent(ctx, convId, maxHistoryRounds*2)
+func (s *AIChatService) buildPrompt(ctx context.Context, convId int64) ([]ai.ChatMessage, error) {
+	recentMsgs, err := s.msgRepo.ListRecentLite(ctx, convId, maxHistoryRounds*2)
 	if err != nil {
 		return nil, err
 	}
@@ -203,7 +211,7 @@ func (s *chatService) buildPrompt(ctx context.Context, convId int64) ([]ai.ChatM
 }
 
 // searchArticles 检索相关文章，失败静默降级
-func (s *chatService) searchArticles(ctx context.Context, query string) []domain.Article {
+func (s *AIChatService) searchArticles(ctx context.Context, query string) []domain.Article {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 	articles, _, err := s.search.Search(ctx, query, 1, ragTopK)
@@ -217,7 +225,7 @@ func (s *chatService) searchArticles(ctx context.Context, query string) []domain
 }
 
 // injectArticleContext 将检索到的文章注入 prompt，插入到 system prompt 之后
-func (s *chatService) injectArticleContext(messages []ai.ChatMessage, articles []domain.Article) []ai.ChatMessage {
+func (s *AIChatService) injectArticleContext(messages []ai.ChatMessage, articles []domain.Article) []ai.ChatMessage {
 	var buf strings.Builder
 	buf.WriteString("以下是平台相关文章，请基于这些内容回答用户问题。引用时直接使用提供的 Markdown 链接。\n\n")
 	for i, a := range articles {
@@ -234,7 +242,7 @@ func (s *chatService) injectArticleContext(messages []ai.ChatMessage, articles [
 
 // runStream 处理 LLM 流，支持工具调用循环，最多 maxToolRounds 轮
 // messages 用于工具调用后追加历史并发起第二轮 LLM 调用
-func (s *chatService) runStream(
+func (s *AIChatService) runStream(
 	ctx context.Context,
 	convId, uid int64,
 	messages []ai.ChatMessage,
@@ -245,6 +253,7 @@ func (s *chatService) runStream(
 	defer s.cancel.Delete(cancelKey(uid, convId))
 
 	var fullContent strings.Builder
+	var allToolResults []domain.ToolResultData
 
 	for round := 0; round <= maxToolRounds; round++ {
 		toolCalls, usage, finished := s.processChunks(ctx, convId, uid, llmCh, &fullContent, eventCh)
@@ -254,7 +263,7 @@ func (s *chatService) runStream(
 
 		if len(toolCalls) == 0 {
 			reply := fullContent.String()
-			msgId := s.saveReply(convId, uid, reply)
+			msgId := s.saveReply(convId, uid, reply, allToolResults)
 			s.trySend(ctx, eventCh, domain.ChatEvent{
 				Type: "done",
 				Data: map[string]any{
@@ -268,7 +277,7 @@ func (s *chatService) runStream(
 		if round == maxToolRounds {
 			s.l.Warn("工具调用超过最大轮次", logger.Int64("convId", convId))
 			reply := fullContent.String()
-			msgId := s.saveReply(convId, uid, reply)
+			msgId := s.saveReply(convId, uid, reply, allToolResults)
 			s.trySend(ctx, eventCh, domain.ChatEvent{
 				Type: "done",
 				Data: map[string]any{"messageId": msgId, "usage": buildUsage(usage)},
@@ -277,7 +286,9 @@ func (s *chatService) runStream(
 		}
 
 		// 执行工具，把 assistant tool_call + tool result 追加到 messages
-		messages = s.executeTools(ctx, uid, messages, toolCalls, eventCh)
+		var results []domain.ToolResultData
+		messages, results = s.executeTools(ctx, uid, messages, toolCalls, eventCh)
+		allToolResults = append(allToolResults, results...)
 
 		// 发起下一轮 LLM 调用
 		var tools []ai.Tool
@@ -296,7 +307,7 @@ func (s *chatService) runStream(
 
 // processChunks 处理单轮 LLM stream
 // finished=true 表示收到 done 或 tool_call，false 表示 ctx 取消/异常
-func (s *chatService) processChunks(
+func (s *AIChatService) processChunks(
 	ctx context.Context,
 	convId, uid int64,
 	llmCh <-chan ai.StreamChunk,
@@ -334,13 +345,13 @@ func (s *chatService) processChunks(
 }
 
 // executeTools 执行工具调用列表，发送 tool_call + tool_result 事件，并把结果追加到 messages
-func (s *chatService) executeTools(
+func (s *AIChatService) executeTools(
 	ctx context.Context,
 	uid int64,
 	messages []ai.ChatMessage,
 	toolCalls []ai.StreamToolCall,
 	eventCh chan<- domain.ChatEvent,
-) []ai.ChatMessage {
+) ([]ai.ChatMessage, []domain.ToolResultData) {
 	// 组装 assistant 消息（携带 tool_calls）
 	assistantMsg := ai.ChatMessage{Role: "assistant"}
 	for _, tc := range toolCalls {
@@ -355,6 +366,7 @@ func (s *chatService) executeTools(
 	}
 	messages = append(messages, assistantMsg)
 
+	var results []domain.ToolResultData
 	for _, tc := range toolCalls {
 		// 通知前端工具调用开始
 		s.trySend(ctx, eventCh, domain.ChatEvent{
@@ -373,6 +385,7 @@ func (s *chatService) executeTools(
 			result = domain.ToolResultData{Name: tc.Name, Error: "no executor"}
 		}
 		result.CallId = tc.Id
+		results = append(results, result)
 
 		// 发送 tool_result 事件给前端
 		s.trySend(ctx, eventCh, domain.ChatEvent{Type: "tool_result", Data: result})
@@ -385,7 +398,7 @@ func (s *chatService) executeTools(
 			Content:    resultContent,
 		})
 	}
-	return messages
+	return messages, results
 }
 
 // marshalArgs 将 args map 序列化为 JSON 字符串
@@ -413,7 +426,7 @@ func marshalResult(r domain.ToolResultData) string {
 }
 
 // trySend 尝试发送事件，如果 ctx 已取消则放弃（防止 goroutine 阻塞泄漏）
-func (s *chatService) trySend(ctx context.Context, ch chan<- domain.ChatEvent, event domain.ChatEvent) bool {
+func (s *AIChatService) trySend(ctx context.Context, ch chan<- domain.ChatEvent, event domain.ChatEvent) bool {
 	select {
 	case ch <- event:
 		return true
@@ -423,14 +436,20 @@ func (s *chatService) trySend(ctx context.Context, ch chan<- domain.ChatEvent, e
 }
 
 // saveReply 保存完整 AI 回复，返回消息 ID
-func (s *chatService) saveReply(convId int64, uid int64, reply string) int64 {
-	if reply == "" {
+func (s *AIChatService) saveReply(convId int64, uid int64, reply string, toolResults []domain.ToolResultData) int64 {
+	if reply == "" && len(toolResults) == 0 {
 		return 0
+	}
+	var toolCallsJSON string
+	if len(toolResults) > 0 {
+		b, _ := json.Marshal(toolResults)
+		toolCallsJSON = string(b)
 	}
 	saved, err := s.msgRepo.Insert(context.Background(), domain.Message{
 		ConversationId: convId,
 		Role:           "assistant",
 		Content:        reply,
+		ToolCalls:      toolCallsJSON,
 	})
 	if err != nil {
 		s.l.Error("保存 AI 回复失败",
@@ -443,15 +462,15 @@ func (s *chatService) saveReply(convId int64, uid int64, reply string) int64 {
 }
 
 // savePartialReply 前端断开或出错时保存已有的部分回复
-func (s *chatService) savePartialReply(convId int64, uid int64, content string) {
+func (s *AIChatService) savePartialReply(convId int64, uid int64, content string) {
 	if content == "" {
 		return
 	}
-	s.saveReply(convId, uid, content)
+	s.saveReply(convId, uid, content, nil)
 }
 
 // autoTitle 首条对话时自动截取 AI 回复前 N 字作为标题
-func (s *chatService) autoTitle(convId int64, uid int64, reply string) {
+func (s *AIChatService) autoTitle(convId int64, uid int64, reply string) {
 	// 只取前 3 条判断是否首轮对话，不全量加载
 	msgs, err := s.msgRepo.ListRecent(context.Background(), convId, 3)
 	if err != nil || len(msgs) > 2 {

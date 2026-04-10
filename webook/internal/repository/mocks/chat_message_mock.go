@@ -100,3 +100,18 @@ func (mr *MockMessageRepositoryMockRecorder) ListRecent(ctx, convId, limit any) 
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListRecent", reflect.TypeOf((*MockMessageRepository)(nil).ListRecent), ctx, convId, limit)
 }
+
+// ListRecentLite mocks base method.
+func (m *MockMessageRepository) ListRecentLite(ctx context.Context, convId int64, limit int) ([]domain.Message, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListRecentLite", ctx, convId, limit)
+	ret0, _ := ret[0].([]domain.Message)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListRecentLite indicates an expected call of ListRecentLite.
+func (mr *MockMessageRepositoryMockRecorder) ListRecentLite(ctx, convId, limit any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListRecentLite", reflect.TypeOf((*MockMessageRepository)(nil).ListRecentLite), ctx, convId, limit)
+}

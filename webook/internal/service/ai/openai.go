@@ -220,12 +220,28 @@ func (c *OpenAIClient) readSSE(ctx context.Context, body io.Reader, ch chan<- St
 		if choice.FinishReason == nil {
 			continue
 		}
-		switch *choice.FinishReason {
-		case "tool_calls":
+		reason := *choice.FinishReason
+		switch reason {
+		case "tool_calls", "function_call":
 			calls := c.assemblePendingCalls(pendingCalls)
 			ch <- StreamChunk{Type: "tool_call", ToolCalls: calls, Usage: lastUsage}
 			return
 		case "stop":
+			// 如果有累积的 tool_call 但 finish_reason 是 stop（某些模型的行为），也要处理
+			if len(pendingCalls) > 0 {
+				calls := c.assemblePendingCalls(pendingCalls)
+				ch <- StreamChunk{Type: "tool_call", ToolCalls: calls, Usage: lastUsage}
+				return
+			}
+			ch <- StreamChunk{Type: "done", Usage: lastUsage}
+			return
+		default:
+			// 未知 finish_reason 但有 pending tool_calls
+			if len(pendingCalls) > 0 {
+				calls := c.assemblePendingCalls(pendingCalls)
+				ch <- StreamChunk{Type: "tool_call", ToolCalls: calls, Usage: lastUsage}
+				return
+			}
 			ch <- StreamChunk{Type: "done", Usage: lastUsage}
 			return
 		}

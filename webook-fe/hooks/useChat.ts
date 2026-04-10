@@ -110,10 +110,27 @@ export function useChat(conversationId: number | null) {
     }
   }, [conversationId]);
 
-  const messages = useMemo(
-    () => [...serverMessages, ...pendingMessages] as PendingMessage[],
-    [serverMessages, pendingMessages],
-  );
+  const messages = useMemo(() => {
+    // 把 serverMessages 中有 toolCalls 的消息解析成 toolStates，还原文章卡片
+    const restored: PendingMessage[] = serverMessages.map((msg) => {
+      if (msg.role !== 'assistant' || !msg.toolCalls) {
+        return msg;
+      }
+      try {
+        const results: ChatToolResultEvent[] = JSON.parse(msg.toolCalls);
+        const toolStates: MessageToolState[] = results.map((r) => ({
+          callId: r.callId,
+          name: r.name,
+          status: (r.error ? 'error' : 'done') as MessageToolState['status'],
+          result: r,
+        }));
+        return { ...msg, toolStates };
+      } catch {
+        return msg;
+      }
+    });
+    return [...restored, ...pendingMessages];
+  }, [serverMessages, pendingMessages]);
 
   // 发送消息
   const send = useCallback(
@@ -187,7 +204,11 @@ export function useChat(conversationId: number | null) {
                   ...last,
                   toolStates: last.toolStates.map((s) =>
                     s.callId === data.callId
-                      ? { ...s, status: data.error ? 'error' : 'done', result: data }
+                      ? {
+                          ...s,
+                          status: data.error ? 'error' : 'done',
+                          result: data,
+                        }
                       : s,
                   ),
                 };
