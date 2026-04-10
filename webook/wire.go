@@ -25,6 +25,14 @@ var searchProviderSet = wire.NewSet(
 	service.NewArticleSearchService,
 )
 
+// clickEventProviderSet 点击埋点模块
+var clickEventProviderSet = wire.NewSet(
+	dao.NewGormAIClickEventDAO,
+	cache.NewRedisAIClickEventCache,
+	repository.NewCacheAIClickEventRepository,
+	service.NewAIClickEventService,
+)
+
 // chatProviderSet Chat 模块的 Wire Provider 集合（不含 Handler）
 var chatProviderSet = wire.NewSet(
 	ioc.InitLLMConfig,
@@ -36,8 +44,8 @@ var chatProviderSet = wire.NewSet(
 	cache.NewRedisMessageCache,
 	repository.NewCacheConversationRepository,
 	repository.NewCacheMessageRepository,
-	service.NewChatService,
-	service.NewChatToolExecutor,
+	service.NewAIChatService,
+	service.NewAIChatToolExecutor,
 )
 
 func InitWebServer() *gin.Engine {
@@ -74,11 +82,14 @@ func InitWebServer() *gin.Engine {
 		web.NewOAuth2WechatHandler,
 		web.NewInternalChatHandler,
 		web.NewInternalArticleSearchHandler,
+		web.NewAIClickEventHandler,
 		jwt.NewRedisJwtHandler,
 		// chat 模块
 		chatProviderSet,
 		// 搜索模块
 		searchProviderSet,
+		// 点击埋点
+		clickEventProviderSet,
 
 		ioc.InitMiddlewares,
 		ioc.InitWebServer,

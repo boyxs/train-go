@@ -149,6 +149,7 @@ function ChatPage() {
             loading={loading}
             streaming={streaming}
             hasMore={hasMore}
+            conversationId={activeId ?? undefined}
             onSend={send}
             onLoadMore={loadMore}
           />

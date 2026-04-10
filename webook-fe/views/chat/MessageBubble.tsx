@@ -4,19 +4,28 @@ import { LoadingOutlined, UserOutlined } from '@ant-design/icons';
 import { Bot } from 'lucide-react';
 import React from 'react';
 import Markdown from 'react-markdown';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import remarkGfm from 'remark-gfm';
 
+import { recordAIClick } from '@/api/ai';
 import { ArticleCardBlock } from '@/components/chat/ArticleCardBlock';
 import type { PendingMessage } from '@/hooks/useChat';
 import type { MessageToolState } from '@/types/chat';
 
+const ARTICLE_LINK_RE = /\/article\/(\d+)/;
+
 interface MessageBubbleProps {
   message: PendingMessage;
   streaming?: boolean;
+  conversationId?: number;
 }
 
 /** 工具调用状态块（工具执行中或结果卡片） */
-const ToolStateBlock: React.FC<{ state: MessageToolState }> = ({ state }) => {
+const ToolStateBlock: React.FC<{
+  state: MessageToolState;
+  conversationId?: number;
+}> = ({ state, conversationId }) => {
   const toolLabel: Record<string, string> = {
     search_articles: '搜索文章',
     get_hot_articles: '获取热门文章',
@@ -34,9 +43,7 @@ const ToolStateBlock: React.FC<{ state: MessageToolState }> = ({ state }) => {
   }
 
   if (state.status === 'error') {
-    return (
-      <div className='text-xs text-[#EF4444] my-1 px-1'>{label}失败</div>
-    );
+    return <div className='text-xs text-[#EF4444] my-1 px-1'>{label}失败</div>;
   }
 
   const articles = state.result?.articles ?? [];
@@ -44,7 +51,9 @@ const ToolStateBlock: React.FC<{ state: MessageToolState }> = ({ state }) => {
     return null;
   }
 
-  return <ArticleCardBlock articles={articles} />;
+  return (
+    <ArticleCardBlock articles={articles} conversationId={conversationId} />
+  );
 };
 
 /** 三点跳动加载指示器 */
@@ -66,6 +75,7 @@ const TypingDots: React.FC = () => (
 export const MessageBubble: React.FC<MessageBubbleProps> = ({
   message,
   streaming,
+  conversationId,
 }) => {
   const isUser = message.role === 'user';
   const isEmpty = !message.content;
@@ -98,7 +108,11 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           <div className='bg-white border border-[#E5E7EB] px-4 py-3 rounded-2xl rounded-tl-md shadow-sm'>
             {/* 工具调用状态块（running/done/error） */}
             {toolStates.map((state, i) => (
-              <ToolStateBlock key={state.callId || `${state.name}-${i}`} state={state} />
+              <ToolStateBlock
+                key={state.callId || `${state.name}-${i}`}
+                state={state}
+                conversationId={conversationId}
+              />
             ))}
             {streaming && isEmpty && toolStates.length === 0 ? (
               <TypingDots />
@@ -113,10 +127,44 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                         target='_blank'
                         rel='noopener noreferrer'
                         {...props}
+                        onClick={() => {
+                          const match = href?.match(ARTICLE_LINK_RE);
+                          if (match && conversationId) {
+                            recordAIClick({
+                              article_id: Number(match[1]),
+                              conversation_id: conversationId,
+                            }).catch(() => {});
+                          }
+                        }}
                       >
                         {children}
                       </a>
                     ),
+                    code: ({ className, children, ...props }) => {
+                      const match = /language-(\w+)/.exec(className || '');
+                      const code = String(children).replace(/\n$/, '');
+                      if (match) {
+                        return (
+                          <SyntaxHighlighter
+                            style={oneDark}
+                            language={match[1]}
+                            PreTag='div'
+                            customStyle={{
+                              margin: 0,
+                              borderRadius: '8px',
+                              fontSize: '13px',
+                            }}
+                          >
+                            {code}
+                          </SyntaxHighlighter>
+                        );
+                      }
+                      return (
+                        <code className={className} {...props}>
+                          {children}
+                        </code>
+                      );
+                    },
                   }}
                 >
                   {message.content || ''}

@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  BarChartOutlined,
   EditOutlined,
   FileTextOutlined,
   HomeOutlined,
@@ -25,6 +26,7 @@ const menuItems: MenuProps['items'] = [
   { key: '/article/edit', icon: <EditOutlined />, label: '写文章' },
   { key: '/search', icon: <SearchOutlined />, label: '搜索' },
   { key: '/chat', icon: <Bot size={14} />, label: 'AI 客服' },
+  { key: '/dashboard/ai', icon: <BarChartOutlined />, label: 'AI 看板' },
 ];
 
 export const Header: React.FC = () => {

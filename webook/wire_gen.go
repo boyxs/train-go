@@ -71,12 +71,17 @@ func InitWebServer() *gin.Engine {
 	messageRepository := repository.NewCacheMessageRepository(messageDAO, messageCache, loggerX)
 	llmConfig := ioc.InitLLMConfig()
 	llmClient := ioc.InitLLMClient(llmConfig, loggerX)
-	toolExecutor := service.NewChatToolExecutor(articleSearchService, articleReaderService, interactionRepository, loggerX)
-	chatService := service.NewChatService(conversationRepository, messageRepository, llmClient, articleSearchService, toolExecutor, loggerX)
+	toolExecutor := service.NewAIChatToolExecutor(articleSearchService, articleReaderService, interactionRepository, loggerX)
+	chatService := service.NewAIChatService(conversationRepository, messageRepository, llmClient, articleSearchService, toolExecutor, loggerX)
 	limiter := ioc.InitChatLimiter(cmdable)
 	chatHandler := web.NewInternalChatHandler(chatService, loggerX, limiter)
 	articleSearchHandler := web.NewInternalArticleSearchHandler(articleSearchService, loggerX)
-	engine := ioc.InitWebServer(v, userHandler, articleAuthorHandler, articleReaderHandler, interactionHandler, oAuth2Handler, chatHandler, articleSearchHandler)
+	clickEventDAO := dao.NewGormAIClickEventDAO(db)
+	clickEventCache := cache.NewRedisAIClickEventCache(cmdable)
+	clickEventRepository := repository.NewCacheAIClickEventRepository(clickEventDAO, clickEventCache, loggerX)
+	clickEventService := service.NewAIClickEventService(clickEventRepository)
+	clickEventHandler := web.NewAIClickEventHandler(clickEventService, loggerX)
+	engine := ioc.InitWebServer(v, userHandler, articleAuthorHandler, articleReaderHandler, interactionHandler, oAuth2Handler, chatHandler, articleSearchHandler, clickEventHandler)
 	return engine
 }
 
@@ -85,5 +90,8 @@ func InitWebServer() *gin.Engine {
 // searchProviderSet 搜索模块的 Wire Provider 集合（不含 Handler）
 var searchProviderSet = wire.NewSet(ioc.InitESClient, ioc.InitOllamaEmbeddingConfig, ioc.InitEmbeddingConfig, ioc.InitEmbeddingClient, dao.NewElasticArticleDAO, repository.NewESArticleSearchRepository, service.NewArticleSearchService)
 
+// clickEventProviderSet 点击埋点模块
+var clickEventProviderSet = wire.NewSet(dao.NewGormAIClickEventDAO, cache.NewRedisAIClickEventCache, repository.NewCacheAIClickEventRepository, service.NewAIClickEventService)
+
 // chatProviderSet Chat 模块的 Wire Provider 集合（不含 Handler）
-var chatProviderSet = wire.NewSet(ioc.InitLLMConfig, ioc.InitLLMClient, ioc.InitChatLimiter, dao.NewGormConversationDAO, dao.NewGormMessageDAO, cache.NewRedisConversationCache, cache.NewRedisMessageCache, repository.NewCacheConversationRepository, repository.NewCacheMessageRepository, service.NewChatService, service.NewChatToolExecutor)
+var chatProviderSet = wire.NewSet(ioc.InitLLMConfig, ioc.InitLLMClient, ioc.InitChatLimiter, dao.NewGormConversationDAO, dao.NewGormMessageDAO, cache.NewRedisConversationCache, cache.NewRedisMessageCache, repository.NewCacheConversationRepository, repository.NewCacheMessageRepository, service.NewAIChatService, service.NewAIChatToolExecutor)

@@ -18,3 +18,9 @@ export type {
   ChatDoneEvent,
   ChatErrorEvent,
 } from './chat';
+export type {
+  AIClickReq,
+  AIClickDashboard,
+  DailyTrend,
+  TopArticle,
+} from './ai';
