@@ -38,6 +38,7 @@
 - DAO 内手动赋时间：`time.Now().UnixMilli()`
 - 软删除：`DeletedAt soft_delete.DeletedAt \`gorm:"softDelete:milli"\``
 - 新建表 `deleted_at` 列必须 `bigint NOT NULL DEFAULT 0`
+- **给已有表加 `deleted_at` 列后**，必须手动执行 `UPDATE table SET deleted_at = 0 WHERE deleted_at IS NULL` + `ALTER TABLE MODIFY deleted_at bigint NOT NULL DEFAULT 0`，GORM AutoMigrate 不会自动处理已有行的 NULL 值
 
 ## 6. 缓存规则
 
@@ -52,3 +53,13 @@
 - 列表/分页查询用 `.Select()` 指定字段，排除大字段（Content BLOB）
 - 权限校验尽量合并到 UPDATE/DELETE 的 WHERE 条件中，避免先 SELECT 再 UPDATE 的 N+1 模式
 - 批量查询（如列表页查互动数据）优先走缓存，miss 再查 DB
+
+## 8. Go 类型命名
+
+- **所有 struct 必须导出（大写开头）**，禁止小写未导出的 struct 实现接口
+- **接口用最通用的名字，实现用 `{技术}{业务}{领域}{层}` 组合前缀**：
+  - 技术前缀描述实现方式：`Gorm`、`Redis`、`Cache`、`ES`
+  - 业务前缀描述所属业务：`AI`、`Search` 等
+  - 两者可组合，不同业务各自有独立的全链路实现
+  - 例：`AIClickEventService`、`CacheAIClickEventRepository`、`GormAIClickEventDAO`、`RedisAIClickEventCache`
+- 领域命名要通用化，不要绑定单一来源。例如点击追踪不叫 `AIClick`（只有 AI 场景），叫 `ClickEvent`（通用） + `Source` 字段区分来源

@@ -139,9 +139,9 @@ func (s *ChatSuite) TestListConversations() {
 	// 验证按 updatedAt DESC 排序：第一条的 updatedAt 应该最大
 	first := result.Data[0]
 	last := result.Data[2]
-	firstTime, _ := time.Parse(time.RFC3339Nano, first["updatedAt"].(string))
-	lastTime, _ := time.Parse(time.RFC3339Nano, last["updatedAt"].(string))
-	s.True(firstTime.After(lastTime) || firstTime.Equal(lastTime))
+	firstUpdated := int64(first["updatedAt"].(float64))
+	lastUpdated := int64(last["updatedAt"].(float64))
+	s.GreaterOrEqual(firstUpdated, lastUpdated)
 }
 
 func (s *ChatSuite) TestListConversations_Empty() {
@@ -253,9 +253,9 @@ func (s *ChatSuite) TestListMessages() {
 	// 验证按 createdAt ASC 排序
 	first := result.Data[0]
 	last := result.Data[2]
-	firstTime, _ := time.Parse(time.RFC3339Nano, first["createdAt"].(string))
-	lastTime, _ := time.Parse(time.RFC3339Nano, last["createdAt"].(string))
-	s.True(firstTime.Before(lastTime) || firstTime.Equal(lastTime))
+	firstCreated := int64(first["createdAt"].(float64))
+	lastCreated := int64(last["createdAt"].(float64))
+	s.LessOrEqual(firstCreated, lastCreated)
 }
 
 func (s *ChatSuite) TestListMessages_NotOwner() {
