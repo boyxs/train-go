@@ -30,6 +30,11 @@ mockgen:
 	@mockgen -source=./internal/repository/chat_message.go -package=repomocks -destination=./internal/repository/mocks/chat_message_mock.go
 	@mockgen -source=./internal/repository/interaction.go -package=repomocks -destination=./internal/repository/mocks/interaction_mock.go
 	@mockgen -source=./internal/service/chat_tools.go -package=svcmocks -destination=./internal/service/mocks/chat_tools_mock.go
+	#click event
+	@mockgen -source=./internal/repository/dao/click_event.go -package=daomocks -destination=./internal/repository/dao/mocks/click_event_mock.go
+	@mockgen -source=./internal/repository/cache/click_event.go -package=cachemocks -destination=./internal/repository/cache/mocks/click_event_mock.go
+	@mockgen -source=./internal/repository/click_event.go -package=repomocks -destination=./internal/repository/mocks/click_event_mock.go
+	@mockgen -source=./internal/service/click_event.go -package=svcmocks -destination=./internal/service/mocks/click_event_mock.go
 	#ai
 	@mockgen -source=./internal/service/ai/llm.go -package=aimocks -destination=./internal/service/ai/mocks/llm_mock.go
 	#embedding

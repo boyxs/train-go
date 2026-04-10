@@ -23,4 +23,8 @@ const (
 	ChatRateLimitPattern = "chat:ratelimit:%d" // chat:ratelimit:{uid}
 
 	EmbeddingCachePattern = "embedding:cache:%s" // embedding:cache:{textHash}
+
+	ClickEventDashboardKey = "click:event:ai:dashboard" // AI 点击看板缓存
 )
+
+var ClickEventDashboardTTL = 10 * time.Minute

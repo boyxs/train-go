@@ -14,6 +14,7 @@ interface ChatMessagesProps {
   loading: boolean;
   streaming: boolean;
   hasMore?: boolean;
+  conversationId?: number;
   onSend?: (content: string) => void;
   onLoadMore?: () => void;
 }
@@ -23,6 +24,7 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
   loading,
   streaming,
   hasMore,
+  conversationId,
   onSend,
   onLoadMore,
 }) => {
@@ -154,6 +156,7 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
           streaming={
             streaming && msg.role === 'assistant' && idx === messages.length - 1
           }
+          conversationId={conversationId}
         />
       ))}
     </div>

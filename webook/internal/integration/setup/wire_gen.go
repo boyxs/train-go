@@ -67,12 +67,17 @@ func InitWebServer() *gin.Engine {
 	messageRepository := repository.NewCacheMessageRepository(messageDAO, messageCache, loggerX)
 	llmConfig := ioc.InitLLMConfig()
 	llmClient := ioc.InitLLMClient(llmConfig, loggerX)
-	toolExecutor := service.NewChatToolExecutor(articleSearchService, articleReaderService, interactionRepository, loggerX)
-	chatService := service.NewChatService(conversationRepository, messageRepository, llmClient, articleSearchService, toolExecutor, loggerX)
+	toolExecutor := service.NewAIChatToolExecutor(articleSearchService, articleReaderService, interactionRepository, loggerX)
+	chatService := service.NewAIChatService(conversationRepository, messageRepository, llmClient, articleSearchService, toolExecutor, loggerX)
 	limiter := ioc.InitChatLimiter(cmdable)
 	chatHandler := web.NewInternalChatHandler(chatService, loggerX, limiter)
 	articleSearchHandler := web.NewInternalArticleSearchHandler(articleSearchService, loggerX)
-	engine := ioc.InitWebServer(v, userHandler, articleAuthorHandler, articleReaderHandler, interactionHandler, oAuth2Handler, chatHandler, articleSearchHandler)
+	clickEventDAO := dao.NewGormAIClickEventDAO(db)
+	clickEventCache := cache.NewRedisAIClickEventCache(cmdable)
+	clickEventRepository := repository.NewCacheAIClickEventRepository(clickEventDAO, clickEventCache, loggerX)
+	clickEventService := service.NewAIClickEventService(clickEventRepository)
+	clickEventHandler := web.NewAIClickEventHandler(clickEventService, loggerX)
+	engine := ioc.InitWebServer(v, userHandler, articleAuthorHandler, articleReaderHandler, interactionHandler, oAuth2Handler, chatHandler, articleSearchHandler, clickEventHandler)
 	return engine
 }
 
@@ -129,6 +134,18 @@ func InitInteractionHandler() web.InteractionHandler {
 	return interactionHandler
 }
 
+func InitClickEventHandler() web.ClickEventHandler {
+	db := InitDB()
+	clickEventDAO := dao.NewGormAIClickEventDAO(db)
+	cmdable := InitRedis()
+	clickEventCache := cache.NewRedisAIClickEventCache(cmdable)
+	loggerX := InitLogger()
+	clickEventRepository := repository.NewCacheAIClickEventRepository(clickEventDAO, clickEventCache, loggerX)
+	clickEventService := service.NewAIClickEventService(clickEventRepository)
+	clickEventHandler := web.NewAIClickEventHandler(clickEventService, loggerX)
+	return clickEventHandler
+}
+
 func InitChatHandler() web.ChatHandler {
 	db := InitDB()
 	conversationDAO := dao.NewGormConversationDAO(db)
@@ -155,8 +172,8 @@ func InitChatHandler() web.ChatHandler {
 	interactionDAO := dao.NewGormInteractionDAO(db)
 	interactionCache := cache.NewRedisInteractionCache(cmdable)
 	interactionRepository := repository.NewCacheInteractionRepository(interactionDAO, interactionCache, loggerX)
-	toolExecutor := service.NewChatToolExecutor(articleSearchService, articleReaderService, interactionRepository, loggerX)
-	chatService := service.NewChatService(conversationRepository, messageRepository, llmClient, articleSearchService, toolExecutor, loggerX)
+	toolExecutor := service.NewAIChatToolExecutor(articleSearchService, articleReaderService, interactionRepository, loggerX)
+	chatService := service.NewAIChatService(conversationRepository, messageRepository, llmClient, articleSearchService, toolExecutor, loggerX)
 	limiter := ioc.InitChatLimiter(cmdable)
 	chatHandler := web.NewInternalChatHandler(chatService, loggerX, limiter)
 	return chatHandler
@@ -182,4 +199,6 @@ var articleReaderSvcProvider = wire.NewSet(dao.NewGormArticleReaderDAO, cache.Ne
 
 var interactionSvcProvider = wire.NewSet(dao.NewGormInteractionDAO, cache.NewRedisInteractionCache, repository.NewCacheInteractionRepository, service.NewInternalInteractionService)
 
-var chatSvcProvider = wire.NewSet(ioc.InitLLMConfig, ioc.InitLLMClient, ioc.InitChatLimiter, dao.NewGormConversationDAO, dao.NewGormMessageDAO, cache.NewRedisConversationCache, cache.NewRedisMessageCache, repository.NewCacheConversationRepository, repository.NewCacheMessageRepository, service.NewChatService, service.NewChatToolExecutor)
+var clickEventSvcProvider = wire.NewSet(dao.NewGormAIClickEventDAO, cache.NewRedisAIClickEventCache, repository.NewCacheAIClickEventRepository, service.NewAIClickEventService)
+
+var chatSvcProvider = wire.NewSet(ioc.InitLLMConfig, ioc.InitLLMClient, ioc.InitChatLimiter, dao.NewGormConversationDAO, dao.NewGormMessageDAO, cache.NewRedisConversationCache, cache.NewRedisMessageCache, repository.NewCacheConversationRepository, repository.NewCacheMessageRepository, service.NewAIChatService, service.NewAIChatToolExecutor)

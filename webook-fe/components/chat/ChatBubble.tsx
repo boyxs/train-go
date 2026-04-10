@@ -170,6 +170,7 @@ export const ChatBubble: React.FC = () => {
               loading={loading}
               streaming={streaming}
               hasMore={hasMore}
+              conversationId={activeId ?? undefined}
               onSend={send}
               onLoadMore={loadMore}
             />

@@ -10,6 +10,7 @@
     "lint:fix": "eslint \"{app,api,types,constants,hooks,utils,components,views}/**/*.{ts,tsx}\" --fix"
   },
   "dependencies": {
+    "@ant-design/charts": "^2.6.7",
     "@ant-design/cssinjs": "^1.24.0",
     "@ant-design/icons": "^5.6.1",
     "@ant-design/nextjs-registry": "^1.3.0",
@@ -23,6 +24,7 @@
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-markdown": "^10.1.0",
+    "react-syntax-highlighter": "^16.1.1",
     "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
@@ -31,6 +33,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/react-syntax-highlighter": "^15.5.13",
     "@typescript-eslint/eslint-plugin": "^8.57.2",
     "@typescript-eslint/parser": "^8.57.2",
     "eslint": "^9",

@@ -186,6 +186,24 @@ CREATE TABLE IF NOT EXISTS `message` (
   INDEX `idx_conv_created` (`conversation_id` ASC, `created_at` ASC) USING BTREE
 ) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
 
+-- ----------------------------
+-- Table structure for ai_click_events (AI 点击埋点)
+-- ----------------------------
+CREATE TABLE IF NOT EXISTS `ai_click_events` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `user_id` bigint NOT NULL,
+  `article_id` bigint NOT NULL,
+  `conversation_id` bigint NOT NULL,
+  `source` varchar(32) NOT NULL DEFAULT 'ai_chat',
+  `created_at` bigint NOT NULL DEFAULT 0,
+  `updated_at` bigint NOT NULL DEFAULT 0,
+  `deleted_at` bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE INDEX `uk_dedup` (`user_id` ASC, `article_id` ASC, `conversation_id` ASC, `source` ASC) USING BTREE,
+  INDEX `idx_article` (`article_id` ASC) USING BTREE,
+  INDEX `idx_created` (`created_at` ASC) USING BTREE
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
+
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- ============================================================
@@ -236,3 +254,10 @@ SELECT id, conversation_id, role,
   LEFT(content, 100) AS content_preview,
   FROM_UNIXTIME(created_at / 1000) AS created_at
 FROM message;
+
+CREATE OR REPLACE VIEW v_ai_click_events AS
+SELECT id, user_id, article_id, conversation_id, source,
+  FROM_UNIXTIME(created_at / 1000) AS created_at,
+  FROM_UNIXTIME(updated_at / 1000) AS updated_at
+FROM ai_click_events
+WHERE deleted_at = 0;

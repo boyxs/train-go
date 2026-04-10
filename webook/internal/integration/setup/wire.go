@@ -39,7 +39,10 @@ func InitWebServer() *gin.Engine {
 		web.NewOAuth2WechatHandler,
 		web.NewInternalChatHandler,
 		web.NewInternalArticleSearchHandler,
+		web.NewAIClickEventHandler,
 		jwt.NewRedisJwtHandler,
+		// 点击埋点
+		clickEventSvcProvider,
 
 		ioc.InitMiddlewares,
 		ioc.InitWebServer,
@@ -72,6 +75,15 @@ func InitInteractionHandler() web.InteractionHandler {
 		web.NewInternalInteractionHandler,
 	)
 	return &web.InternalInteractionHandler{}
+}
+
+func InitClickEventHandler() web.ClickEventHandler {
+	wire.Build(
+		infraSvcProvider,
+		clickEventSvcProvider,
+		web.NewAIClickEventHandler,
+	)
+	return &web.AIClickEventHandler{}
 }
 
 func InitChatHandler() web.ChatHandler {
@@ -135,6 +147,13 @@ var interactionSvcProvider = wire.NewSet(
 	service.NewInternalInteractionService,
 )
 
+var clickEventSvcProvider = wire.NewSet(
+	dao.NewGormAIClickEventDAO,
+	cache.NewRedisAIClickEventCache,
+	repository.NewCacheAIClickEventRepository,
+	service.NewAIClickEventService,
+)
+
 var chatSvcProvider = wire.NewSet(
 	ioc.InitLLMConfig,
 	ioc.InitLLMClient,
@@ -145,6 +164,6 @@ var chatSvcProvider = wire.NewSet(
 	cache.NewRedisMessageCache,
 	repository.NewCacheConversationRepository,
 	repository.NewCacheMessageRepository,
-	service.NewChatService,
-	service.NewChatToolExecutor,
+	service.NewAIChatService,
+	service.NewAIChatToolExecutor,
 )
