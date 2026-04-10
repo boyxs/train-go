@@ -149,22 +149,22 @@ export function sendMessageSSE(
                   callbacks.onDelta(data.content);
                   break;
                 case 'tool_call':
-                  callbacks.onToolCall?.(data);
+                  callbacks.onToolCall?.(data.data ?? data);
                   break;
                 case 'tool_result':
-                  callbacks.onToolResult?.(data);
+                  callbacks.onToolResult?.(data.data ?? data);
                   break;
                 case 'done':
                   if (streamTimer) {
                     clearTimeout(streamTimer);
                   }
-                  callbacks.onDone(data);
+                  callbacks.onDone(data.data ?? data);
                   return;
                 case 'error':
                   if (streamTimer) {
                     clearTimeout(streamTimer);
                   }
-                  callbacks.onError(data);
+                  callbacks.onError(data.data ?? data);
                   return;
               }
             } catch {

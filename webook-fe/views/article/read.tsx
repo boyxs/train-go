@@ -127,7 +127,17 @@ function ArticleReadPage({ articleId }: ArticleReadProps) {
         <div className='flex-1 overflow-auto'>
           <div className='max-w-3xl mx-auto px-4 py-16'>
             <Empty description='文章不存在或已被撤回'>
-              <Button onClick={() => router.back()}>返回</Button>
+              <Button
+                onClick={() => {
+                  if (window.history.length > 1) {
+                    router.back();
+                  } else {
+                    router.push('/');
+                  }
+                }}
+              >
+                返回
+              </Button>
             </Empty>
           </div>
         </div>

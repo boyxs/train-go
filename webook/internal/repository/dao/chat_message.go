@@ -10,6 +10,8 @@ type MessageDAO interface {
 	Insert(ctx context.Context, msg Message) (Message, error)
 	// ListRecent 获取最新 limit 条（初始加载），返回按 created_at ASC
 	ListRecent(ctx context.Context, convId int64, limit int) ([]Message, error)
+	// ListRecentLite 同 ListRecent 但排除 tool_calls 字段，用于构建 prompt
+	ListRecentLite(ctx context.Context, convId int64, limit int) ([]Message, error)
 	// ListBefore 获取 id < beforeId 的 limit 条（上滑加载更早），返回按 created_at ASC
 	ListBefore(ctx context.Context, convId int64, beforeId int64, limit int) ([]Message, error)
 	// ListAll 获取全部消息（buildPrompt 用）
@@ -42,6 +44,21 @@ func (d *GormMessageDAO) ListRecent(ctx context.Context, convId int64, limit int
 		return nil, err
 	}
 	// 反转为 ASC 顺序
+	reverse(msgs)
+	return msgs, nil
+}
+
+func (d *GormMessageDAO) ListRecentLite(ctx context.Context, convId int64, limit int) ([]Message, error) {
+	var msgs []Message
+	err := d.db.WithContext(ctx).
+		Select("id, conversation_id, role, content, token_used, created_at").
+		Where("conversation_id = ?", convId).
+		Order("id DESC").
+		Limit(limit).
+		Find(&msgs).Error
+	if err != nil {
+		return nil, err
+	}
 	reverse(msgs)
 	return msgs, nil
 }

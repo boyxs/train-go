@@ -72,7 +72,7 @@ func TestChatService_SendMessage(t *testing.T) {
 					Return(domain.Conversation{Id: 1, UserId: 1}, nil)
 				msgRepo.EXPECT().Insert(gomock.Any(), gomock.Any()).
 					Return(domain.Message{Id: 1}, nil)
-				msgRepo.EXPECT().ListRecent(gomock.Any(), int64(1), maxHistoryRounds*2).
+				msgRepo.EXPECT().ListRecentLite(gomock.Any(), int64(1), maxHistoryRounds*2).
 					Return([]domain.Message{{Role: "user", Content: "hello"}}, nil)
 				// RAG 检索（正常返回空）
 				search.EXPECT().Search(gomock.Any(), "hello", 1, ragTopK).
@@ -91,7 +91,7 @@ func TestChatService_SendMessage(t *testing.T) {
 			defer ctrl.Finish()
 
 			convRepo, msgRepo, llm, search := tc.mock(ctrl)
-			svc := NewChatService(convRepo, msgRepo, llm, search, nil, logger.NewNopLogger())
+			svc := NewAIChatService(convRepo, msgRepo, llm, search, nil, logger.NewNopLogger())
 
 			_, err := svc.SendMessage(context.Background(), tc.uid, tc.convId, tc.content)
 			if tc.wantErr != nil {
@@ -125,7 +125,7 @@ func TestChatService_RunStream_TextOnly(t *testing.T) {
 	// UpdateTitle
 	convRepo.EXPECT().UpdateTitle(gomock.Any(), int64(1), int64(1), gomock.Any()).Return(nil)
 
-	svc := &chatService{
+	svc := &AIChatService{
 		convRepo: convRepo,
 		msgRepo:  msgRepo,
 		llm:      llm,
@@ -174,7 +174,7 @@ func TestChatService_RunStream_CtxCancel(t *testing.T) {
 	msgRepo.EXPECT().ListRecent(gomock.Any(), int64(1), 3).
 		Return([]domain.Message{{}, {}, {}}, nil) // 3 条 → 非首轮，不更新标题
 
-	svc := &chatService{
+	svc := &AIChatService{
 		convRepo: convRepo,
 		msgRepo:  msgRepo,
 		llm:      llm,
@@ -228,7 +228,7 @@ func TestChatService_RunStream_Error(t *testing.T) {
 	msgRepo.EXPECT().ListRecent(gomock.Any(), int64(1), 3).
 		Return([]domain.Message{{}, {}, {}}, nil)
 
-	svc := &chatService{
+	svc := &AIChatService{
 		convRepo: convRepo,
 		msgRepo:  msgRepo,
 		llm:      llm,
@@ -263,7 +263,7 @@ func TestChatService_RunStream_ErrorNoContent(t *testing.T) {
 	llm := aimocks.NewMockLLMClient(ctrl)
 	// 不应调用 Insert（空内容不保存）
 
-	svc := &chatService{
+	svc := &AIChatService{
 		convRepo: convRepo,
 		msgRepo:  msgRepo,
 		llm:      llm,
@@ -300,7 +300,7 @@ func TestChatService_SendMessage_RAGWithArticles(t *testing.T) {
 		Return(domain.Conversation{Id: 1, UserId: 1}, nil)
 	msgRepo.EXPECT().Insert(gomock.Any(), gomock.Any()).
 		Return(domain.Message{Id: 1}, nil)
-	msgRepo.EXPECT().ListRecent(gomock.Any(), int64(1), maxHistoryRounds*2).
+	msgRepo.EXPECT().ListRecentLite(gomock.Any(), int64(1), maxHistoryRounds*2).
 		Return([]domain.Message{{Role: "user", Content: "Go并发怎么写"}}, nil)
 
 	// RAG 返回 2 篇文章
@@ -328,7 +328,7 @@ func TestChatService_SendMessage_RAGWithArticles(t *testing.T) {
 			return ch, nil
 		})
 
-	svc := NewChatService(convRepo, msgRepo, llm, search, nil, logger.NewNopLogger())
+	svc := NewAIChatService(convRepo, msgRepo, llm, search, nil, logger.NewNopLogger())
 	_, err := svc.SendMessage(context.Background(), 1, 1, "Go并发怎么写")
 	assert.NoError(t, err)
 }
@@ -347,7 +347,7 @@ func TestChatService_SendMessage_RAGNoResults(t *testing.T) {
 		Return(domain.Conversation{Id: 1, UserId: 1}, nil)
 	msgRepo.EXPECT().Insert(gomock.Any(), gomock.Any()).
 		Return(domain.Message{Id: 1}, nil)
-	msgRepo.EXPECT().ListRecent(gomock.Any(), int64(1), maxHistoryRounds*2).
+	msgRepo.EXPECT().ListRecentLite(gomock.Any(), int64(1), maxHistoryRounds*2).
 		Return([]domain.Message{{Role: "user", Content: "你好"}}, nil)
 
 	// 检索无结果
@@ -367,7 +367,7 @@ func TestChatService_SendMessage_RAGNoResults(t *testing.T) {
 			return ch, nil
 		})
 
-	svc := NewChatService(convRepo, msgRepo, llm, search, nil, logger.NewNopLogger())
+	svc := NewAIChatService(convRepo, msgRepo, llm, search, nil, logger.NewNopLogger())
 	_, err := svc.SendMessage(context.Background(), 1, 1, "你好")
 	assert.NoError(t, err)
 }
@@ -386,11 +386,11 @@ func TestChatService_SendMessage_RAGSearchFail(t *testing.T) {
 		Return(domain.Conversation{Id: 1, UserId: 1}, nil)
 	msgRepo.EXPECT().Insert(gomock.Any(), gomock.Any()).
 		Return(domain.Message{Id: 1}, nil)
-	msgRepo.EXPECT().ListRecent(gomock.Any(), int64(1), maxHistoryRounds*2).
-		Return([]domain.Message{{Role: "user", Content: "文章推荐"}}, nil)
+	msgRepo.EXPECT().ListRecentLite(gomock.Any(), int64(1), maxHistoryRounds*2).
+		Return([]domain.Message{{Role: "user", Content: "Go怎么写测试"}}, nil)
 
-	// 检索失败
-	search.EXPECT().Search(gomock.Any(), "文章推荐", 1, ragTopK).
+	// 检索失败（知识类问题走 RAG）
+	search.EXPECT().Search(gomock.Any(), "Go怎么写测试", 1, ragTopK).
 		Return(nil, int64(0), errors.New("ES connection refused"))
 
 	// 即使检索失败，LLM 仍被调用（降级为无 RAG）
@@ -403,13 +403,13 @@ func TestChatService_SendMessage_RAGSearchFail(t *testing.T) {
 			return ch, nil
 		})
 
-	svc := NewChatService(convRepo, msgRepo, llm, search, nil, logger.NewNopLogger())
-	_, err := svc.SendMessage(context.Background(), 1, 1, "文章推荐")
+	svc := NewAIChatService(convRepo, msgRepo, llm, search, nil, logger.NewNopLogger())
+	_, err := svc.SendMessage(context.Background(), 1, 1, "Go怎么写测试")
 	assert.NoError(t, err)
 }
 
 func TestInjectArticleContext(t *testing.T) {
-	svc := &chatService{}
+	svc := &AIChatService{}
 	messages := []ai.ChatMessage{
 		{Role: "system", Content: "你是助手"},
 		{Role: "user", Content: "有什么好文章"},
@@ -430,14 +430,14 @@ func TestInjectArticleContext(t *testing.T) {
 	assert.Equal(t, "user", result[2].Role)
 }
 
-// mockToolExecutor 简单的测试用 ToolExecutor
-type mockToolExecutor struct {
+// MockToolExecutor 简单的测试用 ToolExecutor
+type MockToolExecutor struct {
 	defs    []ai.Tool
 	results map[string]domain.ToolResultData
 }
 
-func (m *mockToolExecutor) Definitions() []ai.Tool { return m.defs }
-func (m *mockToolExecutor) Execute(_ context.Context, _ int64, name string, _ map[string]any) (domain.ToolResultData, error) {
+func (m *MockToolExecutor) Definitions() []ai.Tool { return m.defs }
+func (m *MockToolExecutor) Execute(_ context.Context, _ int64, name string, _ map[string]any) (domain.ToolResultData, error) {
 	if r, ok := m.results[name]; ok {
 		return r, nil
 	}
@@ -453,7 +453,7 @@ func TestChatService_RunStream_WithToolCall(t *testing.T) {
 	convRepo := repomocks.NewMockConversationRepository(ctrl)
 	llm := aimocks.NewMockLLMClient(ctrl)
 
-	executor := &mockToolExecutor{
+	executor := &MockToolExecutor{
 		defs: []ai.Tool{{Name: "get_hot_articles"}},
 		results: map[string]domain.ToolResultData{
 			"get_hot_articles": {
@@ -495,7 +495,7 @@ func TestChatService_RunStream_WithToolCall(t *testing.T) {
 		Return([]domain.Message{{}, {}}, nil)
 	convRepo.EXPECT().UpdateTitle(gomock.Any(), int64(1), int64(1), gomock.Any()).Return(nil)
 
-	svc := &chatService{
+	svc := &AIChatService{
 		convRepo: convRepo,
 		msgRepo:  msgRepo,
 		llm:      llm,

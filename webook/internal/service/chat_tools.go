@@ -57,7 +57,7 @@ var chatToolDefinitions = []ai.Tool{
 	},
 }
 
-// ToolExecutor 工具执行器，供 chatService 调用
+// ToolExecutor 工具执行器，供 AIChatService 调用
 type ToolExecutor interface {
 	// Definitions 返回传给 LLM 的工具定义列表
 	Definitions() []ai.Tool
@@ -65,21 +65,21 @@ type ToolExecutor interface {
 	Execute(ctx context.Context, uid int64, name string, args map[string]any) (domain.ToolResultData, error)
 }
 
-// chatToolExecutor 实现 ToolExecutor，封装 3 个工具
-type chatToolExecutor struct {
+// AIChatToolExecutor 实现 ToolExecutor，封装 3 个工具
+type AIChatToolExecutor struct {
 	search  ArticleSearchService
 	reader  ArticleReaderService
 	intrRepo repository.InteractionRepository
 	l       logger.LoggerX
 }
 
-func NewChatToolExecutor(
+func NewAIChatToolExecutor(
 	search ArticleSearchService,
 	reader ArticleReaderService,
 	intrRepo repository.InteractionRepository,
 	l logger.LoggerX,
 ) ToolExecutor {
-	return &chatToolExecutor{
+	return &AIChatToolExecutor{
 		search:   search,
 		reader:   reader,
 		intrRepo: intrRepo,
@@ -87,11 +87,11 @@ func NewChatToolExecutor(
 	}
 }
 
-func (e *chatToolExecutor) Definitions() []ai.Tool {
+func (e *AIChatToolExecutor) Definitions() []ai.Tool {
 	return chatToolDefinitions
 }
 
-func (e *chatToolExecutor) Execute(ctx context.Context, uid int64, name string, args map[string]any) (domain.ToolResultData, error) {
+func (e *AIChatToolExecutor) Execute(ctx context.Context, uid int64, name string, args map[string]any) (domain.ToolResultData, error) {
 	switch name {
 	case "search_articles":
 		return e.searchArticles(ctx, args)
@@ -104,7 +104,7 @@ func (e *chatToolExecutor) Execute(ctx context.Context, uid int64, name string, 
 	}
 }
 
-func (e *chatToolExecutor) searchArticles(ctx context.Context, args map[string]any) (domain.ToolResultData, error) {
+func (e *AIChatToolExecutor) searchArticles(ctx context.Context, args map[string]any) (domain.ToolResultData, error) {
 	query, _ := args["query"].(string)
 	if query == "" {
 		return domain.ToolResultData{Name: "search_articles", Error: "缺少搜索关键词"}, nil
@@ -120,7 +120,7 @@ func (e *chatToolExecutor) searchArticles(ctx context.Context, args map[string]a
 	}, nil
 }
 
-func (e *chatToolExecutor) getHotArticles(ctx context.Context, args map[string]any) (domain.ToolResultData, error) {
+func (e *AIChatToolExecutor) getHotArticles(ctx context.Context, args map[string]any) (domain.ToolResultData, error) {
 	limit := parseLimit(args, 5)
 	ids, err := e.intrRepo.ListHotBizIds(ctx, "article", limit)
 	if err != nil {
@@ -147,7 +147,7 @@ func (e *chatToolExecutor) getHotArticles(ctx context.Context, args map[string]a
 	return domain.ToolResultData{Name: "get_hot_articles", Articles: cards}, nil
 }
 
-func (e *chatToolExecutor) getMyFavorites(ctx context.Context, uid int64, args map[string]any) (domain.ToolResultData, error) {
+func (e *AIChatToolExecutor) getMyFavorites(ctx context.Context, uid int64, args map[string]any) (domain.ToolResultData, error) {
 	limit := parseLimit(args, 5)
 	ids, err := e.intrRepo.ListCollectedBizIds(ctx, uid, "article", limit)
 	if err != nil {
