@@ -41,6 +41,10 @@ func (s *InteractionSuite) SetupSuite() {
 	s.server = server
 }
 
+func (s *InteractionSuite) SetupTest() {
+	s.truncate("published_article", "interaction", "user_interaction")
+}
+
 func (s *InteractionSuite) TearDownTest() {
 	s.truncate("published_article", "interaction", "user_interaction")
 }
@@ -50,11 +54,13 @@ func (s *InteractionSuite) truncate(tables ...string) {
 		err := s.db.Exec("TRUNCATE TABLE " + table).Error
 		assert.NoError(s.T(), err)
 	}
-	// 清理 Redis 中所有 interaction 缓存
 	ctx := context.Background()
-	keys, _ := s.cmd.Keys(ctx, "interaction:*").Result()
-	if len(keys) > 0 {
-		s.cmd.Del(ctx, keys...)
+	// 清理 Redis 中 interaction 和 article 缓存
+	for _, pattern := range []string{"interaction:*", "article:*"} {
+		keys, _ := s.cmd.Keys(ctx, pattern).Result()
+		if len(keys) > 0 {
+			s.cmd.Del(ctx, keys...)
+		}
 	}
 }
 
@@ -137,8 +143,8 @@ func (s *InteractionSuite) TestInteraction_ReadReport() {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			s.truncate("published_article", "interaction", "user_interaction")
 			tc.before(t)
-			defer s.truncate("published_article", "interaction", "user_interaction")
 
 			for i := 0; i < tc.viewTimes; i++ {
 				recorder := s.postJSON("/interaction/view", tc.req)
@@ -211,8 +217,8 @@ func (s *InteractionSuite) TestInteraction_ReaderDetailReadCnt() {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			s.truncate("published_article", "interaction", "user_interaction")
 			tc.before(t)
-			defer s.truncate("published_article", "interaction", "user_interaction")
 
 			recorder := s.postJSON("/article/reader/detail", tc.req)
 			assert.Equal(t, tc.wantCode, recorder.Code)
@@ -220,7 +226,8 @@ func (s *InteractionSuite) TestInteraction_ReaderDetailReadCnt() {
 			var result Result[ReaderDetailVO]
 			err := json.NewDecoder(recorder.Body).Decode(&result)
 			assert.NoError(t, err)
-			result.Data.UpdatedAt = ""
+			result.Data.CreatedAt = 0
+			result.Data.UpdatedAt = 0
 			assert.Equal(t, tc.wantResult, result)
 		})
 	}
@@ -286,8 +293,8 @@ func (s *InteractionSuite) TestInteraction_ReaderPageReadCnt() {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			s.truncate("published_article", "interaction", "user_interaction")
 			tc.before(t)
-			defer s.truncate("published_article", "interaction", "user_interaction")
 
 			recorder := s.postJSON("/article/reader/page", tc.req)
 			assert.Equal(t, tc.wantCode, recorder.Code)
@@ -297,7 +304,8 @@ func (s *InteractionSuite) TestInteraction_ReaderPageReadCnt() {
 			assert.NoError(t, err)
 			// 忽略时间字段
 			for i := range result.Data.List {
-				result.Data.List[i].UpdatedAt = ""
+				result.Data.List[i].CreatedAt = 0
+				result.Data.List[i].UpdatedAt = 0
 			}
 			assert.Equal(t, tc.wantResult, result)
 		})

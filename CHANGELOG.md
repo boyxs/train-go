@@ -2,6 +2,21 @@
 
 <!-- 新功能前插在此，日期降序 -->
 
+## [2026-04-10] AI 点击埋点 + 数据看板 + Chat 工具调用修复
+
+**变更内容**: 新增 AI 文章点击埋点全链路（记录 + 看板 + 缓存），修复 Chat Function Calling SSE 事件嵌套层级、工具结果刷新丢失问题，代码块语法高亮，命名规范统一
+**影响范围**:
+- 后端：`web/click_event.go`（Handler）· `service/click_event.go` · `repository/click_event.go` · `dao/click_event.go` · `cache/click_event.go`（全链路新增）· `service/chat.go`（saveReply 持久化 toolResults、buildPrompt 用 ListRecentLite）· `service/ai/openai.go`（finish_reason 兼容）· `service/chat_tools.go` + `chat.go`（命名 AIChatService/AIChatToolExecutor）
+- 前端：`api/chat.ts`（SSE data.data 修复）· `hooks/useChat.ts`（历史消息还原 toolStates）· `views/chat/MessageBubble.tsx`（语法高亮 + 链接埋点）· `components/chat/ArticleCardBlock.tsx`（卡片埋点）· `views/dashboard/ai.tsx`（看板页面）· `views/article/read.tsx`（返回按钮兼容新标签）
+**技术决策**:
+- 命名规范：接口通用名，实现用 `{技术}{业务}{领域}{层}` 组合前缀（如 `CacheAIClickEventRepository`）
+- 去重用 `uk_dedup`（user+article+conversation+source），`ON CONFLICT DO NOTHING`
+- 看板缓存 10min TTL + jitter，写入后清缓存
+- `ListRecentLite` 排除 tool_calls 字段优化 buildPrompt 性能
+- 工具结果序列化存入 message.tool_calls，前端加载历史时还原卡片
+**待办**: Phase 6 意图识别 + 路由分发（FAQ / RAG / Tool）
+**会话**: 260410-chat-埋点看板
+
 ## [2026-04-06] Chat Function Calling — 工具调用 + 热门文章精确排行
 
 **变更内容**: Chat 接入 OpenAI Function Calling，实现三个工具（文章搜索、热门推荐、我的收藏）；热门文章改为按互动加权分（read×1 + like×3 + collect×5）真实排行；前端渲染工具执行状态和文章卡片

@@ -2,6 +2,7 @@ package integration
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +13,7 @@ import (
 	"gitee.com/train-cloud/geektime-basic-go/internal/integration/setup"
 	"gitee.com/train-cloud/geektime-basic-go/internal/repository/dao"
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"gorm.io/gorm"
@@ -20,7 +22,12 @@ import (
 type ArticleReaderHandlerSuite struct {
 	suite.Suite
 	db     *gorm.DB
+	cmd    redis.Cmdable
 	server *gin.Engine
+}
+
+func (h *ArticleReaderHandlerSuite) SetupTest() {
+	h.truncate("article", "published_article", "interaction")
 }
 
 func (h *ArticleReaderHandlerSuite) TearDownTest() {
@@ -32,15 +39,23 @@ func (h *ArticleReaderHandlerSuite) truncate(tables ...string) {
 		err := h.db.Exec("TRUNCATE TABLE " + table).Error
 		assert.NoError(h.T(), err)
 	}
+	// 清理 Redis 文章缓存
+	ctx := context.Background()
+	keys, _ := h.cmd.Keys(ctx, "article:*").Result()
+	if len(keys) > 0 {
+		h.cmd.Del(ctx, keys...)
+	}
 }
 
 func (h *ArticleReaderHandlerSuite) SetupSuite() {
 	db := setup.InitDB()
+	cmd := setup.InitRedis()
 	server := gin.Default()
 	// 读者端不需要登录中间件
 	hdl := setup.InitArticleReaderHandler()
 	hdl.RegisterRoutes(server)
 	h.db = db
+	h.cmd = cmd
 	h.server = server
 }
 
@@ -141,8 +156,8 @@ func (h *ArticleReaderHandlerSuite) TestArticleReaderHandler_Page() {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			h.truncate("published_article")
 			tc.before(t)
-			defer h.truncate("published_article")
 
 			req, err := http.NewRequest(http.MethodPost, "/article/reader/page",
 				bytes.NewBufferString(tc.req))
@@ -157,7 +172,8 @@ func (h *ArticleReaderHandlerSuite) TestArticleReaderHandler_Page() {
 			err = json.NewDecoder(recorder.Body).Decode(&result)
 			assert.NoError(t, err)
 			for i := range result.Data.List {
-				result.Data.List[i].UpdatedAt = ""
+				result.Data.List[i].CreatedAt = 0
+				result.Data.List[i].UpdatedAt = 0
 			}
 			assert.Equal(t, tc.wantResult, result)
 		})
@@ -218,8 +234,8 @@ func (h *ArticleReaderHandlerSuite) TestArticleReaderHandler_Detail() {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			h.truncate("published_article", "interaction")
 			tc.before(t)
-			defer h.truncate("published_article", "interaction")
 
 			req, err := http.NewRequest(http.MethodPost, "/article/reader/detail",
 				bytes.NewBufferString(tc.req))
@@ -233,7 +249,8 @@ func (h *ArticleReaderHandlerSuite) TestArticleReaderHandler_Detail() {
 			var result Result[ReaderDetailVO]
 			err = json.NewDecoder(recorder.Body).Decode(&result)
 			assert.NoError(t, err)
-			result.Data.UpdatedAt = ""
+			result.Data.CreatedAt = 0
+			result.Data.UpdatedAt = 0
 			assert.Equal(t, tc.wantResult, result)
 		})
 	}
@@ -242,9 +259,11 @@ func (h *ArticleReaderHandlerSuite) TestArticleReaderHandler_Detail() {
 type ReaderArticleVO struct {
 	Id        int64  `json:"id"`
 	Title     string `json:"title"`
+	Abstract  string `json:"abstract"`
 	AuthorId  int64  `json:"authorId"`
 	ReadCnt   int64  `json:"readCnt"`
-	UpdatedAt string `json:"updatedAt,omitempty"`
+	CreatedAt int64  `json:"createdAt"`
+	UpdatedAt int64  `json:"updatedAt"`
 }
 
 type ReaderDetailVO struct {
@@ -254,7 +273,8 @@ type ReaderDetailVO struct {
 	Abstract  string `json:"abstract"`
 	AuthorId  int64  `json:"authorId"`
 	ReadCnt   int64  `json:"readCnt"`
-	UpdatedAt string `json:"updatedAt,omitempty"`
+	CreatedAt int64  `json:"createdAt"`
+	UpdatedAt int64  `json:"updatedAt"`
 }
 
 type ArticleReaderListData struct {

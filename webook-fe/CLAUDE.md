@@ -53,6 +53,8 @@ npm run lint:fix     # ESLint 自动修复
 - `message` / `notification` / `modal` 必须通过 `App.useApp()` 获取，禁止静态导入
 - 布局层必须 `<ConfigProvider><App>...</App></ConfigProvider>`
 - 破坏性操作统一 `Modal.confirm`，`okButtonProps: { danger: true }`
+- **Table 必须带边框**：所有 `<Table>` 必须加 `bordered` 属性，参考 `views/article/list.tsx`
+- **文章链接新标签打开**：指向文章详情的链接（`/article/{id}`）统一 `target='_blank'`
 
 ## 命名规范
 

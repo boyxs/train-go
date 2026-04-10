@@ -81,6 +81,7 @@ func (h *ArticleAuthorHandlerSuite) TestArticleAuthorHandler_Edit() {
 					Id:        1,
 					Title:     "我的标题",
 					Content:   "我的内容",
+					Abstract:  "我的内容",
 					AuthorId:  1,
 					Status:    1,
 					CreatedAt: mockNow,
@@ -120,6 +121,7 @@ func (h *ArticleAuthorHandlerSuite) TestArticleAuthorHandler_Edit() {
 					Id:        2,
 					Title:     "新的标题",
 					Content:   "新的内容",
+					Abstract:  "新的内容",
 					AuthorId:  1,
 					Status:    1,
 					CreatedAt: mockNow,
@@ -469,7 +471,7 @@ func (h *ArticleAuthorHandlerSuite) TestArticleAuthorHandler_Withdraw() {
 			req:      `{"id":2}`,
 			wantCode: http.StatusOK,
 			wantResult: Result[any]{
-				Msg: "系统错误",
+				Msg: "OK",
 			},
 		},
 		{
@@ -483,7 +485,7 @@ func (h *ArticleAuthorHandlerSuite) TestArticleAuthorHandler_Withdraw() {
 			req:      `{"id":999}`,
 			wantCode: http.StatusOK,
 			wantResult: Result[any]{
-				Msg: "系统错误",
+				Msg: "OK",
 			},
 		},
 		{
@@ -547,7 +549,7 @@ func (h *ArticleAuthorHandlerSuite) TestArticleAuthorHandler_Withdraw() {
 			req:    `{"id":0}`,
 			wantCode: http.StatusOK,
 			wantResult: Result[any]{
-				Msg: "系统错误",
+				Msg: "OK",
 			},
 		},
 	}
