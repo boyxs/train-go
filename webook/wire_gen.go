@@ -81,7 +81,9 @@ func InitWebServer() *gin.Engine {
 	clickEventRepository := repository.NewCacheAIClickEventRepository(clickEventDAO, clickEventCache, loggerX)
 	clickEventService := service.NewAIClickEventService(clickEventRepository)
 	clickEventHandler := web.NewAIClickEventHandler(clickEventService, loggerX)
-	engine := ioc.InitWebServer(v, userHandler, articleAuthorHandler, articleReaderHandler, interactionHandler, oAuth2Handler, chatHandler, articleSearchHandler, clickEventHandler)
+	articlePolishService := service.NewAIArticlePolishService(llmClient)
+	articlePolishHandler := web.NewAIArticlePolishHandler(articlePolishService, cmdable, loggerX)
+	engine := ioc.InitWebServer(v, userHandler, articleAuthorHandler, articleReaderHandler, interactionHandler, oAuth2Handler, chatHandler, articleSearchHandler, clickEventHandler, articlePolishHandler)
 	return engine
 }
 
@@ -92,6 +94,9 @@ var searchProviderSet = wire.NewSet(ioc.InitESClient, ioc.InitOllamaEmbeddingCon
 
 // clickEventProviderSet 点击埋点模块
 var clickEventProviderSet = wire.NewSet(dao.NewGormAIClickEventDAO, cache.NewRedisAIClickEventCache, repository.NewCacheAIClickEventRepository, service.NewAIClickEventService)
+
+// polishProviderSet 文章润色模块
+var polishProviderSet = wire.NewSet(service.NewAIArticlePolishService)
 
 // chatProviderSet Chat 模块的 Wire Provider 集合（不含 Handler）
 var chatProviderSet = wire.NewSet(ioc.InitLLMConfig, ioc.InitLLMClient, ioc.InitChatLimiter, dao.NewGormConversationDAO, dao.NewGormMessageDAO, cache.NewRedisConversationCache, cache.NewRedisMessageCache, repository.NewCacheConversationRepository, repository.NewCacheMessageRepository, service.NewAIChatService, service.NewAIChatToolExecutor)

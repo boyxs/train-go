@@ -77,7 +77,9 @@ func InitWebServer() *gin.Engine {
 	clickEventRepository := repository.NewCacheAIClickEventRepository(clickEventDAO, clickEventCache, loggerX)
 	clickEventService := service.NewAIClickEventService(clickEventRepository)
 	clickEventHandler := web.NewAIClickEventHandler(clickEventService, loggerX)
-	engine := ioc.InitWebServer(v, userHandler, articleAuthorHandler, articleReaderHandler, interactionHandler, oAuth2Handler, chatHandler, articleSearchHandler, clickEventHandler)
+	articlePolishService := service.NewAIArticlePolishService(llmClient)
+	articlePolishHandler := web.NewAIArticlePolishHandler(articlePolishService, cmdable, loggerX)
+	engine := ioc.InitWebServer(v, userHandler, articleAuthorHandler, articleReaderHandler, interactionHandler, oAuth2Handler, chatHandler, articleSearchHandler, clickEventHandler, articlePolishHandler)
 	return engine
 }
 
@@ -132,6 +134,16 @@ func InitInteractionHandler() web.InteractionHandler {
 	interactionService := service.NewInternalInteractionService(interactionRepository)
 	interactionHandler := web.NewInternalInteractionHandler(interactionService, loggerX)
 	return interactionHandler
+}
+
+func InitArticlePolishHandler() web.ArticlePolishHandler {
+	llmConfig := ioc.InitLLMConfig()
+	loggerX := InitLogger()
+	llmClient := ioc.InitLLMClient(llmConfig, loggerX)
+	articlePolishService := service.NewAIArticlePolishService(llmClient)
+	cmdable := InitRedis()
+	articlePolishHandler := web.NewAIArticlePolishHandler(articlePolishService, cmdable, loggerX)
+	return articlePolishHandler
 }
 
 func InitClickEventHandler() web.ClickEventHandler {
@@ -200,5 +212,7 @@ var articleReaderSvcProvider = wire.NewSet(dao.NewGormArticleReaderDAO, cache.Ne
 var interactionSvcProvider = wire.NewSet(dao.NewGormInteractionDAO, cache.NewRedisInteractionCache, repository.NewCacheInteractionRepository, service.NewInternalInteractionService)
 
 var clickEventSvcProvider = wire.NewSet(dao.NewGormAIClickEventDAO, cache.NewRedisAIClickEventCache, repository.NewCacheAIClickEventRepository, service.NewAIClickEventService)
+
+var polishSvcProvider = wire.NewSet(service.NewAIArticlePolishService)
 
 var chatSvcProvider = wire.NewSet(ioc.InitLLMConfig, ioc.InitLLMClient, ioc.InitChatLimiter, dao.NewGormConversationDAO, dao.NewGormMessageDAO, cache.NewRedisConversationCache, cache.NewRedisMessageCache, repository.NewCacheConversationRepository, repository.NewCacheMessageRepository, service.NewAIChatService, service.NewAIChatToolExecutor)

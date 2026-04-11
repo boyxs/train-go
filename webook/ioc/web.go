@@ -28,6 +28,7 @@ func InitWebServer(
 	chatHandler web.ChatHandler,
 	searchHandler web.ArticleSearchHandler,
 	clickEventHandler web.ClickEventHandler,
+	polishHandler web.ArticlePolishHandler,
 ) *gin.Engine {
 	server := gin.Default()
 	server.Use(middlewares...)
@@ -39,6 +40,7 @@ func InitWebServer(
 	chatHandler.RegisterRoutes(server)
 	searchHandler.RegisterRoutes(server)
 	clickEventHandler.RegisterRoutes(server)
+	polishHandler.RegisterRoutes(server)
 	return server
 }
 

@@ -44,6 +44,17 @@ export function deleteArticle(id: number) {
   return axios.post<Result>('/article/delete', { id });
 }
 
+// POST /article/polish — AI 润色文章
+export interface PolishResult {
+  title: string;
+  abstract: string;
+  content: string;
+}
+
+export function polishArticle(data: { title: string; content: string }) {
+  return axios.post<Result<PolishResult>>('/article/polish', data);
+}
+
 // ===== 读者端（公开，不需要登录）=====
 
 // POST /article/reader/page — 公开文章分页

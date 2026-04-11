@@ -25,6 +25,8 @@ const (
 	EmbeddingCachePattern = "embedding:cache:%s" // embedding:cache:{textHash}
 
 	ClickEventDashboardKey = "click:event:ai:dashboard" // AI 点击看板缓存
+
+	PolishRateLimitPattern = "polish:ratelimit:%d" // polish:ratelimit:{uid}
 )
 
 var ClickEventDashboardTTL = 10 * time.Minute

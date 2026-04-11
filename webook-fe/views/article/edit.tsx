@@ -1,11 +1,13 @@
 'use client';
 
-import { SendOutlined } from '@ant-design/icons';
+import { SendOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import { App, Button, Card, Form, Input, Space } from 'antd';
 import { useRouter } from 'next/navigation';
-import React, { useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 
 import * as articleApi from '@/api/article';
+import type { PolishResult } from '@/api/article';
+import { PolishModal } from '@/components/article/PolishModal';
 import { Loading } from '@/components/common/Loading';
 import { useRequest } from '@/hooks/useRequest';
 import type { EditArticleReq } from '@/types';
@@ -43,6 +45,55 @@ function ArticleEditPage({ articleId }: ArticleEditProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [articleRes]);
 
+  const [polishing, setPolishing] = useState(false);
+  const [polishResult, setPolishResult] = useState<PolishResult | null>(null);
+  const [polishModalOpen, setPolishModalOpen] = useState(false);
+  const [polishOriginal, setPolishOriginal] = useState({
+    title: '',
+    abstract: '',
+    content: '',
+  });
+
+  const handlePolish = useCallback(async () => {
+    const title = form.getFieldValue('title');
+    const content = form.getFieldValue('content');
+    if (!title?.trim() || !content?.trim()) {
+      message.warning('请先输入标题和内容');
+      return;
+    }
+    setPolishOriginal({
+      title,
+      abstract: form.getFieldValue('abstract') || '',
+      content,
+    });
+    setPolishing(true);
+    try {
+      const res = await articleApi.polishArticle({ title, content });
+      if (res.data.code === 0 && res.data.data) {
+        setPolishResult(res.data.data);
+        setPolishModalOpen(true);
+      } else {
+        message.error(res.data.msg || '润色失败');
+      }
+    } catch {
+      message.error('网络错误');
+    } finally {
+      setPolishing(false);
+    }
+  }, [form, message]);
+
+  const handleAcceptPolish = useCallback(() => {
+    if (polishResult) {
+      form.setFieldsValue({
+        title: polishResult.title,
+        abstract: polishResult.abstract,
+        content: polishResult.content,
+      });
+      setPolishModalOpen(false);
+      message.success('已采纳润色结果');
+    }
+  }, [form, message, polishResult]);
+
   const submit = async (
     apiFn: (
       data: EditArticleReq,
@@ -58,7 +109,7 @@ function ArticleEditPage({ articleId }: ArticleEditProps) {
       const res = await apiFn(data);
       if (res.data.code === 0 || !res.data.code) {
         message.success(successMsg);
-        router.back();
+        router.push('/article/list');
       } else {
         message.error(res.data.msg || '操作失败');
       }
@@ -111,7 +162,7 @@ function ArticleEditPage({ articleId }: ArticleEditProps) {
           </Form.Item>
 
           <Form.Item style={{ marginBottom: 0 }}>
-            <Space>
+            <Space wrap>
               <Button
                 type='primary'
                 onClick={() => submit(articleApi.editArticle, '保存成功')}
@@ -126,11 +177,35 @@ function ArticleEditPage({ articleId }: ArticleEditProps) {
               >
                 发布
               </Button>
-              <Button onClick={() => router.back()}>取消</Button>
+              <Button
+                onClick={() =>
+                  window.history.length > 1
+                    ? router.back()
+                    : router.push('/article/list')
+                }
+              >
+                返回列表
+              </Button>
+              <Button
+                icon={<ThunderboltOutlined />}
+                loading={polishing}
+                onClick={handlePolish}
+                style={{ color: '#0D9488', borderColor: '#0D9488' }}
+              >
+                AI 润色
+              </Button>
             </Space>
           </Form.Item>
         </Form>
       </Card>
+
+      <PolishModal
+        open={polishModalOpen}
+        original={polishOriginal}
+        polished={polishResult}
+        onAccept={handleAcceptPolish}
+        onCancel={() => setPolishModalOpen(false)}
+      />
     </div>
   );
 }

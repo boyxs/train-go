@@ -35,6 +35,8 @@ mockgen:
 	@mockgen -source=./internal/repository/cache/click_event.go -package=cachemocks -destination=./internal/repository/cache/mocks/click_event_mock.go
 	@mockgen -source=./internal/repository/click_event.go -package=repomocks -destination=./internal/repository/mocks/click_event_mock.go
 	@mockgen -source=./internal/service/click_event.go -package=svcmocks -destination=./internal/service/mocks/click_event_mock.go
+	#article polish
+	@mockgen -source=./internal/service/article_polish.go -package=svcmocks -destination=./internal/service/mocks/article_polish_mock.go
 	#ai
 	@mockgen -source=./internal/service/ai/llm.go -package=aimocks -destination=./internal/service/ai/mocks/llm_mock.go
 	#embedding
