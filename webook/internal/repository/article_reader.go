@@ -3,6 +3,8 @@ package repository
 import (
 	"context"
 
+	"golang.org/x/sync/errgroup"
+
 	"gitee.com/train-cloud/geektime-basic-go/internal/domain"
 	"gitee.com/train-cloud/geektime-basic-go/internal/repository/cache"
 	"gitee.com/train-cloud/geektime-basic-go/internal/repository/dao"
@@ -89,13 +91,21 @@ func (r *CacheArticleReaderRepository) Page(ctx context.Context, offset int, lim
 		}
 	}
 
-	// 缓存 miss 或非首页，查 DB
-	articles, err := r.dao.Page(ctx, offset, limit)
-	if err != nil {
-		return nil, 0, err
-	}
-	count, err := r.dao.Count(ctx)
-	if err != nil {
+	// 缓存 miss 或非首页，并发查 DB
+	var articles []dao.PublishedArticle
+	var count int64
+	var eg errgroup.Group
+	eg.Go(func() error {
+		var e error
+		articles, e = r.dao.Page(ctx, offset, limit)
+		return e
+	})
+	eg.Go(func() error {
+		var e error
+		count, e = r.dao.Count(ctx)
+		return e
+	})
+	if err := eg.Wait(); err != nil {
 		return nil, 0, err
 	}
 	result := make([]domain.Article, 0, len(articles))

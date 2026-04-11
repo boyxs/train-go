@@ -118,6 +118,7 @@ func TestCacheArticleReaderRepository_Page(t *testing.T) {
 				c.EXPECT().GetFirstPage(gomock.Any()).Return(nil, int64(0), redis.Nil)
 				d.EXPECT().Page(gomock.Any(), 0, 10).
 					Return(nil, errors.New("db connection error"))
+				d.EXPECT().Count(gomock.Any()).Return(int64(0), nil).AnyTimes()
 				return d, c
 			},
 			offset:  0,

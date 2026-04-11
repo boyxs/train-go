@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"time"
 
 	"gitee.com/train-cloud/geektime-basic-go/internal/domain"
 	"gitee.com/train-cloud/geektime-basic-go/internal/repository"
@@ -70,13 +71,15 @@ func (s *InternalArticleAuthorService) Publish(ctx context.Context, article doma
 	}
 	// 从 DB 回查完整数据（含 AuthorName / CreatedAt），再写入 ES
 	go func(articleId, uid int64) {
-		complete, err := s.authorRepo.FindById(context.Background(), articleId, uid)
+		bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		complete, err := s.authorRepo.FindById(bgCtx, articleId, uid)
 		if err != nil {
 			s.l.Error("索引文章：回查完整数据失败",
 				logger.Int64("articleId", articleId), logger.Error(err))
 			return
 		}
-		if err := s.searchSvc.IndexArticle(context.Background(), complete); err != nil {
+		if err := s.searchSvc.IndexArticle(bgCtx, complete); err != nil {
 			s.l.Error("索引文章失败", logger.Int64("articleId", articleId), logger.Error(err))
 		}
 	}(id, article.Author.Id)
@@ -95,7 +98,9 @@ func (s *InternalArticleAuthorService) Withdraw(ctx context.Context, id int64, u
 		return err
 	}
 	go func() {
-		if err := s.searchSvc.RemoveArticle(context.Background(), id); err != nil {
+		bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := s.searchSvc.RemoveArticle(bgCtx, id); err != nil {
 			s.l.Error("移除搜索索引失败", logger.Int64("articleId", id), logger.Error(err))
 		}
 	}()
@@ -129,7 +134,9 @@ func (s *InternalArticleAuthorService) Delete(ctx context.Context, id int64, uid
 		return err
 	}
 	go func() {
-		if err := s.searchSvc.RemoveArticle(context.Background(), id); err != nil {
+		bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := s.searchSvc.RemoveArticle(bgCtx, id); err != nil {
 			s.l.Error("移除搜索索引失败", logger.Int64("articleId", id), logger.Error(err))
 		}
 	}()
