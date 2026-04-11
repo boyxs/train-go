@@ -193,3 +193,86 @@ export function sendMessageSSE(
 
   return controller;
 }
+
+// SSE 重连：从 Redis Stream 断点续传
+// GET /chat/message/stream?conversationId=xx，header 带 Last-Event-ID
+export function resumeStream(
+  conversationId: number,
+  lastEventId: string,
+  callbacks: Partial<SSECallbacks> & {
+    onStreamEnd?: () => void;
+  },
+): AbortController {
+  const controller = new AbortController();
+  const token = tokenUtil.getAccess();
+  const url = `${API_BASE}/chat/message/stream?conversationId=${conversationId}`;
+
+  fetch(url, {
+    method: 'GET',
+    headers: {
+      Authorization: token ? `Bearer ${token}` : '',
+      'Last-Event-ID': lastEventId || '0',
+    },
+    signal: controller.signal,
+  })
+    .then(async (response) => {
+      if (!response.ok || !response.body) {
+        callbacks.onStreamEnd?.();
+        return;
+      }
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+          break;
+        }
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        let currentEvent = '';
+        for (const line of lines) {
+          if (line.startsWith('id:')) {
+            // 记录 lastEventId 供下次重连
+          } else if (line.startsWith('event:')) {
+            currentEvent = line.slice(6).trim();
+          } else if (line.startsWith('data:')) {
+            try {
+              const data = JSON.parse(line.slice(5).trim());
+              switch (currentEvent) {
+                case 'delta':
+                  callbacks.onDelta?.(data.content);
+                  break;
+                case 'tool_call':
+                  callbacks.onToolCall?.(data.data ?? data);
+                  break;
+                case 'tool_result':
+                  callbacks.onToolResult?.(data.data ?? data);
+                  break;
+                case 'done':
+                  callbacks.onDone?.(data.data ?? data);
+                  break;
+                case 'error':
+                  callbacks.onError?.(data.data ?? data);
+                  break;
+                case 'stream_end':
+                  callbacks.onStreamEnd?.();
+                  return;
+              }
+            } catch {
+              // 忽略
+            }
+          }
+        }
+      }
+      callbacks.onStreamEnd?.();
+    })
+    .catch(() => {
+      callbacks.onStreamEnd?.();
+    });
+
+  return controller;
+}

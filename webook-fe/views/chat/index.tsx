@@ -61,6 +61,20 @@ function ChatPage() {
     setDrawerOpen(false);
   };
 
+  // 发送消息——如果没有活跃对话，先创建一个
+  const handleSend = async (content: string) => {
+    if (!activeId) {
+      const newId = await create().catch(() => -1);
+      if (newId <= 0) {
+        message.error('创建对话失败');
+        return;
+      }
+      send(content, newId);
+      return;
+    }
+    send(content);
+  };
+
   const sidebar = (
     <ChatSidebar
       conversations={conversations}
@@ -156,10 +170,10 @@ function ChatPage() {
             streaming={streaming}
             hasMore={hasMore}
             conversationId={activeId ?? undefined}
-            onSend={send}
+            onSend={handleSend}
             onLoadMore={loadMore}
           />
-          <ChatInput streaming={streaming} onSend={send} onStop={stop} />
+          <ChatInput streaming={streaming} onSend={handleSend} onStop={stop} />
         </div>
       </div>
     </div>

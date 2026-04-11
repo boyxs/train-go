@@ -63,100 +63,124 @@ export function useChat(conversationId: number | null) {
     }
   }, []);
 
-  // conversationId 变化时：恢复 buffer → 加载历史
+  // conversationId 变化时加载数据
   useEffect(() => {
     activeIdRef.current = conversationId;
 
-    // 恢复目标对话的 buffer（如果有正在 streaming 的）
+    // ── 规则：有活跃 buffer（send() 正在跑），只清旧数据、恢复 buffer ──
     const buf = conversationId
       ? bufferRef.current.get(conversationId)
       : undefined;
-    const restoredPending = buf && buf.messages.length > 0 ? buf.messages : [];
-    const restoredStreaming = buf?.streaming ?? false;
+    if (buf && buf.messages.length > 0 && buf.streaming) {
+      requestAnimationFrame(() => {
+        if (activeIdRef.current !== conversationId) {
+          return;
+        }
+        setServerMessages([]);
+        setPendingMessages(buf.messages);
+        setStreaming(true);
+      });
+      return;
+    }
 
-    // 使用 requestAnimationFrame 批量更新，避免 effect 内同步 setState
+    const convId = conversationId!; // 上面已 if(!conversationId) return
+    // 所有异步回调的守卫：如果活跃对话已切走，跳过 state 更新
+    const isStale = () => activeIdRef.current !== convId;
+
+    // ── 清空旧状态 ──
     requestAnimationFrame(() => {
+      if (isStale()) {
+        return;
+      }
       setError(null);
-      setPendingMessages(restoredPending);
-      setStreaming(restoredStreaming);
+      setPendingMessages([]);
+      setStreaming(false);
+      setServerMessages([]);
     });
 
-    // 加载历史消息
     if (!conversationId) {
       requestAnimationFrame(() => {
-        setServerMessages([]);
+        if (isStale()) {
+          return;
+        }
         setLoading(false);
       });
       return;
     }
 
-    let cancelled = false;
+    let resumeController: AbortController | null = null;
 
-    requestAnimationFrame(() => {
-      setLoading(true);
-    });
-
-    const convId = conversationId;
-    let pollTimer: ReturnType<typeof setInterval> | null = null;
-
-    // 加载消息 + 检查是否在生成中
+    // ── 加载消息 + 检查是否在生成中 ──
     Promise.all([
       chatApi.listMessages(convId, 0, PAGE_SIZE),
       chatApi.isGenerating(convId),
     ])
       .then(([msgRes, genRes]) => {
-        if (cancelled) {
+        if (isStale()) {
           return;
         }
         if (msgRes.data.code === 0) {
-          const msgs = msgRes.data.data ?? [];
-          setServerMessages(msgs);
-          setHasMore(msgs.length >= PAGE_SIZE);
+          setServerMessages(msgRes.data.data ?? []);
+          setHasMore((msgRes.data.data ?? []).length >= PAGE_SIZE);
         }
         setLoading(false);
 
-        // 后端正在生成 且 前端没有活跃的 buffer → 轮询 listMessages
-        const hasBuffer = bufferRef.current.has(convId);
         const generating = genRes.data.data === true;
-        if (generating && !hasBuffer) {
+        if (generating) {
           setStreaming(true);
-          pollTimer = setInterval(() => {
-            if (cancelled) {
-              return;
-            }
-            Promise.all([
-              chatApi.listMessages(convId, 0, PAGE_SIZE),
-              chatApi.isGenerating(convId),
-            ]).then(([pollMsgRes, pollGenRes]) => {
-              if (cancelled) {
+          resumeController = chatApi.resumeStream(convId, '$', {
+            onDelta: (text) => {
+              if (isStale()) {
                 return;
               }
-              if (pollMsgRes.data.code === 0) {
-                setServerMessages(pollMsgRes.data.data ?? []);
-              }
-              if (pollGenRes.data.data !== true) {
-                setStreaming(false);
-                if (pollTimer) {
-                  clearInterval(pollTimer);
-                  pollTimer = null;
+              setServerMessages((prev) => {
+                const updated = [...prev];
+                for (let i = updated.length - 1; i >= 0; i--) {
+                  if (updated[i].role === 'assistant') {
+                    updated[i] = {
+                      ...updated[i],
+                      content: updated[i].content + text,
+                    };
+                    break;
+                  }
                 }
+                return updated;
+              });
+            },
+            onDone: () => {
+              if (isStale()) {
+                return;
               }
-            });
-          }, 1500);
+              setStreaming(false);
+              chatApi.listMessages(convId, 0, PAGE_SIZE).then((res) => {
+                if (!isStale() && res.data.code === 0) {
+                  setServerMessages(res.data.data ?? []);
+                }
+              });
+            },
+            onStreamEnd: () => {
+              if (isStale()) {
+                return;
+              }
+              setStreaming(false);
+              chatApi.listMessages(convId, 0, PAGE_SIZE).then((res) => {
+                if (!isStale() && res.data.code === 0) {
+                  setServerMessages(res.data.data ?? []);
+                }
+              });
+            },
+          });
         }
       })
       .catch(() => {
-        if (!cancelled) {
+        if (!isStale()) {
           setError('加载消息失败');
           setLoading(false);
         }
       });
 
     return () => {
-      cancelled = true;
-      if (pollTimer) {
-        clearInterval(pollTimer);
-      }
+      resumeController?.abort();
     };
   }, [conversationId]);
 
@@ -184,13 +208,13 @@ export function useChat(conversationId: number | null) {
     return [...deduped, ...pendingMessages];
   }, [serverMessages, pendingMessages]);
 
-  // 发送消息
+  // 发送消息，overrideConvId 用于创建对话后立即发送
   const send = useCallback(
-    (content: string) => {
-      if (!conversationId || !content.trim()) {
+    (content: string, overrideConvId?: number) => {
+      const convId = overrideConvId ?? conversationId;
+      if (!convId || !content.trim()) {
         return;
       }
-      const convId = conversationId;
 
       const userMsg: Message = {
         id: tempIdRef.current--,

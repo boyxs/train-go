@@ -14,6 +14,7 @@ import (
 	"gitee.com/train-cloud/geektime-basic-go/internal/web"
 	"gitee.com/train-cloud/geektime-basic-go/internal/web/jwt"
 	"gitee.com/train-cloud/geektime-basic-go/ioc"
+	"gitee.com/train-cloud/geektime-basic-go/pkg/streamer"
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
 )
@@ -72,7 +73,8 @@ func InitWebServer() *gin.Engine {
 	llmConfig := ioc.InitLLMConfig()
 	llmClient := ioc.InitLLMClient(llmConfig, loggerX)
 	toolExecutor := service.NewAIChatToolExecutor(articleSearchService, articleReaderService, interactionRepository, loggerX)
-	chatService := service.NewAIChatService(conversationRepository, messageRepository, llmClient, articleSearchService, toolExecutor, loggerX)
+	eventStreamer := streamer.NewRedisStreamer(cmdable)
+	chatService := service.NewAIChatService(conversationRepository, messageRepository, llmClient, articleSearchService, toolExecutor, loggerX, eventStreamer)
 	limiter := ioc.InitChatLimiter(cmdable)
 	chatHandler := web.NewInternalChatHandler(chatService, loggerX, limiter)
 	articleSearchHandler := web.NewInternalArticleSearchHandler(articleSearchService, loggerX)
@@ -99,4 +101,4 @@ var clickEventProviderSet = wire.NewSet(dao.NewGormAIClickEventDAO, cache.NewRed
 var polishProviderSet = wire.NewSet(service.NewAIArticlePolishService)
 
 // chatProviderSet Chat 模块的 Wire Provider 集合（不含 Handler）
-var chatProviderSet = wire.NewSet(ioc.InitLLMConfig, ioc.InitLLMClient, ioc.InitChatLimiter, dao.NewGormConversationDAO, dao.NewGormMessageDAO, cache.NewRedisConversationCache, cache.NewRedisMessageCache, repository.NewCacheConversationRepository, repository.NewCacheMessageRepository, service.NewAIChatService, service.NewAIChatToolExecutor)
+var chatProviderSet = wire.NewSet(ioc.InitLLMConfig, ioc.InitLLMClient, ioc.InitChatLimiter, dao.NewGormConversationDAO, dao.NewGormMessageDAO, cache.NewRedisConversationCache, cache.NewRedisMessageCache, repository.NewCacheConversationRepository, repository.NewCacheMessageRepository, service.NewAIChatService, service.NewAIChatToolExecutor, streamer.NewRedisStreamer)

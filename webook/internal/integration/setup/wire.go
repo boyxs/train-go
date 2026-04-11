@@ -10,6 +10,7 @@ import (
 	"gitee.com/train-cloud/geektime-basic-go/internal/web"
 	"gitee.com/train-cloud/geektime-basic-go/internal/web/jwt"
 	"gitee.com/train-cloud/geektime-basic-go/ioc"
+	"gitee.com/train-cloud/geektime-basic-go/pkg/streamer"
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
 )
@@ -183,4 +184,5 @@ var chatSvcProvider = wire.NewSet(
 	repository.NewCacheMessageRepository,
 	service.NewAIChatService,
 	service.NewAIChatToolExecutor,
+	streamer.NewRedisStreamer,
 )

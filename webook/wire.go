@@ -8,6 +8,7 @@ import (
 	"gitee.com/train-cloud/geektime-basic-go/internal/repository/dao"
 	"gitee.com/train-cloud/geektime-basic-go/internal/service"
 	"gitee.com/train-cloud/geektime-basic-go/internal/web"
+	"gitee.com/train-cloud/geektime-basic-go/pkg/streamer"
 	"gitee.com/train-cloud/geektime-basic-go/internal/web/jwt"
 	"gitee.com/train-cloud/geektime-basic-go/ioc"
 	"github.com/gin-gonic/gin"
@@ -51,6 +52,7 @@ var chatProviderSet = wire.NewSet(
 	repository.NewCacheMessageRepository,
 	service.NewAIChatService,
 	service.NewAIChatToolExecutor,
+	streamer.NewRedisStreamer,
 )
 
 func InitWebServer() *gin.Engine {

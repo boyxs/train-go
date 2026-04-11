@@ -1,10 +1,14 @@
 package web
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
+	"time"
 
 	"gitee.com/train-cloud/geektime-basic-go/internal/consts"
 	"gitee.com/train-cloud/geektime-basic-go/internal/service"
@@ -37,6 +41,7 @@ func (h *InternalChatHandler) RegisterRoutes(server *gin.Engine) {
 	g.POST("/message/send", h.SendMessage)
 	g.POST("/stop", h.StopGeneration)
 	g.POST("/conversation/generating", h.IsGenerating)
+	g.GET("/message/stream", h.ResumeStream)
 }
 
 type conversationIdReq struct {
@@ -196,3 +201,89 @@ func (h *InternalChatHandler) StopGeneration(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, Result{Msg: "OK"})
 }
 
+// ResumeStream SSE 重连端点：GET /chat/message/stream?conversationId=xx
+// 浏览器带 Last-Event-ID header 从断点续传
+// ResumeStream SSE 重连端点：GET /chat/message/stream?conversationId=xx
+func (h *InternalChatHandler) ResumeStream(ctx *gin.Context) {
+	convId, _ := strconv.ParseInt(ctx.Query("conversationId"), 10, 64)
+	if convId <= 0 {
+		ctx.JSON(http.StatusOK, Result{Code: 4, Msg: "参数错误"})
+		return
+	}
+	lastId := ctx.GetHeader(consts.LastEventIDHeader)
+	if lastId == "" {
+		lastId = "0"
+	}
+
+	ctx.Header("Content-Type", "text/event-stream")
+	ctx.Header("Cache-Control", "no-cache")
+	ctx.Header("Connection", "keep-alive")
+	ctx.Header("X-Accel-Buffering", "no")
+
+	reqCtx := ctx.Request.Context()
+	ch := make(chan string, 32) // 已格式化的 SSE 文本
+	go h.pollStream(reqCtx, convId, lastId, ch)
+
+	ctx.Stream(func(w io.Writer) bool {
+		line, ok := <-ch
+		if !ok {
+			return false
+		}
+		fmt.Fprint(w, line)
+		return true
+	})
+}
+
+// pollStream 从 Redis Stream 读事件，格式化为 SSE 文本推入 ch
+func (h *InternalChatHandler) pollStream(
+	ctx context.Context, convId int64, lastId string, ch chan<- string,
+) {
+	defer close(ch)
+
+	// 补发历史（lastId="$" 跳过）
+	if lastId != "$" {
+		events, ids, generating := h.svc.ReadStream(ctx, convId, lastId)
+		for i, e := range events {
+			ch <- formatSSE(ids[i], e.Type, e)
+		}
+		if len(ids) > 0 {
+			lastId = ids[len(ids)-1]
+		}
+		if !generating {
+			ch <- "event: stream_end\ndata: {}\n\n"
+			return
+		}
+	} else if !h.svc.IsGenerating(ctx, convId) {
+		ch <- "event: stream_end\ndata: {}\n\n"
+		return
+	}
+
+	// 阻塞读新事件
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+		events, ids := h.svc.BlockReadStream(ctx, convId, lastId, 2*time.Second)
+		for i, e := range events {
+			ch <- formatSSE(ids[i], e.Type, e)
+		}
+		if len(ids) > 0 {
+			lastId = ids[len(ids)-1]
+		}
+		if !h.svc.IsGenerating(ctx, convId) {
+			ch <- "event: stream_end\ndata: {}\n\n"
+			return
+		}
+	}
+}
+
+// formatSSE 将事件格式化为 SSE 文本
+func formatSSE(id, eventType string, event any) string {
+	data, _ := json.Marshal(event)
+	if id != "" {
+		return fmt.Sprintf("id: %s\nevent: %s\ndata: %s\n\n", id, eventType, string(data))
+	}
+	return fmt.Sprintf("event: %s\ndata: %s\n\n", eventType, string(data))
+}

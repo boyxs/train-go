@@ -91,7 +91,8 @@ func TestChatService_SendMessage(t *testing.T) {
 			defer ctrl.Finish()
 
 			convRepo, msgRepo, llm, search := tc.mock(ctrl)
-			svc := NewAIChatService(convRepo, msgRepo, llm, search, nil, logger.NewNopLogger())
+			svc := NewAIChatService(convRepo, msgRepo, llm, search, nil, logger.NewNopLogger(), nil)
+
 
 			_, err := svc.SendMessage(context.Background(), tc.uid, tc.convId, tc.content)
 			if tc.wantErr != nil {
@@ -332,7 +333,8 @@ func TestChatService_SendMessage_RAGWithArticles(t *testing.T) {
 			return ch, nil
 		})
 
-	svc := NewAIChatService(convRepo, msgRepo, llm, search, nil, logger.NewNopLogger())
+	svc := NewAIChatService(convRepo, msgRepo, llm, search, nil, logger.NewNopLogger(), nil)
+
 	_, err := svc.SendMessage(context.Background(), 1, 1, "Go并发怎么写")
 	assert.NoError(t, err)
 	time.Sleep(100 * time.Millisecond) // 等 runStream goroutine 完成
@@ -379,7 +381,8 @@ func TestChatService_SendMessage_RAGNoResults(t *testing.T) {
 			return ch, nil
 		})
 
-	svc := NewAIChatService(convRepo, msgRepo, llm, search, nil, logger.NewNopLogger())
+	svc := NewAIChatService(convRepo, msgRepo, llm, search, nil, logger.NewNopLogger(), nil)
+
 	_, err := svc.SendMessage(context.Background(), 1, 1, "你好")
 	assert.NoError(t, err)
 	time.Sleep(100 * time.Millisecond)
@@ -423,7 +426,8 @@ func TestChatService_SendMessage_RAGSearchFail(t *testing.T) {
 			return ch, nil
 		})
 
-	svc := NewAIChatService(convRepo, msgRepo, llm, search, nil, logger.NewNopLogger())
+	svc := NewAIChatService(convRepo, msgRepo, llm, search, nil, logger.NewNopLogger(), nil)
+
 	_, err := svc.SendMessage(context.Background(), 1, 1, "Go怎么写测试")
 	assert.NoError(t, err)
 	time.Sleep(100 * time.Millisecond)

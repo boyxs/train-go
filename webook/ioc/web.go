@@ -56,7 +56,7 @@ func InitMiddlewares(
 		cors.New(cors.Config{
 			AllowOrigins: []string{"http://localhost:3000"},
 			//AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"},
-			AllowHeaders:     []string{"Content-Type", "Content-Length", "Authorization", consts.AccessHeader},
+			AllowHeaders:     []string{"Content-Type", "Content-Length", "Authorization", consts.AccessHeader, consts.LastEventIDHeader},
 			ExposeHeaders:    []string{consts.AccessHeader, consts.RefreshHeader},
 			AllowCredentials: true,
 			AllowOriginFunc: func(origin string) bool {

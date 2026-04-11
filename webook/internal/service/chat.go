@@ -10,10 +10,12 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"gitee.com/train-cloud/geektime-basic-go/internal/consts"
 	"gitee.com/train-cloud/geektime-basic-go/internal/domain"
 	"gitee.com/train-cloud/geektime-basic-go/internal/repository"
 	"gitee.com/train-cloud/geektime-basic-go/internal/service/ai"
 	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
+	"gitee.com/train-cloud/geektime-basic-go/pkg/streamer"
 )
 
 const (
@@ -55,6 +57,10 @@ type ChatService interface {
 	SendMessage(ctx context.Context, uid int64, convId int64, content string) (<-chan domain.ChatEvent, error)
 	StopGeneration(ctx context.Context, uid int64, convId int64) error
 	IsGenerating(ctx context.Context, convId int64) bool
+	// ReadStream 从 Redis Stream 读取事件（非阻塞），afterId 为 Last-Event-ID
+	ReadStream(ctx context.Context, convId int64, afterId string) (events []domain.ChatEvent, ids []string, generating bool)
+	// BlockReadStream 阻塞等待新事件（用于 SSE 重连实时推送）
+	BlockReadStream(ctx context.Context, convId int64, afterId string, timeout time.Duration) ([]domain.ChatEvent, []string)
 }
 
 type AIChatService struct {
@@ -64,6 +70,7 @@ type AIChatService struct {
 	search     ArticleSearchService
 	executor   ToolExecutor
 	l          logger.LoggerX
+	stream     streamer.EventStreamer
 	cancel     sync.Map // convId -> context.CancelFunc
 	generating sync.Map // convId -> bool
 }
@@ -75,6 +82,7 @@ func NewAIChatService(
 	search ArticleSearchService,
 	executor ToolExecutor,
 	l logger.LoggerX,
+	stream streamer.EventStreamer,
 ) ChatService {
 	return &AIChatService{
 		convRepo: convRepo,
@@ -82,6 +90,7 @@ func NewAIChatService(
 		llm:      llm,
 		search:   search,
 		executor: executor,
+		stream:   stream,
 		l:        l,
 	}
 }
@@ -184,6 +193,52 @@ func (s *AIChatService) StopGeneration(ctx context.Context, uid int64, convId in
 	return nil
 }
 
+func (s *AIChatService) ReadStream(ctx context.Context, convId int64, afterId string) ([]domain.ChatEvent, []string, bool) {
+	if s.stream == nil {
+		_, gen := s.generating.Load(convId)
+		return nil, nil, gen
+	}
+	key := fmt.Sprintf(consts.ChatStreamPattern, convId)
+	rawEvents, ids, err := s.stream.ReadAfter(ctx, key, afterId)
+	if err != nil || len(rawEvents) == 0 {
+		_, gen := s.generating.Load(convId)
+		return nil, nil, gen
+	}
+	events := make([]domain.ChatEvent, 0, len(rawEvents))
+	validIds := make([]string, 0, len(rawEvents))
+	for i, raw := range rawEvents {
+		var event domain.ChatEvent
+		if json.Unmarshal([]byte(raw), &event) == nil {
+			events = append(events, event)
+			validIds = append(validIds, ids[i])
+		}
+	}
+	_, gen := s.generating.Load(convId)
+	return events, validIds, gen
+}
+
+// BlockReadStream 阻塞读取新事件（用于 SSE 重连实时推送，零空转）
+func (s *AIChatService) BlockReadStream(ctx context.Context, convId int64, afterId string, timeout time.Duration) ([]domain.ChatEvent, []string) {
+	if s.stream == nil {
+		return nil, nil
+	}
+	key := fmt.Sprintf(consts.ChatStreamPattern, convId)
+	rawEvents, ids, err := s.stream.BlockRead(ctx, key, afterId, timeout)
+	if err != nil || len(rawEvents) == 0 {
+		return nil, nil
+	}
+	events := make([]domain.ChatEvent, 0, len(rawEvents))
+	validIds := make([]string, 0, len(rawEvents))
+	for i, raw := range rawEvents {
+		var event domain.ChatEvent
+		if json.Unmarshal([]byte(raw), &event) == nil {
+			events = append(events, event)
+			validIds = append(validIds, ids[i])
+		}
+	}
+	return events, validIds
+}
+
 func (s *AIChatService) IsGenerating(_ context.Context, convId int64) bool {
 	_, ok := s.generating.Load(convId)
 	return ok
@@ -260,6 +315,11 @@ func (s *AIChatService) runStream(
 	s.generating.Store(convId, true)
 	clearGen := func() {
 		s.generating.Delete(convId)
+		// Stream 保留 5 分钟供重连，之后自动过期
+		if s.stream != nil {
+			streamKey := fmt.Sprintf(consts.ChatStreamPattern, convId)
+			s.stream.Expire(context.Background(), streamKey, consts.ChatStreamTTL)
+		}
 	}
 	defer s.cancel.Delete(cancelKey(uid, convId))
 
@@ -295,7 +355,7 @@ func (s *AIChatService) runStream(
 		if len(toolCalls) == 0 {
 			reply := fullContent.String()
 			s.finalizeReply(placeholderId, convId, uid, reply, allToolResults)
-			s.trySend(ctx, eventCh, domain.ChatEvent{
+			s.trySend(ctx, convId, eventCh, domain.ChatEvent{
 				Type: "done",
 				Data: map[string]any{
 					"messageId": placeholderId,
@@ -310,7 +370,7 @@ func (s *AIChatService) runStream(
 			s.l.Warn("工具调用超过最大轮次", logger.Int64("convId", convId))
 			reply := fullContent.String()
 			s.finalizeReply(placeholderId, convId, uid, reply, allToolResults)
-			s.trySend(ctx, eventCh, domain.ChatEvent{
+			s.trySend(ctx, convId, eventCh, domain.ChatEvent{
 				Type: "done",
 				Data: map[string]any{"messageId": placeholderId, "usage": buildUsage(usage)},
 			})
@@ -320,7 +380,7 @@ func (s *AIChatService) runStream(
 
 		// 执行工具，把 assistant tool_call + tool result 追加到 messages
 		var results []domain.ToolResultData
-		messages, results = s.executeTools(ctx, uid, messages, toolCalls, eventCh)
+		messages, results = s.executeTools(ctx, convId, uid, messages, toolCalls, eventCh)
 		allToolResults = append(allToolResults, results...)
 
 		// 发起下一轮 LLM 调用
@@ -331,7 +391,7 @@ func (s *AIChatService) runStream(
 		var err error
 		llmCh, err = s.llm.ChatStream(ctx, messages, tools)
 		if err != nil {
-			s.trySend(ctx, eventCh, domain.ChatEvent{Type: "error", Content: "工具调用后 LLM 请求失败"})
+			s.trySend(ctx, convId, eventCh, domain.ChatEvent{Type: "error", Content: "工具调用后 LLM 请求失败"})
 			s.savePartialReply(placeholderId, convId, fullContent.String())
 			return
 		}
@@ -364,14 +424,14 @@ func (s *AIChatService) processChunks(
 				if onFlush != nil {
 					onFlush(fullContent)
 				}
-				if !s.trySend(ctx, eventCh, domain.ChatEvent{Type: "delta", Content: chunk.Content}) {
+				if !s.trySend(ctx, convId, eventCh, domain.ChatEvent{Type: "delta", Content: chunk.Content}) {
 					s.savePartialReply(placeholderId, convId, fullContent.String())
 					return nil, nil, false
 				}
 			case "tool_call":
 				return chunk.ToolCalls, chunk.Usage, true
 			case "error":
-				s.trySend(ctx, eventCh, domain.ChatEvent{Type: "error", Content: chunk.Content})
+				s.trySend(ctx, convId, eventCh, domain.ChatEvent{Type: "error", Content: chunk.Content})
 				s.savePartialReply(placeholderId, convId, fullContent.String())
 				return nil, nil, false
 			case "done":
@@ -384,7 +444,7 @@ func (s *AIChatService) processChunks(
 // executeTools 执行工具调用列表，发送 tool_call + tool_result 事件，并把结果追加到 messages
 func (s *AIChatService) executeTools(
 	ctx context.Context,
-	uid int64,
+	convId, uid int64,
 	messages []ai.ChatMessage,
 	toolCalls []ai.StreamToolCall,
 	eventCh chan<- domain.ChatEvent,
@@ -406,7 +466,7 @@ func (s *AIChatService) executeTools(
 	var results []domain.ToolResultData
 	for _, tc := range toolCalls {
 		// 通知前端工具调用开始
-		s.trySend(ctx, eventCh, domain.ChatEvent{
+		s.trySend(ctx, convId, eventCh, domain.ChatEvent{
 			Type: "tool_call",
 			Data: map[string]any{"id": tc.Id, "name": tc.Name, "args": tc.Args},
 		})
@@ -425,7 +485,7 @@ func (s *AIChatService) executeTools(
 		results = append(results, result)
 
 		// 发送 tool_result 事件给前端
-		s.trySend(ctx, eventCh, domain.ChatEvent{Type: "tool_result", Data: result})
+		s.trySend(ctx, convId, eventCh, domain.ChatEvent{Type: "tool_result", Data: result})
 
 		// 把工具结果回注到 messages（tool role）
 		resultContent := marshalResult(result)
@@ -462,16 +522,33 @@ func marshalResult(r domain.ToolResultData) string {
 	return string(b)
 }
 
-// trySend 尝试发送事件，非阻塞：channel 满时丢弃事件但继续处理（浏览器断开后不卡死）
-func (s *AIChatService) trySend(ctx context.Context, ch chan<- domain.ChatEvent, event domain.ChatEvent) bool {
+// trySend 尝试发送事件到 channel + Redis Stream，非阻塞
+func (s *AIChatService) trySend(ctx context.Context, convId int64, ch chan<- domain.ChatEvent, event domain.ChatEvent) bool {
+	// 写 Redis Stream（供断线重连读取）
+	s.publishToStream(convId, event)
+	// 写 channel（供当前 SSE 连接读取）
 	select {
 	case ch <- event:
 		return true
 	case <-ctx.Done():
 		return false
 	default:
-		// channel 满（前端断开不再读取），丢弃事件但继续生成
 		return true
+	}
+}
+
+// publishToStream 将事件写入 Redis Stream，供 SSE 重连消费
+func (s *AIChatService) publishToStream(convId int64, event domain.ChatEvent) {
+	if s.stream == nil {
+		return
+	}
+	data, err := json.Marshal(event)
+	if err != nil {
+		return
+	}
+	key := fmt.Sprintf(consts.ChatStreamPattern, convId)
+	if _, err = s.stream.Publish(context.Background(), key, string(data)); err != nil {
+		s.l.Error("写入 Stream 失败", logger.Int64("convId", convId), logger.Error(err))
 	}
 }
 
