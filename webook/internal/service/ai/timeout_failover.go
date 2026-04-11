@@ -33,6 +33,19 @@ func NewTimeoutFailoverClient(clients []LLMClient, threshold int32, l logger.Log
 	}
 }
 
+func (t *TimeoutFailoverClient) Chat(ctx context.Context, messages []ChatMessage) (string, error) {
+	idx := atomic.LoadInt32(&t.idx)
+	result, err := t.clients[idx].Chat(ctx, messages)
+	if err == nil {
+		atomic.StoreInt32(&t.cnt, 0)
+		return result, nil
+	}
+	if t.isCriticalError(err) || errors.Is(err, context.DeadlineExceeded) {
+		atomic.AddInt32(&t.cnt, 1)
+	}
+	return "", err
+}
+
 func (t *TimeoutFailoverClient) ChatStream(ctx context.Context, messages []ChatMessage, tools []Tool) (<-chan StreamChunk, error) {
 	idx := atomic.LoadInt32(&t.idx)
 	cnt := atomic.LoadInt32(&t.cnt)

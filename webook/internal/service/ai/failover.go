@@ -23,6 +23,28 @@ func NewFailoverClient(clients []LLMClient, l logger.LoggerX) LLMClient {
 	return &FailoverClient{clients: clients, l: l}
 }
 
+func (f *FailoverClient) Chat(ctx context.Context, messages []ChatMessage) (string, error) {
+	length := uint64(len(f.clients))
+	globalIdx := atomic.AddUint64(&f.idx, 1)
+
+	var lastErr error
+	for i := uint64(0); i < length; i++ {
+		index := (globalIdx + i - 1) % length
+		result, err := f.clients[index].Chat(ctx, messages)
+		switch {
+		case err == nil:
+			return result, nil
+		case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
+			return "", err
+		}
+		lastErr = err
+		f.l.Warn("LLM Chat 调用失败，尝试下一个",
+			logger.Uint64("providerIndex", index),
+			logger.Error(err))
+	}
+	return "", fmt.Errorf("轮询所有 LLM 提供方均失败: %w", lastErr)
+}
+
 func (f *FailoverClient) ChatStream(ctx context.Context, messages []ChatMessage, tools []Tool) (<-chan StreamChunk, error) {
 	length := uint64(len(f.clients))
 	globalIdx := atomic.AddUint64(&f.idx, 1)

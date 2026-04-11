@@ -90,6 +90,62 @@ type openaiStreamToolCall struct {
 	} `json:"function"`
 }
 
+// openaiSyncResponse 同步（非流式）调用的响应结构
+type openaiSyncResponse struct {
+	Choices []struct {
+		Message struct {
+			Content string `json:"content"`
+		} `json:"message"`
+	} `json:"choices"`
+}
+
+func (c *OpenAIClient) Chat(ctx context.Context, messages []ChatMessage) (string, error) {
+	reqBody := openaiRequest{
+		Model:    c.cfg.Model,
+		Messages: messages,
+		Stream:   false,
+	}
+	if c.cfg.MaxTokens > 0 {
+		reqBody.MaxTokens = c.cfg.MaxTokens
+	}
+
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		return "", fmt.Errorf("[%s] marshal request: %w", c.name, err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.url, bytes.NewReader(body))
+	if err != nil {
+		return "", fmt.Errorf("[%s] create request: %w", c.name, err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+c.cfg.ApiKey)
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("[%s] do request: %w", c.name, err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, 64*1024))
+	if err != nil {
+		return "", fmt.Errorf("[%s] read response: %w", c.name, err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("[%s] API error: status=%d, body=%s", c.name, resp.StatusCode, string(respBody))
+	}
+
+	var result openaiSyncResponse
+	if err = json.Unmarshal(respBody, &result); err != nil {
+		return "", fmt.Errorf("[%s] unmarshal response: %w", c.name, err)
+	}
+	if len(result.Choices) == 0 {
+		return "", fmt.Errorf("[%s] empty choices", c.name)
+	}
+	return result.Choices[0].Message.Content, nil
+}
+
 func (c *OpenAIClient) ChatStream(ctx context.Context, messages []ChatMessage, tools []Tool) (<-chan StreamChunk, error) {
 	reqBody := openaiRequest{
 		Model:         c.cfg.Model,

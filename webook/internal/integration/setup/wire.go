@@ -40,9 +40,12 @@ func InitWebServer() *gin.Engine {
 		web.NewInternalChatHandler,
 		web.NewInternalArticleSearchHandler,
 		web.NewAIClickEventHandler,
+		web.NewAIArticlePolishHandler,
 		jwt.NewRedisJwtHandler,
 		// 点击埋点
 		clickEventSvcProvider,
+		// 文章润色
+		polishSvcProvider,
 
 		ioc.InitMiddlewares,
 		ioc.InitWebServer,
@@ -75,6 +78,16 @@ func InitInteractionHandler() web.InteractionHandler {
 		web.NewInternalInteractionHandler,
 	)
 	return &web.InternalInteractionHandler{}
+}
+
+func InitArticlePolishHandler() web.ArticlePolishHandler {
+	wire.Build(
+		infraSvcProvider,
+		chatSvcProvider,
+		polishSvcProvider,
+		web.NewAIArticlePolishHandler,
+	)
+	return &web.AIArticlePolishHandler{}
 }
 
 func InitClickEventHandler() web.ClickEventHandler {
@@ -152,6 +165,10 @@ var clickEventSvcProvider = wire.NewSet(
 	cache.NewRedisAIClickEventCache,
 	repository.NewCacheAIClickEventRepository,
 	service.NewAIClickEventService,
+)
+
+var polishSvcProvider = wire.NewSet(
+	service.NewAIArticlePolishService,
 )
 
 var chatSvcProvider = wire.NewSet(

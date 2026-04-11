@@ -2,9 +2,12 @@ package ai
 
 import "context"
 
-// LLMClient LLM 流式调用接口
+// LLMClient LLM 调用接口
 type LLMClient interface {
+	// ChatStream 流式调用，用于对话场景
 	ChatStream(ctx context.Context, messages []ChatMessage, tools []Tool) (<-chan StreamChunk, error)
+	// Chat 同步调用，用于润色等一次性任务，不支持 tools
+	Chat(ctx context.Context, messages []ChatMessage) (string, error)
 }
 
 // ChatMessage 聊天消息，兼容 user/assistant/system/tool 四种 role

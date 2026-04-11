@@ -33,6 +33,11 @@ var clickEventProviderSet = wire.NewSet(
 	service.NewAIClickEventService,
 )
 
+// polishProviderSet 文章润色模块
+var polishProviderSet = wire.NewSet(
+	service.NewAIArticlePolishService,
+)
+
 // chatProviderSet Chat 模块的 Wire Provider 集合（不含 Handler）
 var chatProviderSet = wire.NewSet(
 	ioc.InitLLMConfig,
@@ -83,6 +88,7 @@ func InitWebServer() *gin.Engine {
 		web.NewInternalChatHandler,
 		web.NewInternalArticleSearchHandler,
 		web.NewAIClickEventHandler,
+		web.NewAIArticlePolishHandler,
 		jwt.NewRedisJwtHandler,
 		// chat 模块
 		chatProviderSet,
@@ -90,6 +96,8 @@ func InitWebServer() *gin.Engine {
 		searchProviderSet,
 		// 点击埋点
 		clickEventProviderSet,
+		// 文章润色
+		polishProviderSet,
 
 		ioc.InitMiddlewares,
 		ioc.InitWebServer,

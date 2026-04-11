@@ -22,6 +22,13 @@ func (as ArticleStatus) ToUint8() uint8 {
 	return uint8(as)
 }
 
+// PolishResult AI 润色结果
+type PolishResult struct {
+	Title    string `json:"title"`
+	Abstract string `json:"abstract"`
+	Content  string `json:"content"`
+}
+
 const (
 	ArticleStatusUnknown     ArticleStatus = iota //未知状态
 	ArticleStatusUnpublished                      //未发表
