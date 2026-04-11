@@ -41,6 +41,18 @@ func (m *MockMessageRepository) EXPECT() *MockMessageRepositoryMockRecorder {
 	return m.recorder
 }
 
+// DelMsgCache mocks base method.
+func (m *MockMessageRepository) DelMsgCache(ctx context.Context, convId int64) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "DelMsgCache", ctx, convId)
+}
+
+// DelMsgCache indicates an expected call of DelMsgCache.
+func (mr *MockMessageRepositoryMockRecorder) DelMsgCache(ctx, convId any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DelMsgCache", reflect.TypeOf((*MockMessageRepository)(nil).DelMsgCache), ctx, convId)
+}
+
 // Insert mocks base method.
 func (m *MockMessageRepository) Insert(ctx context.Context, msg domain.Message) (domain.Message, error) {
 	m.ctrl.T.Helper()
@@ -114,4 +126,18 @@ func (m *MockMessageRepository) ListRecentLite(ctx context.Context, convId int64
 func (mr *MockMessageRepositoryMockRecorder) ListRecentLite(ctx, convId, limit any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListRecentLite", reflect.TypeOf((*MockMessageRepository)(nil).ListRecentLite), ctx, convId, limit)
+}
+
+// UpdateContent mocks base method.
+func (m *MockMessageRepository) UpdateContent(ctx context.Context, convId, id int64, content, toolCalls string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateContent", ctx, convId, id, content, toolCalls)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateContent indicates an expected call of UpdateContent.
+func (mr *MockMessageRepositoryMockRecorder) UpdateContent(ctx, convId, id, content, toolCalls any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateContent", reflect.TypeOf((*MockMessageRepository)(nil).UpdateContent), ctx, convId, id, content, toolCalls)
 }

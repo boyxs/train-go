@@ -106,14 +106,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           </div>
         ) : (
           <div className='bg-white border border-[#E5E7EB] px-4 py-3 rounded-2xl rounded-tl-md shadow-sm'>
-            {/* 工具调用状态块（running/done/error） */}
-            {toolStates.map((state, i) => (
-              <ToolStateBlock
-                key={state.callId || `${state.name}-${i}`}
-                state={state}
-                conversationId={conversationId}
-              />
-            ))}
             {streaming && isEmpty && toolStates.length === 0 ? (
               <TypingDots />
             ) : (
@@ -172,6 +164,14 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                 {streaming && !isEmpty && <TypingDots />}
               </div>
             )}
+            {/* 工具调用状态块（在文本内容下方） */}
+            {toolStates.map((state, i) => (
+              <ToolStateBlock
+                key={state.callId || `${state.name}-${i}`}
+                state={state}
+                conversationId={conversationId}
+              />
+            ))}
           </div>
         )}
       </div>

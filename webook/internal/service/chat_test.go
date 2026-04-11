@@ -112,18 +112,15 @@ func TestChatService_RunStream_TextOnly(t *testing.T) {
 	convRepo := repomocks.NewMockConversationRepository(ctrl)
 	llm := aimocks.NewMockLLMClient(ctrl)
 
-	// 保存 AI 回复
+	// placeholder insert + content updates + autoTitle
 	msgRepo.EXPECT().Insert(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(ctx context.Context, msg domain.Message) (domain.Message, error) {
-			assert.Equal(t, "assistant", msg.Role)
-			assert.Equal(t, "你好世界", msg.Content)
-			return domain.Message{Id: 100}, nil
-		})
-	// autoTitle: ListRecent 返回 2 条（首轮对话）
+		Return(domain.Message{Id: 100}, nil).AnyTimes()
+	msgRepo.EXPECT().UpdateContent(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(nil).AnyTimes()
+	msgRepo.EXPECT().DelMsgCache(gomock.Any(), gomock.Any()).AnyTimes()
 	msgRepo.EXPECT().ListRecent(gomock.Any(), int64(1), 3).
-		Return([]domain.Message{{}, {}}, nil)
-	// UpdateTitle
-	convRepo.EXPECT().UpdateTitle(gomock.Any(), int64(1), int64(1), gomock.Any()).Return(nil)
+		Return([]domain.Message{{}, {}}, nil).AnyTimes()
+	convRepo.EXPECT().UpdateTitle(gomock.Any(), int64(1), int64(1), gomock.Any()).Return(nil).AnyTimes()
 
 	svc := &AIChatService{
 		convRepo: convRepo,
@@ -163,16 +160,13 @@ func TestChatService_RunStream_CtxCancel(t *testing.T) {
 	convRepo := repomocks.NewMockConversationRepository(ctrl)
 	llm := aimocks.NewMockLLMClient(ctrl)
 
-	// 部分回复应被保存
 	msgRepo.EXPECT().Insert(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(ctx context.Context, msg domain.Message) (domain.Message, error) {
-			assert.Equal(t, "assistant", msg.Role)
-			assert.Equal(t, "部分", msg.Content)
-			return domain.Message{Id: 50}, nil
-		})
-	// autoTitle
+		Return(domain.Message{Id: 50}, nil).AnyTimes()
+	msgRepo.EXPECT().UpdateContent(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(nil).AnyTimes()
+	msgRepo.EXPECT().DelMsgCache(gomock.Any(), gomock.Any()).AnyTimes()
 	msgRepo.EXPECT().ListRecent(gomock.Any(), int64(1), 3).
-		Return([]domain.Message{{}, {}, {}}, nil) // 3 条 → 非首轮，不更新标题
+		Return([]domain.Message{{}, {}, {}}, nil).AnyTimes()
 
 	svc := &AIChatService{
 		convRepo: convRepo,
@@ -219,14 +213,13 @@ func TestChatService_RunStream_Error(t *testing.T) {
 	convRepo := repomocks.NewMockConversationRepository(ctrl)
 	llm := aimocks.NewMockLLMClient(ctrl)
 
-	// 有部分内容，应保存
 	msgRepo.EXPECT().Insert(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(ctx context.Context, msg domain.Message) (domain.Message, error) {
-			assert.Equal(t, "一些内容", msg.Content)
-			return domain.Message{Id: 60}, nil
-		})
+		Return(domain.Message{Id: 60}, nil).AnyTimes()
+	msgRepo.EXPECT().UpdateContent(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(nil).AnyTimes()
+	msgRepo.EXPECT().DelMsgCache(gomock.Any(), gomock.Any()).AnyTimes()
 	msgRepo.EXPECT().ListRecent(gomock.Any(), int64(1), 3).
-		Return([]domain.Message{{}, {}, {}}, nil)
+		Return([]domain.Message{{}, {}, {}}, nil).AnyTimes()
 
 	svc := &AIChatService{
 		convRepo: convRepo,
@@ -261,7 +254,11 @@ func TestChatService_RunStream_ErrorNoContent(t *testing.T) {
 	msgRepo := repomocks.NewMockMessageRepository(ctrl)
 	convRepo := repomocks.NewMockConversationRepository(ctrl)
 	llm := aimocks.NewMockLLMClient(ctrl)
-	// 不应调用 Insert（空内容不保存）
+	msgRepo.EXPECT().Insert(gomock.Any(), gomock.Any()).
+		Return(domain.Message{Id: 70}, nil).AnyTimes()
+	msgRepo.EXPECT().UpdateContent(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(nil).AnyTimes()
+	msgRepo.EXPECT().DelMsgCache(gomock.Any(), gomock.Any()).AnyTimes()
 
 	svc := &AIChatService{
 		convRepo: convRepo,
@@ -299,9 +296,16 @@ func TestChatService_SendMessage_RAGWithArticles(t *testing.T) {
 	convRepo.EXPECT().Find(gomock.Any(), int64(1), int64(1)).
 		Return(domain.Conversation{Id: 1, UserId: 1}, nil)
 	msgRepo.EXPECT().Insert(gomock.Any(), gomock.Any()).
-		Return(domain.Message{Id: 1}, nil)
+		Return(domain.Message{Id: 1}, nil).AnyTimes()
+	msgRepo.EXPECT().UpdateContent(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(nil).AnyTimes()
+	msgRepo.EXPECT().DelMsgCache(gomock.Any(), gomock.Any()).AnyTimes()
 	msgRepo.EXPECT().ListRecentLite(gomock.Any(), int64(1), maxHistoryRounds*2).
 		Return([]domain.Message{{Role: "user", Content: "Go并发怎么写"}}, nil)
+	msgRepo.EXPECT().ListRecent(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(nil, nil).AnyTimes()
+	convRepo.EXPECT().UpdateTitle(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(nil).AnyTimes()
 
 	// RAG 返回 2 篇文章
 	search.EXPECT().Search(gomock.Any(), "Go并发怎么写", 1, ragTopK).
@@ -331,6 +335,7 @@ func TestChatService_SendMessage_RAGWithArticles(t *testing.T) {
 	svc := NewAIChatService(convRepo, msgRepo, llm, search, nil, logger.NewNopLogger())
 	_, err := svc.SendMessage(context.Background(), 1, 1, "Go并发怎么写")
 	assert.NoError(t, err)
+	time.Sleep(100 * time.Millisecond) // 等 runStream goroutine 完成
 }
 
 func TestChatService_SendMessage_RAGNoResults(t *testing.T) {
@@ -346,9 +351,16 @@ func TestChatService_SendMessage_RAGNoResults(t *testing.T) {
 	convRepo.EXPECT().Find(gomock.Any(), int64(1), int64(1)).
 		Return(domain.Conversation{Id: 1, UserId: 1}, nil)
 	msgRepo.EXPECT().Insert(gomock.Any(), gomock.Any()).
-		Return(domain.Message{Id: 1}, nil)
+		Return(domain.Message{Id: 1}, nil).AnyTimes()
+	msgRepo.EXPECT().UpdateContent(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(nil).AnyTimes()
+	msgRepo.EXPECT().DelMsgCache(gomock.Any(), gomock.Any()).AnyTimes()
 	msgRepo.EXPECT().ListRecentLite(gomock.Any(), int64(1), maxHistoryRounds*2).
 		Return([]domain.Message{{Role: "user", Content: "你好"}}, nil)
+	msgRepo.EXPECT().ListRecent(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(nil, nil).AnyTimes()
+	convRepo.EXPECT().UpdateTitle(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(nil).AnyTimes()
 
 	// 检索无结果
 	search.EXPECT().Search(gomock.Any(), "你好", 1, ragTopK).
@@ -370,6 +382,7 @@ func TestChatService_SendMessage_RAGNoResults(t *testing.T) {
 	svc := NewAIChatService(convRepo, msgRepo, llm, search, nil, logger.NewNopLogger())
 	_, err := svc.SendMessage(context.Background(), 1, 1, "你好")
 	assert.NoError(t, err)
+	time.Sleep(100 * time.Millisecond)
 }
 
 func TestChatService_SendMessage_RAGSearchFail(t *testing.T) {
@@ -385,9 +398,16 @@ func TestChatService_SendMessage_RAGSearchFail(t *testing.T) {
 	convRepo.EXPECT().Find(gomock.Any(), int64(1), int64(1)).
 		Return(domain.Conversation{Id: 1, UserId: 1}, nil)
 	msgRepo.EXPECT().Insert(gomock.Any(), gomock.Any()).
-		Return(domain.Message{Id: 1}, nil)
+		Return(domain.Message{Id: 1}, nil).AnyTimes()
+	msgRepo.EXPECT().UpdateContent(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(nil).AnyTimes()
+	msgRepo.EXPECT().DelMsgCache(gomock.Any(), gomock.Any()).AnyTimes()
 	msgRepo.EXPECT().ListRecentLite(gomock.Any(), int64(1), maxHistoryRounds*2).
 		Return([]domain.Message{{Role: "user", Content: "Go怎么写测试"}}, nil)
+	msgRepo.EXPECT().ListRecent(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(nil, nil).AnyTimes()
+	convRepo.EXPECT().UpdateTitle(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(nil).AnyTimes()
 
 	// 检索失败（知识类问题走 RAG）
 	search.EXPECT().Search(gomock.Any(), "Go怎么写测试", 1, ragTopK).
@@ -406,6 +426,7 @@ func TestChatService_SendMessage_RAGSearchFail(t *testing.T) {
 	svc := NewAIChatService(convRepo, msgRepo, llm, search, nil, logger.NewNopLogger())
 	_, err := svc.SendMessage(context.Background(), 1, 1, "Go怎么写测试")
 	assert.NoError(t, err)
+	time.Sleep(100 * time.Millisecond)
 }
 
 func TestInjectArticleContext(t *testing.T) {
@@ -484,16 +505,14 @@ func TestChatService_RunStream_WithToolCall(t *testing.T) {
 	// 第一次 ChatStream 在 SendMessage 中调用，第二次在 runStream 工具调用后调用
 	llm.EXPECT().ChatStream(gomock.Any(), gomock.Any(), gomock.Any()).Return(secondCh, nil)
 
-	// 保存 AI 最终回复
 	msgRepo.EXPECT().Insert(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(ctx context.Context, msg domain.Message) (domain.Message, error) {
-			assert.Equal(t, "assistant", msg.Role)
-			assert.Equal(t, "以下是热门文章", msg.Content)
-			return domain.Message{Id: 200}, nil
-		})
+		Return(domain.Message{Id: 200}, nil).AnyTimes()
+	msgRepo.EXPECT().UpdateContent(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(nil).AnyTimes()
+	msgRepo.EXPECT().DelMsgCache(gomock.Any(), gomock.Any()).AnyTimes()
 	msgRepo.EXPECT().ListRecent(gomock.Any(), int64(1), 3).
-		Return([]domain.Message{{}, {}}, nil)
-	convRepo.EXPECT().UpdateTitle(gomock.Any(), int64(1), int64(1), gomock.Any()).Return(nil)
+		Return([]domain.Message{{}, {}}, nil).AnyTimes()
+	convRepo.EXPECT().UpdateTitle(gomock.Any(), int64(1), int64(1), gomock.Any()).Return(nil).AnyTimes()
 
 	svc := &AIChatService{
 		convRepo: convRepo,

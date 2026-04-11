@@ -45,6 +45,13 @@ export function stopGeneration(conversationId: number) {
   return request.post<Result<null>>('/chat/stop', { conversationId });
 }
 
+// POST /chat/conversation/generating — 查询是否正在生成
+export function isGenerating(conversationId: number) {
+  return request.post<Result<boolean>>('/chat/conversation/generating', {
+    conversationId,
+  });
+}
+
 // SSE 回调
 export interface SSECallbacks {
   onDelta: (text: string) => void;

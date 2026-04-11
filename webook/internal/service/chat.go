@@ -35,7 +35,7 @@ const (
 3. 回答简洁友好，使用中文
 4. 如果不确定，坦诚告知用户
 5. 如果系统提供了相关文章，优先基于文章内容回答，并在回答中引用来源
-6. 引用时直接复制系统提供的 Markdown 链接，不要自己编造链接
+6. 引用文章时必须使用 url 字段生成 Markdown 链接，格式 [标题](url)，不要用 id 拼链接
 7. 涉及文章推荐、热门、收藏的问题，必须调用对应工具获取实时数据
 8. 每次都必须重新调用工具获取最新数据，不能复用历史对话中出现过的数据
 9. 工具返回结果后，基于结果回答用户，不要编造内容
@@ -54,16 +54,18 @@ type ChatService interface {
 	ListMessages(ctx context.Context, uid int64, convId int64, beforeId int64, limit int) ([]domain.Message, error)
 	SendMessage(ctx context.Context, uid int64, convId int64, content string) (<-chan domain.ChatEvent, error)
 	StopGeneration(ctx context.Context, uid int64, convId int64) error
+	IsGenerating(ctx context.Context, convId int64) bool
 }
 
 type AIChatService struct {
-	convRepo repository.ConversationRepository
-	msgRepo  repository.MessageRepository
-	llm      ai.LLMClient
-	search   ArticleSearchService
-	executor ToolExecutor
-	l        logger.LoggerX
-	cancel   sync.Map // convId -> context.CancelFunc
+	convRepo   repository.ConversationRepository
+	msgRepo    repository.MessageRepository
+	llm        ai.LLMClient
+	search     ArticleSearchService
+	executor   ToolExecutor
+	l          logger.LoggerX
+	cancel     sync.Map // convId -> context.CancelFunc
+	generating sync.Map // convId -> bool
 }
 
 func NewAIChatService(
@@ -152,8 +154,8 @@ func (s *AIChatService) SendMessage(ctx context.Context, uid int64, convId int64
 		messages = s.injectArticleContext(messages, articles)
 	}
 
-	// 5. 创建可取消的 context
-	streamCtx, cancel := context.WithCancel(ctx)
+	// 5. 创建独立 context，不绑定 HTTP 请求（浏览器关闭/刷新不中断生成）
+	streamCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	s.cancel.Store(cancelKey(uid, convId), cancel)
 
 	// 6. 首次调用 LLM
@@ -180,6 +182,11 @@ func (s *AIChatService) StopGeneration(ctx context.Context, uid int64, convId in
 		cancelFn.(context.CancelFunc)()
 	}
 	return nil
+}
+
+func (s *AIChatService) IsGenerating(_ context.Context, convId int64) bool {
+	_, ok := s.generating.Load(convId)
+	return ok
 }
 
 // cancelKey 生成 uid:convId 复合 key，防止越权取消他人的生成
@@ -250,38 +257,64 @@ func (s *AIChatService) runStream(
 	eventCh chan<- domain.ChatEvent,
 ) {
 	defer close(eventCh)
+	s.generating.Store(convId, true)
+	clearGen := func() {
+		s.generating.Delete(convId)
+	}
 	defer s.cancel.Delete(cancelKey(uid, convId))
+
+	// 预先插入一条空的 assistant 消息，后续定期更新内容（支持刷新后轮询看到进度）
+	placeholder, _ := s.msgRepo.Insert(context.Background(), domain.Message{
+		ConversationId: convId,
+		Role:           "assistant",
+		Content:        "",
+	})
+	placeholderId := placeholder.Id
+	lastFlush := time.Now()
 
 	var fullContent strings.Builder
 	var allToolResults []domain.ToolResultData
 
+	// 定期刷新部分内容到 DB（每 2 秒），支持刷新后轮询
+	flushToDB := func(buf *strings.Builder) {
+		if placeholderId > 0 && time.Since(lastFlush) > 2*time.Second {
+			lastFlush = time.Now()
+			if err := s.msgRepo.UpdateContent(context.Background(), convId, placeholderId, buf.String(), ""); err != nil {
+				s.l.Error("刷新部分内容失败", logger.Int64("msgId", placeholderId), logger.Error(err))
+			}
+			s.msgRepo.DelMsgCache(context.Background(), convId)
+		}
+	}
+
 	for round := 0; round <= maxToolRounds; round++ {
-		toolCalls, usage, finished := s.processChunks(ctx, convId, uid, llmCh, &fullContent, eventCh)
+		toolCalls, usage, finished := s.processChunks(ctx, convId, placeholderId, llmCh, &fullContent, eventCh, flushToDB)
 		if !finished {
 			return
 		}
 
 		if len(toolCalls) == 0 {
 			reply := fullContent.String()
-			msgId := s.saveReply(convId, uid, reply, allToolResults)
+			s.finalizeReply(placeholderId, convId, uid, reply, allToolResults)
 			s.trySend(ctx, eventCh, domain.ChatEvent{
 				Type: "done",
 				Data: map[string]any{
-					"messageId": msgId,
+					"messageId": placeholderId,
 					"usage":     buildUsage(usage),
 				},
 			})
+			clearGen()
 			return
 		}
 
 		if round == maxToolRounds {
 			s.l.Warn("工具调用超过最大轮次", logger.Int64("convId", convId))
 			reply := fullContent.String()
-			msgId := s.saveReply(convId, uid, reply, allToolResults)
+			s.finalizeReply(placeholderId, convId, uid, reply, allToolResults)
 			s.trySend(ctx, eventCh, domain.ChatEvent{
 				Type: "done",
-				Data: map[string]any{"messageId": msgId, "usage": buildUsage(usage)},
+				Data: map[string]any{"messageId": placeholderId, "usage": buildUsage(usage)},
 			})
+			clearGen()
 			return
 		}
 
@@ -299,7 +332,7 @@ func (s *AIChatService) runStream(
 		llmCh, err = s.llm.ChatStream(ctx, messages, tools)
 		if err != nil {
 			s.trySend(ctx, eventCh, domain.ChatEvent{Type: "error", Content: "工具调用后 LLM 请求失败"})
-			s.savePartialReply(convId, uid, fullContent.String())
+			s.savePartialReply(placeholderId, convId, fullContent.String())
 			return
 		}
 	}
@@ -309,33 +342,37 @@ func (s *AIChatService) runStream(
 // finished=true 表示收到 done 或 tool_call，false 表示 ctx 取消/异常
 func (s *AIChatService) processChunks(
 	ctx context.Context,
-	convId, uid int64,
+	convId, placeholderId int64,
 	llmCh <-chan ai.StreamChunk,
 	fullContent *strings.Builder,
 	eventCh chan<- domain.ChatEvent,
+	onFlush func(buf *strings.Builder),
 ) (toolCalls []ai.StreamToolCall, usage *ai.StreamUsage, finished bool) {
 	for {
 		select {
 		case <-ctx.Done():
-			s.savePartialReply(convId, uid, fullContent.String())
+			s.savePartialReply(placeholderId, convId, fullContent.String())
 			return nil, nil, false
 		case chunk, ok := <-llmCh:
 			if !ok {
-				s.savePartialReply(convId, uid, fullContent.String())
+				s.savePartialReply(placeholderId, convId, fullContent.String())
 				return nil, nil, false
 			}
 			switch chunk.Type {
 			case "text":
 				fullContent.WriteString(chunk.Content)
+				if onFlush != nil {
+					onFlush(fullContent)
+				}
 				if !s.trySend(ctx, eventCh, domain.ChatEvent{Type: "delta", Content: chunk.Content}) {
-					s.savePartialReply(convId, uid, fullContent.String())
+					s.savePartialReply(placeholderId, convId, fullContent.String())
 					return nil, nil, false
 				}
 			case "tool_call":
 				return chunk.ToolCalls, chunk.Usage, true
 			case "error":
 				s.trySend(ctx, eventCh, domain.ChatEvent{Type: "error", Content: chunk.Content})
-				s.savePartialReply(convId, uid, fullContent.String())
+				s.savePartialReply(placeholderId, convId, fullContent.String())
 				return nil, nil, false
 			case "done":
 				return nil, chunk.Usage, true
@@ -425,48 +462,45 @@ func marshalResult(r domain.ToolResultData) string {
 	return string(b)
 }
 
-// trySend 尝试发送事件，如果 ctx 已取消则放弃（防止 goroutine 阻塞泄漏）
+// trySend 尝试发送事件，非阻塞：channel 满时丢弃事件但继续处理（浏览器断开后不卡死）
 func (s *AIChatService) trySend(ctx context.Context, ch chan<- domain.ChatEvent, event domain.ChatEvent) bool {
 	select {
 	case ch <- event:
 		return true
 	case <-ctx.Done():
 		return false
+	default:
+		// channel 满（前端断开不再读取），丢弃事件但继续生成
+		return true
 	}
 }
 
-// saveReply 保存完整 AI 回复，返回消息 ID
-func (s *AIChatService) saveReply(convId int64, uid int64, reply string, toolResults []domain.ToolResultData) int64 {
-	if reply == "" && len(toolResults) == 0 {
-		return 0
+// finalizeReply 更新 placeholder 消息为最终内容，并自动标题
+func (s *AIChatService) finalizeReply(msgId int64, convId int64, uid int64, reply string, toolResults []domain.ToolResultData) {
+	if msgId <= 0 {
+		return
 	}
 	var toolCallsJSON string
 	if len(toolResults) > 0 {
 		b, _ := json.Marshal(toolResults)
 		toolCallsJSON = string(b)
 	}
-	saved, err := s.msgRepo.Insert(context.Background(), domain.Message{
-		ConversationId: convId,
-		Role:           "assistant",
-		Content:        reply,
-		ToolCalls:      toolCallsJSON,
-	})
-	if err != nil {
-		s.l.Error("保存 AI 回复失败",
-			logger.Int64("convId", convId),
-			logger.Error(err))
-		return 0
+	if err := s.msgRepo.UpdateContent(context.Background(), convId, msgId, reply, toolCallsJSON); err != nil {
+		s.l.Error("最终更新消息失败", logger.Int64("msgId", msgId), logger.Error(err))
 	}
+	s.msgRepo.DelMsgCache(context.Background(), convId)
 	s.autoTitle(convId, uid, reply)
-	return saved.Id
 }
 
-// savePartialReply 前端断开或出错时保存已有的部分回复
-func (s *AIChatService) savePartialReply(convId int64, uid int64, content string) {
-	if content == "" {
+// savePartialReply 异常退出时立即保存最新内容到 placeholder（补 onFlush 的 2 秒间隔差）
+func (s *AIChatService) savePartialReply(msgId int64, convId int64, content string) {
+	if msgId <= 0 || content == "" {
 		return
 	}
-	s.saveReply(convId, uid, content, nil)
+	if err := s.msgRepo.UpdateContent(context.Background(), convId, msgId, content, ""); err != nil {
+		s.l.Error("保存部分回复失败", logger.Int64("msgId", msgId), logger.Error(err))
+	}
+	s.msgRepo.DelMsgCache(context.Background(), convId)
 }
 
 // autoTitle 首条对话时自动截取 AI 回复前 N 字作为标题

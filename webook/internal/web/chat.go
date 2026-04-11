@@ -36,10 +36,21 @@ func (h *InternalChatHandler) RegisterRoutes(server *gin.Engine) {
 	g.POST("/message/list", h.ListMessages)
 	g.POST("/message/send", h.SendMessage)
 	g.POST("/stop", h.StopGeneration)
+	g.POST("/conversation/generating", h.IsGenerating)
 }
 
 type conversationIdReq struct {
 	ConversationId int64 `json:"conversationId"`
+}
+
+func (h *InternalChatHandler) IsGenerating(ctx *gin.Context) {
+	var req conversationIdReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(http.StatusOK, Result{Code: 4, Msg: "参数错误"})
+		return
+	}
+	generating := h.svc.IsGenerating(ctx, req.ConversationId)
+	ctx.JSON(http.StatusOK, Result{Data: generating})
 }
 
 type listMessagesReq struct {

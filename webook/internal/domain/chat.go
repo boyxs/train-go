@@ -32,6 +32,7 @@ type ArticleCard struct {
 	Id       int64  `json:"id"`
 	Title    string `json:"title"`
 	Abstract string `json:"abstract"`
+	Url      string `json:"url"`
 }
 
 // ToolResultData tool_result SSE 事件中的结构化数据
