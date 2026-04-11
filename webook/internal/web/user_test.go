@@ -80,7 +80,7 @@ func TestMock(t *testing.T) {
 		Id:    1,
 		Email: "123456@qq.com",
 	})
-	t.Error(err)
+	assert.Error(t, err, errors.New("mock error"))
 }
 
 func TestInternalUserHandler_Register(t *testing.T) {

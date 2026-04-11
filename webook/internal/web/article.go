@@ -8,6 +8,7 @@ import (
 	"gitee.com/train-cloud/geektime-basic-go/internal/service"
 	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
 	"github.com/gin-gonic/gin"
+	"golang.org/x/sync/errgroup"
 )
 
 type ArticleAuthorHandler interface {
@@ -167,25 +168,30 @@ func (h *InternalArticleAuthorHandler) Detail(ctx *gin.Context) {
 		return
 	}
 	uc := ctx.MustGet(consts.UserKey).(UserClaims)
-	article, err := h.svc.Detail(ctx, req.Id, uc.Userid)
-	if err != nil {
-		ctx.JSON(http.StatusOK, Result{
-			Msg: "系统错误",
-		})
+	var article domain.Article
+	var intr domain.Interaction
+	var eg errgroup.Group
+	eg.Go(func() error {
+		var e error
+		article, e = h.svc.Detail(ctx, req.Id, uc.Userid)
+		return e
+	})
+	eg.Go(func() error {
+		var e error
+		intr, e = h.intrSvc.FindInteraction(ctx, 0, domain.BizArticle, req.Id)
+		if e != nil {
+			h.l.Error("获取文章互动数据失败",
+				logger.Int64("article_id", req.Id), logger.Error(e))
+		}
+		return nil // 互动查询失败不阻塞
+	})
+	if err := eg.Wait(); err != nil {
+		ctx.JSON(http.StatusOK, Result{Msg: "系统错误"})
 		h.l.Error("获取文章详情失败",
 			logger.Int64("userid", uc.Userid),
 			logger.Int64("article_id", req.Id),
 			logger.Error(err))
 		return
-	}
-	var readCnt int64
-	intr, intrErr := h.intrSvc.FindInteraction(ctx, 0, domain.BizArticle, req.Id)
-	if intrErr != nil {
-		h.l.Error("获取文章互动数据失败",
-			logger.Int64("article_id", req.Id),
-			logger.Error(intrErr))
-	} else {
-		readCnt = intr.ReadCount
 	}
 	ctx.JSON(http.StatusOK, Result{
 		Data: AuthorDetailVO{
@@ -194,7 +200,7 @@ func (h *InternalArticleAuthorHandler) Detail(ctx *gin.Context) {
 			Content:   article.Content,
 			Abstract:  article.Abstract,
 			Status:    article.Status.ToUint8(),
-			ReadCnt:   readCnt,
+			ReadCnt:   intr.ReadCount,
 			CreatedAt: article.CreatedAt,
 			UpdatedAt: article.UpdatedAt,
 		},
@@ -388,23 +394,29 @@ func (h *InternalArticleReaderHandler) Detail(ctx *gin.Context) {
 		ctx.AbortWithStatus(http.StatusBadRequest)
 		return
 	}
-	article, err := h.svc.Detail(ctx, req.Id)
-	if err != nil {
+	var article domain.Article
+	var intr domain.Interaction
+	var eg errgroup.Group
+	eg.Go(func() error {
+		var e error
+		article, e = h.svc.Detail(ctx, req.Id)
+		return e
+	})
+	eg.Go(func() error {
+		var e error
+		intr, e = h.intrSvc.FindInteraction(ctx, 0, domain.BizArticle, req.Id)
+		if e != nil {
+			h.l.Error("获取文章互动数据失败",
+				logger.Int64("article_id", req.Id), logger.Error(e))
+		}
+		return nil // 互动查询失败不阻塞
+	})
+	if err := eg.Wait(); err != nil {
 		ctx.JSON(http.StatusOK, Result{Msg: "文章不存在"})
 		h.l.Error("获取公开文章详情失败",
 			logger.Int64("article_id", req.Id),
 			logger.Error(err))
 		return
-	}
-	// 阅读量由前端 /interaction/read 上报，handler 内只查不写
-	var readCnt int64
-	intr, intrErr := h.intrSvc.FindInteraction(ctx, 0, domain.BizArticle, req.Id)
-	if intrErr != nil {
-		h.l.Error("获取文章互动数据失败",
-			logger.Int64("article_id", req.Id),
-			logger.Error(intrErr))
-	} else {
-		readCnt = intr.ReadCount
 	}
 	abstract := article.Abstract
 	if abstract == "" {
@@ -416,7 +428,7 @@ func (h *InternalArticleReaderHandler) Detail(ctx *gin.Context) {
 		Content:   article.Content,
 		Abstract:  abstract,
 		AuthorId:  article.Author.Id,
-		ReadCnt:   readCnt,
+		ReadCnt:   intr.ReadCount,
 		CreatedAt: article.CreatedAt,
 		UpdatedAt: article.UpdatedAt,
 	}})
