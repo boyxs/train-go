@@ -15,4 +15,5 @@ var (
 	ExpireTime       = time.Minute * 30
 	RefreshTime      = time.Hour * 24 * 7
 	RefreshThreshold = ExpireTime - Interval
+	LastEventIDHeader = "Last-Event-ID"
 )

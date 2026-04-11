@@ -2,6 +2,19 @@
 
 <!-- 新功能前插在此，日期降序 -->
 
+## [2026-04-11] Chat SSE 断线续传（Redis Stream）
+
+**变更内容**: 用 Redis Stream 实现 SSE 断线续传，刷新/切换对话后从断点继续流式输出
+**影响范围**:
+- 后端：`pkg/streamer/`（EventStreamer 接口 + Redis Stream 实现）· `service/chat.go`（publishToStream 写入 + ReadStream/BlockReadStream 读取 + isGenerating 内存标记）· `web/chat.go`（ResumeStream GET SSE 端点 + pollStream + formatSSE）· `consts/cache.go`（ChatStreamPattern + ChatStreamTTL）
+- 前端：`api/chat.ts`（resumeStream SSE 重连函数）· `hooks/useChat.ts`（buffer 管理 + isStale 守卫 + resumeStream 恢复）
+**技术决策**:
+- Redis Stream 做消息中转，`XREAD BLOCK` 零空转阻塞读
+- Stream 生成完成后 5 分钟 EXPIRE，供断线重连
+- 前端 `isStale()` 守卫所有异步回调，防止快速切换对话时数据串
+- 有活跃 buffer 时 effect 直接 return，避免与 send() 竞态
+**会话**: 260411-SSE-Redis-Stream
+
 ## [2026-04-11] 文章润色助手 + 原型配色统一 + Chat 生成不中断 + 阅读量展示
 
 **变更内容**: 文章润色助手（LLM 同步调用 + 对比 Modal）；原型配色全量统一为 teal #0D9488；Chat 生成独立 context 不被刷新/切换中断，支持刷新后轮询恢复；阅读页互动栏对齐原型（独立卡片 + 点赞收藏按钮样式）；文章广场/作者列表新增阅读量展示；首页按钮对齐原型；Header logo 统一主色；代码块语法高亮

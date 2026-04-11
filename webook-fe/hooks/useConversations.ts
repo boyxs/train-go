@@ -40,15 +40,15 @@ export function useConversations() {
   }, []);
 
   // 新建对话
-  const create = useCallback(async (): Promise<boolean> => {
+  const create = useCallback(async (): Promise<number> => {
     const res = await chatApi.createConversation();
     if (res.data.code === 0) {
       const conv = res.data.data;
       setConversations((prev) => [conv, ...prev]);
       setActiveId(conv.id);
-      return true;
+      return conv.id;
     }
-    return false;
+    return -1;
   }, []);
 
   // 删除对话

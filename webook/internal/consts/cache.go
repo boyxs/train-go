@@ -21,6 +21,7 @@ const (
 	ChatConvPattern      = "chat:conv:list:%d" // chat:conv:list:{uid}
 	ChatMsgPattern       = "chat:msg:list:%d"  // chat:msg:list:{convId}
 	ChatRateLimitPattern = "chat:ratelimit:%d" // chat:ratelimit:{uid}
+	ChatStreamPattern    = "chat:stream:%d"    // chat:stream:{convId} Redis Stream
 
 	EmbeddingCachePattern = "embedding:cache:%s" // embedding:cache:{textHash}
 
@@ -30,3 +31,4 @@ const (
 )
 
 var ClickEventDashboardTTL = 10 * time.Minute
+var ChatStreamTTL = 5 * time.Minute // 生成完成后 Stream 保留 5 分钟供重连
