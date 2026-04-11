@@ -11,6 +11,8 @@ import (
 
 type MessageRepository interface {
 	Insert(ctx context.Context, msg domain.Message) (domain.Message, error)
+	UpdateContent(ctx context.Context, convId int64, id int64, content string, toolCalls string) error
+	DelMsgCache(ctx context.Context, convId int64)
 	ListRecent(ctx context.Context, convId int64, limit int) ([]domain.Message, error)
 	// ListRecentLite 同 ListRecent 但不含 tool_calls，用于构建 prompt
 	ListRecentLite(ctx context.Context, convId int64, limit int) ([]domain.Message, error)
@@ -58,6 +60,20 @@ func (r *CacheMessageRepository) ListRecent(ctx context.Context, convId int64, l
 		r.l.Error("回填消息缓存失败", logger.Int64("convId", convId), logger.Error(setErr))
 	}
 	return result, nil
+}
+
+func (r *CacheMessageRepository) UpdateContent(ctx context.Context, convId int64, id int64, content string, toolCalls string) error {
+	var tc *string
+	if toolCalls != "" {
+		tc = &toolCalls
+	}
+	return r.dao.Update(ctx, dao.Message{Id: id, Content: content, ToolCalls: tc})
+}
+
+func (r *CacheMessageRepository) DelMsgCache(ctx context.Context, convId int64) {
+	if delErr := r.cache.Del(ctx, convId); delErr != nil {
+		r.l.Error("清除消息缓存失败", logger.Int64("convId", convId), logger.Error(delErr))
+	}
 }
 
 func (r *CacheMessageRepository) ListRecentLite(ctx context.Context, convId int64, limit int) ([]domain.Message, error) {

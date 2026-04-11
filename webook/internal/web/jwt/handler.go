@@ -90,7 +90,8 @@ func (h *RedisJwtHandler) ExtractToken(ctx *gin.Context) string {
 func (h *RedisJwtHandler) CheckSession(ctx *gin.Context, ssid string) error {
 	cnt, err := h.cmd.Exists(ctx, fmt.Sprintf(consts.UserSsidPattern, ssid)).Result()
 	if err != nil {
-		return err
+		// Redis 不可用时容错放行，宁可放行不可误判已登录用户为未登录
+		return nil
 	}
 	if cnt > 0 {
 		return ErrTokenInvalid

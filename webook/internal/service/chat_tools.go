@@ -142,6 +142,7 @@ func (e *AIChatToolExecutor) getHotArticles(ctx context.Context, args map[string
 			Id:       article.Id,
 			Title:    article.Title,
 			Abstract: article.Abstract,
+			Url:      fmt.Sprintf("/article/%d", article.Id),
 		})
 	}
 	return domain.ToolResultData{Name: "get_hot_articles", Articles: cards}, nil
@@ -170,6 +171,7 @@ func (e *AIChatToolExecutor) getMyFavorites(ctx context.Context, uid int64, args
 			Id:       article.Id,
 			Title:    article.Title,
 			Abstract: article.Abstract,
+			Url:      fmt.Sprintf("/article/%d", article.Id),
 		})
 	}
 	return domain.ToolResultData{Name: "get_my_favorites", Articles: cards}, nil
@@ -183,6 +185,7 @@ func toArticleCards(articles []domain.Article) []domain.ArticleCard {
 			Id:       a.Id,
 			Title:    a.Title,
 			Abstract: a.Abstract,
+			Url:      fmt.Sprintf("/article/%d", a.Id),
 		})
 	}
 	return cards
