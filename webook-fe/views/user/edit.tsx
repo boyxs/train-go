@@ -101,7 +101,7 @@ function EditProfilePage() {
               <Button type='primary' htmlType='submit'>
                 保存
               </Button>
-              <Button onClick={() => router.back()}>取消</Button>
+              <Button onClick={() => router.push('/user/profile')}>取消</Button>
             </Space>
           </Form.Item>
         </Form>

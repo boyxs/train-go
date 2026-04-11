@@ -195,3 +195,15 @@ Handler (web/article.go)
 | 集成测试 | 并发阅读计数准确性 |
 | 单元测试 | InteractiveRepo Cache-Aside 逻辑 |
 | 单元测试 | 数字格式化函数 |
+
+---
+
+## 11. 原型文件
+
+所有原型在 `docs/read-count/read-count.pen`（Pencil 格式），PNG 导出在 `docs/read-count/prototypes/`。
+
+| 原型 | 说明 |
+|------|------|
+| `AhTtg.png` | 文章广场卡片（含阅读量） |
+| `ogOV9.png` | 文章阅读页头部（含阅读量） |
+| `3G6L5.png` | 作者文章列表（桌面端 Table + 移动端卡片） |

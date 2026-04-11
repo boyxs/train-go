@@ -14,7 +14,18 @@ export default function MainLayout({
   children: React.ReactNode;
 }) {
   return (
-    <ConfigProvider theme={{ token: { colorPrimary: '#0D9488' } }}>
+    <ConfigProvider
+      theme={{
+        token: { colorPrimary: '#0D9488' },
+        components: {
+          Menu: {
+            itemSelectedColor: '#0D9488',
+            horizontalItemSelectedColor: '#0D9488',
+            itemHoverColor: '#0D9488',
+          },
+        },
+      }}
+    >
       <App>
         <AuthGuard>
           <AppLayout>{children}</AppLayout>

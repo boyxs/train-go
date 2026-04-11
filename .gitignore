@@ -1,5 +1,6 @@
 .idea
 test.db
+*.out
 go.work
 /webook/interactive/integration/data.sql
 /webook/payment/config/cert/

@@ -2,6 +2,26 @@
 
 <!-- 新功能前插在此，日期降序 -->
 
+## [2026-04-11] 文章润色助手 + 原型配色统一 + Chat 生成不中断 + 阅读量展示
+
+**变更内容**: 文章润色助手（LLM 同步调用 + 对比 Modal）；原型配色全量统一为 teal #0D9488；Chat 生成独立 context 不被刷新/切换中断，支持刷新后轮询恢复；阅读页互动栏对齐原型（独立卡片 + 点赞收藏按钮样式）；文章广场/作者列表新增阅读量展示；首页按钮对齐原型；Header logo 统一主色；代码块语法高亮
+**影响范围**:
+- 后端：`service/article_polish.go`（润色服务）· `web/article_polish.go`（Handler + 限流）· `service/ai/llm.go`（LLMClient.Chat 同步方法）· `service/ai/openai.go` + `failover.go` + `timeout_failover.go`（Chat 实现）· `service/chat.go`（独立 context + placeholder + onFlush + isGenerating + trySend 非阻塞）· `web/chat.go`（isGenerating 接口）· `web/jwt/handler.go`（CheckSession Redis 容错）· `domain/chat.go`（ArticleCard.Url）· `chat_tools.go`（工具结果带 url）
+- 前端：`views/article/read.tsx`（互动栏重构）· `views/article/feed.tsx`（阅读量）· `views/article/list.tsx`（阅读量列 + 移动端卡片重构）· `views/article/edit.tsx`（AI 润色按钮 + PolishModal）· `views/home.tsx`（按钮对齐原型）· `views/chat/index.tsx`（Header 导航重构）· `views/chat/MessageBubble.tsx`（工具卡片下移 + 语法高亮）· `hooks/useChat.ts`（buffer 缓存 + 轮询恢复）· `components/layout/Header.tsx`（logo 主色）
+- 原型：3 个 pen 文件配色统一 + PNG 重新导出 + PRD 更新
+**技术决策**:
+- Chat 生成用 `context.WithTimeout(context.Background(), 2min)` 独立于 HTTP 请求
+- placeholder 消息预插入 DB + onFlush 每 2 秒更新，支持刷新后轮询看到进度
+- trySend 加 default 分支，channel 满时不阻塞（浏览器断开后生成继续）
+- isGenerating 用内存 sync.Map，不依赖 Redis
+- 切换对话用 bufferRef 缓存 pending 消息，切回来立即恢复
+- CheckSession Redis 出错时容错放行，解决间歇性点赞状态丢失
+**待办**:
+- Chat SSE 断线续传：用 Redis Stream 替代轮询，支持 Last-Event-ID 断点续传（为微服务拆分做准备）
+- P1 文章标签/分类体系 → 意图识别 + 路由分发
+- P2 用户反馈（点赞/点踩单条回复）
+**会话**: 260411-原型实现-润色-Chat优化
+
 ## [2026-04-10] AI 点击埋点 + 数据看板 + Chat 工具调用修复
 
 **变更内容**: 新增 AI 文章点击埋点全链路（记录 + 看板 + 缓存），修复 Chat Function Calling SSE 事件嵌套层级、工具结果刷新丢失问题，代码块语法高亮，命名规范统一

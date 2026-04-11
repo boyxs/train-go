@@ -38,7 +38,7 @@
 | 5 | 编辑文章 | `/article/edit/[id]` | 需登录 | 同上 |
 | 6 | 首页 | `/` | 需登录 | `05-首页已登录.png` |
 | 7 | 确认弹窗 | Modal | 需登录 | `06-确认弹窗.png` |
-| 8 | 搜索结果页 | `/search` | 需登录 | `article.pen → 搜索结果页` |
+| 8 | 搜索结果页 | `/search` | 需登录 | `08-搜索结果页.png` |
 
 ---
 
@@ -125,4 +125,4 @@
 
 ## 7. 原型文件
 
-所有原型在 `docs/article.pen`（Pencil 格式），PNG 导出在 `docs/prototypes/`。
+所有原型在 `docs/article/article.pen`（Pencil 格式），PNG 导出在 `docs/article/prototypes/`。

@@ -1064,33 +1064,24 @@
               "alignItems": "center",
               "children": [
                 {
-                  "type": "frame",
-                  "id": "QduI3",
-                  "name": "backLink",
-                  "gap": 4,
-                  "alignItems": "center",
-                  "children": [
-                    {
-                      "type": "icon_font",
-                      "id": "EbPsR",
-                      "name": "backIcon",
-                      "width": 16,
-                      "height": 16,
-                      "iconFontName": "arrow-left",
-                      "iconFontFamily": "lucide",
-                      "fill": "#6B7280"
-                    },
-                    {
-                      "type": "text",
-                      "id": "O9YlD",
-                      "name": "backText",
-                      "fill": "#6B7280",
-                      "content": "返回广场",
-                      "fontFamily": "Inter",
-                      "fontSize": 14,
-                      "fontWeight": "normal"
-                    }
-                  ]
+                  "type": "text",
+                  "id": "kOUvE",
+                  "name": "feedBtn",
+                  "fill": "#6B7280",
+                  "content": "文章广场",
+                  "fontFamily": "Inter",
+                  "fontSize": 14,
+                  "fontWeight": "500"
+                },
+                {
+                  "type": "text",
+                  "id": "HYlXW",
+                  "name": "listBtn",
+                  "fill": "#6B7280",
+                  "content": "我的文章",
+                  "fontFamily": "Inter",
+                  "fontSize": 14,
+                  "fontWeight": "500"
                 },
                 {
                   "type": "frame",
@@ -2123,8 +2114,8 @@
     {
       "type": "frame",
       "id": "SGnPk",
-      "x": 2760,
-      "y": 0,
+      "x": 0,
+      "y": 1850,
       "name": "05-AI数据看板",
       "clip": true,
       "width": 1280,
