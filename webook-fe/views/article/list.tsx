@@ -14,6 +14,7 @@ import {
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
+import { Eye } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import React, { useCallback, useState } from 'react';
 
@@ -122,6 +123,21 @@ function ArticleListPage() {
       },
     },
     {
+      title: '阅读量',
+      dataIndex: 'readCnt',
+      key: 'readCnt',
+      width: 120,
+      render: (v?: number) =>
+        v ? (
+          <span className='flex items-center gap-1 text-[#1A1A1A]'>
+            <Eye size={14} color='#9CA3AF' />
+            {v.toLocaleString()}
+          </span>
+        ) : (
+          <span className='text-[#D1D5DB]'>—</span>
+        ),
+    },
+    {
       title: '更新时间',
       dataIndex: 'updatedAt',
       key: 'updatedAt',
@@ -170,47 +186,75 @@ function ArticleListPage() {
     return (
       <div
         key={article.id}
-        className='border-b border-gray-100 py-3 last:border-b-0'
+        className='bg-white rounded-xl p-4 flex flex-col gap-2.5'
+        style={{
+          boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
+        }}
       >
-        <div className='flex items-start justify-between gap-2 mb-1'>
-          <Text strong className='flex-1 truncate'>
-            {article.title}
-          </Text>
-          <Tag color={info.color} className='shrink-0'>
+        {/* 第一行：标题 */}
+        <Text strong className='text-[15px] truncate'>
+          {article.title}
+        </Text>
+
+        {/* 第二行：状态 + 日期 */}
+        <div className='flex items-center gap-2'>
+          <Tag
+            color={info.color}
+            className='m-0'
+            style={{
+              borderRadius: 4,
+              padding: '0 8px',
+              lineHeight: '20px',
+              minWidth: 80,
+              textAlign: 'center',
+            }}
+          >
             {info.label}
           </Tag>
+          <span className='text-xs text-[#9CA3AF]'>
+            {dayjs(article.updatedAt).format('YYYY-MM-DD')}
+          </span>
         </div>
+
+        {/* 第三行：阅读量（左）+ 操作（右） */}
         <div className='flex items-center justify-between'>
-          <Text type='secondary' className='text-xs'>
-            {dayjs(article.updatedAt).format('YYYY-MM-DD HH:mm')}
-          </Text>
-          <Space size={0}>
-            <Button
-              type='link'
-              size='small'
+          {article.readCnt ? (
+            <span className='flex items-center gap-1 text-xs text-[#9CA3AF]'>
+              <Eye size={14} />
+              {article.readCnt.toLocaleString()} 次阅读
+            </span>
+          ) : (
+            <span className='text-xs text-[#D1D5DB]'>— 无阅读量</span>
+          )}
+          <div className='flex items-center gap-3'>
+            <button
+              className='text-[13px] text-[#0D9488] bg-transparent border-none cursor-pointer p-0'
               onClick={() => router.push(`/article/edit/${article.id}`)}
             >
               编辑
-            </Button>
-            {article.status === ArticleStatus.Published && (
-              <Button
-                type='link'
-                size='small'
-                danger
+            </button>
+            {article.status === ArticleStatus.Published ? (
+              <button
+                className='text-[13px] text-[#D97706] bg-transparent border-none cursor-pointer p-0'
                 onClick={() => confirmWithdraw(article.id)}
               >
                 撤回
-              </Button>
+              </button>
+            ) : (
+              <button
+                className='text-[13px] text-[#0D9488] bg-transparent border-none cursor-pointer p-0'
+                onClick={() => router.push(`/article/edit/${article.id}`)}
+              >
+                发布
+              </button>
             )}
-            <Button
-              type='link'
-              size='small'
-              danger
+            <button
+              className='text-[13px] text-[#EF4444] bg-transparent border-none cursor-pointer p-0'
               onClick={() => confirmDelete(article.id)}
             >
               删除
-            </Button>
-          </Space>
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -247,17 +291,20 @@ function ArticleListPage() {
   }
 
   return (
-    <Card title='我的文章' extra={extra}>
-      {articles.length === 0 && !loading ? (
-        <Empty description='暂无文章' className='py-12'>
-          <Button type='primary' onClick={() => router.push('/article/edit')}>
-            写第一篇文章
-          </Button>
-        </Empty>
-      ) : (
-        <>
-          {/* 桌面端 Table */}
-          <div className='hidden md:block'>
+    <>
+      {/* 桌面端 */}
+      <div className='hidden md:block'>
+        <Card title='我的文章' extra={extra}>
+          {articles.length === 0 && !loading ? (
+            <Empty description='暂无文章' className='py-12'>
+              <Button
+                type='primary'
+                onClick={() => router.push('/article/edit')}
+              >
+                写第一篇文章
+              </Button>
+            </Empty>
+          ) : (
             <Table<Article>
               columns={columns}
               dataSource={articles}
@@ -267,18 +314,39 @@ function ArticleListPage() {
               bordered
               pagination={paginationProps}
             />
-          </div>
+          )}
+        </Card>
+      </div>
 
-          {/* 移动端卡片列表 */}
-          <div className='block md:hidden'>
-            {articles.map(renderMobileCard)}
+      {/* 移动端 */}
+      <div className='block md:hidden'>
+        <div className='flex items-center justify-between mb-3'>
+          <h2 className='text-lg font-bold text-[#1A1A1A] m-0'>我的文章</h2>
+          {extra}
+        </div>
+        {articles.length === 0 && !loading ? (
+          <div className='bg-white rounded-xl p-8'>
+            <Empty description='暂无文章'>
+              <Button
+                type='primary'
+                onClick={() => router.push('/article/edit')}
+              >
+                写第一篇文章
+              </Button>
+            </Empty>
+          </div>
+        ) : (
+          <>
+            <div className='flex flex-col gap-3'>
+              {articles.map(renderMobileCard)}
+            </div>
             <div className='flex justify-center mt-4'>
               <Pagination {...paginationProps} simple />
             </div>
-          </div>
-        </>
-      )}
-    </Card>
+          </>
+        )}
+      </div>
+    </>
   );
 }
 

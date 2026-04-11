@@ -86,7 +86,7 @@ export const Header: React.FC = () => {
   return (
     <header className='flex items-center bg-white px-3 md:px-6 border-b border-gray-100'>
       <div
-        className='text-base md:text-lg font-semibold mr-4 md:mr-8 cursor-pointer shrink-0'
+        className='text-base md:text-lg font-semibold mr-4 md:mr-8 cursor-pointer shrink-0 text-[#0D9488]'
         onClick={() => router.push('/')}
       >
         小微书

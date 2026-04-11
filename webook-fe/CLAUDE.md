@@ -55,6 +55,7 @@ npm run lint:fix     # ESLint 自动修复
 - 破坏性操作统一 `Modal.confirm`，`okButtonProps: { danger: true }`
 - **Table 必须带边框**：所有 `<Table>` 必须加 `bordered` 属性，参考 `views/article/list.tsx`
 - **文章链接新标签打开**：指向文章详情的链接（`/article/{id}`）统一 `target='_blank'`
+- **实现必须读 pen 原型**：用 Pencil MCP `batch_get` 读取 `.pen` 文件的精确属性（fill、fontSize、padding、gap、cornerRadius 等），禁止看 PNG 截图目测样式
 
 ## 命名规范
 

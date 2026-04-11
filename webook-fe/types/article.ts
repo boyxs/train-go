@@ -17,6 +17,7 @@ export interface Article {
     name: string;
   };
   status: ArticleStatus;
+  readCnt?: number;
   createdAt: number;
   updatedAt: number;
 }

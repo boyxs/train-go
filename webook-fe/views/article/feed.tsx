@@ -3,6 +3,7 @@
 import { RightOutlined } from '@ant-design/icons';
 import { Empty, Pagination, Typography } from 'antd';
 import dayjs from 'dayjs';
+import { Eye } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import React from 'react';
@@ -18,6 +19,16 @@ import type { Article } from '@/types';
 const { Text } = Typography;
 
 const dotColors = ['#0D9488', '#6366F1', '#22C55E', '#FCD34D', '#D97706'];
+
+function formatReadCount(n: number): string {
+  if (n >= 10000) {
+    return `${(n / 10000).toFixed(1)}w`;
+  }
+  if (n >= 1000) {
+    return `${(n / 1000).toFixed(1)}k`;
+  }
+  return String(n);
+}
 
 function ArticleFeedPage() {
   const router = useRouter();
@@ -130,6 +141,12 @@ function ArticleFeedPage() {
                                 'YYYY-MM-DD HH:mm',
                               )}
                             </span>
+                            {article.readCnt ? (
+                              <span className='flex items-center gap-1.5 text-xs text-gray-400'>
+                                <Eye size={14} />
+                                {formatReadCount(article.readCnt)}
+                              </span>
+                            ) : null}
                           </div>
                         </div>
                         <RightOutlined className='text-gray-300 group-hover:text-[#0D9488] mt-1 text-xs shrink-0' />

@@ -127,8 +127,7 @@ INSERT INTO `user` VALUES (102, NULL, NULL, 0, NULL, '', 'tommy', NULL, 'say my 
 -- ----------------------------
 -- Table structure for interaction
 -- ----------------------------
-DROP TABLE IF EXISTS `interaction`;
-CREATE TABLE `interaction`  (
+CREATE TABLE IF NOT EXISTS `interaction`  (
   `id` bigint NOT NULL AUTO_INCREMENT,
   `biz` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL DEFAULT '',
   `biz_id` bigint NOT NULL DEFAULT 0,
@@ -144,8 +143,7 @@ CREATE TABLE `interaction`  (
 -- ----------------------------
 -- Table structure for user_interaction
 -- ----------------------------
-DROP TABLE IF EXISTS `user_interaction`;
-CREATE TABLE `user_interaction`  (
+CREATE TABLE IF NOT EXISTS `user_interaction`  (
   `id` bigint NOT NULL AUTO_INCREMENT,
   `biz` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL DEFAULT '',
   `biz_id` bigint NOT NULL DEFAULT 0,
