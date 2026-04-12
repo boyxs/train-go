@@ -12,6 +12,7 @@ import (
 type MessageRepository interface {
 	Insert(ctx context.Context, msg domain.Message) (domain.Message, error)
 	UpdateContent(ctx context.Context, convId int64, id int64, content string, toolCalls string) error
+	UpdateFeedback(ctx context.Context, convId int64, msgId int64, feedback int8) error
 	DelMsgCache(ctx context.Context, convId int64)
 	ListRecent(ctx context.Context, convId int64, limit int) ([]domain.Message, error)
 	// ListRecentLite 同 ListRecent 但不含 tool_calls，用于构建 prompt
@@ -70,6 +71,17 @@ func (r *CacheMessageRepository) UpdateContent(ctx context.Context, convId int64
 	return r.dao.Update(ctx, dao.Message{Id: id, Content: content, ToolCalls: tc})
 }
 
+func (r *CacheMessageRepository) UpdateFeedback(ctx context.Context, convId int64, msgId int64, feedback int8) error {
+	err := r.dao.UpdateFeedback(ctx, msgId, convId, feedback)
+	if err != nil {
+		return err
+	}
+	if delErr := r.cache.Del(ctx, convId); delErr != nil {
+		r.l.Error("清除消息缓存失败", logger.Int64("convId", convId), logger.Error(delErr))
+	}
+	return nil
+}
+
 func (r *CacheMessageRepository) DelMsgCache(ctx context.Context, convId int64) {
 	if delErr := r.cache.Del(ctx, convId); delErr != nil {
 		r.l.Error("清除消息缓存失败", logger.Int64("convId", convId), logger.Error(delErr))
@@ -120,6 +132,7 @@ func (r *CacheMessageRepository) toEntity(m domain.Message) dao.Message {
 		Content:        m.Content,
 		ToolCalls:      tc,
 		TokenUsed:      m.TokenUsed,
+		Feedback:       m.Feedback,
 	}
 }
 
@@ -135,6 +148,7 @@ func (r *CacheMessageRepository) toDomain(m dao.Message) domain.Message {
 		Content:        m.Content,
 		ToolCalls:      tc,
 		TokenUsed:      m.TokenUsed,
+		Feedback:       m.Feedback,
 		CreatedAt:      m.CreatedAt,
 	}
 }

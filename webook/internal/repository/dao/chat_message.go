@@ -9,6 +9,7 @@ import (
 type MessageDAO interface {
 	Insert(ctx context.Context, msg Message) (Message, error)
 	Update(ctx context.Context, msg Message) error
+	UpdateFeedback(ctx context.Context, id int64, convId int64, feedback int8) error
 	// ListRecent 获取最新 limit 条（初始加载），返回按 created_at ASC
 	ListRecent(ctx context.Context, convId int64, limit int) ([]Message, error)
 	// ListRecentLite 同 ListRecent 但排除 tool_calls 字段，用于构建 prompt
@@ -36,6 +37,12 @@ func (d *GormMessageDAO) Insert(ctx context.Context, msg Message) (Message, erro
 func (d *GormMessageDAO) Update(ctx context.Context, msg Message) error {
 	return d.db.WithContext(ctx).Model(&Message{}).Where("id = ?", msg.Id).
 		Updates(msg).Error
+}
+
+func (d *GormMessageDAO) UpdateFeedback(ctx context.Context, id int64, convId int64, feedback int8) error {
+	return d.db.WithContext(ctx).Model(&Message{}).
+		Where("id = ? AND conversation_id = ?", id, convId).
+		Update("feedback", feedback).Error
 }
 
 func (d *GormMessageDAO) ListRecent(ctx context.Context, convId int64, limit int) ([]Message, error) {
@@ -106,6 +113,7 @@ type Message struct {
 	Content        string  `gorm:"type:text;not null"`
 	ToolCalls      *string `gorm:"type:json"`
 	TokenUsed      int     `gorm:"not null;default:0"`
+	Feedback       int8    `gorm:"not null;default:0"`
 	CreatedAt      int64   `gorm:"autoCreateTime:milli;index:idx_conv_created"`
 }
 

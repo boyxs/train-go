@@ -1,8 +1,9 @@
 'use client';
 
 import { LoadingOutlined, UserOutlined } from '@ant-design/icons';
-import { Bot } from 'lucide-react';
-import React from 'react';
+import { App } from 'antd';
+import { Bot, Copy, ThumbsDown, ThumbsUp } from 'lucide-react';
+import React, { useCallback } from 'react';
 import Markdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
@@ -19,6 +20,7 @@ interface MessageBubbleProps {
   message: PendingMessage;
   streaming?: boolean;
   conversationId?: number;
+  onFeedback?: (messageId: number, feedback: number) => void;
 }
 
 /** 工具调用状态块（工具执行中或结果卡片） */
@@ -72,10 +74,76 @@ const TypingDots: React.FC = () => (
   </span>
 );
 
+/** AI 消息操作栏：复制 + 赞 + 踩 */
+const ActionBar: React.FC<{
+  message: PendingMessage;
+  onFeedback?: (messageId: number, feedback: number) => void;
+}> = ({ message, onFeedback }) => {
+  const { message: toast } = App.useApp();
+  const feedback = message.feedback ?? 0;
+
+  const handleCopy = useCallback(() => {
+    navigator.clipboard
+      .writeText(message.content)
+      .then(() => {
+        toast.success('已复制');
+      })
+      .catch(() => {
+        toast.error('复制失败');
+      });
+  }, [message.content, toast]);
+
+  const handleFeedback = useCallback(
+    (value: number) => {
+      const next = feedback === value ? 0 : value;
+      onFeedback?.(message.id, next);
+    },
+    [feedback, message.id, onFeedback],
+  );
+
+  return (
+    <div className='flex items-center gap-2 justify-end mt-1'>
+      <button
+        type='button'
+        onClick={handleCopy}
+        className='p-0.5 rounded hover:bg-[#F3F4F6] transition-colors cursor-pointer border-none bg-transparent'
+        title='复制'
+      >
+        <Copy size={14} color='#9CA3AF' />
+      </button>
+      <button
+        type='button'
+        onClick={() => handleFeedback(1)}
+        className='p-0.5 rounded hover:bg-[#F3F4F6] transition-colors cursor-pointer border-none bg-transparent'
+        title='有用'
+      >
+        <ThumbsUp
+          size={14}
+          color={feedback === 1 ? '#0D9488' : '#9CA3AF'}
+          fill={feedback === 1 ? '#0D9488' : 'none'}
+        />
+      </button>
+      <button
+        type='button'
+        onClick={() => handleFeedback(-1)}
+        className='p-0.5 rounded hover:bg-[#F3F4F6] transition-colors cursor-pointer border-none bg-transparent'
+        title='无用'
+      >
+        <ThumbsDown
+          size={14}
+          color={feedback === -1 ? '#EF4444' : '#9CA3AF'}
+          fill={feedback === -1 ? '#EF4444' : 'none'}
+        />
+      </button>
+    </div>
+  );
+};
+
 export const MessageBubble: React.FC<MessageBubbleProps> = ({
   message,
   streaming,
   conversationId,
+  onFeedback,
 }) => {
   const isUser = message.role === 'user';
   const isEmpty = !message.content;
@@ -172,6 +240,10 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
                 conversationId={conversationId}
               />
             ))}
+            {/* 操作栏：复制+赞+踩，流式生成中不显示 */}
+            {!streaming && (
+              <ActionBar message={message} onFeedback={onFeedback} />
+            )}
           </div>
         )}
       </div>

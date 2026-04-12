@@ -2,6 +2,18 @@
 
 <!-- 新功能前插在此，日期降序 -->
 
+## [2026-04-12] AI 回复操作栏（复制 + 点赞/点踩）
+
+**变更内容**: AI 消息气泡底部增加操作栏，支持复制回复内容、点赞/点踩反馈
+**影响范围**:
+- 后端：`domain/chat.go`（Message +Feedback）· `dao/chat_message.go`（+Feedback 字段 + UpdateFeedback）· `repository/chat_message.go`（UpdateFeedback + 清缓存）· `service/chat.go`（SetFeedback 归属校验）· `web/chat.go`（/chat/message/feedback 路由）
+- 前端：`types/chat.ts`（+feedback）· `api/chat.ts`（setMessageFeedback）· `hooks/useChat.ts`（乐观更新 setFeedback）· `views/chat/MessageBubble.tsx`（ActionBar 组件）· `ChatMessages/ChatBubble/index.tsx`（props 传递）
+- 原型：`docs/chat/chat.pen`（06-消息反馈画板）· `docs/chat/prototypes/06-消息反馈.png`
+- 测试：8 个集成测试（点赞/取消/点踩/无效值/无效ID/非属主/幂等/列表展示）
+**技术决策**: feedback 字段直接加在 message 表（1:1 关系），不新建表；前端乐观更新用函数式 setState 避免闭包竞态
+**待办**: 无
+**会话**: 260412-chat-消息反馈
+
 ## [2026-04-11] Chat SSE 断线续传（Redis Stream）
 
 **变更内容**: 用 Redis Stream 实现 SSE 断线续传，刷新/切换对话后从断点继续流式输出

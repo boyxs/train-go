@@ -17,6 +17,7 @@ interface ChatMessagesProps {
   conversationId?: number;
   onSend?: (content: string) => void;
   onLoadMore?: () => void;
+  onFeedback?: (messageId: number, feedback: number) => void;
 }
 
 export const ChatMessages: React.FC<ChatMessagesProps> = ({
@@ -27,6 +28,7 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
   conversationId,
   onSend,
   onLoadMore,
+  onFeedback,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const loadingMoreRef = useRef(false);
@@ -157,6 +159,7 @@ export const ChatMessages: React.FC<ChatMessagesProps> = ({
             streaming && msg.role === 'assistant' && idx === messages.length - 1
           }
           conversationId={conversationId}
+          onFeedback={onFeedback}
         />
       ))}
     </div>

@@ -61,6 +61,7 @@ type ChatService interface {
 	ReadStream(ctx context.Context, convId int64, afterId string) (events []domain.ChatEvent, ids []string, generating bool)
 	// BlockReadStream 阻塞等待新事件（用于 SSE 重连实时推送）
 	BlockReadStream(ctx context.Context, convId int64, afterId string, timeout time.Duration) ([]domain.ChatEvent, []string)
+	SetFeedback(ctx context.Context, uid int64, convId int64, msgId int64, feedback int8) error
 }
 
 type AIChatService struct {
@@ -125,6 +126,21 @@ func (s *AIChatService) ListMessages(ctx context.Context, uid int64, convId int6
 		return s.msgRepo.ListBefore(ctx, convId, beforeId, limit)
 	}
 	return s.msgRepo.ListRecent(ctx, convId, limit)
+}
+
+func (s *AIChatService) SetFeedback(ctx context.Context, uid int64, convId int64, msgId int64, feedback int8) error {
+	if feedback != -1 && feedback != 0 && feedback != 1 {
+		return errors.New("无效的反馈值")
+	}
+	// 校验对话归属
+	_, err := s.convRepo.Find(ctx, uid, convId)
+	if err != nil {
+		if isNotFound(err) {
+			return ErrConversationNotFound
+		}
+		return err
+	}
+	return s.msgRepo.UpdateFeedback(ctx, convId, msgId, feedback)
 }
 
 func (s *AIChatService) SendMessage(ctx context.Context, uid int64, convId int64, content string) (<-chan domain.ChatEvent, error) {

@@ -4179,6 +4179,566 @@
           ]
         }
       ]
+    },
+    {
+      "type": "frame",
+      "id": "AvUrV",
+      "x": 0,
+      "y": 3250,
+      "name": "06-消息反馈",
+      "width": 800,
+      "fill": "#F5F5F5",
+      "layout": "vertical",
+      "gap": 32,
+      "padding": 32,
+      "children": [
+        {
+          "type": "text",
+          "id": "te37j",
+          "name": "title",
+          "fill": "#1A1A1A",
+          "content": "消息反馈 — 复制 / 点赞 / 点踩 AI 回复",
+          "fontFamily": "Inter",
+          "fontSize": 20,
+          "fontWeight": "700"
+        },
+        {
+          "type": "text",
+          "id": "Uwy5j",
+          "name": "subtitle",
+          "fill": "#6B7280",
+          "content": "AI 气泡底部增加操作栏：复制内容 + 反馈按钮，三种反馈状态：默认 / 已点赞 / 已点踩",
+          "fontFamily": "Inter",
+          "fontSize": 14,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "VRYeD",
+          "name": "stateLabel1",
+          "fill": "#9CA3AF",
+          "content": "状态 1：默认（未反馈）",
+          "fontFamily": "Inter",
+          "fontSize": 12,
+          "fontWeight": "600"
+        },
+        {
+          "type": "frame",
+          "id": "yp5Y4",
+          "name": "AIMsg-Default",
+          "width": "fill_container",
+          "gap": 10,
+          "children": [
+            {
+              "type": "frame",
+              "id": "MNpQ2",
+              "name": "aiAvatar",
+              "width": 32,
+              "height": 32,
+              "fill": "#F3F4F6",
+              "cornerRadius": 9999,
+              "layout": "none",
+              "children": [
+                {
+                  "type": "icon_font",
+                  "id": "U5bT7",
+                  "x": 8,
+                  "y": 8,
+                  "name": "avIcon1",
+                  "width": 16,
+                  "height": 16,
+                  "iconFontName": "bot",
+                  "iconFontFamily": "lucide",
+                  "fill": "#0D9488"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "L0Frq",
+              "name": "aiBubble-default",
+              "width": 400,
+              "fill": "#FFFFFF",
+              "cornerRadius": [
+                16,
+                16,
+                16,
+                4
+              ],
+              "stroke": {
+                "align": "inside",
+                "thickness": 1,
+                "fill": "#E5E7EB"
+              },
+              "effect": {
+                "type": "shadow",
+                "shadowType": "outer",
+                "color": "#0000000a",
+                "offset": {
+                  "x": 0,
+                  "y": 1
+                },
+                "blur": 2
+              },
+              "layout": "vertical",
+              "gap": 8,
+              "padding": [
+                12,
+                16
+              ],
+              "children": [
+                {
+                  "type": "text",
+                  "id": "RbT3F",
+                  "name": "txt1",
+                  "fill": "#1A1A1A",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "发布文章的步骤如下：\n\n1. 点击顶部「我的文章」\n2. 点击「写文章」按钮\n3. 编辑标题和正文内容\n4. 点击「发布」按钮即可",
+                  "lineHeight": 1.6,
+                  "fontFamily": "Inter",
+                  "fontSize": 14,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "frame",
+                  "id": "8XhZT",
+                  "name": "feedbackBar-default",
+                  "width": "fill_container",
+                  "gap": 8,
+                  "justifyContent": "end",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon_font",
+                      "id": "kUELU",
+                      "name": "copyIcon1",
+                      "width": 14,
+                      "height": 14,
+                      "iconFontName": "copy",
+                      "iconFontFamily": "lucide",
+                      "fill": "#9CA3AF"
+                    },
+                    {
+                      "type": "icon_font",
+                      "id": "9jPLL",
+                      "name": "fbUp1",
+                      "width": 14,
+                      "height": 14,
+                      "iconFontName": "thumbs-up",
+                      "iconFontFamily": "lucide",
+                      "fill": "#9CA3AF"
+                    },
+                    {
+                      "type": "icon_font",
+                      "id": "lbWCF",
+                      "name": "fbDown1",
+                      "width": 14,
+                      "height": 14,
+                      "iconFontName": "thumbs-down",
+                      "iconFontFamily": "lucide",
+                      "fill": "#9CA3AF"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "id": "ajJSs",
+          "name": "stateLabel2",
+          "fill": "#9CA3AF",
+          "content": "状态 2：已点赞（👍 高亮主色）",
+          "fontFamily": "Inter",
+          "fontSize": 12,
+          "fontWeight": "600"
+        },
+        {
+          "type": "frame",
+          "id": "7KADO",
+          "name": "AIMsg-Liked",
+          "width": "fill_container",
+          "gap": 10,
+          "children": [
+            {
+              "type": "frame",
+              "id": "pBPnC",
+              "name": "aiAvatar2",
+              "width": 32,
+              "height": 32,
+              "fill": "#F3F4F6",
+              "cornerRadius": 9999,
+              "layout": "none",
+              "children": [
+                {
+                  "type": "icon_font",
+                  "id": "lKBdu",
+                  "x": 8,
+                  "y": 8,
+                  "name": "avIcon2",
+                  "width": 16,
+                  "height": 16,
+                  "iconFontName": "bot",
+                  "iconFontFamily": "lucide",
+                  "fill": "#0D9488"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "miInm",
+              "name": "aiBubble-liked",
+              "width": 400,
+              "fill": "#FFFFFF",
+              "cornerRadius": [
+                16,
+                16,
+                16,
+                4
+              ],
+              "stroke": {
+                "align": "inside",
+                "thickness": 1,
+                "fill": "#E5E7EB"
+              },
+              "effect": {
+                "type": "shadow",
+                "shadowType": "outer",
+                "color": "#0000000a",
+                "offset": {
+                  "x": 0,
+                  "y": 1
+                },
+                "blur": 2
+              },
+              "layout": "vertical",
+              "gap": 8,
+              "padding": [
+                12,
+                16
+              ],
+              "children": [
+                {
+                  "type": "text",
+                  "id": "4I6Xi",
+                  "name": "txt2",
+                  "fill": "#1A1A1A",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "Go 使用 goroutine 实现并发，它比线程更轻量。通过 channel 进行通信，遵循「不要通过共享内存来通信，而要通过通信来共享内存」的原则。",
+                  "lineHeight": 1.6,
+                  "fontFamily": "Inter",
+                  "fontSize": 14,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "frame",
+                  "id": "CPvSI",
+                  "name": "feedbackBar-liked",
+                  "width": "fill_container",
+                  "gap": 8,
+                  "justifyContent": "end",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon_font",
+                      "id": "SsdP4",
+                      "name": "copyIcon2",
+                      "width": 14,
+                      "height": 14,
+                      "iconFontName": "copy",
+                      "iconFontFamily": "lucide",
+                      "fill": "#9CA3AF"
+                    },
+                    {
+                      "type": "icon_font",
+                      "id": "3sdz9",
+                      "name": "fbUp2",
+                      "width": 14,
+                      "height": 14,
+                      "iconFontName": "thumbs-up",
+                      "iconFontFamily": "lucide",
+                      "fill": "#0D9488"
+                    },
+                    {
+                      "type": "icon_font",
+                      "id": "9I9K3",
+                      "name": "fbDown2",
+                      "width": 14,
+                      "height": 14,
+                      "iconFontName": "thumbs-down",
+                      "iconFontFamily": "lucide",
+                      "fill": "#9CA3AF"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "id": "bzUDR",
+          "name": "stateLabel3",
+          "fill": "#9CA3AF",
+          "content": "状态 3：已点踩（👎 高亮红色）",
+          "fontFamily": "Inter",
+          "fontSize": 12,
+          "fontWeight": "600"
+        },
+        {
+          "type": "frame",
+          "id": "djK3R",
+          "name": "AIMsg-Disliked",
+          "width": "fill_container",
+          "gap": 10,
+          "children": [
+            {
+              "type": "frame",
+              "id": "PTPbG",
+              "name": "aiAvatar3",
+              "width": 32,
+              "height": 32,
+              "fill": "#F3F4F6",
+              "cornerRadius": 9999,
+              "layout": "none",
+              "children": [
+                {
+                  "type": "icon_font",
+                  "id": "qFAJf",
+                  "x": 8,
+                  "y": 8,
+                  "name": "avIcon3",
+                  "width": 16,
+                  "height": 16,
+                  "iconFontName": "bot",
+                  "iconFontFamily": "lucide",
+                  "fill": "#0D9488"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "JrZyk",
+              "name": "aiBubble-disliked",
+              "width": 400,
+              "fill": "#FFFFFF",
+              "cornerRadius": [
+                16,
+                16,
+                16,
+                4
+              ],
+              "stroke": {
+                "align": "inside",
+                "thickness": 1,
+                "fill": "#E5E7EB"
+              },
+              "effect": {
+                "type": "shadow",
+                "shadowType": "outer",
+                "color": "#0000000a",
+                "offset": {
+                  "x": 0,
+                  "y": 1
+                },
+                "blur": 2
+              },
+              "layout": "vertical",
+              "gap": 8,
+              "padding": [
+                12,
+                16
+              ],
+              "children": [
+                {
+                  "type": "text",
+                  "id": "jGpiG",
+                  "name": "txt3",
+                  "fill": "#1A1A1A",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "抱歉，我暂时无法回答这个问题。你可以尝试换个方式提问，或者直接浏览文章广场查找相关内容。",
+                  "lineHeight": 1.6,
+                  "fontFamily": "Inter",
+                  "fontSize": 14,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "frame",
+                  "id": "yOQkl",
+                  "name": "feedbackBar-disliked",
+                  "width": "fill_container",
+                  "gap": 8,
+                  "justifyContent": "end",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon_font",
+                      "id": "muW4l",
+                      "name": "copyIcon3",
+                      "width": 14,
+                      "height": 14,
+                      "iconFontName": "copy",
+                      "iconFontFamily": "lucide",
+                      "fill": "#9CA3AF"
+                    },
+                    {
+                      "type": "icon_font",
+                      "id": "9RTDZ",
+                      "name": "fbUp3",
+                      "width": 14,
+                      "height": 14,
+                      "iconFontName": "thumbs-up",
+                      "iconFontFamily": "lucide",
+                      "fill": "#9CA3AF"
+                    },
+                    {
+                      "type": "icon_font",
+                      "id": "Hm3uv",
+                      "name": "fbDown3",
+                      "width": 14,
+                      "height": 14,
+                      "iconFontName": "thumbs-down",
+                      "iconFontFamily": "lucide",
+                      "fill": "#EF4444"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "HxGFz",
+          "name": "divider",
+          "width": "fill_container",
+          "height": 1,
+          "fill": "#E5E7EB"
+        },
+        {
+          "type": "text",
+          "id": "i2lyU",
+          "name": "specTitle",
+          "fill": "#1A1A1A",
+          "content": "交互规则",
+          "fontFamily": "Inter",
+          "fontSize": 16,
+          "fontWeight": "700"
+        },
+        {
+          "type": "frame",
+          "id": "mqAj8",
+          "name": "specBox",
+          "width": "fill_container",
+          "fill": "#FFFFFF",
+          "cornerRadius": 12,
+          "stroke": {
+            "align": "inside",
+            "thickness": 1,
+            "fill": "#E5E7EB"
+          },
+          "layout": "vertical",
+          "gap": 12,
+          "padding": 20,
+          "children": [
+            {
+              "type": "text",
+              "id": "bhjJD",
+              "name": "specCopy",
+              "fill": "#1A1A1A",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "• 复制按钮始终灰色，点击后复制 AI 回复文本到剪贴板，toast 提示「已复制」",
+              "lineHeight": 1.6,
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "2o0xj",
+              "name": "spec1",
+              "fill": "#1A1A1A",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "• 仅 AI 回复（role=assistant）显示反馈按钮，用户消息不显示",
+              "lineHeight": 1.6,
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "DCDzg",
+              "name": "spec2",
+              "fill": "#1A1A1A",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "• 流式生成中不显示按钮，生成完成后才出现",
+              "lineHeight": 1.6,
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "qTBAm",
+              "name": "spec3",
+              "fill": "#1A1A1A",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "• 点击 👍 → 主色高亮 (#0D9488)；点击 👎 → 红色高亮 (#EF4444)",
+              "lineHeight": 1.6,
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "ajtw8",
+              "name": "spec4",
+              "fill": "#1A1A1A",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "• 再次点击同一按钮 → 取消反馈，恢复灰色 (#9CA3AF)",
+              "lineHeight": 1.6,
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "0Dw3P",
+              "name": "spec5",
+              "fill": "#1A1A1A",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "• 点击对立按钮 → 自动切换（赞↔踩），无需先取消",
+              "lineHeight": 1.6,
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "1uMgB",
+              "name": "spec6",
+              "fill": "#1A1A1A",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "• 乐观更新：点击立即变色，请求失败则回滚并 toast 提示",
+              "lineHeight": 1.6,
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "normal"
+            }
+          ]
+        }
+      ]
     }
   ]
 }

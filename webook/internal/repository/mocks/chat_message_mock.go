@@ -141,3 +141,17 @@ func (mr *MockMessageRepositoryMockRecorder) UpdateContent(ctx, convId, id, cont
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateContent", reflect.TypeOf((*MockMessageRepository)(nil).UpdateContent), ctx, convId, id, content, toolCalls)
 }
+
+// UpdateFeedback mocks base method.
+func (m *MockMessageRepository) UpdateFeedback(ctx context.Context, convId, msgId int64, feedback int8) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateFeedback", ctx, convId, msgId, feedback)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateFeedback indicates an expected call of UpdateFeedback.
+func (mr *MockMessageRepositoryMockRecorder) UpdateFeedback(ctx, convId, msgId, feedback any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateFeedback", reflect.TypeOf((*MockMessageRepository)(nil).UpdateFeedback), ctx, convId, msgId, feedback)
+}

@@ -34,8 +34,16 @@ export const ChatBubble: React.FC = () => {
     remove,
     select,
   } = useConversations();
-  const { messages, loading, streaming, hasMore, send, stop, loadMore } =
-    useChat(activeId);
+  const {
+    messages,
+    loading,
+    streaming,
+    hasMore,
+    send,
+    stop,
+    loadMore,
+    setFeedback,
+  } = useChat(activeId);
 
   const handleOpen = async () => {
     setOpen(true);
@@ -173,6 +181,7 @@ export const ChatBubble: React.FC = () => {
               conversationId={activeId ?? undefined}
               onSend={send}
               onLoadMore={loadMore}
+              onFeedback={setFeedback}
             />
             <ChatInput streaming={streaming} onSend={send} onStop={stop} />
           </div>
