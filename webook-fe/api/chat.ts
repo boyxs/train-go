@@ -40,6 +40,19 @@ export function listMessages(
   });
 }
 
+// POST /chat/message/feedback — 设置消息反馈
+export function setMessageFeedback(
+  conversationId: number,
+  messageId: number,
+  feedback: number,
+) {
+  return request.post<Result<null>>('/chat/message/feedback', {
+    conversationId,
+    messageId,
+    feedback,
+  });
+}
+
 // POST /chat/message/stop — 停止生成
 export function stopGeneration(conversationId: number) {
   return request.post<Result<null>>('/chat/stop', { conversationId });

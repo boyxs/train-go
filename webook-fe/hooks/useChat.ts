@@ -384,6 +384,57 @@ export function useChat(conversationId: number | null) {
     }
   }, [conversationId, hasMore, loading, serverMessages]);
 
+  // 乐观更新反馈
+  // serverMessages 和 pendingMessages 都用函数式更新，不经过 bufferRef
+  const setFeedback = useCallback(
+    async (messageId: number, feedback: number) => {
+      if (!conversationId) {
+        return;
+      }
+      const convId = conversationId;
+
+      const applyFeedback = <T extends { id: number; feedback?: number }>(
+        prev: T[],
+        value: number,
+      ): T[] =>
+        prev.map((m) => (m.id === messageId ? { ...m, feedback: value } : m));
+
+      // 记住旧值用于回滚
+      let oldFeedback = 0;
+      setServerMessages((prev) => {
+        const found = prev.find((m) => m.id === messageId);
+        if (found) {
+          oldFeedback = found.feedback ?? 0;
+        }
+        return applyFeedback(prev, feedback);
+      });
+      // 直接更新 pendingMessages state，不经过 bufferRef（buffer 可能已被清除）
+      setPendingMessages((prev) => {
+        const found = prev.find((m) => m.id === messageId);
+        if (found) {
+          oldFeedback = found.feedback ?? 0;
+        }
+        return applyFeedback(prev, feedback);
+      });
+
+      try {
+        const res = await chatApi.setMessageFeedback(
+          convId,
+          messageId,
+          feedback,
+        );
+        if (res.data.code !== 0) {
+          setServerMessages((prev) => applyFeedback(prev, oldFeedback));
+          setPendingMessages((prev) => applyFeedback(prev, oldFeedback));
+        }
+      } catch {
+        setServerMessages((prev) => applyFeedback(prev, oldFeedback));
+        setPendingMessages((prev) => applyFeedback(prev, oldFeedback));
+      }
+    },
+    [conversationId],
+  );
+
   return {
     messages,
     loading,
@@ -393,6 +444,7 @@ export function useChat(conversationId: number | null) {
     send,
     stop,
     loadMore,
+    setFeedback,
   };
 }
 
@@ -406,4 +458,5 @@ export type ChatHook = ReturnType<typeof useChat> & {
   send: (content: string) => void;
   stop: () => void;
   loadMore: () => Promise<void>;
+  setFeedback: (messageId: number, feedback: number) => Promise<void>;
 };

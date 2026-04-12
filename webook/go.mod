@@ -25,6 +25,7 @@ require (
 	go.uber.org/zap v1.27.1
 	golang.org/x/crypto v0.48.0
 	golang.org/x/net v0.50.0
+	golang.org/x/sync v0.19.0
 	gorm.io/driver/mysql v1.6.0
 	gorm.io/gorm v1.31.1
 	gorm.io/plugin/soft_delete v1.2.1
@@ -89,7 +90,6 @@ require (
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/exp v0.0.0-20250305212735-054e65f0b394 // indirect
 	golang.org/x/oauth2 v0.30.0 // indirect
-	golang.org/x/sync v0.19.0 // indirect
 	golang.org/x/time v0.12.0 // indirect
 	google.golang.org/api v0.248.0 // indirect
 	google.golang.org/genproto v0.0.0-20250603155806-513f23925822 // indirect

@@ -28,8 +28,17 @@ function ChatPage() {
     select,
   } = useConversations();
 
-  const { messages, loading, streaming, hasMore, error, send, stop, loadMore } =
-    useChat(activeId);
+  const {
+    messages,
+    loading,
+    streaming,
+    hasMore,
+    error,
+    send,
+    stop,
+    loadMore,
+    setFeedback,
+  } = useChat(activeId);
 
   useEffect(() => {
     fetchList().catch(() => message.error('加载对话列表失败'));
@@ -172,6 +181,7 @@ function ChatPage() {
             conversationId={activeId ?? undefined}
             onSend={handleSend}
             onLoadMore={loadMore}
+            onFeedback={setFeedback}
           />
           <ChatInput streaming={streaming} onSend={handleSend} onStop={stop} />
         </div>

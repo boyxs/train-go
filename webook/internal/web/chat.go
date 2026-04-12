@@ -42,6 +42,7 @@ func (h *InternalChatHandler) RegisterRoutes(server *gin.Engine) {
 	g.POST("/stop", h.StopGeneration)
 	g.POST("/conversation/generating", h.IsGenerating)
 	g.GET("/message/stream", h.ResumeStream)
+	g.POST("/message/feedback", h.SetFeedback)
 }
 
 type conversationIdReq struct {
@@ -277,6 +278,43 @@ func (h *InternalChatHandler) pollStream(
 			return
 		}
 	}
+}
+
+type setFeedbackReq struct {
+	ConversationId int64 `json:"conversationId"`
+	MessageId      int64 `json:"messageId"`
+	Feedback       int8  `json:"feedback"`
+}
+
+func (h *InternalChatHandler) SetFeedback(ctx *gin.Context) {
+	var req setFeedbackReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(http.StatusOK, Result{Code: 4, Msg: "参数错误"})
+		return
+	}
+	if req.MessageId <= 0 || req.ConversationId <= 0 {
+		ctx.JSON(http.StatusOK, Result{Code: 4, Msg: "参数错误"})
+		return
+	}
+	if req.Feedback != -1 && req.Feedback != 0 && req.Feedback != 1 {
+		ctx.JSON(http.StatusOK, Result{Code: 4, Msg: "无效的反馈值"})
+		return
+	}
+	uc := ctx.MustGet(consts.UserKey).(jwt.UserClaims)
+	err := h.svc.SetFeedback(ctx.Request.Context(), uc.Userid, req.ConversationId, req.MessageId, req.Feedback)
+	if err != nil {
+		if errors.Is(err, service.ErrConversationNotFound) {
+			ctx.JSON(http.StatusOK, Result{Code: 4, Msg: "对话不存在"})
+			return
+		}
+		ctx.JSON(http.StatusOK, Result{Code: 5, Msg: "系统错误"})
+		h.l.Error("设置反馈失败",
+			logger.Int64("uid", uc.Userid),
+			logger.Int64("msgId", req.MessageId),
+			logger.Error(err))
+		return
+	}
+	ctx.JSON(http.StatusOK, Result{Msg: "OK"})
 }
 
 // formatSSE 将事件格式化为 SSE 文本

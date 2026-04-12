@@ -12,6 +12,7 @@ export interface Message {
   content: string;
   toolCalls?: string;
   tokenUsed?: number;
+  feedback?: number; // 0=无反馈, 1=赞, -1=踩
   createdAt: number;
 }
 

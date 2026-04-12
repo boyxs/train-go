@@ -17,6 +17,7 @@ type Message struct {
 	Content        string `json:"content"`
 	ToolCalls      string `json:"toolCalls,omitempty"`
 	TokenUsed      int    `json:"tokenUsed"`
+	Feedback       int8   `json:"feedback"`
 	CreatedAt      int64  `json:"createdAt"`
 }
 
