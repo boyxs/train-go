@@ -3,6 +3,7 @@ package ioc
 import (
 	"strings"
 
+	"gitee.com/train-cloud/geektime-basic-go/pkg/ginx"
 	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
@@ -29,5 +30,8 @@ func InitLogger() logger.LoggerX {
 	// 替换后全局生效
 	zap.ReplaceGlobals(l)
 	l.Sugar().Infof("logger config: %+v", cfg)
-	return logger.NewZapLogger(l)
+	lx := logger.NewZapLogger(l)
+	// 注入 ginx wrapper 用的全局 logger
+	ginx.L = lx
+	return lx
 }
