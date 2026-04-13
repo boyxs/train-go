@@ -3,6 +3,7 @@ services:
     image: mysql:8.0
     container_name: webook-mysql
     restart: always
+    mem_limit: 512m
     environment:
       MYSQL_ROOT_PASSWORD: "13520"
     ports:
@@ -17,6 +18,7 @@ services:
     image: redis:7.2-alpine
     container_name: webook-redis
     restart: always
+    mem_limit: 128m
     ports:
       - "6379:6379"
     networks:
@@ -43,6 +45,7 @@ services:
     image: bitnami/etcd:3.5.17
     container_name: webook-etcd
     restart: always
+    mem_limit: 128m
     environment:
       ALLOW_NONE_AUTHENTICATION: "no"
       ETCD_ROOT_PASSWORD: "13520"
@@ -73,13 +76,109 @@ services:
       extnetwork:
         ipv4_address: 172.21.0.10
 
+  kafka:
+    image: 'apache/kafka:3.7.0'
+    container_name: webook-kafka
+    restart: always
+    mem_limit: 512m
+    ports:
+      - '9092:9092'
+      - '9094:9094'
+    environment:
+      KAFKA_NODE_ID: 0
+      KAFKA_PROCESS_ROLES: controller,broker
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,EXTERNAL://0.0.0.0:9094
+      # PLAINTEXT 供容器间通信（用容器名），EXTERNAL 供宿主机 Windows 访问（用虚拟机 IP）
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://192.168.150.101:9094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 0@kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      # 允许自动创建 topic，线上不要开启
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+      # 单节点必须设为 1，默认值 3 会因副本不足无法创建内部 topic
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      # 限制 JVM 堆内存，2G 虚拟机必须控制
+      KAFKA_HEAP_OPTS: '-Xmx256m -Xms256m'
+      # 固定集群 ID，重启不丢数据
+      CLUSTER_ID: webook-kafka-kraft-cluster-id
+    volumes:
+      - kafka-data:/tmp/kraft-combined-logs
+    networks:
+      extnetwork:
+        ipv4_address: 172.21.0.5
+
+  elasticsearch:
+    image: elasticsearch:8.12.2
+    container_name: webook-es
+    restart: always
+    mem_limit: 1024m
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - xpack.security.http.ssl.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+    volumes:
+      - es-data:/usr/share/elasticsearch/data
+    networks:
+      extnetwork:
+        ipv4_address: 172.21.0.6
+
+  ollama:
+    image: ollama/ollama:0.6.2
+    container_name: webook-ollama
+    restart: always
+    mem_limit: 2048m
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    networks:
+      extnetwork:
+        ipv4_address: 172.21.0.7
+
+  # ── bitnami/kafka 备用配置（镜像源可用时切换） ──────────────
+  # kafka:
+  #   image: 'bitnami/kafka:3.6.0'
+  #   container_name: webook-kafka
+  #   restart: always
+  #   mem_limit: 512m
+  #   ports:
+  #     - '9092:9092'
+  #     - '9094:9094'
+  #   environment:
+  #     - KAFKA_CFG_NODE_ID=0
+  #     - KAFKA_CFG_PROCESS_ROLES=controller,broker
+  #     - KAFKA_CFG_LISTENERS=PLAINTEXT://0.0.0.0:9092,CONTROLLER://:9093,EXTERNAL://0.0.0.0:9094
+  #     - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092,EXTERNAL://localhost:9094
+  #     - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT,PLAINTEXT:PLAINTEXT
+  #     - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=0@kafka:9093
+  #     - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+  #     - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
+  #     - KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+  #     - KAFKA_CFG_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
+  #     - KAFKA_CFG_TRANSACTION_STATE_LOG_MIN_ISR=1
+  #     - KAFKA_HEAP_OPTS=-Xmx256m -Xms256m
+  #     - KAFKA_KRAFT_CLUSTER_ID=webook-kafka-kraft-cluster-id
+  #   volumes:
+  #     - kafka-data:/bitnami/kafka
+  #   networks:
+  #     extnetwork:
+  #       ipv4_address: 172.21.0.5
+
 volumes:
   mysql-data:
+  kafka-data:
+  es-data:
+  ollama-data:
 
 networks:
   extnetwork:
     external: true
-    # name: extnetwork
-    # ipam:
-    #   config:
-    #     - subnet: 172.21.0.0/16
+    name: extnetwork
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16
