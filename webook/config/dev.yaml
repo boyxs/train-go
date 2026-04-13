@@ -1,14 +1,14 @@
 etcd:
-    endpoint: http://127.0.0.1:2379
-    path: /webook
-    type: yaml
+  endpoint: http://127.0.0.1:2379
+  path: /webook
+  type: yaml
 
 mysql:
-    dsn: root:13520@tcp(localhost:3306)/webook?parseTime=true&loc=UTC
+  dsn: root:13520@tcp(localhost:3306)/webook?parseTime=true&loc=UTC
 
 redis:
-    addr: 127.0.0.1:6379
-    password: "13520"
+  addr: 127.0.0.1:6379
+  password: "13520"
 
 #web:
 #  logger:
@@ -19,34 +19,54 @@ redis:
 #    maxPathLen: 1024
 
 llm:
-    providers:
-        - name: deepseek
-          apiKey: "sk-405db05b37ac418b91268403d32a55aa"
-          baseUrl: "https://api.deepseek.com"
-          model: "deepseek-chat"
-          maxTokens: 2048
-          timeout: 60
-        - name: kimi
-          apiKey: "sk-KURYxBodidmpQmZsL1SGrEiDoWcETmKDkgr70qsfmEDleS6d"
-          baseUrl: "https://api.moonshot.cn/v1"
-          model: "kimi-k2.5"
-          maxTokens: 2048
-          timeout: 60
+  providers:
+    - name: deepseek
+      apiKey: "sk-405db05b37ac418b91268403d32a55aa"
+      baseUrl: "https://api.deepseek.com"
+      model: "deepseek-chat"
+      maxTokens: 2048
+      timeout: 60
+    - name: kimi
+      apiKey: "sk-KURYxBodidmpQmZsL1SGrEiDoWcETmKDkgr70qsfmEDleS6d"
+      baseUrl: "https://api.moonshot.cn/v1"
+      model: "kimi-k2.5"
+      maxTokens: 2048
+      timeout: 60
+
+kafka:
+  addrs:
+    - "localhost:9094"
+  # 网络超时（秒）
+  dialTimeout: 10
+  readTimeout: 10
+  writeTimeout: 10
+  # Producer
+  producerTimeout: 10  # broker ack 超时（秒）
+  producerRetryMax: 0  # 失败不重试，直接降级同步
+  # Metadata
+  metadataRetryMax: 1
+  metadataRetryBackoff: 250  # 毫秒
+  metadataTimeout: 5
+  # Consumer group
+  consumerGroup: "interaction-consumer"
+  # Consumer 失败退避（秒）
+  consumerBackoffInitial: 5
+  consumerBackoffMax: 60
 
 es:
-    addr: "http://localhost:9200"
+  addr: "http://localhost:9200"
 
 ollama:
-    baseUrl: "http://localhost:11434"
-    model: "bge-m3"
-    timeout: 5
+  baseUrl: "http://localhost:11434"
+  model: "bge-m3"
+  timeout: 5
 
 embedding:
-    baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1"
-    apiKey: "sk-ef23911b061943b681584ac467c4cd28"
-    model: "text-embedding-v3"
-    dims: 1024
-    timeout: 30
+  baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+  apiKey: "sk-ef23911b061943b681584ac467c4cd28"
+  model: "text-embedding-v3"
+  dims: 1024
+  timeout: 30
 
 #etcdctl --endpoints=127.0.0.1:2379 put /webook < config/dev.yaml
 

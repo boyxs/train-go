@@ -10,6 +10,27 @@ redis:
   addr: 'webook-redis:6379'
   password: '13520'
 
+kafka:
+  addrs:
+    - 'kafka:9092'
+  dialTimeout: 10
+  readTimeout: 10
+  writeTimeout: 10
+  producerTimeout: 10
+  producerRetryMax: 3
+  metadataRetryMax: 3
+  metadataRetryBackoff: 250
+  metadataTimeout: 5
+  consumerGroup: "interaction-consumer"
+  consumerBackoffInitial: 5
+  consumerBackoffMax: 60
+
+es:
+  addr: 'http://webook-es:9200'
+
+ollama:
+  baseUrl: 'http://webook-ollama:11434'
+
 logger:
   level:
     l: 0
