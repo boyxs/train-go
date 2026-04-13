@@ -7,6 +7,8 @@
 package main
 
 import (
+	"gitee.com/train-cloud/geektime-basic-go/internal/events"
+	"gitee.com/train-cloud/geektime-basic-go/internal/events/interaction"
 	"gitee.com/train-cloud/geektime-basic-go/internal/repository"
 	"gitee.com/train-cloud/geektime-basic-go/internal/repository/cache"
 	"gitee.com/train-cloud/geektime-basic-go/internal/repository/dao"
@@ -25,7 +27,7 @@ import (
 
 // Injectors from wire.go:
 
-func InitWebServer() *gin.Engine {
+func InitWebServer() App {
 	cmdable := ioc.InitRedis()
 	jwtHandler := jwt.NewRedisJwtHandler(cmdable)
 	loggerX := ioc.InitLogger()
@@ -57,7 +59,12 @@ func InitWebServer() *gin.Engine {
 	interactionDAO := dao.NewGormInteractionDAO(db)
 	interactionCache := cache.NewRedisInteractionCache(cmdable)
 	interactionRepository := repository.NewCacheInteractionRepository(interactionDAO, interactionCache, loggerX)
-	interactionService := service.NewInternalInteractionService(interactionRepository)
+	kafkaConfig := ioc.InitKafkaConfig()
+	config := ioc.InitSaramaConfig(kafkaConfig)
+	syncProducer := ioc.InitSaramaSyncProducer(kafkaConfig, config)
+	producer := ioc.InitEventProducer(syncProducer, loggerX)
+	interactionEventProducer := interaction.NewSaramaInteractionEventProducer(producer)
+	interactionService := ioc.InitInteractionService(interactionRepository, interactionEventProducer, loggerX)
 	articleAuthorHandler := web.NewInternalArticleAuthorHandler(articleAuthorService, interactionService, loggerX)
 	articleReaderService := service.NewInternalArticleReaderService(articleReaderRepository)
 	articleReaderHandler := web.NewInternalArticleReaderHandler(articleReaderService, interactionService, loggerX)
@@ -86,7 +93,14 @@ func InitWebServer() *gin.Engine {
 	articlePolishService := service.NewAIArticlePolishService(llmClient)
 	articlePolishHandler := web.NewAIArticlePolishHandler(articlePolishService, cmdable, loggerX)
 	engine := ioc.InitWebServer(v, userHandler, articleAuthorHandler, articleReaderHandler, interactionHandler, oAuth2Handler, chatHandler, articleSearchHandler, clickEventHandler, articlePolishHandler)
-	return engine
+	client := ioc.InitSaramaClient(kafkaConfig, config)
+	consumerConfig := ioc.InitInteractionConsumerConfig(kafkaConfig)
+	consumer := interaction.NewSaramaInteractionEventConsumer(client, interactionRepository, consumerConfig, loggerX)
+	app := App{
+		Server:   engine,
+		Consumer: consumer,
+	}
+	return app
 }
 
 // wire.go:
@@ -100,5 +114,14 @@ var clickEventProviderSet = wire.NewSet(dao.NewGormAIClickEventDAO, cache.NewRed
 // polishProviderSet 文章润色模块
 var polishProviderSet = wire.NewSet(service.NewAIArticlePolishService)
 
+// kafkaProviderSet Kafka 基础设施 + 互动事件
+var kafkaProviderSet = wire.NewSet(ioc.InitKafkaConfig, ioc.InitSaramaConfig, ioc.InitSaramaSyncProducer, ioc.InitSaramaClient, ioc.InitEventProducer, ioc.InitInteractionConsumerConfig, interaction.NewSaramaInteractionEventProducer, interaction.NewSaramaInteractionEventConsumer)
+
 // chatProviderSet Chat 模块的 Wire Provider 集合（不含 Handler）
 var chatProviderSet = wire.NewSet(ioc.InitLLMConfig, ioc.InitLLMClient, ioc.InitChatLimiter, dao.NewGormConversationDAO, dao.NewGormMessageDAO, cache.NewRedisConversationCache, cache.NewRedisMessageCache, repository.NewCacheConversationRepository, repository.NewCacheMessageRepository, service.NewAIChatService, service.NewAIChatToolExecutor, streamer.NewRedisStreamer)
+
+// App 应用入口，包含 Web 服务和后台消费者
+type App struct {
+	Server   *gin.Engine
+	Consumer events.Consumer
+}
