@@ -17,7 +17,7 @@ type InteractionHandler interface {
 type InternalInteractionHandler struct {
 	svc service.InteractionService
 	l   logger.LoggerX
-	biz string // 当前 handler 绑定的业务类型
+	biz string
 }
 
 func NewInternalInteractionHandler(svc service.InteractionService, l logger.LoggerX) InteractionHandler {
@@ -29,6 +29,7 @@ func (h *InternalInteractionHandler) RegisterRoutes(server *gin.Engine) {
 	g.POST("/like", h.Like)
 	g.POST("/collect", h.Collect)
 	g.POST("/detail", h.Detail)
+	g.POST("/state", h.State)
 	g.POST("/view", h.View)
 }
 
@@ -94,17 +95,14 @@ func (h *InternalInteractionHandler) Collect(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, Result{Msg: "OK"})
 }
 
+// Detail 获取互动聚合计数（公开接口，不含用户个人状态）
 func (h *InternalInteractionHandler) Detail(ctx *gin.Context) {
 	var req bizIdReq
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		ctx.AbortWithStatus(http.StatusBadRequest)
 		return
 	}
-	uid := int64(0)
-	if val, exists := ctx.Get(consts.UserKey); exists {
-		uid = val.(UserClaims).Userid
-	}
-	intr, err := h.svc.FindInteraction(ctx, uid, h.biz, req.ArticleId)
+	intr, err := h.svc.FindInteraction(ctx, 0, h.biz, req.ArticleId)
 	if err != nil {
 		ctx.JSON(http.StatusOK, Result{Code: 5, Msg: "系统错误"})
 		h.l.Error("获取互动数据失败",
@@ -113,6 +111,29 @@ func (h *InternalInteractionHandler) Detail(ctx *gin.Context) {
 		return
 	}
 	ctx.JSON(http.StatusOK, Result{Data: intr})
+}
+
+// State 获取当前用户的互动状态（liked/collected），需登录
+func (h *InternalInteractionHandler) State(ctx *gin.Context) {
+	var req bizIdReq
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+	uc := ctx.MustGet(consts.UserKey).(UserClaims)
+	liked, collected, err := h.svc.FindUserState(ctx, uc.Userid, h.biz, req.ArticleId)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{Code: 5, Msg: "系统错误"})
+		h.l.Error("获取用户互动状态失败",
+			logger.Int64("uid", uc.Userid),
+			logger.Int64("bizId", req.ArticleId),
+			logger.Error(err))
+		return
+	}
+	ctx.JSON(http.StatusOK, Result{Data: gin.H{
+		"liked":     liked,
+		"collected": collected,
+	}})
 }
 
 func (h *InternalInteractionHandler) View(ctx *gin.Context) {

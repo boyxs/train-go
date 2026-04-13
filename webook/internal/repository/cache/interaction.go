@@ -21,6 +21,9 @@ type InteractionCache interface {
 	Get(ctx context.Context, biz string, bizId int64) (domain.Interaction, error)
 	Set(ctx context.Context, intr domain.Interaction) error
 	Del(ctx context.Context, biz string, bizId int64) error
+	GetUserState(ctx context.Context, uid int64, biz string, bizId int64) (liked, collected bool, err error)
+	SetUserState(ctx context.Context, uid int64, biz string, bizId int64, liked, collected bool) error
+	DelUserState(ctx context.Context, uid int64, biz string, bizId int64) error
 }
 
 type RedisInteractionCache struct {
@@ -78,4 +81,47 @@ func (c *RedisInteractionCache) Del(ctx context.Context, biz string, bizId int64
 
 func (c *RedisInteractionCache) key(biz string, bizId int64) string {
 	return fmt.Sprintf(consts.InteractionPattern, biz, bizId)
+}
+
+func (c *RedisInteractionCache) stateKey(uid int64, biz string, bizId int64) string {
+	return fmt.Sprintf(consts.InteractionStatePattern, biz, bizId, uid)
+}
+
+// GetUserState 查用户对指定业务的 liked/collected 状态
+// 未命中返回 redis.Nil
+func (c *RedisInteractionCache) GetUserState(ctx context.Context, uid int64, biz string, bizId int64) (bool, bool, error) {
+	data, err := c.cmd.HGetAll(ctx, c.stateKey(uid, biz, bizId)).Result()
+	if err != nil {
+		return false, false, err
+	}
+	if len(data) == 0 {
+		return false, false, redis.Nil
+	}
+	liked := data["liked"] == "1"
+	collected := data["collected"] == "1"
+	return liked, collected, nil
+}
+
+func (c *RedisInteractionCache) SetUserState(ctx context.Context, uid int64, biz string, bizId int64, liked, collected bool) error {
+	key := c.stateKey(uid, biz, bizId)
+	jitter := time.Duration(rand.Int63n(int64(5 * time.Minute)))
+	pipe := c.cmd.Pipeline()
+	pipe.HSet(ctx, key,
+		"liked", boolInt(liked),
+		"collected", boolInt(collected),
+	)
+	pipe.Expire(ctx, key, consts.InteractionTTL+jitter)
+	_, err := pipe.Exec(ctx)
+	return err
+}
+
+func (c *RedisInteractionCache) DelUserState(ctx context.Context, uid int64, biz string, bizId int64) error {
+	return c.cmd.Del(ctx, c.stateKey(uid, biz, bizId)).Err()
+}
+
+func boolInt(b bool) string {
+	if b {
+		return "1"
+	}
+	return "0"
 }

@@ -19,6 +19,7 @@ import { Loading } from '@/components/common/Loading';
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { useRequest } from '@/hooks/useRequest';
 import type { Interaction } from '@/types';
+import { tokenUtil } from '@/utils/token';
 
 interface ArticleReadProps {
   articleId: string;
@@ -39,9 +40,29 @@ function ArticleReadPage({ articleId }: ArticleReadProps) {
     [articleId],
   );
 
+  // 登录用户才查个人状态，未登录跳过
+  const { data: stateRes } = useRequest(
+    () =>
+      tokenUtil.hasToken()
+        ? interactionApi.findUserState(id)
+        : Promise.resolve(null),
+    [articleId],
+  );
+
   const [intrOverride, setIntrOverride] = useState<Interaction | null>(null);
   const readReported = useRef(false);
-  const intr = intrOverride ?? intrRes?.data ?? null;
+
+  // 合并聚合计数 + 个人状态
+  const baseIntr = intrRes?.data ?? null;
+  const userState = stateRes?.data ?? null;
+  const mergedIntr: Interaction | null = baseIntr
+    ? {
+        ...baseIntr,
+        liked: userState?.liked ?? false,
+        collected: userState?.collected ?? false,
+      }
+    : null;
+  const intr = intrOverride ?? mergedIntr;
 
   // 文章加载成功后上报阅读量（只执行一次，useRef 防 Strict Mode 双渲染）
   useEffect(() => {

@@ -108,8 +108,6 @@ func loginJwtMiddleware(hdl jwt.JwtHandler) gin.HandlerFunc {
 			"/article/reader/detail",
 			"/article/reader/page",
 			"/interaction/view",
-		).
-		OptionalPaths(
 			"/interaction/detail",
 		).
 		Build()
