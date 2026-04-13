@@ -8,6 +8,7 @@ import (
 	"gitee.com/train-cloud/geektime-basic-go/internal/domain"
 	"gitee.com/train-cloud/geektime-basic-go/internal/service"
 	"gitee.com/train-cloud/geektime-basic-go/internal/web/jwt"
+	"gitee.com/train-cloud/geektime-basic-go/pkg/ginx"
 	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
@@ -26,18 +27,6 @@ const (
 
 type UserHandler interface {
 	RegisterRoutes(server *gin.Engine)
-	Register(ctx *gin.Context)
-	SendLoginSMSCode(ctx *gin.Context)
-	LoginSMS(ctx *gin.Context)
-	Login(ctx *gin.Context)
-	Logout(ctx *gin.Context)
-	Edit(ctx *gin.Context)
-	Profile(ctx *gin.Context)
-	//Session Operations
-	LoginSS(ctx *gin.Context)
-	LogoutSS(ctx *gin.Context)
-	EditSS(ctx *gin.Context)
-	ProfileSS(ctx *gin.Context)
 }
 
 type InternalUserHandler struct {
@@ -64,190 +53,133 @@ func NewInternalUserHandler(hdl jwt.JwtHandler, us service.UserService, cs servi
 	}
 }
 
-func (h *InternalUserHandler) RegisterRoutes(server *gin.Engine) {
-	ug := server.Group("/user")
-	ug.POST("/register", h.Register)
-	ug.POST("/login", h.Login)
-	ug.POST("/logout", h.Logout)
-	ug.POST("/edit", h.Edit)
-	ug.GET("/refresh_token", h.RefreshToken)
-	ug.GET("/profile", h.Profile)
-	//ug.POST("/login", h.LoginSS)
-	//ug.POST("/logout", h.LogoutSS)
-	//ug.POST("/edit", h.EditSS)
-	//ug.GET("/profile", h.ProfileSS)
-
-	//手机验证码登录相关功能
-	ug.POST("/login_sms/code/send", h.SendLoginSMSCode)
-	ug.POST("/login_sms", h.LoginSMS)
+type registerReq struct {
+	Email           string `json:"email" binding:"required"`
+	Password        string `json:"password" binding:"required"`
+	ConfirmPassword string `json:"confirmPassword" binding:"required"`
 }
 
-func (h *InternalUserHandler) Register(ctx *gin.Context) {
-	type RegisterRequest struct {
-		//Email           string `json:"email" binding:"required,email"`                      // 必填，且必须是邮箱格式
-		//Password        string `json:"password" binding:"required,min=8,max=20"`            // 必填，长度8-20位
-		//ConfirmPassword string `json:"confirmPassword" binding:"required,eqfield=Password"` // 必填，且必须与 Password 字段相等
-		Email           string `json:"email" binding:"required"`           // 必填，这里使用后面逻辑校验
-		Password        string `json:"password" binding:"required"`        // 必填，这里使用后面逻辑校验
-		ConfirmPassword string `json:"confirmPassword" binding:"required"` // 必填，这里使用后面逻辑校验
-	}
-	var req RegisterRequest
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.AbortWithStatus(http.StatusBadRequest)
-		return
-	}
-	// &syntax.Error{Code:"invalid or unsupported Perl syntax", Expr:"(?="}
-	// match, err := regexp.Match(passwordRegexPattern, []byte("000"))
+type smsCodeReq struct {
+	Phone string `json:"phone"`
+}
 
+type loginSMSReq struct {
+	Phone string `json:"phone"`
+	Code  string `json:"code"`
+}
+
+type loginReq struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+type editReqUser struct {
+	Nickname string `json:"nickname"`
+	Birthday int64  `json:"birthday"`
+	AboutMe  string `json:"aboutMe"`
+}
+
+func (h *InternalUserHandler) RegisterRoutes(server *gin.Engine) {
+	ug := server.Group("/user")
+	ug.POST("/register", ginx.WrapReq[registerReq](h.Register))
+	ug.POST("/login", ginx.WrapReq[loginReq](h.Login))
+	ug.POST("/logout", ginx.Wrap(h.Logout))
+	ug.POST("/edit", ginx.WrapReqClaims[editReqUser, UserClaims](consts.UserKey, h.Edit))
+	ug.GET("/refresh_token", h.RefreshToken) // 直接返 401，不走 wrapper
+	ug.GET("/profile", h.Profile) // 不走 wrapper：前端期望直接 Profile 不带 Result 包装
+
+	//手机验证码登录相关功能
+	ug.POST("/login_sms/code/send", ginx.WrapReq[smsCodeReq](h.SendLoginSMSCode))
+	ug.POST("/login_sms", ginx.WrapReq[loginSMSReq](h.LoginSMS))
+}
+
+func (h *InternalUserHandler) Register(ctx *gin.Context, req registerReq) (ginx.Result, error) {
 	isEmail, err := h.emailRegexp.MatchString(req.Email)
 	if err != nil {
-		ctx.JSON(http.StatusOK, Result{Code: 5, Msg: "系统错误"})
-		return
+		return ginx.Result{Code: 5, Msg: "系统错误"}, err
 	}
 	if !isEmail {
-		ctx.JSON(http.StatusOK, Result{Code: 4, Msg: "非法邮箱格式"})
-		return
+		return ginx.Result{Code: 4, Msg: "非法邮箱格式"}, nil
 	}
 	if req.Password != req.ConfirmPassword {
-		ctx.JSON(http.StatusOK, Result{Code: 4, Msg: "两次输入密码不匹配"})
-		return
+		return ginx.Result{Code: 4, Msg: "两次输入密码不匹配"}, nil
 	}
 	isPassword, err := h.passwordRegexp.MatchString(req.Password)
 	if err != nil {
-		ctx.JSON(http.StatusOK, Result{Code: 5, Msg: "系统错误"})
-		return
+		return ginx.Result{Code: 5, Msg: "系统错误"}, err
 	}
 	if !isPassword {
-		ctx.JSON(http.StatusOK, Result{Code: 4, Msg: "密码必须包含字母、数字、特殊字符，并且不少于八位"})
-		return
+		return ginx.Result{Code: 4, Msg: "密码必须包含字母、数字、特殊字符，并且不少于八位"}, nil
 	}
 	err = h.userService.Register(ctx, domain.User{
 		Email:    req.Email,
 		Password: req.Password,
 	})
 	if errors.Is(err, service.ErrDuplicateEmail) {
-		ctx.JSON(http.StatusOK, Result{Code: 4, Msg: "邮箱已被注册"})
-		return
+		return ginx.Result{Code: 4, Msg: "邮箱已被注册"}, nil
 	}
 	if err != nil {
-		ctx.JSON(http.StatusOK, Result{Code: 5, Msg: "系统异常"})
-		return
+		return ginx.Result{Code: 5, Msg: "系统异常"}, err
 	}
-	ctx.JSON(http.StatusOK, Result{Msg: "注册成功"})
+	return ginx.Result{Msg: "注册成功"}, nil
 }
 
-func (h *InternalUserHandler) SendLoginSMSCode(ctx *gin.Context) {
-	type CodeRequest struct {
-		Phone string `json:"phone"`
-	}
-	var req CodeRequest
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		return
-	}
+func (h *InternalUserHandler) SendLoginSMSCode(ctx *gin.Context, req smsCodeReq) (ginx.Result, error) {
 	if req.Phone == "" {
-		ctx.JSON(http.StatusOK, Result{
-			Code: 4,
-			Msg:  "请输入手机号码",
-		})
-		return
+		return ginx.Result{Code: 4, Msg: "请输入手机号码"}, nil
 	}
 	err := h.codeService.Send(ctx, loginBiz, req.Phone)
 	switch {
 	case err == nil:
-		ctx.JSON(http.StatusOK, Result{
-			Msg: "发送成功",
-		})
+		return ginx.Result{Msg: "发送成功"}, nil
 	case errors.Is(err, service.ErrCodeSendTooMany):
-		ctx.JSON(http.StatusOK, Result{
-			Code: 4,
-			Msg:  "短信发送太频繁，请稍后再试",
-		})
+		return ginx.Result{Code: 4, Msg: "短信发送太频繁，请稍后再试"}, nil
 	default:
-		ctx.JSON(http.StatusOK, Result{
-			Code: 5,
-			Msg:  "系统错误",
-		})
-		//记录日志
-		h.l.Error("发送验证码失败", logger.Error(err))
+		return ginx.Result{Code: 5, Msg: "系统错误"}, err
 	}
 }
 
-func (h *InternalUserHandler) LoginSMS(ctx *gin.Context) {
-	type LoginRequest struct {
-		Phone string `json:"phone"`
-		Code  string `json:"code"`
-	}
-	var req LoginRequest
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		return
-	}
+func (h *InternalUserHandler) LoginSMS(ctx *gin.Context, req loginSMSReq) (ginx.Result, error) {
 	ok, err := h.codeService.Verify(ctx, loginBiz, req.Phone, req.Code)
 	if err != nil {
-		ctx.JSON(http.StatusOK, Result{
-			Code: 5,
-			Msg:  err.Error(),
-		})
-		return
+		return ginx.Result{Code: 5, Msg: err.Error()}, err
 	}
 	if !ok {
-		ctx.JSON(http.StatusOK, Result{
-			Code: 4,
-			Msg:  "验证码错误，请重新输入",
-		})
-		return
+		return ginx.Result{Code: 4, Msg: "验证码错误，请重新输入"}, nil
 	}
 	user, err := h.userService.FindOrCreate(ctx, req.Phone)
 	if err != nil {
-		ctx.JSON(http.StatusOK, Result{
-			Code: 5,
-			Msg:  err.Error(),
-		})
-		return
+		return ginx.Result{Code: 5, Msg: err.Error()}, err
 	}
-	err = h.SetLoginToken(ctx, user.Id)
-	if err != nil {
-		ctx.JSON(http.StatusOK, Result{Code: 5, Msg: "系统异常"})
-		return
+	if err := h.SetLoginToken(ctx, user.Id); err != nil {
+		return ginx.Result{Code: 5, Msg: "系统异常"}, err
 	}
-	ctx.JSON(http.StatusOK, Result{
-		Msg: "登录成功",
-	})
+	return ginx.Result{Msg: "登录成功"}, nil
 }
 
-func (h *InternalUserHandler) Login(ctx *gin.Context) {
-	type LoginRequest struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
-	}
-	var req LoginRequest
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		return
-	}
+func (h *InternalUserHandler) Login(ctx *gin.Context, req loginReq) (ginx.Result, error) {
 	user, err := h.userService.Login(ctx, req.Email, req.Password)
 	switch err {
 	case nil:
-		err := h.SetLoginToken(ctx, user.Id)
-		if err != nil {
-			ctx.JSON(http.StatusOK, Result{Code: 5, Msg: "系统异常"})
-			return
+		if err := h.SetLoginToken(ctx, user.Id); err != nil {
+			return ginx.Result{Code: 5, Msg: "系统异常"}, err
 		}
-		ctx.JSON(http.StatusOK, Result{Msg: "登录成功"})
+		return ginx.Result{Msg: "登录成功"}, nil
 	case service.ErrInvalidUserOrPassword:
-		ctx.JSON(http.StatusOK, Result{Code: 4, Msg: "用户名或密码错误"})
+		return ginx.Result{Code: 4, Msg: "用户名或密码错误"}, nil
 	default:
-		ctx.JSON(http.StatusOK, Result{Code: 5, Msg: "系统错误"})
+		return ginx.Result{Code: 5, Msg: "系统错误"}, err
 	}
 }
 
-func (h *InternalUserHandler) Logout(ctx *gin.Context) {
-	err := h.ClearToken(ctx)
-	if err != nil {
-		ctx.JSON(http.StatusOK, Result{Code: 5, Msg: "退出失败"})
-		return
+func (h *InternalUserHandler) Logout(ctx *gin.Context) (ginx.Result, error) {
+	if err := h.ClearToken(ctx); err != nil {
+		return ginx.Result{Code: 5, Msg: "退出失败"}, err
 	}
-	ctx.JSON(http.StatusOK, Result{Code: 0, Msg: "退出成功"})
+	return ginx.Result{Msg: "退出成功"}, nil
 }
 
+// RefreshToken 不走 wrapper：失败直接 401 让前端跳登录
 func (h *InternalUserHandler) RefreshToken(ctx *gin.Context) {
 	tokenStr := h.ExtractToken(ctx)
 	var rc jwt.RefreshClaims
@@ -262,37 +194,18 @@ func (h *InternalUserHandler) RefreshToken(ctx *gin.Context) {
 		ctx.AbortWithStatus(http.StatusUnauthorized)
 		return
 	}
-	err = h.CheckSession(ctx, rc.Ssid)
-	if err != nil {
+	if err := h.CheckSession(ctx, rc.Ssid); err != nil {
 		ctx.AbortWithStatus(http.StatusUnauthorized)
 		return
 	}
-	err = h.SetAccessToken(ctx, rc.Userid, rc.Ssid)
-	if err != nil {
+	if err := h.SetAccessToken(ctx, rc.Userid, rc.Ssid); err != nil {
 		ctx.AbortWithStatus(http.StatusUnauthorized)
 		return
 	}
-	ctx.JSON(http.StatusOK, Result{
-		Msg: "OK",
-	})
+	ctx.JSON(http.StatusOK, ginx.Result{Msg: "OK"})
 }
 
-func (h *InternalUserHandler) Edit(ctx *gin.Context) {
-	type EditRequest struct {
-		Nickname string `json:"nickname"`
-		Birthday int64  `json:"birthday"`
-		AboutMe  string `json:"aboutMe"`
-	}
-	var req EditRequest
-	err := ctx.Bind(&req)
-	if err != nil {
-		return
-	}
-	uc, ok := ctx.MustGet(consts.UserKey).(UserClaims)
-	if !ok {
-		ctx.JSON(http.StatusUnauthorized, "请先登录")
-		return
-	}
+func (h *InternalUserHandler) Edit(ctx *gin.Context, req editReqUser, uc UserClaims) (ginx.Result, error) {
 	user, err := h.userService.Edit(ctx, domain.User{
 		Id:       uc.Userid,
 		Nickname: req.Nickname,
@@ -300,13 +213,12 @@ func (h *InternalUserHandler) Edit(ctx *gin.Context) {
 		AboutMe:  req.AboutMe,
 	})
 	if err != nil {
-		ctx.JSON(http.StatusOK, Result{Code: 5, Msg: "系统错误"})
-		h.l.Error("编辑用户信息失败", logger.Int64("uid", uc.Userid), logger.Error(err))
-		return
+		return ginx.Result{Code: 5, Msg: "系统错误"}, err
 	}
-	ctx.JSON(http.StatusOK, Result{Code: 0, Data: user})
+	return ginx.Result{Data: user}, nil
 }
 
+// Profile 不走 wrapper：保持原格式直接返回 Profile 对象（前端依赖此格式）
 func (h *InternalUserHandler) Profile(ctx *gin.Context) {
 	uc, ok := ctx.MustGet(consts.UserKey).(UserClaims)
 	if !ok {
@@ -315,7 +227,7 @@ func (h *InternalUserHandler) Profile(ctx *gin.Context) {
 	}
 	profile, err := h.userService.Profile(ctx, uc.Userid)
 	if err != nil {
-		ctx.JSON(http.StatusOK, Result{Code: 5, Msg: "系统异常"})
+		ctx.JSON(http.StatusOK, ginx.Result{Code: 5, Msg: "系统异常"})
 		return
 	}
 	ctx.JSON(http.StatusOK, profile)
@@ -323,15 +235,7 @@ func (h *InternalUserHandler) Profile(ctx *gin.Context) {
 
 // ==================Session Operations==================
 
-func (h *InternalUserHandler) LoginSS(ctx *gin.Context) {
-	type LoginRequest struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
-	}
-	var req LoginRequest
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		return
-	}
+func (h *InternalUserHandler) LoginSS(ctx *gin.Context, req loginReq) (ginx.Result, error) {
 	user, err := h.userService.Login(ctx, req.Email, req.Password)
 	switch err {
 	case nil:
@@ -343,43 +247,27 @@ func (h *InternalUserHandler) LoginSS(ctx *gin.Context) {
 			Secure:   true,
 			HttpOnly: true,
 		})
-		err := session.Save()
-		if err != nil {
-			ctx.JSON(http.StatusOK, Result{Code: 5, Msg: "系统异常"})
-			return
+		if err := session.Save(); err != nil {
+			return ginx.Result{Code: 5, Msg: "系统异常"}, err
 		}
-		ctx.JSON(http.StatusOK, Result{Msg: "登录成功"})
+		return ginx.Result{Msg: "登录成功"}, nil
 	case service.ErrInvalidUserOrPassword:
-		ctx.JSON(http.StatusOK, Result{Code: 4, Msg: "用户名或密码错误"})
+		return ginx.Result{Code: 4, Msg: "用户名或密码错误"}, nil
 	default:
-		ctx.JSON(http.StatusOK, Result{Code: 5, Msg: "系统错误"})
+		return ginx.Result{Code: 5, Msg: "系统错误"}, err
 	}
 }
 
-func (h *InternalUserHandler) LogoutSS(ctx *gin.Context) {
-	//err := h.ClearToken(ctx)
+func (h *InternalUserHandler) LogoutSS(ctx *gin.Context) (ginx.Result, error) {
 	session := sessions.Default(ctx)
 	session.Delete("userid")
-	//session.Clear()
-	err := session.Save()
-	if err != nil {
-		ctx.JSON(http.StatusOK, Result{Code: 5, Msg: "退出失败"})
-		return
+	if err := session.Save(); err != nil {
+		return ginx.Result{Code: 5, Msg: "退出失败"}, err
 	}
-	ctx.JSON(http.StatusOK, Result{Code: 0, Msg: "退出成功"})
+	return ginx.Result{Msg: "退出成功"}, nil
 }
 
-func (h *InternalUserHandler) EditSS(ctx *gin.Context) {
-	type EditRequest struct {
-		Nickname string `json:"nickname"`
-		Birthday int64  `json:"birthday"`
-		AboutMe  string `json:"aboutMe"`
-	}
-	var req EditRequest
-	err := ctx.Bind(&req)
-	if err != nil {
-		return
-	}
+func (h *InternalUserHandler) EditSS(ctx *gin.Context, req editReqUser) (ginx.Result, error) {
 	session := sessions.Default(ctx)
 	userid := session.Get("userid")
 	user, err := h.userService.Edit(ctx, domain.User{
@@ -389,24 +277,21 @@ func (h *InternalUserHandler) EditSS(ctx *gin.Context) {
 		AboutMe:  req.AboutMe,
 	})
 	if err != nil {
-		ctx.JSON(http.StatusOK, Result{Code: 5, Msg: "系统错误"})
-		return
+		return ginx.Result{Code: 5, Msg: "系统错误"}, err
 	}
-	ctx.JSON(http.StatusOK, Result{Code: 0, Data: user})
+	return ginx.Result{Data: user}, nil
 }
 
-func (h *InternalUserHandler) ProfileSS(ctx *gin.Context) {
+func (h *InternalUserHandler) ProfileSS(ctx *gin.Context) (ginx.Result, error) {
 	session := sessions.Default(ctx)
 	val := session.Get("userid")
 	userid, ok := val.(int64)
 	if !ok {
-		ctx.JSON(http.StatusUnauthorized, "请先登录")
-		return
+		return ginx.Result{Code: 4, Msg: "请先登录"}, nil
 	}
 	profile, err := h.userService.Profile(ctx, userid)
 	if err != nil {
-		ctx.JSON(http.StatusOK, Result{Code: 5, Msg: "系统异常"})
-		return
+		return ginx.Result{Code: 5, Msg: "系统异常"}, err
 	}
-	ctx.JSON(http.StatusOK, profile)
+	return ginx.Result{Data: profile}, nil
 }

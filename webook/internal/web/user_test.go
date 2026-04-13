@@ -130,7 +130,8 @@ func TestInternalUserHandler_Register(t *testing.T) {
 				assert.NoError(t, err)
 				return req
 			},
-			wantCode: http.StatusBadRequest,
+			wantCode: http.StatusOK,
+			wantBody: `{"code":4,"msg":"参数错误","data":null}`,
 		},
 		{
 			name: "非法邮箱格式",
@@ -320,7 +321,8 @@ func TestInternalUserHandler_LoginSMS(t *testing.T) {
 				assert.NoError(t, err)
 				return req
 			},
-			wantCode: http.StatusOK,
+			wantCode:   http.StatusOK,
+			wantResult: Result{Code: 4, Msg: "参数错误"},
 		},
 		{
 			name: "验证码验证太频繁",

@@ -1,11 +1,10 @@
 package web
 
 import (
-	"net/http"
-
 	"gitee.com/train-cloud/geektime-basic-go/internal/consts"
 	"gitee.com/train-cloud/geektime-basic-go/internal/domain"
 	"gitee.com/train-cloud/geektime-basic-go/internal/service"
+	"gitee.com/train-cloud/geektime-basic-go/pkg/ginx"
 	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
 	"github.com/gin-gonic/gin"
 )
@@ -26,11 +25,11 @@ func NewInternalInteractionHandler(svc service.InteractionService, l logger.Logg
 
 func (h *InternalInteractionHandler) RegisterRoutes(server *gin.Engine) {
 	g := server.Group("/interaction")
-	g.POST("/like", h.Like)
-	g.POST("/collect", h.Collect)
-	g.POST("/detail", h.Detail)
-	g.POST("/state", h.State)
-	g.POST("/view", h.View)
+	g.POST("/like", ginx.WrapReqClaims[likeReq, UserClaims](consts.UserKey, h.Like))
+	g.POST("/collect", ginx.WrapReqClaims[collectReq, UserClaims](consts.UserKey, h.Collect))
+	g.POST("/detail", ginx.WrapReq[bizIdReq](h.Detail))
+	g.POST("/state", ginx.WrapReqClaims[bizIdReq, UserClaims](consts.UserKey, h.State))
+	g.POST("/view", ginx.WrapReq[bizIdReq](h.View))
 }
 
 type bizIdReq struct {
@@ -47,13 +46,7 @@ type collectReq struct {
 	Collected bool  `json:"collected"`
 }
 
-func (h *InternalInteractionHandler) Like(ctx *gin.Context) {
-	var req likeReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.AbortWithStatus(http.StatusBadRequest)
-		return
-	}
-	uc := ctx.MustGet(consts.UserKey).(UserClaims)
+func (h *InternalInteractionHandler) Like(ctx *gin.Context, req likeReq, uc UserClaims) (ginx.Result, error) {
 	var err error
 	if req.Liked {
 		err = h.svc.Like(ctx, uc.Userid, h.biz, req.ArticleId)
@@ -61,23 +54,12 @@ func (h *InternalInteractionHandler) Like(ctx *gin.Context) {
 		err = h.svc.CancelLike(ctx, uc.Userid, h.biz, req.ArticleId)
 	}
 	if err != nil {
-		ctx.JSON(http.StatusOK, Result{Code: 5, Msg: "系统错误"})
-		h.l.Error("点赞操作失败",
-			logger.Int64("uid", uc.Userid),
-			logger.Int64("bizId", req.ArticleId),
-			logger.Error(err))
-		return
+		return ginx.Result{Code: 5, Msg: "系统错误"}, err
 	}
-	ctx.JSON(http.StatusOK, Result{Msg: "OK"})
+	return ginx.Result{Msg: "OK"}, nil
 }
 
-func (h *InternalInteractionHandler) Collect(ctx *gin.Context) {
-	var req collectReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.AbortWithStatus(http.StatusBadRequest)
-		return
-	}
-	uc := ctx.MustGet(consts.UserKey).(UserClaims)
+func (h *InternalInteractionHandler) Collect(ctx *gin.Context, req collectReq, uc UserClaims) (ginx.Result, error) {
 	var err error
 	if req.Collected {
 		err = h.svc.Collect(ctx, uc.Userid, h.biz, req.ArticleId)
@@ -85,67 +67,36 @@ func (h *InternalInteractionHandler) Collect(ctx *gin.Context) {
 		err = h.svc.CancelCollect(ctx, uc.Userid, h.biz, req.ArticleId)
 	}
 	if err != nil {
-		ctx.JSON(http.StatusOK, Result{Code: 5, Msg: "系统错误"})
-		h.l.Error("收藏操作失败",
-			logger.Int64("uid", uc.Userid),
-			logger.Int64("bizId", req.ArticleId),
-			logger.Error(err))
-		return
+		return ginx.Result{Code: 5, Msg: "系统错误"}, err
 	}
-	ctx.JSON(http.StatusOK, Result{Msg: "OK"})
+	return ginx.Result{Msg: "OK"}, nil
 }
 
 // Detail 获取互动聚合计数（公开接口，不含用户个人状态）
-func (h *InternalInteractionHandler) Detail(ctx *gin.Context) {
-	var req bizIdReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.AbortWithStatus(http.StatusBadRequest)
-		return
-	}
+func (h *InternalInteractionHandler) Detail(ctx *gin.Context, req bizIdReq) (ginx.Result, error) {
 	intr, err := h.svc.FindInteraction(ctx, 0, h.biz, req.ArticleId)
 	if err != nil {
-		ctx.JSON(http.StatusOK, Result{Code: 5, Msg: "系统错误"})
-		h.l.Error("获取互动数据失败",
-			logger.Int64("bizId", req.ArticleId),
-			logger.Error(err))
-		return
+		return ginx.Result{Code: 5, Msg: "系统错误"}, err
 	}
-	ctx.JSON(http.StatusOK, Result{Data: intr})
+	return ginx.Result{Data: intr}, nil
 }
 
 // State 获取当前用户的互动状态（liked/collected），需登录
-func (h *InternalInteractionHandler) State(ctx *gin.Context) {
-	var req bizIdReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.AbortWithStatus(http.StatusBadRequest)
-		return
-	}
-	uc := ctx.MustGet(consts.UserKey).(UserClaims)
+func (h *InternalInteractionHandler) State(ctx *gin.Context, req bizIdReq, uc UserClaims) (ginx.Result, error) {
 	liked, collected, err := h.svc.FindUserState(ctx, uc.Userid, h.biz, req.ArticleId)
 	if err != nil {
-		ctx.JSON(http.StatusOK, Result{Code: 5, Msg: "系统错误"})
-		h.l.Error("获取用户互动状态失败",
-			logger.Int64("uid", uc.Userid),
-			logger.Int64("bizId", req.ArticleId),
-			logger.Error(err))
-		return
+		return ginx.Result{Code: 5, Msg: "系统错误"}, err
 	}
-	ctx.JSON(http.StatusOK, Result{Data: gin.H{
+	return ginx.Result{Data: gin.H{
 		"liked":     liked,
 		"collected": collected,
-	}})
+	}}, nil
 }
 
-func (h *InternalInteractionHandler) View(ctx *gin.Context) {
-	var req bizIdReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.AbortWithStatus(http.StatusBadRequest)
-		return
-	}
+func (h *InternalInteractionHandler) View(ctx *gin.Context, req bizIdReq) (ginx.Result, error) {
 	if err := h.svc.IncrReadCount(ctx, h.biz, req.ArticleId); err != nil {
-		h.l.Error("阅读量上报失败",
-			logger.Int64("bizId", req.ArticleId),
-			logger.Error(err))
+		// View 失败不影响主流程，wrapper 会记日志
+		return ginx.Result{Msg: "OK"}, err
 	}
-	ctx.JSON(http.StatusOK, Result{Msg: "OK"})
+	return ginx.Result{Msg: "OK"}, nil
 }

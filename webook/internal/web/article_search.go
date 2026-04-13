@@ -1,10 +1,10 @@
 package web
 
 import (
-	"net/http"
 	"strings"
 
 	"gitee.com/train-cloud/geektime-basic-go/internal/service"
+	"gitee.com/train-cloud/geektime-basic-go/pkg/ginx"
 	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
 	"github.com/gin-gonic/gin"
 )
@@ -23,7 +23,7 @@ func NewInternalArticleSearchHandler(svc service.ArticleSearchService, l logger.
 }
 
 func (h *InternalArticleSearchHandler) RegisterRoutes(server *gin.Engine) {
-	server.POST("/search/article", h.Search)
+	server.POST("/search/article", ginx.WrapReq[searchReq](h.Search))
 }
 
 type searchReq struct {
@@ -32,16 +32,9 @@ type searchReq struct {
 	Size  int    `json:"size"`
 }
 
-func (h *InternalArticleSearchHandler) Search(ctx *gin.Context) {
-	var req searchReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.AbortWithStatus(http.StatusBadRequest)
-		return
-	}
-
+func (h *InternalArticleSearchHandler) Search(ctx *gin.Context, req searchReq) (ginx.Result, error) {
 	if strings.TrimSpace(req.Query) == "" {
-		ctx.JSON(http.StatusOK, Result{Code: 4, Msg: "搜索内容不能为空"})
-		return
+		return ginx.Result{Code: 4, Msg: "搜索内容不能为空"}, nil
 	}
 	if req.Page <= 0 {
 		req.Page = 1
@@ -52,15 +45,10 @@ func (h *InternalArticleSearchHandler) Search(ctx *gin.Context) {
 
 	list, total, err := h.svc.Search(ctx.Request.Context(), req.Query, req.Page, req.Size)
 	if err != nil {
-		ctx.JSON(http.StatusOK, Result{Code: 5, Msg: "系统错误"})
-		h.l.Error("搜索文章失败", logger.Error(err))
-		return
+		return ginx.Result{Code: 5, Msg: "系统错误"}, err
 	}
-
-	ctx.JSON(http.StatusOK, Result{
-		Data: map[string]any{
-			"list":  list,
-			"total": total,
-		},
-	})
+	return ginx.Result{Data: map[string]any{
+		"list":  list,
+		"total": total,
+	}}, nil
 }

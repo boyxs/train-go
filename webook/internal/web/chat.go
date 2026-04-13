@@ -13,6 +13,7 @@ import (
 	"gitee.com/train-cloud/geektime-basic-go/internal/consts"
 	"gitee.com/train-cloud/geektime-basic-go/internal/service"
 	"gitee.com/train-cloud/geektime-basic-go/internal/web/jwt"
+	"gitee.com/train-cloud/geektime-basic-go/pkg/ginx"
 	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
 	"gitee.com/train-cloud/geektime-basic-go/pkg/ratelimit"
 	"github.com/gin-gonic/gin"
@@ -34,29 +35,24 @@ func NewInternalChatHandler(svc service.ChatService, l logger.LoggerX, limiter r
 
 func (h *InternalChatHandler) RegisterRoutes(server *gin.Engine) {
 	g := server.Group("/chat")
-	g.POST("/conversation/create", h.CreateConversation)
-	g.POST("/conversation/list", h.ListConversations)
-	g.POST("/conversation/delete", h.DeleteConversation)
-	g.POST("/message/list", h.ListMessages)
-	g.POST("/message/send", h.SendMessage)
-	g.POST("/stop", h.StopGeneration)
-	g.POST("/conversation/generating", h.IsGenerating)
-	g.GET("/message/stream", h.ResumeStream)
-	g.POST("/message/feedback", h.SetFeedback)
+	g.POST("/conversation/create", ginx.WrapClaims[jwt.UserClaims](consts.UserKey, h.CreateConversation))
+	g.POST("/conversation/list", ginx.WrapClaims[jwt.UserClaims](consts.UserKey, h.ListConversations))
+	g.POST("/conversation/delete", ginx.WrapReqClaims[conversationIdReq, jwt.UserClaims](consts.UserKey, h.DeleteConversation))
+	g.POST("/message/list", ginx.WrapReqClaims[listMessagesReq, jwt.UserClaims](consts.UserKey, h.ListMessages))
+	g.POST("/message/send", h.SendMessage) // SSE 不能 wrap
+	g.POST("/stop", ginx.WrapReqClaims[conversationIdReq, jwt.UserClaims](consts.UserKey, h.StopGeneration))
+	g.POST("/conversation/generating", ginx.WrapReq[conversationIdReq](h.IsGenerating))
+	g.GET("/message/stream", h.ResumeStream) // SSE 不能 wrap
+	g.POST("/message/feedback", ginx.WrapReqClaims[setFeedbackReq, jwt.UserClaims](consts.UserKey, h.SetFeedback))
 }
 
 type conversationIdReq struct {
 	ConversationId int64 `json:"conversationId"`
 }
 
-func (h *InternalChatHandler) IsGenerating(ctx *gin.Context) {
-	var req conversationIdReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusOK, Result{Code: 4, Msg: "参数错误"})
-		return
-	}
+func (h *InternalChatHandler) IsGenerating(ctx *gin.Context, req conversationIdReq) (ginx.Result, error) {
 	generating := h.svc.IsGenerating(ctx, req.ConversationId)
-	ctx.JSON(http.StatusOK, Result{Data: generating})
+	return ginx.Result{Data: generating}, nil
 }
 
 type listMessagesReq struct {
@@ -70,68 +66,39 @@ type sendMessageReq struct {
 	Content        string `json:"content"`
 }
 
-func (h *InternalChatHandler) CreateConversation(ctx *gin.Context) {
-	uc := ctx.MustGet(consts.UserKey).(jwt.UserClaims)
+func (h *InternalChatHandler) CreateConversation(ctx *gin.Context, uc jwt.UserClaims) (ginx.Result, error) {
 	conv, err := h.svc.CreateConversation(ctx.Request.Context(), uc.Userid)
 	if err != nil {
-		ctx.JSON(http.StatusOK, Result{Code: 5, Msg: "系统错误"})
-		h.l.Error("创建对话失败", logger.Int64("uid", uc.Userid), logger.Error(err))
-		return
+		return ginx.Result{Code: 5, Msg: "系统错误"}, err
 	}
-	ctx.JSON(http.StatusOK, Result{Data: conv})
+	return ginx.Result{Data: conv}, nil
 }
 
-func (h *InternalChatHandler) ListConversations(ctx *gin.Context) {
-	uc := ctx.MustGet(consts.UserKey).(jwt.UserClaims)
+func (h *InternalChatHandler) ListConversations(ctx *gin.Context, uc jwt.UserClaims) (ginx.Result, error) {
 	convs, err := h.svc.ListConversations(ctx.Request.Context(), uc.Userid)
 	if err != nil {
-		ctx.JSON(http.StatusOK, Result{Code: 5, Msg: "系统错误"})
-		h.l.Error("获取对话列表失败", logger.Int64("uid", uc.Userid), logger.Error(err))
-		return
+		return ginx.Result{Code: 5, Msg: "系统错误"}, err
 	}
-	ctx.JSON(http.StatusOK, Result{Data: convs})
+	return ginx.Result{Data: convs}, nil
 }
 
-func (h *InternalChatHandler) DeleteConversation(ctx *gin.Context) {
-	var req conversationIdReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.AbortWithStatus(http.StatusBadRequest)
-		return
-	}
-	uc := ctx.MustGet(consts.UserKey).(jwt.UserClaims)
+func (h *InternalChatHandler) DeleteConversation(ctx *gin.Context, req conversationIdReq, uc jwt.UserClaims) (ginx.Result, error) {
 	err := h.svc.DeleteConversation(ctx.Request.Context(), uc.Userid, req.ConversationId)
 	if err != nil {
-		ctx.JSON(http.StatusOK, Result{Code: 5, Msg: "系统错误"})
-		h.l.Error("删除对话失败",
-			logger.Int64("uid", uc.Userid),
-			logger.Int64("convId", req.ConversationId),
-			logger.Error(err))
-		return
+		return ginx.Result{Code: 5, Msg: "系统错误"}, err
 	}
-	ctx.JSON(http.StatusOK, Result{Msg: "OK"})
+	return ginx.Result{Msg: "OK"}, nil
 }
 
-func (h *InternalChatHandler) ListMessages(ctx *gin.Context) {
-	var req listMessagesReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.AbortWithStatus(http.StatusBadRequest)
-		return
-	}
-	uc := ctx.MustGet(consts.UserKey).(jwt.UserClaims)
+func (h *InternalChatHandler) ListMessages(ctx *gin.Context, req listMessagesReq, uc jwt.UserClaims) (ginx.Result, error) {
 	msgs, err := h.svc.ListMessages(ctx.Request.Context(), uc.Userid, req.ConversationId, req.BeforeId, req.Limit)
 	if err != nil {
 		if errors.Is(err, service.ErrConversationNotFound) {
-			ctx.JSON(http.StatusOK, Result{Code: 4, Msg: "对话不存在"})
-			return
+			return ginx.Result{Code: 4, Msg: "对话不存在"}, nil
 		}
-		ctx.JSON(http.StatusOK, Result{Code: 5, Msg: "系统错误"})
-		h.l.Error("获取消息列表失败",
-			logger.Int64("uid", uc.Userid),
-			logger.Int64("convId", req.ConversationId),
-			logger.Error(err))
-		return
+		return ginx.Result{Code: 5, Msg: "系统错误"}, err
 	}
-	ctx.JSON(http.StatusOK, Result{Data: msgs})
+	return ginx.Result{Data: msgs}, nil
 }
 
 func (h *InternalChatHandler) SendMessage(ctx *gin.Context) {
@@ -187,19 +154,12 @@ func (h *InternalChatHandler) SendMessage(ctx *gin.Context) {
 	})
 }
 
-func (h *InternalChatHandler) StopGeneration(ctx *gin.Context) {
-	var req conversationIdReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.AbortWithStatus(http.StatusBadRequest)
-		return
-	}
-	uc := ctx.MustGet(consts.UserKey).(jwt.UserClaims)
+func (h *InternalChatHandler) StopGeneration(ctx *gin.Context, req conversationIdReq, uc jwt.UserClaims) (ginx.Result, error) {
 	err := h.svc.StopGeneration(ctx.Request.Context(), uc.Userid, req.ConversationId)
 	if err != nil {
-		ctx.JSON(http.StatusOK, Result{Code: 5, Msg: "系统错误"})
-		return
+		return ginx.Result{Code: 5, Msg: "系统错误"}, err
 	}
-	ctx.JSON(http.StatusOK, Result{Msg: "OK"})
+	return ginx.Result{Msg: "OK"}, nil
 }
 
 // ResumeStream SSE 重连端点：GET /chat/message/stream?conversationId=xx
@@ -286,35 +246,21 @@ type setFeedbackReq struct {
 	Feedback       int8  `json:"feedback"`
 }
 
-func (h *InternalChatHandler) SetFeedback(ctx *gin.Context) {
-	var req setFeedbackReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusOK, Result{Code: 4, Msg: "参数错误"})
-		return
-	}
+func (h *InternalChatHandler) SetFeedback(ctx *gin.Context, req setFeedbackReq, uc jwt.UserClaims) (ginx.Result, error) {
 	if req.MessageId <= 0 || req.ConversationId <= 0 {
-		ctx.JSON(http.StatusOK, Result{Code: 4, Msg: "参数错误"})
-		return
+		return ginx.Result{Code: 4, Msg: "参数错误"}, nil
 	}
 	if req.Feedback != -1 && req.Feedback != 0 && req.Feedback != 1 {
-		ctx.JSON(http.StatusOK, Result{Code: 4, Msg: "无效的反馈值"})
-		return
+		return ginx.Result{Code: 4, Msg: "无效的反馈值"}, nil
 	}
-	uc := ctx.MustGet(consts.UserKey).(jwt.UserClaims)
 	err := h.svc.SetFeedback(ctx.Request.Context(), uc.Userid, req.ConversationId, req.MessageId, req.Feedback)
 	if err != nil {
 		if errors.Is(err, service.ErrConversationNotFound) {
-			ctx.JSON(http.StatusOK, Result{Code: 4, Msg: "对话不存在"})
-			return
+			return ginx.Result{Code: 4, Msg: "对话不存在"}, nil
 		}
-		ctx.JSON(http.StatusOK, Result{Code: 5, Msg: "系统错误"})
-		h.l.Error("设置反馈失败",
-			logger.Int64("uid", uc.Userid),
-			logger.Int64("msgId", req.MessageId),
-			logger.Error(err))
-		return
+		return ginx.Result{Code: 5, Msg: "系统错误"}, err
 	}
-	ctx.JSON(http.StatusOK, Result{Msg: "OK"})
+	return ginx.Result{Msg: "OK"}, nil
 }
 
 // formatSSE 将事件格式化为 SSE 文本

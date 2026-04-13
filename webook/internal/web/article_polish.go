@@ -2,12 +2,11 @@ package web
 
 import (
 	"fmt"
-	"net/http"
 	"time"
 
 	"gitee.com/train-cloud/geektime-basic-go/internal/consts"
 	"gitee.com/train-cloud/geektime-basic-go/internal/service"
-	"gitee.com/train-cloud/geektime-basic-go/internal/web/jwt"
+	"gitee.com/train-cloud/geektime-basic-go/pkg/ginx"
 	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
 	"gitee.com/train-cloud/geektime-basic-go/pkg/ratelimit"
 	"github.com/gin-gonic/gin"
@@ -33,7 +32,7 @@ func NewAIArticlePolishHandler(svc service.ArticlePolishService, cmd redis.Cmdab
 }
 
 func (h *AIArticlePolishHandler) RegisterRoutes(server *gin.Engine) {
-	server.POST("/article/polish", h.Polish)
+	server.POST("/article/polish", ginx.WrapReqClaims[polishReq, UserClaims](consts.UserKey, h.Polish))
 }
 
 type polishReq struct {
@@ -41,15 +40,7 @@ type polishReq struct {
 	Content string `json:"content"`
 }
 
-func (h *AIArticlePolishHandler) Polish(ctx *gin.Context) {
-	var req polishReq
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusOK, Result{Code: 4, Msg: "参数错误"})
-		return
-	}
-
-	uc := ctx.MustGet(consts.UserKey).(jwt.UserClaims)
-
+func (h *AIArticlePolishHandler) Polish(ctx *gin.Context, req polishReq, uc UserClaims) (ginx.Result, error) {
 	// 限流：5 次/小时
 	key := fmt.Sprintf(consts.PolishRateLimitPattern, uc.Userid)
 	limited, limitErr := h.limiter.Limit(ctx.Request.Context(), key)
@@ -57,24 +48,18 @@ func (h *AIArticlePolishHandler) Polish(ctx *gin.Context) {
 		h.l.Error("润色限流检查失败", logger.Int64("uid", uc.Userid), logger.Error(limitErr))
 	}
 	if limited {
-		ctx.JSON(http.StatusOK, Result{Code: 4, Msg: "润色次数已达上限，请稍后再试"})
-		return
+		return ginx.Result{Code: 4, Msg: "润色次数已达上限，请稍后再试"}, nil
 	}
 
 	result, err := h.svc.Polish(ctx.Request.Context(), req.Title, req.Content)
 	if err != nil {
-		h.l.Error("AI 润色失败",
-			logger.Int64("uid", uc.Userid),
-			logger.Error(err))
 		// 区分业务参数错误和系统错误
 		switch err {
 		case service.ErrPolishEmptyTitle, service.ErrPolishEmptyContent, service.ErrPolishContentTooLong:
-			ctx.JSON(http.StatusOK, Result{Code: 4, Msg: err.Error()})
+			return ginx.Result{Code: 4, Msg: err.Error()}, nil
 		default:
-			ctx.JSON(http.StatusOK, Result{Code: 5, Msg: "润色失败，请重试"})
+			return ginx.Result{Code: 5, Msg: "润色失败，请重试"}, err
 		}
-		return
 	}
-
-	ctx.JSON(http.StatusOK, Result{Code: 0, Msg: "ok", Data: result})
+	return ginx.Result{Msg: "ok", Data: result}, nil
 }
