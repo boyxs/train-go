@@ -18,6 +18,8 @@ type InteractionRepository interface {
 	Collect(ctx context.Context, uid int64, biz string, bizId int64) error
 	CancelCollect(ctx context.Context, uid int64, biz string, bizId int64) error
 	FindInteraction(ctx context.Context, uid int64, biz string, bizId int64) (domain.Interaction, error)
+	// FindUserState 只查用户对指定业务的 liked/collected，不查聚合计数
+	FindUserState(ctx context.Context, uid int64, biz string, bizId int64) (liked, collected bool, err error)
 	FindByBizIds(ctx context.Context, biz string, bizIds []int64) ([]domain.Interaction, error)
 	// ListCollectedBizIds 查询用户收藏的 bizId 列表，按收藏时间降序
 	ListCollectedBizIds(ctx context.Context, uid int64, biz string, limit int) ([]int64, error)
@@ -51,6 +53,7 @@ func (r *CacheInteractionRepository) Like(ctx context.Context, uid int64, biz st
 	err := r.dao.UpsertLike(ctx, uid, biz, bizId, true)
 	if err == nil {
 		r.delCache(ctx, biz, bizId)
+		r.delUserStateCache(ctx, uid, biz, bizId)
 	}
 	return err
 }
@@ -59,6 +62,7 @@ func (r *CacheInteractionRepository) CancelLike(ctx context.Context, uid int64, 
 	err := r.dao.UpsertLike(ctx, uid, biz, bizId, false)
 	if err == nil {
 		r.delCache(ctx, biz, bizId)
+		r.delUserStateCache(ctx, uid, biz, bizId)
 	}
 	return err
 }
@@ -67,6 +71,7 @@ func (r *CacheInteractionRepository) Collect(ctx context.Context, uid int64, biz
 	err := r.dao.UpsertCollect(ctx, uid, biz, bizId, true)
 	if err == nil {
 		r.delCache(ctx, biz, bizId)
+		r.delUserStateCache(ctx, uid, biz, bizId)
 	}
 	return err
 }
@@ -75,8 +80,16 @@ func (r *CacheInteractionRepository) CancelCollect(ctx context.Context, uid int6
 	err := r.dao.UpsertCollect(ctx, uid, biz, bizId, false)
 	if err == nil {
 		r.delCache(ctx, biz, bizId)
+		r.delUserStateCache(ctx, uid, biz, bizId)
 	}
 	return err
+}
+
+func (r *CacheInteractionRepository) delUserStateCache(ctx context.Context, uid int64, biz string, bizId int64) {
+	if err := r.cache.DelUserState(ctx, uid, biz, bizId); err != nil {
+		r.l.Error("删除用户互动状态缓存失败",
+			logger.Int64("uid", uid), logger.Error(err))
+	}
 }
 
 func (r *CacheInteractionRepository) delCache(ctx context.Context, biz string, bizId int64) {
@@ -143,12 +156,28 @@ func (r *CacheInteractionRepository) ListHotBizIds(ctx context.Context, biz stri
 }
 
 func (r *CacheInteractionRepository) fillUserState(ctx context.Context, uid int64, biz string, bizId int64, intr *domain.Interaction) {
+	liked, collected, _ := r.FindUserState(ctx, uid, biz, bizId)
+	intr.Liked = liked
+	intr.Collected = collected
+}
+
+// FindUserState Cache-Aside 查用户状态
+func (r *CacheInteractionRepository) FindUserState(ctx context.Context, uid int64, biz string, bizId int64) (bool, bool, error) {
+	// 缓存优先
+	if liked, collected, err := r.cache.GetUserState(ctx, uid, biz, bizId); err == nil {
+		return liked, collected, nil
+	}
+	// 回源 DB
 	ui, err := r.dao.FindUserInteraction(ctx, uid, biz, bizId)
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		r.l.Error("查询用户互动状态失败",
 			logger.Int64("uid", uid), logger.String("biz", biz), logger.Int64("bizId", bizId), logger.Error(err))
-		return
+		return false, false, err
 	}
-	intr.Liked = ui.Liked
-	intr.Collected = ui.Collected
+	// 回填缓存（错误不阻塞）
+	if setErr := r.cache.SetUserState(ctx, uid, biz, bizId, ui.Liked, ui.Collected); setErr != nil {
+		r.l.Error("回填用户互动状态缓存失败",
+			logger.Int64("uid", uid), logger.Error(setErr))
+	}
+	return ui.Liked, ui.Collected, nil
 }

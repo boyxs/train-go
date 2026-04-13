@@ -113,6 +113,22 @@ func (mr *MockInteractionRepositoryMockRecorder) FindInteraction(ctx, uid, biz, 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindInteraction", reflect.TypeOf((*MockInteractionRepository)(nil).FindInteraction), ctx, uid, biz, bizId)
 }
 
+// FindUserState mocks base method.
+func (m *MockInteractionRepository) FindUserState(ctx context.Context, uid int64, biz string, bizId int64) (bool, bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FindUserState", ctx, uid, biz, bizId)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(bool)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// FindUserState indicates an expected call of FindUserState.
+func (mr *MockInteractionRepositoryMockRecorder) FindUserState(ctx, uid, biz, bizId any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindUserState", reflect.TypeOf((*MockInteractionRepository)(nil).FindUserState), ctx, uid, biz, bizId)
+}
+
 // IncrReadCount mocks base method.
 func (m *MockInteractionRepository) IncrReadCount(ctx context.Context, biz string, bizId int64) error {
 	m.ctrl.T.Helper()

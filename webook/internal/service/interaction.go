@@ -14,6 +14,8 @@ type InteractionService interface {
 	Collect(ctx context.Context, uid int64, biz string, bizId int64) error
 	CancelCollect(ctx context.Context, uid int64, biz string, bizId int64) error
 	FindInteraction(ctx context.Context, uid int64, biz string, bizId int64) (domain.Interaction, error)
+	// FindUserState 只查用户的 liked/collected，不查聚合计数
+	FindUserState(ctx context.Context, uid int64, biz string, bizId int64) (liked, collected bool, err error)
 	// FindByBizIds 批量查聚合计数，返回 map[bizId]Interaction
 	FindByBizIds(ctx context.Context, biz string, bizIds []int64) (map[int64]domain.Interaction, error)
 }
@@ -48,6 +50,10 @@ func (s *InternalInteractionService) CancelCollect(ctx context.Context, uid int6
 
 func (s *InternalInteractionService) FindInteraction(ctx context.Context, uid int64, biz string, bizId int64) (domain.Interaction, error) {
 	return s.repo.FindInteraction(ctx, uid, biz, bizId)
+}
+
+func (s *InternalInteractionService) FindUserState(ctx context.Context, uid int64, biz string, bizId int64) (bool, bool, error) {
+	return s.repo.FindUserState(ctx, uid, biz, bizId)
 }
 
 func (s *InternalInteractionService) FindByBizIds(ctx context.Context, biz string, bizIds []int64) (map[int64]domain.Interaction, error) {
