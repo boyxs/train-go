@@ -129,20 +129,48 @@ func (r *CacheInteractionRepository) FindInteraction(ctx context.Context, uid in
 	return result, nil
 }
 
+// FindByBizIds 批量查聚合计数
+// 策略：先逐个尝试缓存，miss 的 bizId 批量回源 DB，再异步回填缓存
 func (r *CacheInteractionRepository) FindByBizIds(ctx context.Context, biz string, bizIds []int64) ([]domain.Interaction, error) {
-	intrs, err := r.dao.FindByBizIds(ctx, biz, bizIds)
+	result := make([]domain.Interaction, 0, len(bizIds))
+	missIds := make([]int64, 0, len(bizIds))
+
+	// 逐个尝试缓存
+	for _, id := range bizIds {
+		intr, err := r.cache.Get(ctx, biz, id)
+		if err == nil {
+			result = append(result, intr)
+			continue
+		}
+		missIds = append(missIds, id)
+	}
+
+	// 全部命中直接返回
+	if len(missIds) == 0 {
+		return result, nil
+	}
+
+	// miss 的批量查 DB
+	intrs, err := r.dao.FindByBizIds(ctx, biz, missIds)
 	if err != nil {
 		return nil, err
 	}
-	result := make([]domain.Interaction, 0, len(intrs))
-	for _, intr := range intrs {
-		result = append(result, domain.Interaction{
-			BizId:        intr.BizId,
+	for _, e := range intrs {
+		intr := domain.Interaction{
+			BizId:        e.BizId,
 			Biz:          biz,
-			ReadCount:    intr.ReadCount,
-			LikeCount:    intr.LikeCount,
-			CollectCount: intr.CollectCount,
-		})
+			ReadCount:    e.ReadCount,
+			LikeCount:    e.LikeCount,
+			CollectCount: e.CollectCount,
+		}
+		result = append(result, intr)
+		// 异步回填缓存，不阻塞主流程
+		go func(i domain.Interaction) {
+			if setErr := r.cache.Set(context.Background(), i); setErr != nil {
+				r.l.Error("批量查询回填互动缓存失败",
+					logger.Int64("bizId", i.BizId), logger.Error(setErr))
+			}
+		}(intr)
 	}
 	return result, nil
 }
@@ -155,6 +183,8 @@ func (r *CacheInteractionRepository) ListHotBizIds(ctx context.Context, biz stri
 	return r.dao.ListHotBizIds(ctx, biz, limit)
 }
 
+// fillUserState 作为 FindInteraction 的边路逻辑，出错不影响聚合计数返回
+// FindUserState 内部已记日志，这里刻意吞掉错误保证主流程不被阻塞
 func (r *CacheInteractionRepository) fillUserState(ctx context.Context, uid int64, biz string, bizId int64, intr *domain.Interaction) {
 	liked, collected, _ := r.FindUserState(ctx, uid, biz, bizId)
 	intr.Liked = liked

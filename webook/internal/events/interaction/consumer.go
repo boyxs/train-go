@@ -2,24 +2,24 @@ package interaction
 
 import (
 	"context"
-	"encoding/json"
 	"time"
 
 	"gitee.com/train-cloud/geektime-basic-go/internal/events"
 	"gitee.com/train-cloud/geektime-basic-go/internal/repository"
 	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
+	"gitee.com/train-cloud/geektime-basic-go/pkg/saramax"
 	"github.com/IBM/sarama"
-	"golang.org/x/sync/errgroup"
 )
 
 // ConsumerConfig Consumer 配置
 type ConsumerConfig struct {
-	GroupID         string
-	BackoffInitial  time.Duration
-	BackoffMax      time.Duration
+	GroupID        string
+	BackoffInitial time.Duration
+	BackoffMax     time.Duration
 }
 
-// SaramaInteractionEventConsumer 互动事件消费者 sarama 实现
+// SaramaInteractionEventConsumer 互动事件消费者，业务只关心 handleBatch 业务逻辑
+// 攒批 / 反序列化 / 提交 offset 全部由 saramax.BatchConsumer 负责
 type SaramaInteractionEventConsumer struct {
 	client sarama.Client
 	repo   repository.InteractionRepository
@@ -46,11 +46,17 @@ func (c *SaramaInteractionEventConsumer) Start(ctx context.Context) error {
 		return err
 	}
 	defer group.Close()
+
+	// 用通用批量消费者：业务只写 handleBatch
+	handler := saramax.NewBatchConsumer[InteractionEvent](
+		c.handleBatch, 10, time.Second, c.l,
+	)
+
 	// 连接失败退避：从 BackoffInitial 起，指数增长到 BackoffMax
 	backoff := c.cfg.BackoffInitial
 	maxBackoff := c.cfg.BackoffMax
 	for {
-		err = group.Consume(ctx, []string{TopicInteractionEvents}, c)
+		err = group.Consume(ctx, []string{TopicInteractionEvents}, handler)
 		if err != nil {
 			c.l.Warn("消费互动事件出错，稍后重试",
 				logger.String("backoff", backoff.String()),
@@ -66,7 +72,6 @@ func (c *SaramaInteractionEventConsumer) Start(ctx context.Context) error {
 			}
 			continue
 		}
-		// 消费成功，重置退避
 		backoff = c.cfg.BackoffInitial
 		if ctx.Err() != nil {
 			return ctx.Err()
@@ -74,61 +79,16 @@ func (c *SaramaInteractionEventConsumer) Start(ctx context.Context) error {
 	}
 }
 
-func (c *SaramaInteractionEventConsumer) Setup(_ sarama.ConsumerGroupSession) error   { return nil }
-func (c *SaramaInteractionEventConsumer) Cleanup(_ sarama.ConsumerGroupSession) error { return nil }
-
-func (c *SaramaInteractionEventConsumer) ConsumeClaim(session sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
-	const batchSize = 10
-	msgCh := claim.Messages()
-
-	for {
-		batch := make([]*sarama.ConsumerMessage, 0, batchSize)
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-
-		for i := 0; i < batchSize; i++ {
-			select {
-			case <-ctx.Done():
-				goto process
-			case msg, ok := <-msgCh:
-				if !ok {
-					cancel()
-					c.processBatch(session, batch)
-					return nil
-				}
-				batch = append(batch, msg)
-			}
-		}
-
-	process:
-		cancel()
-		if len(batch) == 0 {
-			continue
-		}
-		c.processBatch(session, batch)
-	}
-}
-
-func (c *SaramaInteractionEventConsumer) processBatch(session sarama.ConsumerGroupSession, batch []*sarama.ConsumerMessage) {
-	var eg errgroup.Group
-	for _, msg := range batch {
-		eg.Go(func() error {
-			var evt InteractionEvent
-			if err := json.Unmarshal(msg.Value, &evt); err != nil {
+// handleBatch 业务逻辑：批量处理互动事件
+func (c *SaramaInteractionEventConsumer) handleBatch(_ []*sarama.ConsumerMessage, events []InteractionEvent) error {
+	ctx := context.Background()
+	for _, evt := range events {
+		switch evt.Type {
+		case "read":
+			if err := c.repo.IncrReadCount(ctx, evt.Biz, evt.BizId); err != nil {
 				return err
 			}
-			switch evt.Type {
-			case "read":
-				return c.repo.IncrReadCount(context.Background(), evt.Biz, evt.BizId)
-			default:
-				return nil
-			}
-		})
+		}
 	}
-	if err := eg.Wait(); err != nil {
-		c.l.Error("批量处理互动事件失败", logger.Error(err))
-		return
-	}
-	for _, msg := range batch {
-		session.MarkMessage(msg, "")
-	}
+	return nil
 }

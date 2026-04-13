@@ -107,8 +107,8 @@ func (c *RedisInteractionCache) SetUserState(ctx context.Context, uid int64, biz
 	jitter := time.Duration(rand.Int63n(int64(5 * time.Minute)))
 	pipe := c.cmd.Pipeline()
 	pipe.HSet(ctx, key,
-		"liked", boolInt(liked),
-		"collected", boolInt(collected),
+		"liked", boolStr(liked),
+		"collected", boolStr(collected),
 	)
 	pipe.Expire(ctx, key, consts.InteractionTTL+jitter)
 	_, err := pipe.Exec(ctx)
@@ -119,7 +119,7 @@ func (c *RedisInteractionCache) DelUserState(ctx context.Context, uid int64, biz
 	return c.cmd.Del(ctx, c.stateKey(uid, biz, bizId)).Err()
 }
 
-func boolInt(b bool) string {
+func boolStr(b bool) string {
 	if b {
 		return "1"
 	}
