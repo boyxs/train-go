@@ -1,11 +1,10 @@
 package web
 
 import (
-	"net/http"
-
 	"gitee.com/train-cloud/geektime-basic-go/internal/consts"
 	"gitee.com/train-cloud/geektime-basic-go/internal/domain"
 	"gitee.com/train-cloud/geektime-basic-go/internal/service"
+	"gitee.com/train-cloud/geektime-basic-go/pkg/ginx"
 	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/sync/errgroup"
@@ -13,13 +12,6 @@ import (
 
 type ArticleAuthorHandler interface {
 	RegisterRoutes(server *gin.Engine)
-	Edit(ctx *gin.Context)
-	Publish(ctx *gin.Context)
-	Withdraw(ctx *gin.Context)
-	Detail(ctx *gin.Context)
-	Page(ctx *gin.Context)
-	List(ctx *gin.Context)
-	Delete(ctx *gin.Context)
 }
 
 type InternalArticleAuthorHandler struct {
@@ -36,138 +28,75 @@ func NewInternalArticleAuthorHandler(svc service.ArticleAuthorService, intrSvc s
 	}
 }
 
-func (h *InternalArticleAuthorHandler) RegisterRoutes(server *gin.Engine) {
-	g := server.Group("/article")
-	g.POST("/edit", h.Edit)
-	g.POST("/publish", h.Publish)
-	g.POST("/withdraw", h.Withdraw)
-	g.POST("/detail", h.Detail)
-	g.POST("/page", h.Page)
-	g.POST("/list", h.List)
-	g.POST("/delete", h.Delete)
+type editReq struct {
+	Id       int64  `json:"id"`
+	Title    string `json:"title"`
+	Abstract string `json:"abstract"`
+	Content  string `json:"content"`
 }
 
-func (h *InternalArticleAuthorHandler) Edit(ctx *gin.Context) {
-	type EditRequest struct {
-		Id       int64  `json:"id"`
-		Title    string `json:"title"`
-		Abstract string `json:"abstract"`
-		Content  string `json:"content"`
-	}
-	var req EditRequest
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.AbortWithStatus(http.StatusBadRequest)
-		return
-	}
+type idReq struct {
+	Id int64 `json:"id"`
+}
+
+type pageReq struct {
+	Page     int `json:"page"`
+	PageSize int `json:"pageSize"`
+}
+
+func (h *InternalArticleAuthorHandler) RegisterRoutes(server *gin.Engine) {
+	g := server.Group("/article")
+	g.POST("/edit", ginx.WrapReqClaims[editReq, UserClaims](consts.UserKey, h.Edit))
+	g.POST("/publish", ginx.WrapReqClaims[editReq, UserClaims](consts.UserKey, h.Publish))
+	g.POST("/withdraw", ginx.WrapReqClaims[idReq, UserClaims](consts.UserKey, h.Withdraw))
+	g.POST("/detail", ginx.WrapReqClaims[idReq, UserClaims](consts.UserKey, h.Detail))
+	g.POST("/page", ginx.WrapReqClaims[pageReq, UserClaims](consts.UserKey, h.Page))
+	g.POST("/list", ginx.WrapClaims[UserClaims](consts.UserKey, h.List))
+	g.POST("/delete", ginx.WrapReqClaims[idReq, UserClaims](consts.UserKey, h.Delete))
+}
+
+func (h *InternalArticleAuthorHandler) Edit(ctx *gin.Context, req editReq, uc UserClaims) (ginx.Result, error) {
 	if req.Title == "" || req.Content == "" {
-		ctx.JSON(http.StatusOK, Result{
-			Code: 4,
-			Msg:  "标题和内容不能为空",
-		})
-		return
+		return ginx.Result{Code: 4, Msg: "标题和内容不能为空"}, nil
 	}
-	uc := ctx.MustGet(consts.UserKey).(UserClaims)
 	id, err := h.svc.Edit(ctx, domain.Article{
 		Id:       req.Id,
 		Title:    req.Title,
 		Abstract: req.Abstract,
 		Content:  req.Content,
-		Author: domain.Author{
-			Id: uc.Userid,
-		},
+		Author:   domain.Author{Id: uc.Userid},
 	})
 	if err != nil {
-		ctx.JSON(http.StatusOK, Result{
-			Msg: "系统错误",
-		})
-		h.l.Error("编辑文章数据失败",
-			logger.Int64("userid", uc.Userid),
-			logger.Error(err))
-		return
+		return ginx.Result{Msg: "系统错误"}, err
 	}
-	ctx.JSON(http.StatusOK, Result{
-		Data: id,
-	})
+	return ginx.Result{Data: id}, nil
 }
 
-func (h *InternalArticleAuthorHandler) Publish(ctx *gin.Context) {
-	type PublishRequest struct {
-		Id       int64  `json:"id"`
-		Title    string `json:"title"`
-		Abstract string `json:"abstract"`
-		Content  string `json:"content"`
-	}
-	var req PublishRequest
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.AbortWithStatus(http.StatusBadRequest)
-		return
-	}
+func (h *InternalArticleAuthorHandler) Publish(ctx *gin.Context, req editReq, uc UserClaims) (ginx.Result, error) {
 	if req.Title == "" || req.Content == "" {
-		ctx.JSON(http.StatusOK, Result{
-			Code: 4,
-			Msg:  "标题和内容不能为空",
-		})
-		return
+		return ginx.Result{Code: 4, Msg: "标题和内容不能为空"}, nil
 	}
-	uc := ctx.MustGet(consts.UserKey).(UserClaims)
 	_, err := h.svc.Publish(ctx, domain.Article{
 		Id:       req.Id,
 		Title:    req.Title,
 		Abstract: req.Abstract,
 		Content:  req.Content,
-		Author: domain.Author{
-			Id: uc.Userid,
-		},
+		Author:   domain.Author{Id: uc.Userid},
 	})
 	if err != nil {
-		ctx.JSON(http.StatusOK, Result{
-			Msg: "系统错误",
-		})
-		h.l.Error("发布文章失败",
-			logger.Int64("userid", uc.Userid),
-			logger.Error(err))
-		return
+		return ginx.Result{Msg: "系统错误"}, err
 	}
-	ctx.JSON(http.StatusOK, Result{
-		Msg: "OK",
-	})
+	return ginx.Result{Msg: "OK"}, nil
 }
 
-func (h *InternalArticleAuthorHandler) Withdraw(ctx *gin.Context) {
-	type WithdrawRequest struct {
-		Id int64 `json:"id"`
+func (h *InternalArticleAuthorHandler) Withdraw(ctx *gin.Context, req idReq, uc UserClaims) (ginx.Result, error) {
+	if err := h.svc.Withdraw(ctx, req.Id, uc.Userid); err != nil {
+		return ginx.Result{Msg: "系统错误"}, err
 	}
-	var req WithdrawRequest
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.AbortWithStatus(http.StatusBadRequest)
-		return
-	}
-	uc := ctx.MustGet(consts.UserKey).(UserClaims)
-	err := h.svc.Withdraw(ctx, req.Id, uc.Userid)
-	if err != nil {
-		ctx.JSON(http.StatusOK, Result{
-			Msg: "系统错误",
-		})
-		h.l.Error("撤回文章失败",
-			logger.Int64("userid", uc.Userid),
-			logger.Error(err))
-		return
-	}
-	ctx.JSON(http.StatusOK, Result{
-		Msg: "OK",
-	})
+	return ginx.Result{Msg: "OK"}, nil
 }
 
-func (h *InternalArticleAuthorHandler) Detail(ctx *gin.Context) {
-	type DetailRequest struct {
-		Id int64 `json:"id"`
-	}
-	var req DetailRequest
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.AbortWithStatus(http.StatusBadRequest)
-		return
-	}
-	uc := ctx.MustGet(consts.UserKey).(UserClaims)
+func (h *InternalArticleAuthorHandler) Detail(ctx *gin.Context, req idReq, uc UserClaims) (ginx.Result, error) {
 	var article domain.Article
 	var intr domain.Interaction
 	var eg errgroup.Group
@@ -183,28 +112,21 @@ func (h *InternalArticleAuthorHandler) Detail(ctx *gin.Context) {
 			h.l.Error("获取文章互动数据失败",
 				logger.Int64("article_id", req.Id), logger.Error(e))
 		}
-		return nil // 互动查询失败不阻塞
+		return nil
 	})
 	if err := eg.Wait(); err != nil {
-		ctx.JSON(http.StatusOK, Result{Msg: "系统错误"})
-		h.l.Error("获取文章详情失败",
-			logger.Int64("userid", uc.Userid),
-			logger.Int64("article_id", req.Id),
-			logger.Error(err))
-		return
+		return ginx.Result{Msg: "系统错误"}, err
 	}
-	ctx.JSON(http.StatusOK, Result{
-		Data: AuthorDetailVO{
-			Id:        article.Id,
-			Title:     article.Title,
-			Content:   article.Content,
-			Abstract:  article.Abstract,
-			Status:    article.Status.ToUint8(),
-			ReadCnt:   intr.ReadCount,
-			CreatedAt: article.CreatedAt,
-			UpdatedAt: article.UpdatedAt,
-		},
-	})
+	return ginx.Result{Data: AuthorDetailVO{
+		Id:        article.Id,
+		Title:     article.Title,
+		Content:   article.Content,
+		Abstract:  article.Abstract,
+		Status:    article.Status.ToUint8(),
+		ReadCnt:   intr.ReadCount,
+		CreatedAt: article.CreatedAt,
+		UpdatedAt: article.UpdatedAt,
+	}}, nil
 }
 
 // ArticleVO 列表接口返回的简化文章结构
@@ -241,28 +163,11 @@ type ReaderDetailVO struct {
 	UpdatedAt int64  `json:"updatedAt"`
 }
 
-func (h *InternalArticleAuthorHandler) Page(ctx *gin.Context) {
-	type PageRequest struct {
-		Page     int `json:"page"`
-		PageSize int `json:"pageSize"`
-	}
-	var req PageRequest
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.AbortWithStatus(http.StatusBadRequest)
-		return
-	}
-	uc := ctx.MustGet(consts.UserKey).(UserClaims)
+func (h *InternalArticleAuthorHandler) Page(ctx *gin.Context, req pageReq, uc UserClaims) (ginx.Result, error) {
 	articles, total, err := h.svc.Page(ctx, uc.Userid, req.Page, req.PageSize)
 	if err != nil {
-		ctx.JSON(http.StatusOK, Result{
-			Msg: "系统错误",
-		})
-		h.l.Error("分页获取文章失败",
-			logger.Int64("userid", uc.Userid),
-			logger.Error(err))
-		return
+		return ginx.Result{Msg: "系统错误"}, err
 	}
-	// 批量查阅读量
 	ids := make([]int64, 0, len(articles))
 	for _, a := range articles {
 		ids = append(ids, a.Id)
@@ -283,25 +188,13 @@ func (h *InternalArticleAuthorHandler) Page(ctx *gin.Context) {
 			UpdatedAt: a.UpdatedAt,
 		})
 	}
-	ctx.JSON(http.StatusOK, Result{
-		Data: gin.H{
-			"list":  list,
-			"total": total,
-		},
-	})
+	return ginx.Result{Data: gin.H{"list": list, "total": total}}, nil
 }
 
-func (h *InternalArticleAuthorHandler) List(ctx *gin.Context) {
-	uc := ctx.MustGet(consts.UserKey).(UserClaims)
+func (h *InternalArticleAuthorHandler) List(ctx *gin.Context, uc UserClaims) (ginx.Result, error) {
 	articles, err := h.svc.List(ctx, uc.Userid)
 	if err != nil {
-		ctx.JSON(http.StatusOK, Result{
-			Msg: "系统错误",
-		})
-		h.l.Error("获取全部文章失败",
-			logger.Int64("userid", uc.Userid),
-			logger.Error(err))
-		return
+		return ginx.Result{Msg: "系统错误"}, err
 	}
 	list := make([]ArticleVO, 0, len(articles))
 	for _, a := range articles {
@@ -313,35 +206,14 @@ func (h *InternalArticleAuthorHandler) List(ctx *gin.Context) {
 			UpdatedAt: a.UpdatedAt,
 		})
 	}
-	ctx.JSON(http.StatusOK, Result{
-		Data: list,
-	})
+	return ginx.Result{Data: list}, nil
 }
 
-func (h *InternalArticleAuthorHandler) Delete(ctx *gin.Context) {
-	type DeleteRequest struct {
-		Id int64 `json:"id"`
+func (h *InternalArticleAuthorHandler) Delete(ctx *gin.Context, req idReq, uc UserClaims) (ginx.Result, error) {
+	if err := h.svc.Delete(ctx, req.Id, uc.Userid); err != nil {
+		return ginx.Result{Msg: "系统错误"}, err
 	}
-	var req DeleteRequest
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.AbortWithStatus(http.StatusBadRequest)
-		return
-	}
-	uc := ctx.MustGet(consts.UserKey).(UserClaims)
-	err := h.svc.Delete(ctx, req.Id, uc.Userid)
-	if err != nil {
-		ctx.JSON(http.StatusOK, Result{
-			Msg: "系统错误",
-		})
-		h.l.Error("删除文章失败",
-			logger.Int64("userid", uc.Userid),
-			logger.Int64("article_id", req.Id),
-			logger.Error(err))
-		return
-	}
-	ctx.JSON(http.StatusOK, Result{
-		Msg: "OK",
-	})
+	return ginx.Result{Msg: "OK"}, nil
 }
 
 // ===== 读者端（公开，无需登录） =====
@@ -362,8 +234,8 @@ func NewInternalArticleReaderHandler(svc service.ArticleReaderService, intrSvc s
 
 func (h *InternalArticleReaderHandler) RegisterRoutes(server *gin.Engine) {
 	g := server.Group("/article/reader")
-	g.POST("/detail", h.Detail)
-	g.POST("/page", h.Page)
+	g.POST("/detail", ginx.WrapReq[idReq](h.Detail))
+	g.POST("/page", ginx.WrapReq[pageReq](h.Page))
 }
 
 // ReaderArticleVO 读者视角的文章简要信息
@@ -385,15 +257,7 @@ func abstractFromContent(content string, maxLen int) string {
 	return string(r[:maxLen]) + "..."
 }
 
-func (h *InternalArticleReaderHandler) Detail(ctx *gin.Context) {
-	type DetailRequest struct {
-		Id int64 `json:"id"`
-	}
-	var req DetailRequest
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.AbortWithStatus(http.StatusBadRequest)
-		return
-	}
+func (h *InternalArticleReaderHandler) Detail(ctx *gin.Context, req idReq) (ginx.Result, error) {
 	var article domain.Article
 	var intr domain.Interaction
 	var eg errgroup.Group
@@ -409,20 +273,16 @@ func (h *InternalArticleReaderHandler) Detail(ctx *gin.Context) {
 			h.l.Error("获取文章互动数据失败",
 				logger.Int64("article_id", req.Id), logger.Error(e))
 		}
-		return nil // 互动查询失败不阻塞
+		return nil
 	})
 	if err := eg.Wait(); err != nil {
-		ctx.JSON(http.StatusOK, Result{Msg: "文章不存在"})
-		h.l.Error("获取公开文章详情失败",
-			logger.Int64("article_id", req.Id),
-			logger.Error(err))
-		return
+		return ginx.Result{Msg: "文章不存在"}, err
 	}
 	abstract := article.Abstract
 	if abstract == "" {
 		abstract = abstractFromContent(article.Content, 128)
 	}
-	ctx.JSON(http.StatusOK, Result{Data: ReaderDetailVO{
+	return ginx.Result{Data: ReaderDetailVO{
 		Id:        article.Id,
 		Title:     article.Title,
 		Content:   article.Content,
@@ -431,26 +291,14 @@ func (h *InternalArticleReaderHandler) Detail(ctx *gin.Context) {
 		ReadCnt:   intr.ReadCount,
 		CreatedAt: article.CreatedAt,
 		UpdatedAt: article.UpdatedAt,
-	}})
+	}}, nil
 }
 
-func (h *InternalArticleReaderHandler) Page(ctx *gin.Context) {
-	type PageRequest struct {
-		Page     int `json:"page"`
-		PageSize int `json:"pageSize"`
-	}
-	var req PageRequest
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.AbortWithStatus(http.StatusBadRequest)
-		return
-	}
+func (h *InternalArticleReaderHandler) Page(ctx *gin.Context, req pageReq) (ginx.Result, error) {
 	articles, total, err := h.svc.Page(ctx, req.Page, req.PageSize)
 	if err != nil {
-		ctx.JSON(http.StatusOK, Result{Msg: "系统错误"})
-		h.l.Error("获取公开文章列表失败", logger.Error(err))
-		return
+		return ginx.Result{Msg: "系统错误"}, err
 	}
-	// 批量查阅读量
 	ids := make([]int64, 0, len(articles))
 	for _, a := range articles {
 		ids = append(ids, a.Id)
@@ -476,7 +324,5 @@ func (h *InternalArticleReaderHandler) Page(ctx *gin.Context) {
 			UpdatedAt: a.UpdatedAt,
 		})
 	}
-	ctx.JSON(http.StatusOK, Result{
-		Data: gin.H{"list": list, "total": total},
-	})
+	return ginx.Result{Data: gin.H{"list": list, "total": total}}, nil
 }

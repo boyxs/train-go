@@ -2,13 +2,13 @@ package web
 
 import (
 	"fmt"
-	"net/http"
 	"time"
 
 	"gitee.com/train-cloud/geektime-basic-go/internal/consts"
 	"gitee.com/train-cloud/geektime-basic-go/internal/service"
 	"gitee.com/train-cloud/geektime-basic-go/internal/service/oauth2"
 	myJwt "gitee.com/train-cloud/geektime-basic-go/internal/web/jwt"
+	"gitee.com/train-cloud/geektime-basic-go/pkg/ginx"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
@@ -16,8 +16,6 @@ import (
 
 type OAuth2Handler interface {
 	RegisterRoutes(server *gin.Engine)
-	AuthURL(ctx *gin.Context)
-	Callback(ctx *gin.Context)
 }
 
 type OAuth2WechatHandler struct {
@@ -44,68 +42,39 @@ func NewOAuth2WechatHandler(
 
 func (h *OAuth2WechatHandler) RegisterRoutes(server *gin.Engine) {
 	og := server.Group("/oauth2/wechat")
-	og.GET("/authurl", h.AuthURL)
-	og.Any("/callback", h.Callback)
+	og.GET("/authurl", ginx.Wrap(h.AuthURL))
+	og.Any("/callback", ginx.Wrap(h.Callback))
 }
 
-func (h *OAuth2WechatHandler) AuthURL(ctx *gin.Context) {
+func (h *OAuth2WechatHandler) AuthURL(ctx *gin.Context) (ginx.Result, error) {
 	state := uuid.New().String()
 	authURL, err := h.svc.AuthURL(ctx, state)
 	if err != nil {
-		ctx.JSON(http.StatusOK, Result{
-			Code: 5,
-			Msg:  "构造授权登录URL失败",
-		})
-		return
+		return ginx.Result{Code: 5, Msg: "构造授权登录URL失败"}, err
 	}
-	err = h.setStateCookie(ctx, state)
-	if err != nil {
-		ctx.JSON(http.StatusOK, Result{
-			Msg:  "服务器异常",
-			Code: 5,
-		})
-		return
+	if err := h.setStateCookie(ctx, state); err != nil {
+		return ginx.Result{Code: 5, Msg: "服务器异常"}, err
 	}
-	ctx.JSON(http.StatusOK, Result{
-		Data: authURL,
-	})
+	return ginx.Result{Data: authURL}, nil
 }
 
-func (h *OAuth2WechatHandler) Callback(ctx *gin.Context) {
-	err := h.verifyState(ctx)
-	if err != nil {
-		ctx.JSON(http.StatusOK, Result{
-			Msg:  "非法请求",
-			Code: 4,
-		})
-		return
+func (h *OAuth2WechatHandler) Callback(ctx *gin.Context) (ginx.Result, error) {
+	if err := h.verifyState(ctx); err != nil {
+		return ginx.Result{Code: 4, Msg: "非法请求"}, nil
 	}
-	//可选校验
 	code := ctx.Query("code")
 	wechatAuth, err := h.svc.VerifyCode(ctx, code)
 	if err != nil {
-		ctx.JSON(http.StatusOK, Result{
-			Msg:  "授权码有误",
-			Code: 4,
-		})
-		return
+		return ginx.Result{Code: 4, Msg: "授权码有误"}, nil
 	}
 	u, err := h.userSvc.FindOrCreateByWechat(ctx, wechatAuth)
 	if err != nil {
-		ctx.JSON(http.StatusOK, Result{
-			Msg:  "系统错误",
-			Code: 5,
-		})
-		return
+		return ginx.Result{Code: 5, Msg: "系统错误"}, err
 	}
-	err = h.SetLoginToken(ctx, u.Id)
-	if err != nil {
-		ctx.String(http.StatusOK, "系统错误")
-		return
+	if err := h.SetLoginToken(ctx, u.Id); err != nil {
+		return ginx.Result{Code: 5, Msg: "系统错误"}, err
 	}
-	ctx.JSON(http.StatusOK, Result{
-		Msg: "OK",
-	})
+	return ginx.Result{Msg: "OK"}, nil
 }
 
 func (h *OAuth2WechatHandler) verifyState(ctx *gin.Context) error {
@@ -122,7 +91,6 @@ func (h *OAuth2WechatHandler) verifyState(ctx *gin.Context) error {
 		return fmt.Errorf("解析 token 失败 %w", err)
 	}
 	if state != sc.State {
-		// state 不匹配，有人搞鬼
 		return fmt.Errorf("state 不匹配")
 	}
 	return nil
