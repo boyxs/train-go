@@ -3,14 +3,16 @@
 package main
 
 import (
+	"gitee.com/train-cloud/geektime-basic-go/internal/events"
+	intrevt "gitee.com/train-cloud/geektime-basic-go/internal/events/interaction"
 	"gitee.com/train-cloud/geektime-basic-go/internal/repository"
 	"gitee.com/train-cloud/geektime-basic-go/internal/repository/cache"
 	"gitee.com/train-cloud/geektime-basic-go/internal/repository/dao"
 	"gitee.com/train-cloud/geektime-basic-go/internal/service"
 	"gitee.com/train-cloud/geektime-basic-go/internal/web"
-	"gitee.com/train-cloud/geektime-basic-go/pkg/streamer"
 	"gitee.com/train-cloud/geektime-basic-go/internal/web/jwt"
 	"gitee.com/train-cloud/geektime-basic-go/ioc"
+	"gitee.com/train-cloud/geektime-basic-go/pkg/streamer"
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
 )
@@ -39,6 +41,18 @@ var polishProviderSet = wire.NewSet(
 	service.NewAIArticlePolishService,
 )
 
+// kafkaProviderSet Kafka 基础设施 + 互动事件
+var kafkaProviderSet = wire.NewSet(
+	ioc.InitKafkaConfig,
+	ioc.InitSaramaConfig,
+	ioc.InitSaramaSyncProducer,
+	ioc.InitSaramaClient,
+	ioc.InitEventProducer,
+	ioc.InitInteractionConsumerConfig,
+	intrevt.NewSaramaInteractionEventProducer,
+	intrevt.NewSaramaInteractionEventConsumer,
+)
+
 // chatProviderSet Chat 模块的 Wire Provider 集合（不含 Handler）
 var chatProviderSet = wire.NewSet(
 	ioc.InitLLMConfig,
@@ -55,7 +69,13 @@ var chatProviderSet = wire.NewSet(
 	streamer.NewRedisStreamer,
 )
 
-func InitWebServer() *gin.Engine {
+// App 应用入口，包含 Web 服务和后台消费者
+type App struct {
+	Server   *gin.Engine
+	Consumer events.Consumer
+}
+
+func InitWebServer() App {
 	wire.Build(
 		//infra
 		ioc.InitDB, ioc.InitRedis, ioc.InitLogger, ioc.InitTimezone,
@@ -80,7 +100,7 @@ func InitWebServer() *gin.Engine {
 		service.NewSmsCodeService,
 		service.NewInternalArticleAuthorService,
 		service.NewInternalArticleReaderService,
-		service.NewInternalInteractionService,
+		ioc.InitInteractionService,
 		//handler
 		web.NewInternalUserHandler,
 		web.NewInternalArticleAuthorHandler,
@@ -100,9 +120,12 @@ func InitWebServer() *gin.Engine {
 		clickEventProviderSet,
 		// 文章润色
 		polishProviderSet,
+		// kafka + 互动事件
+		kafkaProviderSet,
 
 		ioc.InitMiddlewares,
 		ioc.InitWebServer,
+		wire.Struct(new(App), "*"),
 	)
-	return gin.Default()
+	return App{}
 }

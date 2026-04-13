@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"os"
 	"time"
@@ -16,8 +17,14 @@ func main() {
 	// initViper()
 	// initViperV1()
 	initViperV2()
-	server := InitWebServer()
-	err := server.Run(":8089")
+	app := InitWebServer()
+	// 后台启动 Kafka 消费者
+	go func() {
+		if err := app.Consumer.Start(context.Background()); err != nil {
+			log.Printf("[Kafka] consumer exited: %v", err)
+		}
+	}()
+	err := app.Server.Run(":8089")
 	if err != nil {
 		panic(err)
 	}

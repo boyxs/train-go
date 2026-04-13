@@ -13,6 +13,8 @@
       "console": "integratedTerminal",
       "env": {
         "APP_ENV": "config/dev.yaml", // k8s
+        "GOMEMLIMIT": "512MiB",
+        "GOGC": "80"
       },
       // "args": ["--env=config/dev.yaml"], //优先于env
     }
