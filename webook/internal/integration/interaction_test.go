@@ -14,12 +14,16 @@ import (
 	"gitee.com/train-cloud/geektime-basic-go/internal/domain"
 	"gitee.com/train-cloud/geektime-basic-go/internal/integration/setup"
 	"gitee.com/train-cloud/geektime-basic-go/internal/repository/dao"
+	"gitee.com/train-cloud/geektime-basic-go/internal/web"
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"gorm.io/gorm"
 )
+
+// testUid 测试用的固定登录 uid
+const testUid int64 = 1
 
 type InteractionSuite struct {
 	suite.Suite
@@ -32,6 +36,11 @@ func (s *InteractionSuite) SetupSuite() {
 	db := setup.InitDB()
 	cmd := setup.InitRedis()
 	server := gin.Default()
+	// 测试登录态：固定注入 uid=1 的 UserClaims，模拟已登录用户
+	server.Use(func(ctx *gin.Context) {
+		ctx.Set(consts.UserKey, web.UserClaims{Userid: testUid})
+		ctx.Next()
+	})
 	readerHdl := setup.InitArticleReaderHandler()
 	readerHdl.RegisterRoutes(server)
 	intrHdl := setup.InitInteractionHandler()
@@ -69,6 +78,14 @@ func (s *InteractionSuite) clearInteractionCache(bizIds ...int64) {
 	ctx := context.Background()
 	for _, id := range bizIds {
 		s.cmd.Del(ctx, fmt.Sprintf(consts.InteractionPattern, "article", id))
+	}
+}
+
+// clearUserStateCache 清理用户状态缓存
+func (s *InteractionSuite) clearUserStateCache(uid int64, bizIds ...int64) {
+	ctx := context.Background()
+	for _, id := range bizIds {
+		s.cmd.Del(ctx, fmt.Sprintf(consts.InteractionStatePattern, "article", id, uid))
 	}
 }
 
@@ -310,4 +327,191 @@ func (s *InteractionSuite) TestInteraction_ReaderPageReadCnt() {
 			assert.Equal(t, tc.wantResult, result)
 		})
 	}
+}
+
+// ── /interaction/state 独立接口 + 用户状态缓存测试 ────────────────────────
+
+type userStateResp struct {
+	Liked     bool `json:"liked"`
+	Collected bool `json:"collected"`
+}
+
+func (s *InteractionSuite) TestInteraction_State() {
+	t := s.T()
+	now := time.Now().UnixMilli()
+
+	testCases := []struct {
+		name      string
+		before    func(t *testing.T)
+		bizId     int64
+		wantLiked bool
+		wantColl  bool
+	}{
+		{
+			name:   "未互动返回 false",
+			before: func(t *testing.T) {},
+			bizId:  1001,
+		},
+		{
+			name: "已点赞已收藏",
+			before: func(t *testing.T) {
+				err := s.db.Create(&dao.UserInteraction{
+					UserId: testUid, Biz: "article", BizId: 1002,
+					Liked: true, Collected: true,
+					CreatedAt: now, UpdatedAt: now,
+				}).Error
+				assert.NoError(t, err)
+			},
+			bizId:     1002,
+			wantLiked: true,
+			wantColl:  true,
+		},
+		{
+			name: "已点赞未收藏",
+			before: func(t *testing.T) {
+				err := s.db.Create(&dao.UserInteraction{
+					UserId: testUid, Biz: "article", BizId: 1003,
+					Liked: true, Collected: false,
+					CreatedAt: now, UpdatedAt: now,
+				}).Error
+				assert.NoError(t, err)
+			},
+			bizId:     1003,
+			wantLiked: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			s.truncate("published_article", "interaction", "user_interaction")
+			tc.before(t)
+
+			req := fmt.Sprintf(`{"articleId":%d}`, tc.bizId)
+			recorder := s.postJSON("/interaction/state", req)
+			assert.Equal(t, http.StatusOK, recorder.Code)
+
+			var result Result[userStateResp]
+			err := json.NewDecoder(recorder.Body).Decode(&result)
+			assert.NoError(t, err)
+			assert.Equal(t, 0, result.Code)
+			assert.Equal(t, tc.wantLiked, result.Data.Liked)
+			assert.Equal(t, tc.wantColl, result.Data.Collected)
+		})
+	}
+}
+
+func (s *InteractionSuite) TestInteraction_StateCacheAside() {
+	t := s.T()
+	now := time.Now().UnixMilli()
+	const bizId int64 = 2001
+
+	s.truncate("published_article", "interaction", "user_interaction")
+	s.clearUserStateCache(testUid, bizId)
+
+	// DB 预置已点赞
+	err := s.db.Create(&dao.UserInteraction{
+		UserId: testUid, Biz: "article", BizId: bizId,
+		Liked: true, Collected: false,
+		CreatedAt: now, UpdatedAt: now,
+	}).Error
+	assert.NoError(t, err)
+
+	// 第一次请求：缓存 miss → 回源 DB → 回填缓存
+	req := fmt.Sprintf(`{"articleId":%d}`, bizId)
+	recorder := s.postJSON("/interaction/state", req)
+	assert.Equal(t, http.StatusOK, recorder.Code)
+	var r1 Result[userStateResp]
+	_ = json.NewDecoder(recorder.Body).Decode(&r1)
+	assert.True(t, r1.Data.Liked)
+
+	// 验证缓存已回填
+	ctx := context.Background()
+	key := fmt.Sprintf(consts.InteractionStatePattern, "article", bizId, testUid)
+	data, err := s.cmd.HGetAll(ctx, key).Result()
+	assert.NoError(t, err)
+	assert.Equal(t, "1", data["liked"])
+	assert.Equal(t, "0", data["collected"])
+
+	// 改 DB 但不清缓存：下次请求应走缓存（拿到旧值）
+	err = s.db.Model(&dao.UserInteraction{}).
+		Where("user_id = ? AND biz_id = ?", testUid, bizId).
+		Update("liked", false).Error
+	assert.NoError(t, err)
+
+	recorder = s.postJSON("/interaction/state", req)
+	var r2 Result[userStateResp]
+	_ = json.NewDecoder(recorder.Body).Decode(&r2)
+	assert.True(t, r2.Data.Liked, "缓存命中应返回旧值 true")
+}
+
+func (s *InteractionSuite) TestInteraction_StateCacheInvalidation() {
+	t := s.T()
+	const bizId int64 = 3001
+
+	s.truncate("published_article", "interaction", "user_interaction")
+	s.clearUserStateCache(testUid, bizId)
+	s.clearInteractionCache(bizId)
+
+	// 先通过 State 接口查一次，触发缓存回填（初始全 false）
+	req := fmt.Sprintf(`{"articleId":%d}`, bizId)
+	s.postJSON("/interaction/state", req)
+
+	// 确认缓存已存在
+	ctx := context.Background()
+	stateKey := fmt.Sprintf(consts.InteractionStatePattern, "article", bizId, testUid)
+	exists, _ := s.cmd.Exists(ctx, stateKey).Result()
+	assert.Equal(t, int64(1), exists)
+
+	// 点赞：写操作应清用户状态缓存
+	likeReq := fmt.Sprintf(`{"articleId":%d,"liked":true}`, bizId)
+	recorder := s.postJSON("/interaction/like", likeReq)
+	assert.Equal(t, http.StatusOK, recorder.Code)
+
+	// 验证缓存已清除
+	exists, _ = s.cmd.Exists(ctx, stateKey).Result()
+	assert.Equal(t, int64(0), exists, "点赞后用户状态缓存应被清除")
+
+	// 再查一次 state：回源 DB 应拿到最新 liked=true
+	recorder = s.postJSON("/interaction/state", req)
+	var r Result[userStateResp]
+	_ = json.NewDecoder(recorder.Body).Decode(&r)
+	assert.True(t, r.Data.Liked)
+}
+
+func (s *InteractionSuite) TestInteraction_DetailNoUserState() {
+	t := s.T()
+	now := time.Now().UnixMilli()
+	const bizId int64 = 4001
+
+	s.truncate("published_article", "interaction", "user_interaction")
+	s.clearInteractionCache(bizId)
+
+	// DB 预置聚合 + 用户状态
+	err := s.db.Create(&dao.Interaction{
+		BizId: bizId, Biz: "article",
+		ReadCount: 5, LikeCount: 3, CollectCount: 2,
+		CreatedAt: now, UpdatedAt: now,
+	}).Error
+	assert.NoError(t, err)
+	err = s.db.Create(&dao.UserInteraction{
+		UserId: testUid, Biz: "article", BizId: bizId,
+		Liked: true, Collected: true,
+		CreatedAt: now, UpdatedAt: now,
+	}).Error
+	assert.NoError(t, err)
+
+	// /interaction/detail 应只返回聚合计数，不含 liked/collected
+	req := fmt.Sprintf(`{"articleId":%d}`, bizId)
+	recorder := s.postJSON("/interaction/detail", req)
+	assert.Equal(t, http.StatusOK, recorder.Code)
+
+	var r Result[domain.Interaction]
+	err = json.NewDecoder(recorder.Body).Decode(&r)
+	assert.NoError(t, err)
+	assert.Equal(t, int64(5), r.Data.ReadCount)
+	assert.Equal(t, int64(3), r.Data.LikeCount)
+	assert.Equal(t, int64(2), r.Data.CollectCount)
+	// Detail 不应该返回用户状态（uid=0）
+	assert.False(t, r.Data.Liked)
+	assert.False(t, r.Data.Collected)
 }

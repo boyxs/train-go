@@ -2,7 +2,7 @@ package interaction
 
 import (
 	"context"
-	"encoding/json"
+	"errors"
 	"testing"
 
 	"gitee.com/train-cloud/geektime-basic-go/internal/domain"
@@ -46,56 +46,42 @@ func (m *mockRepo) ListCollectedBizIds(context.Context, int64, string, int) ([]i
 }
 func (m *mockRepo) ListHotBizIds(context.Context, string, int) ([]int64, error) { return nil, nil }
 
-// mockSession 仅实现 MarkMessage，其他方法不会被调用
-type mockSession struct {
-	sarama.ConsumerGroupSession
-	marked []*sarama.ConsumerMessage
-}
+func TestHandleBatch_Read(t *testing.T) {
+	r := &mockRepo{}
+	c := &SaramaInteractionEventConsumer{repo: r, l: logger.NewNopLogger()}
 
-func (m *mockSession) MarkMessage(msg *sarama.ConsumerMessage, _ string) {
-	m.marked = append(m.marked, msg)
-}
-
-func buildMsg(t *testing.T, evt InteractionEvent) *sarama.ConsumerMessage {
-	data, err := json.Marshal(evt)
+	err := c.handleBatch(nil, []InteractionEvent{
+		{Type: "read", Biz: "article", BizId: 123},
+		{Type: "read", Biz: "article", BizId: 456},
+	})
 	require.NoError(t, err)
-	return &sarama.ConsumerMessage{Value: data}
-}
-
-func TestProcessBatch_Read(t *testing.T) {
-	r := &mockRepo{}
-	c := &SaramaInteractionEventConsumer{repo: r, l: logger.NewNopLogger()}
-	sess := &mockSession{}
-
-	c.processBatch(sess, []*sarama.ConsumerMessage{
-		buildMsg(t, InteractionEvent{Type: "read", Biz: "article", BizId: 123}),
-	})
-	require.Len(t, r.readCalls, 1)
-	assert.Equal(t, "article", r.readCalls[0].biz)
+	require.Len(t, r.readCalls, 2)
 	assert.Equal(t, int64(123), r.readCalls[0].bizId)
-	assert.Len(t, sess.marked, 1)
+	assert.Equal(t, int64(456), r.readCalls[1].bizId)
 }
 
-func TestProcessBatch_UnknownType(t *testing.T) {
+func TestHandleBatch_UnknownTypeIgnored(t *testing.T) {
 	r := &mockRepo{}
 	c := &SaramaInteractionEventConsumer{repo: r, l: logger.NewNopLogger()}
-	sess := &mockSession{}
 
-	c.processBatch(sess, []*sarama.ConsumerMessage{
-		buildMsg(t, InteractionEvent{Type: "unknown", Biz: "article", BizId: 123}),
+	err := c.handleBatch(nil, []InteractionEvent{
+		{Type: "unknown", Biz: "article", BizId: 1},
+		{Type: "read", Biz: "article", BizId: 2},
 	})
-	assert.Empty(t, r.readCalls)
-	assert.Len(t, sess.marked, 1)
+	require.NoError(t, err)
+	require.Len(t, r.readCalls, 1)
+	assert.Equal(t, int64(2), r.readCalls[0].bizId)
 }
 
-func TestProcessBatch_InvalidJSON(t *testing.T) {
-	r := &mockRepo{}
+func TestHandleBatch_RepoError(t *testing.T) {
+	r := &mockRepo{err: errors.New("db down")}
 	c := &SaramaInteractionEventConsumer{repo: r, l: logger.NewNopLogger()}
-	sess := &mockSession{}
 
-	c.processBatch(sess, []*sarama.ConsumerMessage{
-		{Value: []byte("not json")},
+	err := c.handleBatch(nil, []InteractionEvent{
+		{Type: "read", Biz: "article", BizId: 1},
 	})
-	// 解析失败不提交 offset
-	assert.Empty(t, sess.marked)
+	assert.Error(t, err)
 }
+
+// 防止 sarama 类型未使用引发 import 警告
+var _ = sarama.ConsumerMessage{}
