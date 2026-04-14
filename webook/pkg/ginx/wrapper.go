@@ -11,11 +11,36 @@ import (
 // 默认 NopLogger 防止 nil panic（测试环境可能没注入）
 var L logger.LoggerX = logger.NewNopLogger()
 
+// CodeToHttpStatus 将业务 Code 映射为 HTTP 状态码
+// 由 ioc 在启动时注入，未注入时使用默认规则
+var CodeToHttpStatus func(code int) int = defaultCodeToHttpStatus
+
+func defaultCodeToHttpStatus(code int) int {
+	switch code {
+	case 0:
+		return http.StatusOK // 成功
+	case 4:
+		return http.StatusBadRequest // 客户端错误
+	case 5:
+		return http.StatusInternalServerError // 服务端错误
+	default:
+		return http.StatusOK
+	}
+}
+
+// httpStatus 决定 HTTP 状态码
+// err != nil 一律 500（handler 约定：err 只用于系统错误，业务错误走 Code != 0 + err == nil）
+func httpStatus(res Result, err error) int {
+	if err != nil {
+		return http.StatusInternalServerError
+	}
+	return CodeToHttpStatus(res.Code)
+}
+
 // HandlerFunc 业务 handler 签名：返回 (Result, error)
 //
-//	error != nil  → 500 + 系统错误日志
-//	Result.Code != 0 → 业务错误，按 Result 返回，不打 error 日志
-//	都没有       → 正常返回 Result
+//	error != nil  → httpStatus 决定状态码 + 系统错误日志
+//	error == nil  → CodeToHttpStatus(Result.Code) 决定状态码
 type HandlerFunc func(ctx *gin.Context) (Result, error)
 
 // HandlerFuncReq 带请求体反序列化的业务 handler 签名
@@ -36,7 +61,7 @@ func Wrap(fn HandlerFunc) gin.HandlerFunc {
 				logger.String("path", ctx.Request.URL.Path),
 				logger.Error(err))
 		}
-		ctx.JSON(http.StatusOK, res)
+		ctx.JSON(httpStatus(res, err), res)
 	}
 }
 
@@ -46,7 +71,7 @@ func WrapReq[Req any](fn HandlerFuncReq[Req]) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		var req Req
 		if err := ctx.ShouldBindJSON(&req); err != nil {
-			ctx.JSON(http.StatusOK, Result{Code: 4, Msg: "参数错误"})
+			ctx.JSON(http.StatusBadRequest, Result{Code: 4, Msg: "参数错误"})
 			return
 		}
 		res, err := fn(ctx, req)
@@ -55,7 +80,7 @@ func WrapReq[Req any](fn HandlerFuncReq[Req]) gin.HandlerFunc {
 				logger.String("path", ctx.Request.URL.Path),
 				logger.Error(err))
 		}
-		ctx.JSON(http.StatusOK, res)
+		ctx.JSON(httpStatus(res, err), res)
 	}
 }
 
@@ -79,7 +104,7 @@ func WrapClaims[C any](userKey string, fn HandlerFuncClaims[C]) gin.HandlerFunc 
 				logger.String("path", ctx.Request.URL.Path),
 				logger.Error(err))
 		}
-		ctx.JSON(http.StatusOK, res)
+		ctx.JSON(httpStatus(res, err), res)
 	}
 }
 
@@ -88,7 +113,7 @@ func WrapReqClaims[Req any, C any](userKey string, fn HandlerFuncReqClaims[Req, 
 	return func(ctx *gin.Context) {
 		var req Req
 		if err := ctx.ShouldBindJSON(&req); err != nil {
-			ctx.JSON(http.StatusOK, Result{Code: 4, Msg: "参数错误"})
+			ctx.JSON(http.StatusBadRequest, Result{Code: 4, Msg: "参数错误"})
 			return
 		}
 		val, exists := ctx.Get(userKey)
@@ -107,6 +132,6 @@ func WrapReqClaims[Req any, C any](userKey string, fn HandlerFuncReqClaims[Req, 
 				logger.String("path", ctx.Request.URL.Path),
 				logger.Error(err))
 		}
-		ctx.JSON(http.StatusOK, res)
+		ctx.JSON(httpStatus(res, err), res)
 	}
 }
