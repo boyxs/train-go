@@ -402,4 +402,4 @@ Then   显示空状态提示："暂无数据，AI 对话中点击文章卡片后
 
 ## 10. 原型文件
 
-所有原型在 `docs/chat/chat.pen`（Pencil 格式），PNG 导出在 `docs/chat/prototypes/`。
+所有原型在 `prd/chat/chat.pen`（Pencil 格式），PNG 导出在 `prd/chat/prototypes/`。

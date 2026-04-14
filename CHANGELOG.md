@@ -2,13 +2,29 @@
 
 <!-- 新功能前插在此，日期降序 -->
 
+## [2026-04-14] Prometheus 监控链路
+
+**变更内容**: HTTP 指标中间件 + Prometheus/Grafana/Exporter Docker 栈 + 3 个自定义 Grafana 面板 + PromQL 文档
+**影响范围**:
+- 中间件：`pkg/ginx/middleware/metrics/`（Builder 接口 + PrometheusBuilder 实现，4 种指标按需启用）
+- 集成：`ioc/web.go`（/metrics 端点 + 中间件注册）
+- Docker：`docker-compose.yaml`（prometheus/grafana/mysqld-exporter/redis-exporter/kafka-exporter/node-exporter）
+- 配置：`prometheus/prometheus.yml`、`prometheus/prometheus.local.yml`、`grafana/provisioning/`
+- 面板：`webook-overview.json`（17 面板）、`webook-ops.json`（15 面板）、`linux-host.json`（18 面板）
+- 文档：`docs/monitoring/`（架构/部署/PromQL/实战查询/告警/最佳实践，6 篇）
+- 目录整理：`docs/` PRD 文件移至 `prd/`，`docs/` 改为技术文档目录
+- 配置同步：`config/prod.yaml` 补齐 llm/embedding/ollama 配置
+**技术决策**: 中间件用 Builder 接口抽象，Prometheus 为具体实现，后续可换 OpenTelemetry；Histogram + Summary 同时开启便于学习对比，生产建议二选一
+**待办**: 生产环境 API Key 移到密钥管理
+**会话**: 260414-monitoring-Prometheus监控
+
 ## [2026-04-12] AI 回复操作栏（复制 + 点赞/点踩）
 
 **变更内容**: AI 消息气泡底部增加操作栏，支持复制回复内容、点赞/点踩反馈
 **影响范围**:
 - 后端：`domain/chat.go`（Message +Feedback）· `dao/chat_message.go`（+Feedback 字段 + UpdateFeedback）· `repository/chat_message.go`（UpdateFeedback + 清缓存）· `service/chat.go`（SetFeedback 归属校验）· `web/chat.go`（/chat/message/feedback 路由）
 - 前端：`types/chat.ts`（+feedback）· `api/chat.ts`（setMessageFeedback）· `hooks/useChat.ts`（乐观更新 setFeedback）· `views/chat/MessageBubble.tsx`（ActionBar 组件）· `ChatMessages/ChatBubble/index.tsx`（props 传递）
-- 原型：`docs/chat/chat.pen`（06-消息反馈画板）· `docs/chat/prototypes/06-消息反馈.png`
+- 原型：`prd/chat/chat.pen`（06-消息反馈画板）· `prd/chat/prototypes/06-消息反馈.png`
 - 测试：8 个集成测试（点赞/取消/点踩/无效值/无效ID/非属主/幂等/列表展示）
 **技术决策**: feedback 字段直接加在 message 表（1:1 关系），不新建表；前端乐观更新用函数式 setState 避免闭包竞态
 **待办**: 无

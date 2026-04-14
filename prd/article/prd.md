@@ -125,4 +125,4 @@
 
 ## 7. 原型文件
 
-所有原型在 `docs/article/article.pen`（Pencil 格式），PNG 导出在 `docs/article/prototypes/`。
+所有原型在 `prd/article/article.pen`（Pencil 格式），PNG 导出在 `prd/article/prototypes/`。
