@@ -1,0 +1,241 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "graphTooltip": 1,
+  "panels": [
+    {
+      "title": "CPU 使用率",
+      "type": "gauge",
+      "gridPos": { "h": 5, "w": 4, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "(1 - avg(rate(node_cpu_seconds_total{mode=\"idle\"}[5m]))) * 100", "legendFormat": "CPU %" }],
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100, "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 70 }, { "color": "red", "value": 90 }] } }, "overrides": [] }
+    },
+    {
+      "title": "内存使用率",
+      "type": "gauge",
+      "gridPos": { "h": 5, "w": 4, "x": 4, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "(1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100", "legendFormat": "Mem %" }],
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100, "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 70 }, { "color": "red", "value": 90 }] } }, "overrides": [] }
+    },
+    {
+      "title": "磁盘使用率 /",
+      "type": "gauge",
+      "gridPos": { "h": 5, "w": 4, "x": 8, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "(1 - node_filesystem_avail_bytes{mountpoint=\"/\",fstype!=\"tmpfs\"} / node_filesystem_size_bytes{mountpoint=\"/\",fstype!=\"tmpfs\"}) * 100", "legendFormat": "Disk %" }],
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100, "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 70 }, { "color": "red", "value": 90 }] } }, "overrides": [] }
+    },
+    {
+      "title": "运行时间",
+      "type": "stat",
+      "gridPos": { "h": 5, "w": 4, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "time() - node_boot_time_seconds", "legendFormat": "uptime" }],
+      "fieldConfig": { "defaults": { "unit": "s", "thresholds": { "steps": [{ "color": "green", "value": null }] } }, "overrides": [] }
+    },
+    {
+      "title": "总内存",
+      "type": "stat",
+      "gridPos": { "h": 5, "w": 4, "x": 16, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "node_memory_MemTotal_bytes", "legendFormat": "total" }],
+      "fieldConfig": { "defaults": { "unit": "bytes", "thresholds": { "steps": [{ "color": "blue", "value": null }] } }, "overrides": [] }
+    },
+    {
+      "title": "CPU 核数",
+      "type": "stat",
+      "gridPos": { "h": 5, "w": 4, "x": 20, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "count(node_cpu_seconds_total{mode=\"idle\"})", "legendFormat": "cores" }],
+      "fieldConfig": { "defaults": { "thresholds": { "steps": [{ "color": "blue", "value": null }] } }, "overrides": [] }
+    },
+    {
+      "title": "CPU 使用率（按模式）",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 5 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        { "expr": "avg(rate(node_cpu_seconds_total{mode=\"user\"}[5m])) * 100", "legendFormat": "user" },
+        { "expr": "avg(rate(node_cpu_seconds_total{mode=\"system\"}[5m])) * 100", "legendFormat": "system" },
+        { "expr": "avg(rate(node_cpu_seconds_total{mode=\"iowait\"}[5m])) * 100", "legendFormat": "iowait" },
+        { "expr": "avg(rate(node_cpu_seconds_total{mode=\"steal\"}[5m])) * 100", "legendFormat": "steal" },
+        { "expr": "avg(rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100", "legendFormat": "idle" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percent", "custom": { "drawStyle": "line", "fillOpacity": 30, "stacking": { "mode": "normal" } } }, "overrides": [] }
+    },
+    {
+      "title": "系统负载（Load Average）",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 5 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        { "expr": "node_load1", "legendFormat": "1m" },
+        { "expr": "node_load5", "legendFormat": "5m" },
+        { "expr": "node_load15", "legendFormat": "15m" },
+        { "expr": "count(node_cpu_seconds_total{mode=\"idle\"})", "legendFormat": "CPU 核数" }
+      ],
+      "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [{ "matcher": { "id": "byName", "options": "CPU 核数" }, "properties": [{ "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }, { "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] }] }
+    },
+    {
+      "title": "内存使用详情",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 13 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        { "expr": "(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / 1024 / 1024", "legendFormat": "已用" },
+        { "expr": "node_memory_Buffers_bytes / 1024 / 1024", "legendFormat": "Buffers" },
+        { "expr": "node_memory_Cached_bytes / 1024 / 1024", "legendFormat": "Cached" },
+        { "expr": "node_memory_MemAvailable_bytes / 1024 / 1024", "legendFormat": "可用" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "decmbytes", "custom": { "drawStyle": "line", "fillOpacity": 20, "stacking": { "mode": "normal" } } }, "overrides": [] }
+    },
+    {
+      "title": "Swap 使用",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 13 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        { "expr": "node_memory_SwapTotal_bytes / 1024 / 1024", "legendFormat": "Swap 总量" },
+        { "expr": "(node_memory_SwapTotal_bytes - node_memory_SwapFree_bytes) / 1024 / 1024", "legendFormat": "Swap 已用" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "decmbytes", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] }
+    },
+    {
+      "title": "磁盘使用量",
+      "type": "table",
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 21 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        { "expr": "node_filesystem_size_bytes{fstype!~\"tmpfs|overlay\"}", "legendFormat": "", "instant": true, "format": "table", "refId": "total" },
+        { "expr": "node_filesystem_avail_bytes{fstype!~\"tmpfs|overlay\"}", "legendFormat": "", "instant": true, "format": "table", "refId": "avail" },
+        { "expr": "(1 - node_filesystem_avail_bytes{fstype!~\"tmpfs|overlay\"} / node_filesystem_size_bytes{fstype!~\"tmpfs|overlay\"}) * 100", "legendFormat": "", "instant": true, "format": "table", "refId": "pct" }
+      ],
+      "transformations": [
+        { "id": "seriesToColumns", "options": { "byField": "mountpoint" } },
+        { "id": "organize", "options": { "excludeByName": { "Time 1": true, "Time 2": true, "Time 3": true, "device 1": true, "device 2": true, "device 3": true, "fstype 1": true, "fstype 2": true, "fstype 3": true, "instance 1": true, "instance 2": true, "instance 3": true, "job 1": true, "job 2": true, "job 3": true, "__name__ 1": true, "__name__ 2": true, "__name__ 3": true }, "renameByName": { "mountpoint": "挂载点", "Value 1": "总量", "Value 2": "可用", "Value 3": "使用率 %" } } }
+      ],
+      "fieldConfig": { "defaults": { "decimals": 1 }, "overrides": [{ "matcher": { "id": "byName", "options": "总量" }, "properties": [{ "id": "unit", "value": "bytes" }] }, { "matcher": { "id": "byName", "options": "可用" }, "properties": [{ "id": "unit", "value": "bytes" }] }, { "matcher": { "id": "byName", "options": "使用率 %" }, "properties": [{ "id": "unit", "value": "percent" }, { "id": "thresholds", "value": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 70 }, { "color": "red", "value": 90 }] } }, { "id": "custom.cellOptions", "value": { "type": "color-background" } }] }] }
+    },
+    {
+      "title": "磁盘 I/O 吞吐",
+      "type": "timeseries",
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 21 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        { "expr": "rate(node_disk_read_bytes_total[5m])", "legendFormat": "读 {{device}}" },
+        { "expr": "-rate(node_disk_written_bytes_total[5m])", "legendFormat": "写 {{device}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "Bps", "custom": { "drawStyle": "line", "fillOpacity": 20 } }, "overrides": [] }
+    },
+    {
+      "title": "磁盘 IOPS",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 27 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        { "expr": "rate(node_disk_reads_completed_total[5m])", "legendFormat": "读 {{device}}" },
+        { "expr": "-rate(node_disk_writes_completed_total[5m])", "legendFormat": "写 {{device}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "iops", "custom": { "drawStyle": "line", "fillOpacity": 20 } }, "overrides": [] }
+    },
+    {
+      "title": "磁盘 I/O 延迟",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 27 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        { "expr": "rate(node_disk_read_time_seconds_total[5m]) / rate(node_disk_reads_completed_total[5m])", "legendFormat": "读延迟 {{device}}" },
+        { "expr": "rate(node_disk_write_time_seconds_total[5m]) / rate(node_disk_writes_completed_total[5m])", "legendFormat": "写延迟 {{device}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] }
+    },
+    {
+      "title": "网络流量",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 35 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        { "expr": "rate(node_network_receive_bytes_total{device!~\"lo|veth.*|docker.*|br-.*\"}[5m])", "legendFormat": "接收 {{device}}" },
+        { "expr": "-rate(node_network_transmit_bytes_total{device!~\"lo|veth.*|docker.*|br-.*\"}[5m])", "legendFormat": "发送 {{device}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "Bps", "custom": { "drawStyle": "line", "fillOpacity": 20 } }, "overrides": [] }
+    },
+    {
+      "title": "网络包速率",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 35 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        { "expr": "rate(node_network_receive_packets_total{device!~\"lo|veth.*|docker.*|br-.*\"}[5m])", "legendFormat": "接收 {{device}}" },
+        { "expr": "-rate(node_network_transmit_packets_total{device!~\"lo|veth.*|docker.*|br-.*\"}[5m])", "legendFormat": "发送 {{device}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "pps", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] }
+    },
+    {
+      "title": "网络错误 & 丢包",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 43 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        { "expr": "rate(node_network_receive_errs_total{device!~\"lo|veth.*\"}[5m])", "legendFormat": "接收错误 {{device}}" },
+        { "expr": "rate(node_network_transmit_errs_total{device!~\"lo|veth.*\"}[5m])", "legendFormat": "发送错误 {{device}}" },
+        { "expr": "rate(node_network_receive_drop_total{device!~\"lo|veth.*\"}[5m])", "legendFormat": "接收丢包 {{device}}" },
+        { "expr": "rate(node_network_transmit_drop_total{device!~\"lo|veth.*\"}[5m])", "legendFormat": "发送丢包 {{device}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "pps", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] }
+    },
+    {
+      "title": "TCP 连接状态",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 43 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        { "expr": "node_netstat_Tcp_CurrEstab", "legendFormat": "ESTABLISHED" },
+        { "expr": "node_sockstat_TCP_tw", "legendFormat": "TIME_WAIT" },
+        { "expr": "node_sockstat_TCP_alloc", "legendFormat": "ALLOCATED" }
+      ],
+      "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] }
+    },
+    {
+      "title": "文件描述符",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 51 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        { "expr": "node_filefd_allocated", "legendFormat": "已分配" },
+        { "expr": "node_filefd_maximum", "legendFormat": "上限" }
+      ],
+      "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [{ "matcher": { "id": "byName", "options": "上限" }, "properties": [{ "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }, { "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] }] }
+    },
+    {
+      "title": "系统熵 & 上下文切换",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 51 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        { "expr": "rate(node_context_switches_total[5m])", "legendFormat": "上下文切换/s" },
+        { "expr": "rate(node_intr_total[5m])", "legendFormat": "中断/s" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] }
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["linux", "node", "host"],
+  "templating": {
+    "list": [
+      {
+        "name": "DS_PROMETHEUS",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": { "text": "Prometheus", "value": "Prometheus" }
+      }
+    ]
+  },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": { "refresh_intervals": ["10s", "30s", "1m", "5m"] },
+  "timezone": "",
+  "title": "Linux Host",
+  "uid": "linux-host"
+}

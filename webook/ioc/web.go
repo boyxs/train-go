@@ -9,12 +9,14 @@ import (
 	"gitee.com/train-cloud/geektime-basic-go/internal/web"
 	"gitee.com/train-cloud/geektime-basic-go/internal/web/jwt"
 	"gitee.com/train-cloud/geektime-basic-go/internal/web/middleware"
+	"gitee.com/train-cloud/geektime-basic-go/pkg/ginx/middleware/metrics"
 	"gitee.com/train-cloud/geektime-basic-go/pkg/ginx/middleware/ratelimit"
 	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/sessions"
 	redisSession "github.com/gin-contrib/sessions/redis"
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -31,6 +33,8 @@ func InitWebServer(
 	polishHandler web.ArticlePolishHandler,
 ) *gin.Engine {
 	server := gin.Default()
+	// /metrics 放在中间件之前，Prometheus 抓取不经过 CORS/限流/JWT/日志
+	server.GET("/metrics", gin.WrapH(promhttp.Handler()))
 	server.Use(middlewares...)
 	userHandler.RegisterRoutes(server)
 	articleHandler.RegisterRoutes(server)
@@ -50,8 +54,13 @@ func InitMiddlewares(
 	cmd redis.Cmdable,
 ) []gin.HandlerFunc {
 	return []gin.HandlerFunc{
-		//自定义中间件
-		//func(ctx *gin.Context) {},
+		// Prometheus 指标采集（最外层，能统计所有请求包括被限流/拒绝的）
+		metrics.NewPrometheusBuilder("webook", "http", "requests", "HTTP 请求统计").
+			WithCounter().
+			WithHistogram().
+			WithSummary().
+			WithInFlight().
+			Build(),
 		//cors
 		cors.New(cors.Config{
 			AllowOrigins: []string{"http://localhost:3000"},

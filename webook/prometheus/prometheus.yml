@@ -1,0 +1,35 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # Prometheus 自身
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # webook 应用（本地开发用 host.docker.internal，容器部署可改 webook-app:8089）
+  - job_name: 'webook-app'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['host.docker.internal:8089']
+
+  # MySQL
+  - job_name: 'mysql'
+    static_configs:
+      - targets: ['mysqld-exporter:9104']
+
+  # Redis
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+
+  # Kafka
+  - job_name: 'kafka'
+    static_configs:
+      - targets: ['kafka-exporter:9308']
+
+  # 宿主机（Node Exporter）
+  - job_name: 'node'
+    static_configs:
+      - targets: ['node-exporter:9100']

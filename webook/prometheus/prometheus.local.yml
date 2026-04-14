@@ -1,0 +1,16 @@
+## 本地开发版（Docker 容器内运行，通过 host.docker.internal 访问宿主机服务）
+## 只采集 webook 应用指标，不含 exporter
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # webook 应用（宿主机 go run，Docker 内通过 host.docker.internal 访问）
+  - job_name: 'webook-app'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['host.docker.internal:8089']
