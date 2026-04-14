@@ -200,7 +200,7 @@ Handler (web/article.go)
 
 ## 11. 原型文件
 
-所有原型在 `docs/read-count/read-count.pen`（Pencil 格式），PNG 导出在 `docs/read-count/prototypes/`。
+所有原型在 `prd/read-count/read-count.pen`（Pencil 格式），PNG 导出在 `prd/read-count/prototypes/`。
 
 | 原型 | 说明 |
 |------|------|
