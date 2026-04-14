@@ -4,7 +4,7 @@
 #	@rm webook || true
 #	@go mod tidy
 #	# Build for Linux/AMD64 to ensure compatibility inside the container
-#	@GOOS=linux GOARCH=amd64 go build -tags=k8s -o webook .
+#	@CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -tags=k8s -o webook .
 #
 #	@echo "--- [2/5] Building Docker image ---"
 #	@docker rmi -f train/webook:1.0.0 || true
@@ -43,7 +43,7 @@
 docker:
 	@rm webook || true
 	@go mod tidy
-	@GOOS=linux GOARCH=amd64 go build -tags=k8s -o webook .
+	@CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -tags=k8s -o webook .
 	@docker rmi -f train/webook:1.0.0
 	@docker build -t train/webook:1.0.0 .
 
