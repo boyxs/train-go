@@ -58,14 +58,15 @@ services:
         ipv4_address: 172.21.0.4
 
   webook:
-    # image: train/webook:1.0.0
+    image: train/webook:1.0.0
     container_name: webook-app
     build:
       context: .
       dockerfile: Dockerfile
     restart: always
+    working_dir: /app
     environment:
-      APP_ENV: "config/k8s.yaml"
+      APP_ENV: "config/prod.yaml"
     ports:
       - "8089:8089"
     depends_on:
@@ -140,6 +141,93 @@ services:
       extnetwork:
         ipv4_address: 172.21.0.7
 
+  # ── 监控链路 ──────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v3.4.1
+    container_name: webook-prometheus
+    restart: always
+    mem_limit: 256m
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    extra_hosts:
+      # Linux 上让容器能访问宿主机的 webook 应用（Mac/Windows 已原生支持）
+      - "host.docker.internal:host-gateway"
+    networks:
+      extnetwork:
+        ipv4_address: 172.21.0.20
+
+  grafana:
+    image: grafana/grafana:11.6.0
+    container_name: webook-grafana
+    restart: always
+    mem_limit: 256m
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - grafana-data:/var/lib/grafana
+    networks:
+      extnetwork:
+        ipv4_address: 172.21.0.21
+
+  mysqld-exporter:
+    image: prom/mysqld-exporter:v0.15.0
+    container_name: webook-mysqld-exporter
+    restart: always
+    mem_limit: 64m
+    environment:
+      MYSQLD_EXPORTER_PASSWORD: "13520"
+    command:
+      - "--mysqld.username=root"
+      - "--mysqld.address=mysql:3306"
+    depends_on:
+      - mysql
+    networks:
+      extnetwork:
+        ipv4_address: 172.21.0.22
+
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.58.0
+    container_name: webook-redis-exporter
+    restart: always
+    mem_limit: 64m
+    environment:
+      REDIS_ADDR: "redis://redis:6379"
+      REDIS_PASSWORD: "13520"
+    depends_on:
+      - redis
+    networks:
+      extnetwork:
+        ipv4_address: 172.21.0.23
+
+  kafka-exporter:
+    image: danielqsj/kafka-exporter:v1.7.0
+    container_name: webook-kafka-exporter
+    restart: always
+    mem_limit: 64m
+    command:
+      - "--kafka.server=kafka:9092"
+    depends_on:
+      - kafka
+    networks:
+      extnetwork:
+        ipv4_address: 172.21.0.24
+
+  node-exporter:
+    image: prom/node-exporter:v1.7.0
+    container_name: webook-node-exporter
+    restart: always
+    mem_limit: 64m
+    networks:
+      extnetwork:
+        ipv4_address: 172.21.0.25
+
   # ── bitnami/kafka 备用配置（镜像源可用时切换） ──────────────
   # kafka:
   #   image: 'bitnami/kafka:3.6.0'
@@ -174,6 +262,8 @@ volumes:
   kafka-data:
   es-data:
   ollama-data:
+  prometheus-data:
+  grafana-data:
 
 networks:
   extnetwork:
@@ -182,3 +272,33 @@ networks:
     ipam:
       config:
         - subnet: 172.21.0.0/16
+
+# ── 常用命令 ──────────────────────────────────────────────
+#
+# 创建网络（首次）:
+#   docker network create --subnet=172.21.0.0/16 extnetwork
+# 启动全部:
+#   docker compose up -d
+# 启动指定服务:
+#   docker compose up -d mysql redis kafka webook
+# 只启动监控栈:
+#   docker compose up -d prometheus grafana mysqld-exporter redis-exporter kafka-exporter
+# 构建并启动 webook:
+#   docker compose build webook && docker compose up -d webook
+# 强制重建（不用缓存）:
+#   docker compose build --no-cache webook
+# 查看运行状态:
+#   docker compose ps
+# 查看日志:
+#   docker compose logs -f webook
+#   docker compose logs -f --tail=100 webook
+# 进入容器:
+#   docker compose exec webook sh
+# 重启单个服务:
+#   docker compose restart webook
+# 停止全部:
+#   docker compose down
+# 停止并删除数据卷（慎用）:
+#   docker compose down -v
+# 清理未使用的镜像:
+#   docker image prune -f

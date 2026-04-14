@@ -1,0 +1,170 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "graphTooltip": 1,
+  "panels": [
+    {
+      "title": "运行时间",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "time() - process_start_time_seconds{job=\"webook-app\"}", "legendFormat": "uptime" }],
+      "fieldConfig": { "defaults": { "unit": "s", "thresholds": { "steps": [{ "color": "green", "value": null }] } }, "overrides": [] }
+    },
+    {
+      "title": "进程重启次数 (1h)",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "resets(process_cpu_seconds_total{job=\"webook-app\"}[1h])", "legendFormat": "restarts" }],
+      "fieldConfig": { "defaults": { "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] } }, "overrides": [] }
+    },
+    {
+      "title": "Redis 命中率",
+      "type": "gauge",
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "rate(redis_keyspace_hits_total[5m]) / (rate(redis_keyspace_hits_total[5m]) + rate(redis_keyspace_misses_total[5m])) * 100", "legendFormat": "hit %" }],
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100, "thresholds": { "steps": [{ "color": "red", "value": null }, { "color": "yellow", "value": 80 }, { "color": "green", "value": 95 }] } }, "overrides": [] }
+    },
+    {
+      "title": "MySQL 连接数",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "mysql_global_status_threads_connected", "legendFormat": "connections" }],
+      "fieldConfig": { "defaults": { "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 100 }, { "color": "red", "value": 150 }] } }, "overrides": [] }
+    },
+    {
+      "title": "Kafka Consumer Lag",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "sum(kafka_consumergroup_lag)", "legendFormat": "total lag" }],
+      "fieldConfig": { "defaults": { "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 100 }, { "color": "red", "value": 1000 }] } }, "overrides": [] }
+    },
+    {
+      "title": "内存分配速率",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "rate(go_memstats_alloc_bytes_total{job=\"webook-app\"}[5m])", "legendFormat": "alloc/s" }],
+      "fieldConfig": { "defaults": { "unit": "Bps", "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 52428800 }, { "color": "red", "value": 104857600 }] } }, "overrides": [] }
+    },
+    {
+      "title": "Top 10 慢接口（P99）",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "topk(10, histogram_quantile(0.99, sum(rate(webook_http_requests_duration_seconds_bucket[5m])) by (le, path)))", "legendFormat": "{{path}}", "instant": true, "format": "table" }],
+      "transformations": [
+        { "id": "organize", "options": { "excludeByName": { "Time": true, "le": true }, "renameByName": { "path": "路径", "Value": "P99 (秒)" } } },
+        { "id": "sortBy", "options": { "fields": {}, "sort": [{ "field": "P99 (秒)", "desc": true }] } }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s", "decimals": 4 }, "overrides": [] }
+    },
+    {
+      "title": "Top 10 高流量接口",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "topk(10, sum(rate(webook_http_requests_total[5m])) by (path))", "legendFormat": "{{path}}", "instant": true, "format": "table" }],
+      "transformations": [
+        { "id": "organize", "options": { "excludeByName": { "Time": true }, "renameByName": { "path": "路径", "Value": "QPS" } } },
+        { "id": "sortBy", "options": { "fields": {}, "sort": [{ "field": "QPS", "desc": true }] } }
+      ],
+      "fieldConfig": { "defaults": { "unit": "reqps", "decimals": 2 }, "overrides": [] }
+    },
+    {
+      "title": "5xx 错误接口",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "sum(rate(webook_http_requests_total{status=~\"5..\"}[5m])) by (path, status) > 0", "legendFormat": "{{path}}", "instant": true, "format": "table" }],
+      "transformations": [
+        { "id": "organize", "options": { "excludeByName": { "Time": true }, "renameByName": { "path": "路径", "status": "状态码", "Value": "错误率/s" } } },
+        { "id": "sortBy", "options": { "fields": {}, "sort": [{ "field": "错误率/s", "desc": true }] } }
+      ],
+      "fieldConfig": { "defaults": { "decimals": 4 }, "overrides": [] }
+    },
+    {
+      "title": "4xx 客户端错误",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "sum(rate(webook_http_requests_total{status=~\"4..\"}[5m])) by (path, status) > 0", "legendFormat": "{{path}}", "instant": true, "format": "table" }],
+      "transformations": [
+        { "id": "organize", "options": { "excludeByName": { "Time": true }, "renameByName": { "path": "路径", "status": "状态码", "Value": "请求率/s" } } },
+        { "id": "sortBy", "options": { "fields": {}, "sort": [{ "field": "请求率/s", "desc": true }] } }
+      ],
+      "fieldConfig": { "defaults": { "decimals": 4 }, "overrides": [] }
+    },
+    {
+      "title": "Redis 命中率趋势",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 20 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "rate(redis_keyspace_hits_total[5m]) / (rate(redis_keyspace_hits_total[5m]) + rate(redis_keyspace_misses_total[5m])) * 100", "legendFormat": "hit %" }],
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100, "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] }
+    },
+    {
+      "title": "MySQL QPS",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 20 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        { "expr": "rate(mysql_global_status_queries[5m])", "legendFormat": "queries/s" },
+        { "expr": "rate(mysql_global_status_slow_queries[5m])", "legendFormat": "slow queries/s" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] }
+    },
+    {
+      "title": "Kafka Consumer Lag 趋势",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 20 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "sum(kafka_consumergroup_lag) by (consumergroup, topic)", "legendFormat": "{{consumergroup}}/{{topic}}" }],
+      "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] }
+    },
+    {
+      "title": "内存趋势（泄漏检测）",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        { "expr": "go_memstats_alloc_bytes{job=\"webook-app\"} / 1024 / 1024", "legendFormat": "当前堆 MB" },
+        { "expr": "go_memstats_sys_bytes{job=\"webook-app\"} / 1024 / 1024", "legendFormat": "OS 分配 MB" },
+        { "expr": "predict_linear(go_memstats_alloc_bytes{job=\"webook-app\"}[1h], 3600) / 1024 / 1024", "legendFormat": "1h 后预测 MB" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "decmbytes", "custom": { "drawStyle": "line", "fillOpacity": 5 } }, "overrides": [{ "matcher": { "id": "byName", "options": "1h 后预测 MB" }, "properties": [{ "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }] }] }
+    },
+    {
+      "title": "Scrape Targets 状态",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "up", "instant": true, "format": "table" }],
+      "transformations": [
+        { "id": "organize", "options": { "excludeByName": { "Time": true, "__name__": true }, "renameByName": { "job": "Job", "instance": "实例", "Value": "状态" } } }
+      ],
+      "fieldConfig": { "defaults": {}, "overrides": [{ "matcher": { "id": "byName", "options": "状态" }, "properties": [{ "id": "mappings", "value": [{ "type": "value", "options": { "0": { "text": "DOWN", "color": "red" }, "1": { "text": "UP", "color": "green" } } }] }] }] }
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["webook", "ops"],
+  "templating": {
+    "list": [
+      {
+        "name": "DS_PROMETHEUS",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": { "text": "Prometheus", "value": "Prometheus" }
+      }
+    ]
+  },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": { "refresh_intervals": ["10s", "30s", "1m", "5m"] },
+  "timezone": "",
+  "title": "Webook Ops",
+  "uid": "webook-ops"
+}

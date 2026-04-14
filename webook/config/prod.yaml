@@ -25,11 +25,35 @@ kafka:
   consumerBackoffInitial: 5
   consumerBackoffMax: 60
 
+llm:
+  providers:
+    - name: deepseek
+      apiKey: "sk-405db05b37ac418b91268403d32a55aa"
+      baseUrl: "https://api.deepseek.com"
+      model: "deepseek-chat"
+      maxTokens: 2048
+      timeout: 60
+    - name: kimi
+      apiKey: "sk-KURYxBodidmpQmZsL1SGrEiDoWcETmKDkgr70qsfmEDleS6d"
+      baseUrl: "https://api.moonshot.cn/v1"
+      model: "kimi-k2.5"
+      maxTokens: 2048
+      timeout: 60
+
 es:
   addr: 'http://webook-es:9200'
 
 ollama:
   baseUrl: 'http://webook-ollama:11434'
+  model: "bge-m3"
+  timeout: 5
+
+embedding:
+  baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+  apiKey: "sk-ef23911b061943b681584ac467c4cd28"
+  model: "text-embedding-v3"
+  dims: 1024
+  timeout: 30
 
 logger:
   level:
