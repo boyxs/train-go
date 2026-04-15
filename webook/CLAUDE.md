@@ -61,6 +61,10 @@ Handler (web/) → Service (service/) → Repository (repository/) → DAO (dao/
 | receiver | 类型首字母小写 | `func (s *chatService) Send()` |
 | 查询方法 | `Find`(单条) `Page`(分页) `List`(列表) | `FindByXx` / `PageXxs` / `ListXxs` |
 | 写入方法 | 按业务动作 | `Publish` / `Withdraw`（非 `Process`） |
+| DB 查询结果 | `xxxList` | `articleList, err := dao.ListByAuthor()` |
+| 自定义切片 | `xxxs` | `ids := make([]int64, 0, len(articleList))` |
+| 索引/映射 | `xxxMap` | `authorMap := make(map[int64]Author)` |
+| 单条查询 | 原名或无后缀 | `article, err := dao.FindById()` |
 
 ## 复用已有工具包（禁止重复造轮子）
 

@@ -66,6 +66,9 @@ npm run lint:fix     # ESLint 自动修复
 | API 文件 | 小写模块名 | `article.ts` |
 | 类型名 | PascalCase | `EditArticleReq` |
 | 常量 | UPPER_SNAKE | `ACCESS_KEY` |
+| API 返回数组 | `xxxList` | `const articleList = data.articles` |
+| 自定义数组 | `xxxs` | `const ids = articleList.map(a => a.id)` |
+| 索引/映射 | `xxxMap` | `const authorMap: Record<number, Author> = {}` |
 
 ## 编码约束
 
