@@ -56,9 +56,9 @@
       "type": "table",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "targets": [{ "expr": "topk(10, histogram_quantile(0.99, sum(rate(webook_http_requests_duration_seconds_bucket[5m])) by (le, path)))", "legendFormat": "{{path}}", "instant": true, "format": "table" }],
+      "targets": [{ "expr": "topk(10, histogram_quantile(0.99, sum(rate(webook_http_requests_duration_seconds_bucket[5m])) by (le, pattern)))", "legendFormat": "{{pattern}}", "instant": true, "format": "table" }],
       "transformations": [
-        { "id": "organize", "options": { "excludeByName": { "Time": true, "le": true }, "renameByName": { "path": "路径", "Value": "P99 (秒)" } } },
+        { "id": "organize", "options": { "excludeByName": { "Time": true, "le": true }, "renameByName": { "pattern": "路径", "Value": "P99 (秒)" } } },
         { "id": "sortBy", "options": { "fields": {}, "sort": [{ "field": "P99 (秒)", "desc": true }] } }
       ],
       "fieldConfig": { "defaults": { "unit": "s", "decimals": 4 }, "overrides": [] }
@@ -68,9 +68,9 @@
       "type": "table",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "targets": [{ "expr": "topk(10, sum(rate(webook_http_requests_total[5m])) by (path))", "legendFormat": "{{path}}", "instant": true, "format": "table" }],
+      "targets": [{ "expr": "topk(10, sum(rate(webook_http_requests_total[5m])) by (pattern))", "legendFormat": "{{pattern}}", "instant": true, "format": "table" }],
       "transformations": [
-        { "id": "organize", "options": { "excludeByName": { "Time": true }, "renameByName": { "path": "路径", "Value": "QPS" } } },
+        { "id": "organize", "options": { "excludeByName": { "Time": true }, "renameByName": { "pattern": "路径", "Value": "QPS" } } },
         { "id": "sortBy", "options": { "fields": {}, "sort": [{ "field": "QPS", "desc": true }] } }
       ],
       "fieldConfig": { "defaults": { "unit": "reqps", "decimals": 2 }, "overrides": [] }
@@ -80,9 +80,9 @@
       "type": "table",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "targets": [{ "expr": "sum(rate(webook_http_requests_total{status=~\"5..\"}[5m])) by (path, status) > 0", "legendFormat": "{{path}}", "instant": true, "format": "table" }],
+      "targets": [{ "expr": "sum(rate(webook_http_requests_total{status=~\"5..\"}[5m])) by (pattern, status) > 0", "legendFormat": "{{pattern}}", "instant": true, "format": "table" }],
       "transformations": [
-        { "id": "organize", "options": { "excludeByName": { "Time": true }, "renameByName": { "path": "路径", "status": "状态码", "Value": "错误率/s" } } },
+        { "id": "organize", "options": { "excludeByName": { "Time": true }, "renameByName": { "pattern": "路径", "status": "状态码", "Value": "错误率/s" } } },
         { "id": "sortBy", "options": { "fields": {}, "sort": [{ "field": "错误率/s", "desc": true }] } }
       ],
       "fieldConfig": { "defaults": { "decimals": 4 }, "overrides": [] }
@@ -92,9 +92,9 @@
       "type": "table",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "targets": [{ "expr": "sum(rate(webook_http_requests_total{status=~\"4..\"}[5m])) by (path, status) > 0", "legendFormat": "{{path}}", "instant": true, "format": "table" }],
+      "targets": [{ "expr": "sum(rate(webook_http_requests_total{status=~\"4..\"}[5m])) by (pattern, status) > 0", "legendFormat": "{{pattern}}", "instant": true, "format": "table" }],
       "transformations": [
-        { "id": "organize", "options": { "excludeByName": { "Time": true }, "renameByName": { "path": "路径", "status": "状态码", "Value": "请求率/s" } } },
+        { "id": "organize", "options": { "excludeByName": { "Time": true }, "renameByName": { "pattern": "路径", "status": "状态码", "Value": "请求率/s" } } },
         { "id": "sortBy", "options": { "fields": {}, "sort": [{ "field": "请求率/s", "desc": true }] } }
       ],
       "fieldConfig": { "defaults": { "decimals": 4 }, "overrides": [] }

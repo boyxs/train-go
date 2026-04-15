@@ -36,11 +36,12 @@ Prometheus 主动拉取（scrape）目标的 `/metrics` 端点，而不是目标
 每条时间序列由 **指标名 + 标签集** 唯一标识：
 
 ```
-webook_http_requests_total{method="GET", path="/article/:id", status="200"}
+webook_http_requests_total{method="GET", pattern="/article/:id", status="200"}
 ```
 
 - `webook_http_requests_total`：指标名
-- `{method="GET", path="/article/:id", status="200"}`：标签（label），用于多维度筛选
+- `{method="GET", pattern="/article/:id", status="200"}`：标签（label），用于多维度筛选
+- `pattern` 是 Gin 路由模板（`/article/:id`），不是实际 URL（`/article/123`），避免高基数
 
 ### 四种指标类型
 
@@ -69,10 +70,10 @@ webook_http_requests_total{method="GET", path="/article/:id", status="200"}
 
 | 指标名 | 类型 | 标签 | 含义 |
 |--------|------|------|------|
-| `webook_http_requests_total` | Counter | method, path, status | 请求总数 |
-| `webook_http_requests_duration_seconds` | Histogram | method, path | 响应时间分布 |
-| `webook_http_requests_duration_seconds_summary` | Summary | method, path | 响应时间分位数 |
-| `webook_http_requests_in_flight` | Gauge | method, path | 当前处理中请求数 |
+| `webook_http_requests_total` | Counter | method, pattern, status | 请求总数 |
+| `webook_http_requests_duration_seconds` | Histogram | method, pattern | 响应时间分布 |
+| `webook_http_requests_duration_seconds_summary` | Summary | method, pattern | 响应时间分位数 |
+| `webook_http_requests_in_flight` | Gauge | method, pattern | 当前处理中请求数 |
 
 ### Go 运行时指标（自动暴露）
 

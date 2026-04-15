@@ -26,17 +26,18 @@
 标签的每种组合都是一条独立的时间序列。标签值的数量叫做**基数（cardinality）**。
 
 ```
-# 好：用路由模板（基数 = 路由数 ≈ 20）
-path="/article/:id"
+# 好：用路由模板 pattern（基数 = 路由数 ≈ 20）
+pattern="/article/:id"
 
-# 坏：用实际路径（基数 = 文章数 ≈ 无限）
-path="/article/12345"
+# 坏：用实际 URL path（基数 = 文章数 ≈ 无限）
+pattern="/article/12345"
 ```
 
 **规则**：
 - 单个指标的标签组合不要超过 1000
 - 不要把 user_id、request_id、IP 这种高基数值放进标签
-- 用 `FullPath()` 而不是 `URL.Path`（webook 中间件已这样做）
+- 用 `ctx.FullPath()`（返回路由 pattern）而不是 `ctx.Request.URL.Path`（返回实际 URL）
+- 标签名用 `pattern`，明确语义；webook 中间件已这样做
 - 状态码用原始值（200/404/500），不要用自定义分类
 
 ### 选择指标类型
@@ -102,10 +103,10 @@ rate(webook_http_requests_total[5m])
 
 ```promql
 # 错：聚合时丢掉了 le 标签
-histogram_quantile(0.99, sum(rate(webook_http_requests_duration_seconds_bucket[5m])) by (path))
+histogram_quantile(0.99, sum(rate(webook_http_requests_duration_seconds_bucket[5m])) by (pattern))
 
 # 对：by 里必须包含 le
-histogram_quantile(0.99, sum(rate(webook_http_requests_duration_seconds_bucket[5m])) by (le, path))
+histogram_quantile(0.99, sum(rate(webook_http_requests_duration_seconds_bucket[5m])) by (le, pattern))
 ```
 
 ### 4. 除法除以 0
@@ -125,7 +126,7 @@ rate(duration_sum[5m]) / (rate(duration_count[5m]) > 0)
 sum(rate(webook_http_requests_total[5m]))  # 只剩一个数字
 
 # 保留需要的标签
-sum(rate(webook_http_requests_total[5m])) by (path)
+sum(rate(webook_http_requests_total[5m])) by (pattern)
 ```
 
 ### 6. increase 返回浮点数
@@ -159,11 +160,11 @@ histogram_quantile(0.99, rate(webook_http_requests_duration_seconds_bucket[5m]))
 ```promql
 # 哪个接口最慢
 topk(5, histogram_quantile(0.99,
-  sum(rate(webook_http_requests_duration_seconds_bucket[5m])) by (le, path)
+  sum(rate(webook_http_requests_duration_seconds_bucket[5m])) by (le, pattern)
 ))
 
 # 哪个接口错误最多
-topk(5, sum(rate(webook_http_requests_total{status=~"5.."}[5m])) by (path))
+topk(5, sum(rate(webook_http_requests_total{status=~"5.."}[5m])) by (pattern))
 ```
 
 ### Step 3: 检查资源

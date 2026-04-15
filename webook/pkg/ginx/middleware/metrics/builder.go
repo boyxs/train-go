@@ -16,18 +16,20 @@ type Builder interface {
 // PrometheusBuilder Prometheus 实现的 HTTP 指标中间件构造器
 //
 // 按需启用：
-//   - WithCounter()   → {name}_total (Counter, 标签: method/path/status)
-//   - WithHistogram() → {name}_duration_seconds (Histogram, 标签: method/path)
-//   - WithSummary()   → {name}_duration_seconds_summary (Summary, 标签: method/path)
-//   - WithInFlight()  → {name}_in_flight (Gauge, 标签: method/path)
+//   - WithCounter()   → {name}_total (Counter, 标签: method/pattern/status)
+//   - WithHistogram() → {name}_duration_seconds (Histogram, 标签: method/pattern)
+//   - WithSummary()   → {name}_duration_seconds_summary (Summary, 标签: method/pattern)
+//   - WithInFlight()  → {name}_in_flight (Gauge, 标签: method/pattern)
+//
+// pattern 是 Gin 路由模板（如 /article/:id），基数等于路由数量，避免高基数问题
 type PrometheusBuilder struct {
-	namespace string
-	subsystem string
-	name      string
-	help      string
-	buckets   []float64
+	namespace  string
+	subsystem  string
+	name       string
+	help       string
+	buckets    []float64
 	objectives map[float64]float64
-	registry  prometheus.Registerer
+	registry   prometheus.Registerer
 
 	enableCounter   bool
 	enableHistogram bool
@@ -74,12 +76,13 @@ func (b *PrometheusBuilder) Objectives(obj map[float64]float64) *PrometheusBuild
 	return b
 }
 
-func (b *PrometheusBuilder) fullPath(ctx *gin.Context) string {
-	path := ctx.FullPath()
-	if path == "" {
-		path = "unknown"
+func (b *PrometheusBuilder) pattern(ctx *gin.Context) string {
+	// pattern 是命中的路由
+	p := ctx.FullPath()
+	if p == "" {
+		p = "unknown"
 	}
-	return path
+	return p
 }
 
 func (b *PrometheusBuilder) WithCounter() *PrometheusBuilder {
@@ -114,7 +117,7 @@ func (b *PrometheusBuilder) Build() gin.HandlerFunc {
 			Subsystem: b.subsystem,
 			Name:      b.name + "_total",
 			Help:      b.help,
-		}, []string{"method", "path", "status"})
+		}, []string{"method", "pattern", "status"})
 		b.registry.MustRegister(counter)
 	}
 
@@ -125,7 +128,7 @@ func (b *PrometheusBuilder) Build() gin.HandlerFunc {
 			Name:      b.name + "_duration_seconds",
 			Help:      b.help + "（耗时分布）",
 			Buckets:   b.buckets,
-		}, []string{"method", "path"})
+		}, []string{"method", "pattern"})
 		b.registry.MustRegister(histogram)
 	}
 
@@ -136,7 +139,7 @@ func (b *PrometheusBuilder) Build() gin.HandlerFunc {
 			Name:       b.name + "_duration_seconds_summary",
 			Help:       b.help + "（分位数）",
 			Objectives: b.objectives,
-		}, []string{"method", "path"})
+		}, []string{"method", "pattern"})
 		b.registry.MustRegister(summary)
 	}
 
@@ -146,32 +149,32 @@ func (b *PrometheusBuilder) Build() gin.HandlerFunc {
 			Subsystem: b.subsystem,
 			Name:      b.name + "_in_flight",
 			Help:      b.help + "（正在处理中）",
-		}, []string{"method", "path"})
+		}, []string{"method", "pattern"})
 		b.registry.MustRegister(inflight)
 	}
 
 	return func(ctx *gin.Context) {
 		start := time.Now()
 		if inflight != nil {
-			inflight.WithLabelValues(ctx.Request.Method, b.fullPath(ctx)).Inc()
+			inflight.WithLabelValues(ctx.Request.Method, b.pattern(ctx)).Inc()
 		}
 
 		defer func() {
-			path := b.fullPath(ctx)
+			pattern := b.pattern(ctx)
 			method := ctx.Request.Method
 			duration := time.Since(start).Seconds()
 
 			if counter != nil {
-				counter.WithLabelValues(method, path, strconv.Itoa(ctx.Writer.Status())).Inc()
+				counter.WithLabelValues(method, pattern, strconv.Itoa(ctx.Writer.Status())).Inc()
 			}
 			if histogram != nil {
-				histogram.WithLabelValues(method, path).Observe(duration)
+				histogram.WithLabelValues(method, pattern).Observe(duration)
 			}
 			if summary != nil {
-				summary.WithLabelValues(method, path).Observe(duration)
+				summary.WithLabelValues(method, pattern).Observe(duration)
 			}
 			if inflight != nil {
-				inflight.WithLabelValues(method, path).Dec()
+				inflight.WithLabelValues(method, pattern).Dec()
 			}
 		}()
 

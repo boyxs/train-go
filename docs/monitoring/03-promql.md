@@ -10,13 +10,13 @@ webook_http_requests_total
 
 # 标签过滤
 webook_http_requests_total{method="GET"}
-webook_http_requests_total{status="200", path="/hello"}
+webook_http_requests_total{status="200", pattern="/hello"}
 
 # 标签匹配操作符
-webook_http_requests_total{method="GET"}      # 精确匹配
-webook_http_requests_total{method!="GET"}     # 不等于
-webook_http_requests_total{path=~"/article.*"} # 正则匹配
-webook_http_requests_total{path!~"/article.*"} # 正则不匹配
+webook_http_requests_total{method="GET"}         # 精确匹配
+webook_http_requests_total{method!="GET"}        # 不等于
+webook_http_requests_total{pattern=~"/article.*"} # 正则匹配
+webook_http_requests_total{pattern!~"/article.*"} # 正则不匹配
 
 # 范围向量（最近 5 分钟的所有样本）
 webook_http_requests_total[5m]
@@ -96,7 +96,7 @@ histogram_quantile(0.95, rate(webook_http_requests_duration_seconds_bucket[5m]))
 histogram_quantile(0.50, rate(webook_http_requests_duration_seconds_bucket[5m]))
 
 # 按路径分组的 P99
-histogram_quantile(0.99, sum(rate(webook_http_requests_duration_seconds_bucket[5m])) by (le, path))
+histogram_quantile(0.99, sum(rate(webook_http_requests_duration_seconds_bucket[5m])) by (le, pattern))
 ```
 
 **重要**：
@@ -112,7 +112,7 @@ histogram_quantile(0.99, sum(rate(webook_http_requests_duration_seconds_bucket[5
 sum(rate(webook_http_requests_total[5m]))
 
 # 按标签分组
-sum(rate(webook_http_requests_total[5m])) by (path)
+sum(rate(webook_http_requests_total[5m])) by (pattern)
 sum(rate(webook_http_requests_total[5m])) by (method, status)
 
 # 排除标签分组
@@ -217,7 +217,7 @@ rate(webook_http_requests_total[5m]) > 100
 rate(webook_http_requests_total{status=~"5.."}[5m]) > 0.05
 
 # 排除某些路径
-rate(webook_http_requests_total[5m]) unless rate(webook_http_requests_total{path="/metrics"}[5m])
+rate(webook_http_requests_total[5m]) unless rate(webook_http_requests_total{pattern="/metrics"}[5m])
 ```
 
 ### 向量匹配
@@ -227,11 +227,11 @@ rate(webook_http_requests_total[5m]) unless rate(webook_http_requests_total{path
 metric_a / metric_b
 
 # 指定匹配标签
-metric_a / on(method, path) metric_b
+metric_a / on(method, pattern) metric_b
 
 # 忽略某些标签匹配
 metric_a / ignoring(status) metric_b
 
 # 多对一匹配
-metric_a / on(path) group_left metric_b
+metric_a / on(pattern) group_left metric_b
 ```
