@@ -28,7 +28,7 @@ func TestBuildCounter_Increment(t *testing.T) {
 	assert.Equal(t, 1, count)
 }
 
-func TestBuildCounter_UsesFullPath(t *testing.T) {
+func TestBuildCounter_UsesPattern(t *testing.T) {
 	reg := prometheus.NewRegistry()
 	server := gin.New()
 	server.Use(newTestBuilder(reg).WithCounter().Build())

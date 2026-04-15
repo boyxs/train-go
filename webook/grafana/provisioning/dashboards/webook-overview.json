@@ -58,7 +58,7 @@
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "targets": [{ "expr": "sum(rate(webook_http_requests_total[5m])) by (path)", "legendFormat": "{{path}}" }],
+      "targets": [{ "expr": "sum(rate(webook_http_requests_total[5m])) by (pattern)", "legendFormat": "{{pattern}}" }],
       "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "drawStyle": "line", "fillOpacity": 10, "pointSize": 5 } }, "overrides": [] }
     },
     {
@@ -87,7 +87,7 @@
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "targets": [{ "expr": "histogram_quantile(0.99, sum(rate(webook_http_requests_duration_seconds_bucket[5m])) by (le, path))", "legendFormat": "{{path}}" }],
+      "targets": [{ "expr": "histogram_quantile(0.99, sum(rate(webook_http_requests_duration_seconds_bucket[5m])) by (le, pattern))", "legendFormat": "{{pattern}}" }],
       "fieldConfig": { "defaults": { "unit": "s", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] }
     },
     {
@@ -95,7 +95,7 @@
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "targets": [{ "expr": "sum(rate(webook_http_requests_duration_seconds_sum[5m])) by (path) / sum(rate(webook_http_requests_duration_seconds_count[5m])) by (path)", "legendFormat": "{{path}}" }],
+      "targets": [{ "expr": "sum(rate(webook_http_requests_duration_seconds_sum[5m])) by (pattern) / sum(rate(webook_http_requests_duration_seconds_count[5m])) by (pattern)", "legendFormat": "{{pattern}}" }],
       "fieldConfig": { "defaults": { "unit": "s", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] }
     },
     {
@@ -103,7 +103,7 @@
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "targets": [{ "expr": "sum(webook_http_requests_in_flight) by (path)", "legendFormat": "{{path}}" }],
+      "targets": [{ "expr": "sum(webook_http_requests_in_flight) by (pattern)", "legendFormat": "{{pattern}}" }],
       "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 20 } }, "overrides": [] }
     },
     {

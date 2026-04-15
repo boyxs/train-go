@@ -12,22 +12,22 @@
 sum(rate(webook_http_requests_total[5m]))
 
 # 按路径 QPS（看哪个接口最忙）
-sum(rate(webook_http_requests_total[5m])) by (path)
+sum(rate(webook_http_requests_total[5m])) by (pattern)
 
 # 按方法 + 路径（区分 GET 和 POST 同路径）
-sum(rate(webook_http_requests_total[5m])) by (method, path)
+sum(rate(webook_http_requests_total[5m])) by (method, pattern)
 
 # 单个接口 QPS（排查特定接口）
-rate(webook_http_requests_total{path="/user/login"}[5m])
+rate(webook_http_requests_total{pattern="/user/login"}[5m])
 
 # Top 10 高流量接口（找热点）
-topk(10, sum(rate(webook_http_requests_total[5m])) by (path))
+topk(10, sum(rate(webook_http_requests_total[5m])) by (pattern))
 
 # 过去 1 小时总请求数（看绝对量）
 sum(increase(webook_http_requests_total[1h]))
 
 # 按路径的过去 1 小时请求数
-sum(increase(webook_http_requests_total[1h])) by (path)
+sum(increase(webook_http_requests_total[1h])) by (pattern)
 
 # QPS 环比：当前 vs 1 小时前（> 1 表示在增长）
 sum(rate(webook_http_requests_total[5m]))
@@ -55,15 +55,15 @@ sum(rate(webook_http_requests_total[5m]))
   * 100
 
 # 按路径的 5xx 错误率（定位哪个接口出问题）
-sum(rate(webook_http_requests_total{status=~"5.."}[5m])) by (path)
+sum(rate(webook_http_requests_total{status=~"5.."}[5m])) by (pattern)
   /
-sum(rate(webook_http_requests_total[5m])) by (path)
+sum(rate(webook_http_requests_total[5m])) by (pattern)
   * 100
 
 # 4xx 客户端错误率（按路径）
-sum(rate(webook_http_requests_total{status=~"4.."}[5m])) by (path)
+sum(rate(webook_http_requests_total{status=~"4.."}[5m])) by (pattern)
   /
-sum(rate(webook_http_requests_total[5m])) by (path)
+sum(rate(webook_http_requests_total[5m])) by (pattern)
   * 100
 
 # 非 200 请求占比
@@ -75,13 +75,13 @@ sum(rate(webook_http_requests_total[5m])) by (path)
 sum(increase(webook_http_requests_total{status=~"5.."}[1h]))
 
 # 5xx 错误绝对数按路径（过去 1 小时）
-sum(increase(webook_http_requests_total{status=~"5.."}[1h])) by (path)
+sum(increase(webook_http_requests_total{status=~"5.."}[1h])) by (pattern)
 
 # 有 5xx 错误的接口列表（排查用，只看 > 0 的）
-sum(rate(webook_http_requests_total{status=~"5.."}[5m])) by (path, status) > 0
+sum(rate(webook_http_requests_total{status=~"5.."}[5m])) by (pattern, status) > 0
 
 # 有 4xx 错误的接口列表
-sum(rate(webook_http_requests_total{status=~"4.."}[5m])) by (path, status) > 0
+sum(rate(webook_http_requests_total{status=~"4.."}[5m])) by (pattern, status) > 0
 
 # 错误率安全除法（避免无请求时除以 0 返回 NaN）
 sum(rate(webook_http_requests_total{status=~"5.."}[5m]))
@@ -100,7 +100,7 @@ sum(rate(webook_http_requests_total[5m])) by (status)
 sum(increase(webook_http_requests_total[1h])) by (status)
 
 # 按路径 + 状态码（最细粒度）
-sum(rate(webook_http_requests_total[5m])) by (path, status)
+sum(rate(webook_http_requests_total[5m])) by (pattern, status)
 
 # 成功率（200 占比）
 sum(rate(webook_http_requests_total{status="200"}[5m]))
@@ -133,25 +133,25 @@ histogram_quantile(0.99,
 
 # 按路径的 P99（定位慢接口）
 histogram_quantile(0.99,
-  sum(rate(webook_http_requests_duration_seconds_bucket[5m])) by (le, path)
+  sum(rate(webook_http_requests_duration_seconds_bucket[5m])) by (le, pattern)
 )
 
 # 按路径的 P50（对比中位数和 P99 看离散度）
 histogram_quantile(0.50,
-  sum(rate(webook_http_requests_duration_seconds_bucket[5m])) by (le, path)
+  sum(rate(webook_http_requests_duration_seconds_bucket[5m])) by (le, pattern)
 )
 
 # 最慢的 5 个接口（P99 排名）
 topk(5,
   histogram_quantile(0.99,
-    sum(rate(webook_http_requests_duration_seconds_bucket[5m])) by (le, path)
+    sum(rate(webook_http_requests_duration_seconds_bucket[5m])) by (le, pattern)
   )
 )
 
 # 最慢的 10 个接口（P99 排名，表格用）
 topk(10,
   histogram_quantile(0.99,
-    sum(rate(webook_http_requests_duration_seconds_bucket[5m])) by (le, path)
+    sum(rate(webook_http_requests_duration_seconds_bucket[5m])) by (le, pattern)
   )
 )
 
@@ -170,14 +170,14 @@ rate(webook_http_requests_duration_seconds_sum[5m])
 rate(webook_http_requests_duration_seconds_count[5m])
 
 # 按路径平均响应时间
-sum(rate(webook_http_requests_duration_seconds_sum[5m])) by (path)
+sum(rate(webook_http_requests_duration_seconds_sum[5m])) by (pattern)
   /
-sum(rate(webook_http_requests_duration_seconds_count[5m])) by (path)
+sum(rate(webook_http_requests_duration_seconds_count[5m])) by (pattern)
 
 # 安全除法（避免无请求时 NaN）
-sum(rate(webook_http_requests_duration_seconds_sum[5m])) by (path)
+sum(rate(webook_http_requests_duration_seconds_sum[5m])) by (pattern)
   /
-(sum(rate(webook_http_requests_duration_seconds_count[5m])) by (path) > 0)
+(sum(rate(webook_http_requests_duration_seconds_count[5m])) by (pattern) > 0)
 ```
 
 ### 分位数（Summary）
@@ -229,7 +229,7 @@ sum(rate(webook_http_requests_duration_seconds_count[5m]))
 sum(rate(webook_http_requests_duration_seconds_bucket[5m])) by (le)
 
 # 按路径看各桶分布
-sum(rate(webook_http_requests_duration_seconds_bucket{path="/article/reader/detail"}[5m])) by (le)
+sum(rate(webook_http_requests_duration_seconds_bucket{pattern="/article/reader/detail"}[5m])) by (le)
 
 # Apdex 近似值（满意 < 100ms，容忍 < 500ms）
 (
@@ -248,13 +248,13 @@ sum(rate(webook_http_requests_duration_seconds_bucket{path="/article/reader/deta
 sum(webook_http_requests_in_flight)
 
 # 按路径的活跃请求
-sum(webook_http_requests_in_flight) by (path)
+sum(webook_http_requests_in_flight) by (pattern)
 
 # 按方法的活跃请求
 sum(webook_http_requests_in_flight) by (method)
 
 # 活跃请求最多的 5 个接口
-topk(5, sum(webook_http_requests_in_flight) by (path))
+topk(5, sum(webook_http_requests_in_flight) by (pattern))
 
 # 活跃请求历史峰值（过去 1 小时）
 max_over_time(sum(webook_http_requests_in_flight)[1h:])
@@ -654,12 +654,12 @@ prometheus_engine_query_duration_seconds{quantile="0.99"}
 | 活跃请求 | `sum(webook_http_requests_in_flight)` | Stat |
 | Goroutines | `go_goroutines{job="webook-app"}` | Stat |
 | 堆内存 | `go_memstats_alloc_bytes{job="webook-app"}` | Stat |
-| QPS 按路径 | `sum(rate(webook_http_requests_total[5m])) by (path)` | Time series |
+| QPS 按路径 | `sum(rate(webook_http_requests_total[5m])) by (pattern)` | Time series |
 | 分位数曲线 | P50/P90/P95/P99 四条 `histogram_quantile` | Time series |
 | 状态码分布 | `sum(rate(...[5m])) by (status)` | Stacked bar |
-| P99 按路径 | `histogram_quantile(0.99, ... by (le, path))` | Time series |
-| 平均延迟按路径 | `sum(rate(..._sum[5m])) by (path) / sum(rate(..._count[5m])) by (path)` | Time series |
-| 活跃请求按路径 | `sum(webook_http_requests_in_flight) by (path)` | Time series |
+| P99 按路径 | `histogram_quantile(0.99, ... by (le, pattern))` | Time series |
+| 平均延迟按路径 | `sum(rate(..._sum[5m])) by (pattern) / sum(rate(..._count[5m])) by (pattern)` | Time series |
+| 活跃请求按路径 | `sum(webook_http_requests_in_flight) by (pattern)` | Time series |
 | Goroutines 趋势 | `go_goroutines{job="webook-app"}` | Time series |
 | 堆内存趋势 | `alloc_bytes` + `sys_bytes` 双线 | Time series |
 | CPU 使用率 | `rate(process_cpu_seconds_total[5m]) * 100` | Time series |
@@ -677,10 +677,10 @@ prometheus_engine_query_duration_seconds{quantile="0.99"}
 | MySQL 连接数 | `mysql_global_status_threads_connected` | Stat |
 | Kafka Lag | `sum(kafka_consumergroup_lag)` | Stat |
 | 内存分配率 | `rate(go_memstats_alloc_bytes_total[5m])` | Stat |
-| Top 10 慢接口 | `topk(10, histogram_quantile(0.99, ... by (le, path)))` | Table |
-| Top 10 高流量 | `topk(10, sum(rate(...[5m])) by (path))` | Table |
-| 5xx 错误接口 | `sum(rate(...{status=~"5.."}[5m])) by (path, status) > 0` | Table |
-| 4xx 错误接口 | `sum(rate(...{status=~"4.."}[5m])) by (path, status) > 0` | Table |
+| Top 10 慢接口 | `topk(10, histogram_quantile(0.99, ... by (le, pattern)))` | Table |
+| Top 10 高流量 | `topk(10, sum(rate(...[5m])) by (pattern))` | Table |
+| 5xx 错误接口 | `sum(rate(...{status=~"5.."}[5m])) by (pattern, status) > 0` | Table |
+| 4xx 错误接口 | `sum(rate(...{status=~"4.."}[5m])) by (pattern, status) > 0` | Table |
 | Redis 命中率趋势 | 命中率公式 | Time series |
 | MySQL QPS | `queries/s` + `slow queries/s` 双线 | Time series |
 | Kafka Lag 趋势 | `sum(lag) by (consumergroup, topic)` | Time series |
@@ -749,15 +749,15 @@ deriv(sum(rate(webook_http_requests_total[1h]))[7d:1h])
 ```promql
 # 延迟高 + QPS 高的接口（可能是性能瓶颈）
 histogram_quantile(0.99,
-  sum(rate(webook_http_requests_duration_seconds_bucket[5m])) by (le, path)
+  sum(rate(webook_http_requests_duration_seconds_bucket[5m])) by (le, pattern)
 ) > 0.5
 and
-sum(rate(webook_http_requests_total[5m])) by (path) > 1
+sum(rate(webook_http_requests_total[5m])) by (pattern) > 1
 
 # 高错误率 + 高流量（影响面最大的故障接口）
-sum(rate(webook_http_requests_total{status=~"5.."}[5m])) by (path) > 0
+sum(rate(webook_http_requests_total{status=~"5.."}[5m])) by (pattern) > 0
 and
-sum(rate(webook_http_requests_total[5m])) by (path) > 10
+sum(rate(webook_http_requests_total[5m])) by (pattern) > 10
 
 # MySQL 慢查询增多的同时 HTTP 延迟上升（关联 DB 问题）
 rate(mysql_global_status_slow_queries[5m]) > 0.1
@@ -794,8 +794,8 @@ sum(rate(webook_http_requests_total{status=~"5.."}[5m]))            # 有 5xx？
 histogram_quantile(0.99, sum(rate(..._bucket[5m])) by (le))         # P99 正常？
 
 # Step 2: 定位接口 — 哪个路径出问题
-topk(5, sum(rate(webook_http_requests_total{status=~"5.."}[5m])) by (path))
-topk(5, histogram_quantile(0.99, sum(rate(..._bucket[5m])) by (le, path)))
+topk(5, sum(rate(webook_http_requests_total{status=~"5.."}[5m])) by (pattern))
+topk(5, histogram_quantile(0.99, sum(rate(..._bucket[5m])) by (le, pattern)))
 
 # Step 3: 检查应用 — Go 运行时有没有异常
 go_goroutines{job="webook-app"}                                     # goroutine 泄漏？
