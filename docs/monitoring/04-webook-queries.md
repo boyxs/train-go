@@ -263,6 +263,68 @@ max_over_time(sum(webook_http_requests_in_flight)[1h:])
 sum(webook_http_requests_in_flight) > 50
 ```
 
+## DB 操作（GORM）
+
+### QPS
+
+```promql
+# 全局 DB QPS
+sum(rate(webook_db_query_total[5m]))
+
+# 按操作类型（query/create/update/delete/raw/row）
+sum(rate(webook_db_query_total[5m])) by (type)
+
+# 按表名
+sum(rate(webook_db_query_total[5m])) by (table)
+
+# 按操作 + 表名（最细粒度）
+sum(rate(webook_db_query_total[5m])) by (type, table)
+
+# Top 5 高频表
+topk(5, sum(rate(webook_db_query_total[5m])) by (table))
+
+# 读写比
+sum(rate(webook_db_query_total{type="query"}[5m]))
+  /
+(sum(rate(webook_db_query_total{type="create"}[5m]))
+  + sum(rate(webook_db_query_total{type="update"}[5m]))
+  + sum(rate(webook_db_query_total{type="delete"}[5m])))
+```
+
+### 延迟
+
+```promql
+# 全局 P99
+histogram_quantile(0.99, sum(rate(webook_db_query_duration_seconds_bucket[5m])) by (le))
+
+# 按表的 P99（定位慢表）
+histogram_quantile(0.99, sum(rate(webook_db_query_duration_seconds_bucket[5m])) by (le, table))
+
+# 按操作类型的 P99
+histogram_quantile(0.99, sum(rate(webook_db_query_duration_seconds_bucket[5m])) by (le, type))
+
+# Top 5 慢表
+topk(5, histogram_quantile(0.99, sum(rate(webook_db_query_duration_seconds_bucket[5m])) by (le, table)))
+
+# 平均延迟（按操作类型）
+sum(rate(webook_db_query_duration_seconds_sum[5m])) by (type)
+  /
+sum(rate(webook_db_query_duration_seconds_count[5m])) by (type)
+
+# 平均延迟（按表）
+sum(rate(webook_db_query_duration_seconds_sum[5m])) by (table)
+  /
+sum(rate(webook_db_query_duration_seconds_count[5m])) by (table)
+
+# Summary P99（精确值）
+webook_db_query_duration_seconds_summary{quantile="0.99"}
+
+# 超过 100ms 的慢查询占比
+1 - sum(rate(webook_db_query_duration_seconds_bucket{le="0.1"}[5m]))
+      /
+    sum(rate(webook_db_query_duration_seconds_count[5m]))
+```
+
 ## Go 运行时
 
 ### Goroutine
@@ -686,6 +748,11 @@ prometheus_engine_query_duration_seconds{quantile="0.99"}
 | Kafka Lag 趋势 | `sum(lag) by (consumergroup, topic)` | Time series |
 | 内存泄漏检测 | 当前堆 + `predict_linear` 预测虚线 | Time series |
 | Targets 状态 | `up`，值映射 1=UP(绿) 0=DOWN(红) | Table |
+| DB QPS 按操作类型 | `sum(rate(webook_db_query_total[5m])) by (type)` | Stacked time series |
+| DB P99 延迟按表 | `histogram_quantile(0.99, ... by (le, table))` | Time series |
+| DB 平均延迟按操作 | `sum(rate(..._sum[5m])) by (type) / sum(rate(..._count[5m])) by (type)` | Time series |
+| Top 5 慢表 | `topk(5, histogram_quantile(0.99, ... by (le, table)))` | Table |
+| Top 5 高频表 | `topk(5, sum(rate(..._total[5m])) by (table))` | Table |
 
 > **单位说明**：`histogram_quantile` 返回值单位是秒（和桶边界一致），Grafana 设了 `unit: s` 后会自动转为 ms/μs 显示（如 0.091s → 91ms）。这不是 bug，是 Grafana 的智能单位转换。
 
