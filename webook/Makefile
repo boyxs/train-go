@@ -47,4 +47,9 @@ docker:
 	@docker rmi -f train/webook:1.0.0
 	@docker build -t train/webook:1.0.0 .
 
+dockercp:
+	@docker compose build webook
+	@docker compose up -d webook
+
 # make docker
+# make dockercp
