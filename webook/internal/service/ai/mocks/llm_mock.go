@@ -13,8 +13,9 @@ import (
 	context "context"
 	reflect "reflect"
 
-	ai "gitee.com/train-cloud/geektime-basic-go/internal/service/ai"
 	gomock "go.uber.org/mock/gomock"
+
+	ai "github.com/webook/internal/service/ai"
 )
 
 // MockLLMClient is a mock of LLMClient interface.

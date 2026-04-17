@@ -5,12 +5,13 @@ import (
 	"errors"
 	"testing"
 
-	"gitee.com/train-cloud/geektime-basic-go/internal/service/sms"
-	smsmocks "gitee.com/train-cloud/geektime-basic-go/internal/service/sms/mocks"
-	"gitee.com/train-cloud/geektime-basic-go/pkg/ratelimit"
-	limitmocks "gitee.com/train-cloud/geektime-basic-go/pkg/ratelimit/mocks"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
+
+	"github.com/webook/internal/service/sms"
+	smsmocks "github.com/webook/internal/service/sms/mocks"
+	"github.com/webook/pkg/ratelimit"
+	limitmocks "github.com/webook/pkg/ratelimit/mocks"
 )
 
 func TestRateLimitSmsService_Send(t *testing.T) {

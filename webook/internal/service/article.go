@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
-	"gitee.com/train-cloud/geektime-basic-go/internal/domain"
-	"gitee.com/train-cloud/geektime-basic-go/internal/repository"
-	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
+	"github.com/webook/internal/domain"
+	"github.com/webook/internal/repository"
+	"github.com/webook/pkg/logger"
 )
 
 // ===== 作者端 =====

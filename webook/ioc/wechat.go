@@ -3,8 +3,8 @@ package ioc
 import (
 	"os"
 
-	"gitee.com/train-cloud/geektime-basic-go/internal/service/oauth2"
-	"gitee.com/train-cloud/geektime-basic-go/internal/service/oauth2/wechat"
+	"github.com/webook/internal/service/oauth2"
+	"github.com/webook/internal/service/oauth2/wechat"
 )
 
 func InitWechatOAuth2Service() oauth2.OAuth2Service {

@@ -4,20 +4,21 @@ import (
 	"log"
 	"time"
 
-	"gitee.com/train-cloud/geektime-basic-go/internal/events"
-	intrevt "gitee.com/train-cloud/geektime-basic-go/internal/events/interaction"
-	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
 	"github.com/IBM/sarama"
 	"github.com/spf13/viper"
+
+	"github.com/webook/internal/events"
+	intrevt "github.com/webook/internal/events/interaction"
+	"github.com/webook/pkg/logger"
 )
 
 // KafkaConfig 映射 yaml 里 kafka 段
 type KafkaConfig struct {
 	Addrs                []string `mapstructure:"addrs"`
-	DialTimeout          int      `mapstructure:"dialTimeout"`          // 秒
-	ReadTimeout          int      `mapstructure:"readTimeout"`          // 秒
-	WriteTimeout         int      `mapstructure:"writeTimeout"`         // 秒
-	ProducerTimeout      int      `mapstructure:"producerTimeout"`      // 秒
+	DialTimeout          int      `mapstructure:"dialTimeout"`     // 秒
+	ReadTimeout          int      `mapstructure:"readTimeout"`     // 秒
+	WriteTimeout         int      `mapstructure:"writeTimeout"`    // 秒
+	ProducerTimeout      int      `mapstructure:"producerTimeout"` // 秒
 	ProducerRetryMax     int      `mapstructure:"producerRetryMax"`
 	MetadataRetryMax     int      `mapstructure:"metadataRetryMax"`
 	MetadataRetryBackoff int      `mapstructure:"metadataRetryBackoff"` // 毫秒

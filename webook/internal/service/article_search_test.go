@@ -5,14 +5,15 @@ import (
 	"errors"
 	"testing"
 
-	"gitee.com/train-cloud/geektime-basic-go/internal/domain"
-	"gitee.com/train-cloud/geektime-basic-go/internal/repository"
-	repomocks "gitee.com/train-cloud/geektime-basic-go/internal/repository/mocks"
-	embmocks "gitee.com/train-cloud/geektime-basic-go/internal/service/ai/embedding/mocks"
-	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
+
+	"github.com/webook/internal/domain"
+	"github.com/webook/internal/repository"
+	repomocks "github.com/webook/internal/repository/mocks"
+	embmocks "github.com/webook/internal/service/ai/embedding/mocks"
+	"github.com/webook/pkg/logger"
 )
 
 var stubVec = make([]float32, 1024)
@@ -24,14 +25,14 @@ func TestSearchService_Search(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name     string
-		query    string
-		page     int
-		size     int
-		mock     func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *embmocks.MockEmbeddingClient)
-		wantList []domain.Article
+		name      string
+		query     string
+		page      int
+		size      int
+		mock      func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *embmocks.MockEmbeddingClient)
+		wantList  []domain.Article
 		wantTotal int64
-		wantErr  string
+		wantErr   string
 	}{
 		{
 			name:  "搜索成功有结果",

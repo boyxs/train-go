@@ -23,7 +23,7 @@ type Message struct {
 
 // ChatEvent SSE 事件
 type ChatEvent struct {
-	Type    string `json:"type"`    // "delta" | "tool_call" | "tool_result" | "error" | "done"
+	Type    string `json:"type"` // "delta" | "tool_call" | "tool_result" | "error" | "done"
 	Content string `json:"content"`
 	Data    any    `json:"data,omitempty"`
 }

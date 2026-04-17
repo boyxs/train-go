@@ -5,10 +5,10 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"gitee.com/train-cloud/geektime-basic-go/internal/domain"
-	"gitee.com/train-cloud/geektime-basic-go/internal/repository/cache"
-	"gitee.com/train-cloud/geektime-basic-go/internal/repository/dao"
-	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
+	"github.com/webook/internal/domain"
+	"github.com/webook/internal/repository/cache"
+	"github.com/webook/internal/repository/dao"
+	"github.com/webook/pkg/logger"
 )
 
 // ArticleReaderRepository 线上库 Repository
@@ -125,12 +125,12 @@ func (r *CacheArticleReaderRepository) Page(ctx context.Context, offset int, lim
 
 func (r *CacheArticleReaderRepository) toDomain(a dao.PublishedArticle) domain.Article {
 	return domain.Article{
-		Id:       a.Id,
-		Title:    a.Title,
-		Content:  a.Content,
-		Abstract: a.Abstract,
-		Author:   domain.Author{Id: a.AuthorId},
-		Status:  domain.ArticleStatus(a.Status),
+		Id:        a.Id,
+		Title:     a.Title,
+		Content:   a.Content,
+		Abstract:  a.Abstract,
+		Author:    domain.Author{Id: a.AuthorId},
+		Status:    domain.ArticleStatus(a.Status),
 		CreatedAt: a.CreatedAt,
 		UpdatedAt: a.UpdatedAt,
 	}

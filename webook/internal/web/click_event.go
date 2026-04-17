@@ -1,11 +1,12 @@
 package web
 
 import (
-	"gitee.com/train-cloud/geektime-basic-go/internal/consts"
-	"gitee.com/train-cloud/geektime-basic-go/internal/service"
-	"gitee.com/train-cloud/geektime-basic-go/pkg/ginx"
-	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
 	"github.com/gin-gonic/gin"
+
+	"github.com/webook/internal/consts"
+	"github.com/webook/internal/service"
+	"github.com/webook/pkg/ginx"
+	"github.com/webook/pkg/logger"
 )
 
 type ClickEventHandler interface {

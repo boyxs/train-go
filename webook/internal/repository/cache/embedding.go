@@ -9,10 +9,11 @@ import (
 	"math/rand"
 	"time"
 
-	"gitee.com/train-cloud/geektime-basic-go/internal/consts"
-	"gitee.com/train-cloud/geektime-basic-go/internal/service/ai/embedding"
-	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
 	"github.com/redis/go-redis/v9"
+
+	"github.com/webook/internal/consts"
+	"github.com/webook/internal/service/ai/embedding"
+	"github.com/webook/pkg/logger"
 )
 
 // CachedEmbeddingClient 对 embedding.EmbeddingClient 加 Redis 缓存，相同 text 不重复调 API

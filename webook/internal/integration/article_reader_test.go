@@ -9,14 +9,15 @@ import (
 	"testing"
 	"time"
 
-	"gitee.com/train-cloud/geektime-basic-go/internal/domain"
-	"gitee.com/train-cloud/geektime-basic-go/internal/integration/setup"
-	"gitee.com/train-cloud/geektime-basic-go/internal/repository/dao"
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"gorm.io/gorm"
+
+	"github.com/webook/internal/domain"
+	"github.com/webook/internal/integration/setup"
+	"github.com/webook/internal/repository/dao"
 )
 
 type ArticleReaderHandlerSuite struct {
@@ -98,9 +99,9 @@ func (h *ArticleReaderHandlerSuite) TestArticleReaderHandler_Page() {
 			},
 		},
 		{
-			name:   "空列表",
-			before: func(t *testing.T) {},
-			req:    `{"page":1,"pageSize":10}`,
+			name:     "空列表",
+			before:   func(t *testing.T) {},
+			req:      `{"page":1,"pageSize":10}`,
 			wantCode: http.StatusOK,
 			wantResult: Result[ArticleReaderListData]{
 				Data: ArticleReaderListData{
@@ -214,18 +215,18 @@ func (h *ArticleReaderHandlerSuite) TestArticleReaderHandler_Detail() {
 			},
 		},
 		{
-			name:   "获取不存在的文章",
-			before: func(t *testing.T) {},
-			req:    `{"id":999}`,
+			name:     "获取不存在的文章",
+			before:   func(t *testing.T) {},
+			req:      `{"id":999}`,
 			wantCode: http.StatusOK,
 			wantResult: Result[ReaderDetailVO]{
 				Msg: "文章不存在",
 			},
 		},
 		{
-			name:   "id为零",
-			before: func(t *testing.T) {},
-			req:    `{"id":0}`,
+			name:     "id为零",
+			before:   func(t *testing.T) {},
+			req:      `{"id":0}`,
 			wantCode: http.StatusOK,
 			wantResult: Result[ReaderDetailVO]{
 				Msg: "文章不存在",

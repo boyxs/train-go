@@ -11,13 +11,13 @@ var (
 
 // Redis 键模式
 const (
-	UserPattern        = "user:%d"              // user:{uid}
-	UserSsidPattern    = "user:ssid:%s"         // user:ssid:{ssid}
-	ArticlePattern     = "article:author:%d:%d" // article:author:{uid}:{id}
-	ArticlePubPattern  = "article:pub:%d"       // article:pub:{id}
-	InteractionPattern     = "interaction:%s:%d"       // interaction:{biz}:{bizId}
+	UserPattern             = "user:%d"                    // user:{uid}
+	UserSsidPattern         = "user:ssid:%s"               // user:ssid:{ssid}
+	ArticlePattern          = "article:author:%d:%d"       // article:author:{uid}:{id}
+	ArticlePubPattern       = "article:pub:%d"             // article:pub:{id}
+	InteractionPattern      = "interaction:%s:%d"          // interaction:{biz}:{bizId}
 	InteractionStatePattern = "interaction:state:%s:%d:%d" // interaction:state:{biz}:{bizId}:{uid}
-	ReaderFirstPageKey = "article:reader:first_page"
+	ReaderFirstPageKey      = "article:reader:first_page"
 
 	ChatConvPattern      = "chat:conv:list:%d" // chat:conv:list:{uid}
 	ChatMsgPattern       = "chat:msg:list:%d"  // chat:msg:list:{convId}

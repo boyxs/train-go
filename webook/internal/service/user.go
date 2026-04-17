@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 
-	"gitee.com/train-cloud/geektime-basic-go/internal/domain"
-	"gitee.com/train-cloud/geektime-basic-go/internal/repository"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
+
+	"github.com/webook/internal/domain"
+	"github.com/webook/internal/repository"
 )
 
 var (

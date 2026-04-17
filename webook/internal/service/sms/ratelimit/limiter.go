@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
-	"gitee.com/train-cloud/geektime-basic-go/internal/service/sms"
-	"gitee.com/train-cloud/geektime-basic-go/pkg/ratelimit"
+	"github.com/webook/internal/service/sms"
+	"github.com/webook/pkg/ratelimit"
 )
 
 var errLimited = errors.New("触发短信限流")

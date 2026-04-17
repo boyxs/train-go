@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"math/rand"
 
-	"gitee.com/train-cloud/geektime-basic-go/internal/repository"
-	"gitee.com/train-cloud/geektime-basic-go/internal/service/sms"
+	"github.com/webook/internal/repository"
+	"github.com/webook/internal/service/sms"
 )
 
 var (

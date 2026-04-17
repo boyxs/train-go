@@ -4,8 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
 	"github.com/IBM/sarama"
+
+	"github.com/webook/pkg/logger"
 )
 
 // SaramaSyncProducer 同步生产者，发送后等待 broker 确认

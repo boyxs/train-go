@@ -5,11 +5,12 @@ import (
 	"errors"
 	"testing"
 
-	"gitee.com/train-cloud/geektime-basic-go/internal/domain"
-	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
 	"github.com/IBM/sarama"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/webook/internal/domain"
+	"github.com/webook/pkg/logger"
 )
 
 type mockRepo struct {

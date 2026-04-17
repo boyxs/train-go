@@ -3,7 +3,7 @@ package oauth2
 import (
 	"context"
 
-	"gitee.com/train-cloud/geektime-basic-go/internal/domain"
+	"github.com/webook/internal/domain"
 )
 
 type OAuth2Service interface {

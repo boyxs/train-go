@@ -3,7 +3,7 @@ package repository
 import (
 	"context"
 
-	"gitee.com/train-cloud/geektime-basic-go/internal/repository/cache"
+	"github.com/webook/internal/repository/cache"
 )
 
 var (

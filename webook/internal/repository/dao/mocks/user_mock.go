@@ -13,8 +13,9 @@ import (
 	context "context"
 	reflect "reflect"
 
-	dao "gitee.com/train-cloud/geektime-basic-go/internal/repository/dao"
 	gomock "go.uber.org/mock/gomock"
+
+	dao "github.com/webook/internal/repository/dao"
 )
 
 // MockUserDAO is a mock of UserDAO interface.

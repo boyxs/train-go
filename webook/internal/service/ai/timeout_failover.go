@@ -6,7 +6,7 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
+	"github.com/webook/pkg/logger"
 )
 
 // TimeoutFailoverClient 粘性主 provider + 连续故障计数切换

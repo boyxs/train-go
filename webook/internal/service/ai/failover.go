@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"sync/atomic"
 
-	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
+	"github.com/webook/pkg/logger"
 )
 
 // FailoverClient 严格轮询：从当前 idx 开始，全部试一遍

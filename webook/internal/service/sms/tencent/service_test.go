@@ -14,9 +14,12 @@ import (
 func TestSend(t *testing.T) {
 	secretId, ok := os.LookupEnv("SMS_SECRET_ID")
 	if !ok {
-		t.Fatal()
+		t.Skip("SMS_SECRET_ID 未设置，跳过腾讯云短信真实调用测试")
 	}
 	secretKey, ok := os.LookupEnv("SMS_SECRET_KEY")
+	if !ok {
+		t.Skip("SMS_SECRET_KEY 未设置，跳过腾讯云短信真实调用测试")
+	}
 	c, err := sms.NewClient(common.NewCredential(secretId, secretKey),
 		"ap-nanjing",
 		profile.NewClientProfile())

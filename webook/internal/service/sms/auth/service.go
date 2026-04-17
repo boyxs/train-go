@@ -3,8 +3,9 @@ package auth
 import (
 	"context"
 
-	"gitee.com/train-cloud/geektime-basic-go/internal/service/sms"
 	"github.com/golang-jwt/jwt/v5"
+
+	"github.com/webook/internal/service/sms"
 )
 
 type AuthSmsService struct {

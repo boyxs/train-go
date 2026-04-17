@@ -3,6 +3,8 @@ package ioc
 import (
 	"github.com/redis/go-redis/v9"
 	"github.com/spf13/viper"
+
+	redisprom "github.com/webook/pkg/redisx/prometheus"
 )
 
 func InitRedis() redis.Cmdable {
@@ -19,9 +21,11 @@ func InitRedis() redis.Cmdable {
 		Addr:     cfg.Addr,
 		Password: cfg.Password,
 	})
-	// client := redis.NewClient(&redis.Options{
-	// 	Addr:     config.Config.Redis.Addr,
-	// 	Password: config.Config.Redis.Password,
-	// })
+	// 注册 Prometheus 指标 Hook（Counter + Histogram + Summary）
+	client.AddHook(redisprom.NewPrometheusBuilder("webook", "redis", "cmd", "Redis 命令统计").
+		WithCounter().
+		WithHistogram().
+		WithSummary().
+		Build())
 	return client
 }

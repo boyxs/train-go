@@ -148,6 +148,101 @@
         { "id": "organize", "options": { "excludeByName": { "Time": true, "__name__": true }, "renameByName": { "job": "Job", "instance": "实例", "Value": "状态" } } }
       ],
       "fieldConfig": { "defaults": {}, "overrides": [{ "matcher": { "id": "byName", "options": "状态" }, "properties": [{ "id": "mappings", "value": [{ "type": "value", "options": { "0": { "text": "DOWN", "color": "red" }, "1": { "text": "UP", "color": "green" } } }] }] }] }
+    },
+    {
+      "title": "DB QPS（按操作类型）",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 36 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "sum(rate(webook_db_query_total[5m])) by (type)", "legendFormat": "{{type}}" }],
+      "fieldConfig": { "defaults": { "unit": "ops", "custom": { "drawStyle": "line", "fillOpacity": 20, "stacking": { "mode": "normal" } } }, "overrides": [] }
+    },
+    {
+      "title": "DB P99 延迟（按表）",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 36 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "histogram_quantile(0.99, sum(rate(webook_db_query_duration_seconds_bucket[5m])) by (le, table))", "legendFormat": "{{table}}" }],
+      "fieldConfig": { "defaults": { "unit": "s", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] }
+    },
+    {
+      "title": "DB 平均延迟（按操作类型）",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 36 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "sum(rate(webook_db_query_duration_seconds_sum[5m])) by (type) / sum(rate(webook_db_query_duration_seconds_count[5m])) by (type)", "legendFormat": "{{type}}" }],
+      "fieldConfig": { "defaults": { "unit": "s", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] }
+    },
+    {
+      "title": "Top 5 慢表（P99）",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 44 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "topk(5, histogram_quantile(0.99, sum(rate(webook_db_query_duration_seconds_bucket[5m])) by (le, table)))", "legendFormat": "{{table}}", "instant": true, "format": "table" }],
+      "transformations": [
+        { "id": "organize", "options": { "excludeByName": { "Time": true, "le": true }, "renameByName": { "table": "表", "Value": "P99 (秒)" } } },
+        { "id": "sortBy", "options": { "fields": {}, "sort": [{ "field": "P99 (秒)", "desc": true }] } }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s", "decimals": 4 }, "overrides": [] }
+    },
+    {
+      "title": "Top 5 高频表（QPS）",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 44 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "topk(5, sum(rate(webook_db_query_total[5m])) by (table))", "legendFormat": "{{table}}", "instant": true, "format": "table" }],
+      "transformations": [
+        { "id": "organize", "options": { "excludeByName": { "Time": true }, "renameByName": { "table": "表", "Value": "QPS" } } },
+        { "id": "sortBy", "options": { "fields": {}, "sort": [{ "field": "QPS", "desc": true }] } }
+      ],
+      "fieldConfig": { "defaults": { "unit": "reqps", "decimals": 2 }, "overrides": [] }
+    },
+    {
+      "title": "Redis 缓存命中率（按业务）",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 52 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "sum(rate(webook_redis_cmd_total{hit=\"true\"}[5m])) by (biz) / sum(rate(webook_redis_cmd_total{hit=~\"true|false\"}[5m])) by (biz) * 100", "legendFormat": "{{biz}}" }],
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100, "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] }
+    },
+    {
+      "title": "Redis QPS（按业务）",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 52 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "sum(rate(webook_redis_cmd_total[5m])) by (biz)", "legendFormat": "{{biz}}" }],
+      "fieldConfig": { "defaults": { "unit": "ops", "custom": { "drawStyle": "line", "fillOpacity": 20, "stacking": { "mode": "normal" } } }, "overrides": [] }
+    },
+    {
+      "title": "Redis P99 延迟（按命令）",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 52 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "histogram_quantile(0.99, sum(rate(webook_redis_cmd_duration_seconds_bucket[5m])) by (le, cmd))", "legendFormat": "{{cmd}}" }],
+      "fieldConfig": { "defaults": { "unit": "s", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] }
+    },
+    {
+      "title": "Redis 命中/未命中（按业务）",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 60 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        { "expr": "sum(rate(webook_redis_cmd_total{hit=\"true\"}[5m])) by (biz)", "legendFormat": "", "instant": true, "format": "table", "refId": "hit" },
+        { "expr": "sum(rate(webook_redis_cmd_total{hit=\"false\"}[5m])) by (biz)", "legendFormat": "", "instant": true, "format": "table", "refId": "miss" }
+      ],
+      "transformations": [
+        { "id": "seriesToColumns", "options": { "byField": "biz" } },
+        { "id": "organize", "options": { "excludeByName": { "Time 1": true, "Time 2": true }, "renameByName": { "biz": "业务", "Value 1": "命中/s", "Value 2": "未命中/s" } } }
+      ],
+      "fieldConfig": { "defaults": { "decimals": 4 }, "overrides": [] }
+    },
+    {
+      "title": "Redis QPS（按命令）",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 60 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "topk(10, sum(rate(webook_redis_cmd_total[5m])) by (cmd))", "legendFormat": "{{cmd}}" }],
+      "fieldConfig": { "defaults": { "unit": "ops", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] }
     }
   ],
   "schemaVersion": 39,

@@ -10,9 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"gitee.com/train-cloud/geektime-basic-go/internal/integration/setup"
-	"gitee.com/train-cloud/geektime-basic-go/internal/web"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/webook/internal/integration/setup"
+	"github.com/webook/internal/web"
 )
 
 func TestInternalUserHandler_SendSMSCode(t *testing.T) {

@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/go-sql-driver/mysql"
-	"gorm.io/plugin/soft_delete"
 	"gorm.io/gorm"
+	"gorm.io/plugin/soft_delete"
 )
 
 var (

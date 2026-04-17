@@ -4,10 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"gitee.com/train-cloud/geektime-basic-go/internal/service/sms"
 	"github.com/ecodeclub/ekit"
 	"github.com/ecodeclub/ekit/slice"
 	tsms "github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/sms/v20210111"
+
+	"github.com/webook/internal/service/sms"
 )
 
 type SmsService struct {

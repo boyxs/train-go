@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"gitee.com/train-cloud/geektime-basic-go/config"
+	"github.com/webook/config"
 )
 
 // OllamaClient 调用本地 Ollama /api/embeddings 接口

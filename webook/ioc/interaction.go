@@ -3,11 +3,11 @@ package ioc
 import (
 	"time"
 
-	intrevt "gitee.com/train-cloud/geektime-basic-go/internal/events/interaction"
-	"gitee.com/train-cloud/geektime-basic-go/internal/repository"
-	"gitee.com/train-cloud/geektime-basic-go/internal/service"
-	"gitee.com/train-cloud/geektime-basic-go/pkg/circuitbreaker"
-	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
+	intrevt "github.com/webook/internal/events/interaction"
+	"github.com/webook/internal/repository"
+	"github.com/webook/internal/service"
+	"github.com/webook/pkg/circuitbreaker"
+	"github.com/webook/pkg/logger"
 )
 
 // InitInteractionService 组装互动 Service：Kafka 装饰器包装同步实现

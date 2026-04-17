@@ -5,11 +5,12 @@ import (
 	"testing"
 	"time"
 
-	"gitee.com/train-cloud/geektime-basic-go/internal/service/sms"
-	smsmocks "gitee.com/train-cloud/geektime-basic-go/internal/service/sms/mocks"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
+
+	"github.com/webook/internal/service/sms"
+	smsmocks "github.com/webook/internal/service/sms/mocks"
 )
 
 func TestAuthSmsService_Send(t *testing.T) {
