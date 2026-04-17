@@ -49,7 +49,7 @@ func TestSearchHandler_Search(t *testing.T) {
 			mock: func(ctrl *gomock.Controller) *svcmocks.MockArticleSearchService {
 				return svcmocks.NewMockArticleSearchService(ctrl)
 			},
-			wantCode:   http.StatusOK,
+			wantCode:   http.StatusBadRequest,
 			wantResult: Result{Code: 4, Msg: "搜索内容不能为空"},
 		},
 		{
@@ -73,7 +73,7 @@ func TestSearchHandler_Search(t *testing.T) {
 					Return(nil, int64(0), errors.New("es down"))
 				return svc
 			},
-			wantCode:   http.StatusOK,
+			wantCode:   http.StatusInternalServerError,
 			wantResult: Result{Code: 5, Msg: "系统错误"},
 		},
 	}

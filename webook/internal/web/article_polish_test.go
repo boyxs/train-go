@@ -63,7 +63,7 @@ func TestAIArticlePolishHandler_Polish(t *testing.T) {
 			mock: func(ctrl *gomock.Controller) (*svcmocks.MockArticlePolishService, *limitmocks.MockLimiter) {
 				return svcmocks.NewMockArticlePolishService(ctrl), limitmocks.NewMockLimiter(ctrl)
 			},
-			wantCode: http.StatusOK,
+			wantCode: http.StatusBadRequest,
 			wantBody: Result{Code: 4, Msg: "参数错误"},
 		},
 		{
@@ -76,7 +76,7 @@ func TestAIArticlePolishHandler_Polish(t *testing.T) {
 				svc.EXPECT().Polish(gomock.Any(), "", "有内容").Return(domain.PolishResult{}, service.ErrPolishEmptyTitle)
 				return svc, lim
 			},
-			wantCode: http.StatusOK,
+			wantCode: http.StatusBadRequest,
 			wantBody: Result{Code: 4, Msg: "标题不能为空"},
 		},
 		{
@@ -89,7 +89,7 @@ func TestAIArticlePolishHandler_Polish(t *testing.T) {
 				svc.EXPECT().Polish(gomock.Any(), "标题", "").Return(domain.PolishResult{}, service.ErrPolishEmptyContent)
 				return svc, lim
 			},
-			wantCode: http.StatusOK,
+			wantCode: http.StatusBadRequest,
 			wantBody: Result{Code: 4, Msg: "内容不能为空"},
 		},
 		{
@@ -102,7 +102,7 @@ func TestAIArticlePolishHandler_Polish(t *testing.T) {
 				svc.EXPECT().Polish(gomock.Any(), "标题", "超长内容").Return(domain.PolishResult{}, service.ErrPolishContentTooLong)
 				return svc, lim
 			},
-			wantCode: http.StatusOK,
+			wantCode: http.StatusBadRequest,
 			wantBody: Result{Code: 4, Msg: "内容过长，请缩减至 10000 字符以内"},
 		},
 		{
@@ -114,7 +114,7 @@ func TestAIArticlePolishHandler_Polish(t *testing.T) {
 				lim.EXPECT().Limit(gomock.Any(), gomock.Any()).Return(true, nil)
 				return svc, lim
 			},
-			wantCode: http.StatusOK,
+			wantCode: http.StatusBadRequest,
 			wantBody: Result{Code: 4, Msg: "润色次数已达上限，请稍后再试"},
 		},
 		{
@@ -127,7 +127,7 @@ func TestAIArticlePolishHandler_Polish(t *testing.T) {
 				svc.EXPECT().Polish(gomock.Any(), "标题", "内容").Return(domain.PolishResult{}, errors.New("LLM timeout"))
 				return svc, lim
 			},
-			wantCode: http.StatusOK,
+			wantCode: http.StatusInternalServerError,
 			wantBody: Result{Code: 5, Msg: "润色失败，请重试"},
 		},
 		{

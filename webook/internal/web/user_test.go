@@ -131,7 +131,7 @@ func TestInternalUserHandler_Register(t *testing.T) {
 				assert.NoError(t, err)
 				return req
 			},
-			wantCode: http.StatusOK,
+			wantCode: http.StatusBadRequest,
 			wantBody: `{"code":4,"msg":"参数错误","data":null}`,
 		},
 		{
@@ -150,7 +150,7 @@ func TestInternalUserHandler_Register(t *testing.T) {
 				assert.NoError(t, err)
 				return req
 			},
-			wantCode: http.StatusOK,
+			wantCode: http.StatusBadRequest,
 			wantBody: `{"code":4,"msg":"非法邮箱格式","data":null}`,
 		},
 		{
@@ -169,7 +169,7 @@ func TestInternalUserHandler_Register(t *testing.T) {
 				assert.NoError(t, err)
 				return req
 			},
-			wantCode: http.StatusOK,
+			wantCode: http.StatusBadRequest,
 			wantBody: `{"code":4,"msg":"两次输入密码不匹配","data":null}`,
 		},
 		{
@@ -188,7 +188,7 @@ func TestInternalUserHandler_Register(t *testing.T) {
 				assert.NoError(t, err)
 				return req
 			},
-			wantCode: http.StatusOK,
+			wantCode: http.StatusBadRequest,
 			wantBody: `{"code":4,"msg":"密码必须包含字母、数字、特殊字符，并且不少于八位","data":null}`,
 		},
 		{
@@ -212,7 +212,7 @@ func TestInternalUserHandler_Register(t *testing.T) {
 				assert.NoError(t, err)
 				return req
 			},
-			wantCode: http.StatusOK,
+			wantCode: http.StatusBadRequest,
 			wantBody: `{"code":4,"msg":"邮箱已被注册","data":null}`,
 		},
 		{
@@ -236,7 +236,7 @@ func TestInternalUserHandler_Register(t *testing.T) {
 				assert.NoError(t, err)
 				return req
 			},
-			wantCode: http.StatusOK,
+			wantCode: http.StatusInternalServerError,
 			wantBody: `{"code":5,"msg":"系统异常","data":null}`,
 		},
 	}
@@ -322,7 +322,7 @@ func TestInternalUserHandler_LoginSMS(t *testing.T) {
 				assert.NoError(t, err)
 				return req
 			},
-			wantCode:   http.StatusOK,
+			wantCode:   http.StatusBadRequest,
 			wantResult: Result{Code: 4, Msg: "参数错误"},
 		},
 		{
@@ -343,7 +343,7 @@ func TestInternalUserHandler_LoginSMS(t *testing.T) {
 				assert.NoError(t, err)
 				return req
 			},
-			wantCode:   http.StatusOK,
+			wantCode:   http.StatusInternalServerError,
 			wantResult: Result{Code: 5, Msg: service.ErrCodeVerifyTooMany.Error()},
 		},
 		{
@@ -364,7 +364,7 @@ func TestInternalUserHandler_LoginSMS(t *testing.T) {
 				assert.NoError(t, err)
 				return req
 			},
-			wantCode:   http.StatusOK,
+			wantCode:   http.StatusBadRequest,
 			wantResult: Result{Code: 4, Msg: "验证码错误，请重新输入"},
 		},
 		{
@@ -387,7 +387,7 @@ func TestInternalUserHandler_LoginSMS(t *testing.T) {
 				assert.NoError(t, err)
 				return req
 			},
-			wantCode:   http.StatusOK,
+			wantCode:   http.StatusInternalServerError,
 			wantResult: Result{Code: 5, Msg: service.ErrRecordNotFound.Error()},
 		},
 		{
@@ -410,7 +410,7 @@ func TestInternalUserHandler_LoginSMS(t *testing.T) {
 				assert.NoError(t, err)
 				return req
 			},
-			wantCode:   http.StatusOK,
+			wantCode:   http.StatusInternalServerError,
 			wantResult: Result{Code: 5, Msg: repository.ErrDuplicateUser.Error()},
 		},
 		{
@@ -441,7 +441,7 @@ func TestInternalUserHandler_LoginSMS(t *testing.T) {
 				assert.NoError(t, err)
 				return req
 			},
-			wantCode:   http.StatusOK,
+			wantCode:   http.StatusInternalServerError,
 			wantResult: Result{Code: 5, Msg: "系统异常"},
 		},
 	}

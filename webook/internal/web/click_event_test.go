@@ -55,7 +55,7 @@ func TestAIClickEventHandler_Click(t *testing.T) {
 			mock: func(ctrl *gomock.Controller) *svcmocks.MockClickEventService {
 				return svcmocks.NewMockClickEventService(ctrl)
 			},
-			wantCode: http.StatusOK,
+			wantCode: http.StatusBadRequest,
 			wantBody: Result{Code: 4, Msg: "参数无效"},
 		},
 		{
@@ -64,7 +64,7 @@ func TestAIClickEventHandler_Click(t *testing.T) {
 			mock: func(ctrl *gomock.Controller) *svcmocks.MockClickEventService {
 				return svcmocks.NewMockClickEventService(ctrl)
 			},
-			wantCode: http.StatusOK,
+			wantCode: http.StatusBadRequest,
 			wantBody: Result{Code: 4, Msg: "参数无效"},
 		},
 		{
@@ -73,7 +73,7 @@ func TestAIClickEventHandler_Click(t *testing.T) {
 			mock: func(ctrl *gomock.Controller) *svcmocks.MockClickEventService {
 				return svcmocks.NewMockClickEventService(ctrl)
 			},
-			wantCode: http.StatusOK,
+			wantCode: http.StatusBadRequest,
 			wantBody: Result{Code: 4, Msg: "参数无效"},
 		},
 		{
@@ -82,7 +82,7 @@ func TestAIClickEventHandler_Click(t *testing.T) {
 			mock: func(ctrl *gomock.Controller) *svcmocks.MockClickEventService {
 				return svcmocks.NewMockClickEventService(ctrl)
 			},
-			wantCode: http.StatusOK,
+			wantCode: http.StatusBadRequest,
 			wantBody: Result{Code: 4, Msg: "参数错误"},
 		},
 		{
@@ -94,7 +94,7 @@ func TestAIClickEventHandler_Click(t *testing.T) {
 					Return(errors.New("db error"))
 				return svc
 			},
-			wantCode: http.StatusOK,
+			wantCode: http.StatusInternalServerError,
 			wantBody: Result{Code: 5, Msg: "系统错误"},
 		},
 	}
@@ -152,7 +152,7 @@ func TestAIClickEventHandler_Dashboard(t *testing.T) {
 				svc.EXPECT().Dashboard(gomock.Any()).Return(domain.ClickEventDashboard{}, errors.New("db error"))
 				return svc
 			},
-			wantCode: http.StatusOK,
+			wantCode: http.StatusInternalServerError,
 			wantBody: Result{Code: 5, Msg: "系统错误"},
 		},
 	}
