@@ -7,21 +7,20 @@
 package main
 
 import (
-	"gitee.com/train-cloud/geektime-basic-go/internal/events"
-	"gitee.com/train-cloud/geektime-basic-go/internal/events/interaction"
-	"gitee.com/train-cloud/geektime-basic-go/internal/repository"
-	"gitee.com/train-cloud/geektime-basic-go/internal/repository/cache"
-	"gitee.com/train-cloud/geektime-basic-go/internal/repository/dao"
-	"gitee.com/train-cloud/geektime-basic-go/internal/service"
-	"gitee.com/train-cloud/geektime-basic-go/internal/web"
-	"gitee.com/train-cloud/geektime-basic-go/internal/web/jwt"
-	"gitee.com/train-cloud/geektime-basic-go/ioc"
-	"gitee.com/train-cloud/geektime-basic-go/pkg/streamer"
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
-)
 
-import (
+	"github.com/webook/internal/events"
+	"github.com/webook/internal/events/interaction"
+	"github.com/webook/internal/repository"
+	"github.com/webook/internal/repository/cache"
+	"github.com/webook/internal/repository/dao"
+	"github.com/webook/internal/service"
+	"github.com/webook/internal/web"
+	"github.com/webook/internal/web/jwt"
+	"github.com/webook/ioc"
+	"github.com/webook/pkg/streamer"
+
 	_ "github.com/spf13/viper/remote"
 )
 

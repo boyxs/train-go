@@ -5,8 +5,8 @@ import (
 	"errors"
 	"sync/atomic"
 
-	"gitee.com/train-cloud/geektime-basic-go/internal/service/sms"
-	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
+	"github.com/webook/internal/service/sms"
+	"github.com/webook/pkg/logger"
 )
 
 type FailoverSmsService struct {

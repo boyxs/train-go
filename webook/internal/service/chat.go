@@ -10,12 +10,12 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"gitee.com/train-cloud/geektime-basic-go/internal/consts"
-	"gitee.com/train-cloud/geektime-basic-go/internal/domain"
-	"gitee.com/train-cloud/geektime-basic-go/internal/repository"
-	"gitee.com/train-cloud/geektime-basic-go/internal/service/ai"
-	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
-	"gitee.com/train-cloud/geektime-basic-go/pkg/streamer"
+	"github.com/webook/internal/consts"
+	"github.com/webook/internal/domain"
+	"github.com/webook/internal/repository"
+	"github.com/webook/internal/service/ai"
+	"github.com/webook/pkg/logger"
+	"github.com/webook/pkg/streamer"
 )
 
 const (

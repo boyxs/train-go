@@ -2,6 +2,23 @@
 
 <!-- 新功能前插在此，日期降序 -->
 
+## [2026-04-17] GitHub 迁移 + CI 体系
+
+**变更内容**: 仓库从 gitee 迁至 GitHub（`github.com/boyxs/train-go`），Go 模块路径改为 `github.com/webook`，落地 GitHub Actions CI（goimports + vet + test），handler 测试适配 ginx.WrapReq HTTP 状态码映射
+**影响范围**:
+- 模块路径：`webook/go.mod` + 132 个 .go 文件 import 全替换（`gitee.com/train-cloud/geektime-basic-go` → `github.com/webook`）
+- Import 规范：`goimports -local github.com/webook` 重排 111 个文件，本地包分组到第三组
+- Makefile：`webook/Makefile` 加 `fmt` / `fmt-check` target，MODULE 从 go.mod 动态提取
+- CI：`.github/workflows/webook-ci.yml`（lint-test：goimports 检查 + go vet + go test -race），actions/checkout@v5、setup-go@v6（消除 Node 20 警告）
+- Test 修复：`internal/web/` 5 个 test 函数的 wantCode 按 ginx.WrapReq 状态码映射校正（Code 4→400、Code 5→500）；`internal/service/sms/tencent/` TestSend 无凭证时改 `t.Skip()`
+- Remote：origin → GitHub，原 gitee 重命名为 `gitee` remote 保留
+**技术决策**:
+- 模块路径采用 `github.com/webook` 而非 `github.com/boyxs/train-go/webook`：短路径更简洁，私有项目不需要外部 `go get`
+- CI 不依赖 make，直接调 goimports 二进制：降低 runner 环境耦合
+- 当前只有 lint-test job，build-push 留到 L1 完整流程时加（需配合 Dockerfile 多阶段）
+**待办**: Dockerfile 改多阶段 + CI 加 build-push → GHCR；打开 GitHub 仓库分支保护（master 强制 PR + CI 绿）
+**会话**: 260417-infra-GitHub迁移
+
 ## [2026-04-14] Prometheus 监控链路
 
 **变更内容**: HTTP 指标中间件 + Prometheus/Grafana/Exporter Docker 栈 + 3 个自定义 Grafana 面板 + PromQL 文档

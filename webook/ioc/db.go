@@ -1,12 +1,14 @@
 package ioc
 
 import (
-	"gitee.com/train-cloud/geektime-basic-go/internal/repository/dao"
-	loggerx "gitee.com/train-cloud/geektime-basic-go/pkg/logger"
 	"github.com/spf13/viper"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
+
+	"github.com/webook/internal/repository/dao"
+	gormprom "github.com/webook/pkg/gormx/prometheus"
+	loggerx "github.com/webook/pkg/logger"
 )
 
 func InitDB(_ TimezoneReady, l loggerx.LoggerX) *gorm.DB {
@@ -26,6 +28,14 @@ func InitDB(_ TimezoneReady, l loggerx.LoggerX) *gorm.DB {
 	if err != nil {
 		// 数据库都连接不上，就不要启动服务了
 		panic("failed to connect database")
+	}
+	// 注册 Prometheus 指标 callback（Counter + Histogram + Summary）
+	if err := gormprom.NewPrometheusBuilder("webook", "db", "query", "DB 查询统计").
+		WithCounter().
+		WithHistogram().
+		WithSummary().
+		Register(db); err != nil {
+		panic(err)
 	}
 	err = dao.InitTable(db)
 	if err != nil {

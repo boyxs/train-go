@@ -7,14 +7,15 @@ import (
 	"testing"
 	"time"
 
-	"gitee.com/train-cloud/geektime-basic-go/internal/consts"
-	"gitee.com/train-cloud/geektime-basic-go/internal/domain"
-	"gitee.com/train-cloud/geektime-basic-go/internal/repository/cache"
-	cachemocks "gitee.com/train-cloud/geektime-basic-go/internal/repository/cache/mocks"
-	"gitee.com/train-cloud/geektime-basic-go/internal/repository/dao"
-	daomocks "gitee.com/train-cloud/geektime-basic-go/internal/repository/dao/mocks"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
+
+	"github.com/webook/internal/consts"
+	"github.com/webook/internal/domain"
+	"github.com/webook/internal/repository/cache"
+	cachemocks "github.com/webook/internal/repository/cache/mocks"
+	"github.com/webook/internal/repository/dao"
+	daomocks "github.com/webook/internal/repository/dao/mocks"
 )
 
 func TestRedisUserRepository_FindById(t *testing.T) {

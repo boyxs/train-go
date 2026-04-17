@@ -5,8 +5,9 @@ import (
 	"encoding/json"
 	"time"
 
-	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
 	"github.com/IBM/sarama"
+
+	"github.com/webook/pkg/logger"
 )
 
 // BatchConsumer 批量消费者

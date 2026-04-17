@@ -4,15 +4,16 @@ import (
 	"errors"
 	"net/http"
 
-	"gitee.com/train-cloud/geektime-basic-go/internal/consts"
-	"gitee.com/train-cloud/geektime-basic-go/internal/domain"
-	"gitee.com/train-cloud/geektime-basic-go/internal/service"
-	"gitee.com/train-cloud/geektime-basic-go/internal/web/jwt"
-	"gitee.com/train-cloud/geektime-basic-go/pkg/ginx"
-	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	jwt2 "github.com/golang-jwt/jwt/v5"
+
+	"github.com/webook/internal/consts"
+	"github.com/webook/internal/domain"
+	"github.com/webook/internal/service"
+	"github.com/webook/internal/web/jwt"
+	"github.com/webook/pkg/ginx"
+	"github.com/webook/pkg/logger"
 
 	//"regexp" 此库不支持 (?=
 	regexp "github.com/dlclark/regexp2"
@@ -86,7 +87,7 @@ func (h *InternalUserHandler) RegisterRoutes(server *gin.Engine) {
 	ug.POST("/logout", ginx.Wrap(h.Logout))
 	ug.POST("/edit", ginx.WrapReqClaims[editReqUser, UserClaims](consts.UserKey, h.Edit))
 	ug.GET("/refresh_token", h.RefreshToken) // 直接返 401，不走 wrapper
-	ug.GET("/profile", h.Profile) // 不走 wrapper：前端期望直接 Profile 不带 Result 包装
+	ug.GET("/profile", h.Profile)            // 不走 wrapper：前端期望直接 Profile 不带 Result 包装
 
 	//手机验证码登录相关功能
 	ug.POST("/login_sms/code/send", ginx.WrapReq[smsCodeReq](h.SendLoginSMSCode))

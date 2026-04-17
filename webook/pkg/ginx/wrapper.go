@@ -3,8 +3,9 @@ package ginx
 import (
 	"net/http"
 
-	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
 	"github.com/gin-gonic/gin"
+
+	"github.com/webook/pkg/logger"
 )
 
 // L 全局 Logger，由 ioc 在启动时注入

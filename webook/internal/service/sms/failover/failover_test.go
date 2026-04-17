@@ -7,11 +7,12 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"gitee.com/train-cloud/geektime-basic-go/internal/service/sms"
-	smsmocks "gitee.com/train-cloud/geektime-basic-go/internal/service/sms/mocks"
-	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
+
+	"github.com/webook/internal/service/sms"
+	smsmocks "github.com/webook/internal/service/sms/mocks"
+	"github.com/webook/pkg/logger"
 )
 
 //go:generate mockgen -source=../types.go -package=smsmocks -destination=../mocks/sms_mock.go

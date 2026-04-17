@@ -6,13 +6,14 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"gitee.com/train-cloud/geektime-basic-go/config"
-	"gitee.com/train-cloud/geektime-basic-go/internal/repository/cache"
-	"gitee.com/train-cloud/geektime-basic-go/internal/service/ai/embedding"
-	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/redis/go-redis/v9"
 	"github.com/spf13/viper"
+
+	"github.com/webook/config"
+	"github.com/webook/internal/repository/cache"
+	"github.com/webook/internal/service/ai/embedding"
+	"github.com/webook/pkg/logger"
 )
 
 func InitESClient() *elasticsearch.TypedClient {

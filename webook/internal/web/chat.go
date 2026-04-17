@@ -10,13 +10,14 @@ import (
 	"strconv"
 	"time"
 
-	"gitee.com/train-cloud/geektime-basic-go/internal/consts"
-	"gitee.com/train-cloud/geektime-basic-go/internal/service"
-	"gitee.com/train-cloud/geektime-basic-go/internal/web/jwt"
-	"gitee.com/train-cloud/geektime-basic-go/pkg/ginx"
-	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
-	"gitee.com/train-cloud/geektime-basic-go/pkg/ratelimit"
 	"github.com/gin-gonic/gin"
+
+	"github.com/webook/internal/consts"
+	"github.com/webook/internal/service"
+	"github.com/webook/internal/web/jwt"
+	"github.com/webook/pkg/ginx"
+	"github.com/webook/pkg/logger"
+	"github.com/webook/pkg/ratelimit"
 )
 
 type ChatHandler interface {

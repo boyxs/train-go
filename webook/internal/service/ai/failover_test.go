@@ -6,11 +6,12 @@ import (
 	"sync"
 	"testing"
 
-	"gitee.com/train-cloud/geektime-basic-go/internal/service/ai"
-	aimocks "gitee.com/train-cloud/geektime-basic-go/internal/service/ai/mocks"
-	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
+
+	"github.com/webook/internal/service/ai"
+	aimocks "github.com/webook/internal/service/ai/mocks"
+	"github.com/webook/pkg/logger"
 )
 
 func makeCh() <-chan ai.StreamChunk {

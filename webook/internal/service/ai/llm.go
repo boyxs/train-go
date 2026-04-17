@@ -14,7 +14,7 @@ type LLMClient interface {
 type ChatMessage struct {
 	Role       string         `json:"role"`
 	Content    string         `json:"content,omitempty"`
-	ToolCalls  []ToolCallData `json:"tool_calls,omitempty"`  // assistant 发出工具调用时
+	ToolCalls  []ToolCallData `json:"tool_calls,omitempty"`   // assistant 发出工具调用时
 	ToolCallId string         `json:"tool_call_id,omitempty"` // tool role 回填结果时
 }
 
@@ -40,7 +40,7 @@ type Tool struct {
 
 // StreamChunk 流式响应块
 type StreamChunk struct {
-	Type      string           // "text" | "tool_call" | "done" | "error"
+	Type      string // "text" | "tool_call" | "done" | "error"
 	Content   string
 	ToolCalls []StreamToolCall // Type == "tool_call" 时有效
 	Usage     *StreamUsage     // Type == "done" 时有效（如果 API 返回）

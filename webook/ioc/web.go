@@ -5,19 +5,20 @@ import (
 	"strings"
 	"time"
 
-	"gitee.com/train-cloud/geektime-basic-go/internal/consts"
-	"gitee.com/train-cloud/geektime-basic-go/internal/web"
-	"gitee.com/train-cloud/geektime-basic-go/internal/web/jwt"
-	"gitee.com/train-cloud/geektime-basic-go/internal/web/middleware"
-	"gitee.com/train-cloud/geektime-basic-go/pkg/ginx/middleware/metrics"
-	"gitee.com/train-cloud/geektime-basic-go/pkg/ginx/middleware/ratelimit"
-	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/sessions"
 	redisSession "github.com/gin-contrib/sessions/redis"
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/redis/go-redis/v9"
+
+	"github.com/webook/internal/consts"
+	"github.com/webook/internal/web"
+	"github.com/webook/internal/web/jwt"
+	"github.com/webook/internal/web/middleware"
+	"github.com/webook/pkg/ginx/middleware/metrics"
+	"github.com/webook/pkg/ginx/middleware/ratelimit"
+	"github.com/webook/pkg/logger"
 )
 
 func InitWebServer(

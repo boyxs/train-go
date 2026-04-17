@@ -1,0 +1,53 @@
+name: Webook Backend CI
+
+on:
+  push:
+    branches: [master, feature]
+    paths:
+      - 'webook/**'
+      - '.github/workflows/webook-ci.yml'
+  pull_request:
+    branches: [master]
+    paths:
+      - 'webook/**'
+
+env:
+  MODULE: github.com/webook
+
+defaults:
+  run:
+    working-directory: webook
+
+jobs:
+  lint-test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read        # 只需读代码，最小权限
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: 设置 Go 环境
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.25.6'
+          cache: true
+          cache-dependency-path: webook/go.sum
+
+      - name: 安装 goimports
+        run: go install golang.org/x/tools/cmd/goimports@latest
+
+      - name: 检查 import 顺序
+        run: |
+          DIFF=$(goimports -local "$MODULE" -l .)
+          if [ -n "$DIFF" ]; then
+            echo "❌ 以下文件 import 未按规范排序，请本地执行：goimports -local $MODULE -w ."
+            echo "$DIFF"
+            exit 1
+          fi
+          echo "✅ import 顺序规范"
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: 单元测试
+        run: go test -race $(go list ./... | grep -v /integration)

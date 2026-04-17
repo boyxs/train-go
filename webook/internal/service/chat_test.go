@@ -6,15 +6,16 @@ import (
 	"testing"
 	"time"
 
-	"gitee.com/train-cloud/geektime-basic-go/internal/domain"
-	"gitee.com/train-cloud/geektime-basic-go/internal/repository"
-	repomocks "gitee.com/train-cloud/geektime-basic-go/internal/repository/mocks"
-	"gitee.com/train-cloud/geektime-basic-go/internal/service/ai"
-	aimocks "gitee.com/train-cloud/geektime-basic-go/internal/service/ai/mocks"
-	svcmocks "gitee.com/train-cloud/geektime-basic-go/internal/service/mocks"
-	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
+
+	"github.com/webook/internal/domain"
+	"github.com/webook/internal/repository"
+	repomocks "github.com/webook/internal/repository/mocks"
+	"github.com/webook/internal/service/ai"
+	aimocks "github.com/webook/internal/service/ai/mocks"
+	svcmocks "github.com/webook/internal/service/mocks"
+	"github.com/webook/pkg/logger"
 )
 
 func TestChatService_SendMessage(t *testing.T) {
@@ -92,7 +93,6 @@ func TestChatService_SendMessage(t *testing.T) {
 
 			convRepo, msgRepo, llm, search := tc.mock(ctrl)
 			svc := NewAIChatService(convRepo, msgRepo, llm, search, nil, logger.NewNopLogger(), nil)
-
 
 			_, err := svc.SendMessage(context.Background(), tc.uid, tc.convId, tc.content)
 			if tc.wantErr != nil {

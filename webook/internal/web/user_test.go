@@ -11,18 +11,19 @@ import (
 	"strings"
 	"testing"
 
-	"gitee.com/train-cloud/geektime-basic-go/internal/domain"
-	"gitee.com/train-cloud/geektime-basic-go/internal/repository"
-	"gitee.com/train-cloud/geektime-basic-go/internal/service"
-	svcmocks "gitee.com/train-cloud/geektime-basic-go/internal/service/mocks"
-	"gitee.com/train-cloud/geektime-basic-go/internal/web/jwt"
-	jwtmocks "gitee.com/train-cloud/geektime-basic-go/internal/web/jwt/mocks"
-	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	"golang.org/x/crypto/bcrypt"
+
+	"github.com/webook/internal/domain"
+	"github.com/webook/internal/repository"
+	"github.com/webook/internal/service"
+	svcmocks "github.com/webook/internal/service/mocks"
+	"github.com/webook/internal/web/jwt"
+	jwtmocks "github.com/webook/internal/web/jwt/mocks"
+	"github.com/webook/pkg/logger"
 )
 
 func TestPasswordEncrypt(t *testing.T) {
@@ -130,7 +131,7 @@ func TestInternalUserHandler_Register(t *testing.T) {
 				assert.NoError(t, err)
 				return req
 			},
-			wantCode: http.StatusOK,
+			wantCode: http.StatusBadRequest,
 			wantBody: `{"code":4,"msg":"参数错误","data":null}`,
 		},
 		{
@@ -149,7 +150,7 @@ func TestInternalUserHandler_Register(t *testing.T) {
 				assert.NoError(t, err)
 				return req
 			},
-			wantCode: http.StatusOK,
+			wantCode: http.StatusBadRequest,
 			wantBody: `{"code":4,"msg":"非法邮箱格式","data":null}`,
 		},
 		{
@@ -168,7 +169,7 @@ func TestInternalUserHandler_Register(t *testing.T) {
 				assert.NoError(t, err)
 				return req
 			},
-			wantCode: http.StatusOK,
+			wantCode: http.StatusBadRequest,
 			wantBody: `{"code":4,"msg":"两次输入密码不匹配","data":null}`,
 		},
 		{
@@ -187,7 +188,7 @@ func TestInternalUserHandler_Register(t *testing.T) {
 				assert.NoError(t, err)
 				return req
 			},
-			wantCode: http.StatusOK,
+			wantCode: http.StatusBadRequest,
 			wantBody: `{"code":4,"msg":"密码必须包含字母、数字、特殊字符，并且不少于八位","data":null}`,
 		},
 		{
@@ -211,7 +212,7 @@ func TestInternalUserHandler_Register(t *testing.T) {
 				assert.NoError(t, err)
 				return req
 			},
-			wantCode: http.StatusOK,
+			wantCode: http.StatusBadRequest,
 			wantBody: `{"code":4,"msg":"邮箱已被注册","data":null}`,
 		},
 		{
@@ -235,7 +236,7 @@ func TestInternalUserHandler_Register(t *testing.T) {
 				assert.NoError(t, err)
 				return req
 			},
-			wantCode: http.StatusOK,
+			wantCode: http.StatusInternalServerError,
 			wantBody: `{"code":5,"msg":"系统异常","data":null}`,
 		},
 	}
@@ -321,7 +322,7 @@ func TestInternalUserHandler_LoginSMS(t *testing.T) {
 				assert.NoError(t, err)
 				return req
 			},
-			wantCode:   http.StatusOK,
+			wantCode:   http.StatusBadRequest,
 			wantResult: Result{Code: 4, Msg: "参数错误"},
 		},
 		{
@@ -342,7 +343,7 @@ func TestInternalUserHandler_LoginSMS(t *testing.T) {
 				assert.NoError(t, err)
 				return req
 			},
-			wantCode:   http.StatusOK,
+			wantCode:   http.StatusInternalServerError,
 			wantResult: Result{Code: 5, Msg: service.ErrCodeVerifyTooMany.Error()},
 		},
 		{
@@ -363,7 +364,7 @@ func TestInternalUserHandler_LoginSMS(t *testing.T) {
 				assert.NoError(t, err)
 				return req
 			},
-			wantCode:   http.StatusOK,
+			wantCode:   http.StatusBadRequest,
 			wantResult: Result{Code: 4, Msg: "验证码错误，请重新输入"},
 		},
 		{
@@ -386,7 +387,7 @@ func TestInternalUserHandler_LoginSMS(t *testing.T) {
 				assert.NoError(t, err)
 				return req
 			},
-			wantCode:   http.StatusOK,
+			wantCode:   http.StatusInternalServerError,
 			wantResult: Result{Code: 5, Msg: service.ErrRecordNotFound.Error()},
 		},
 		{
@@ -409,7 +410,7 @@ func TestInternalUserHandler_LoginSMS(t *testing.T) {
 				assert.NoError(t, err)
 				return req
 			},
-			wantCode:   http.StatusOK,
+			wantCode:   http.StatusInternalServerError,
 			wantResult: Result{Code: 5, Msg: repository.ErrDuplicateUser.Error()},
 		},
 		{
@@ -440,7 +441,7 @@ func TestInternalUserHandler_LoginSMS(t *testing.T) {
 				assert.NoError(t, err)
 				return req
 			},
-			wantCode:   http.StatusOK,
+			wantCode:   http.StatusInternalServerError,
 			wantResult: Result{Code: 5, Msg: "系统异常"},
 		},
 	}

@@ -3,12 +3,13 @@ package ioc
 import (
 	"time"
 
-	"gitee.com/train-cloud/geektime-basic-go/config"
-	"gitee.com/train-cloud/geektime-basic-go/internal/service/ai"
-	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
-	"gitee.com/train-cloud/geektime-basic-go/pkg/ratelimit"
 	"github.com/redis/go-redis/v9"
 	"github.com/spf13/viper"
+
+	"github.com/webook/config"
+	"github.com/webook/internal/service/ai"
+	"github.com/webook/pkg/logger"
+	"github.com/webook/pkg/ratelimit"
 )
 
 func InitLLMConfig() config.LLMConfig {

@@ -8,14 +8,15 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"gitee.com/train-cloud/geektime-basic-go/internal/consts"
-	"gitee.com/train-cloud/geektime-basic-go/internal/domain"
-	svcmocks "gitee.com/train-cloud/geektime-basic-go/internal/service/mocks"
-	"gitee.com/train-cloud/geektime-basic-go/internal/web/jwt"
-	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
+
+	"github.com/webook/internal/consts"
+	"github.com/webook/internal/domain"
+	svcmocks "github.com/webook/internal/service/mocks"
+	"github.com/webook/internal/web/jwt"
+	"github.com/webook/pkg/logger"
 )
 
 func setupClickEventRouter(handler ClickEventHandler) *gin.Engine {
@@ -54,7 +55,7 @@ func TestAIClickEventHandler_Click(t *testing.T) {
 			mock: func(ctrl *gomock.Controller) *svcmocks.MockClickEventService {
 				return svcmocks.NewMockClickEventService(ctrl)
 			},
-			wantCode: http.StatusOK,
+			wantCode: http.StatusBadRequest,
 			wantBody: Result{Code: 4, Msg: "参数无效"},
 		},
 		{
@@ -63,7 +64,7 @@ func TestAIClickEventHandler_Click(t *testing.T) {
 			mock: func(ctrl *gomock.Controller) *svcmocks.MockClickEventService {
 				return svcmocks.NewMockClickEventService(ctrl)
 			},
-			wantCode: http.StatusOK,
+			wantCode: http.StatusBadRequest,
 			wantBody: Result{Code: 4, Msg: "参数无效"},
 		},
 		{
@@ -72,7 +73,7 @@ func TestAIClickEventHandler_Click(t *testing.T) {
 			mock: func(ctrl *gomock.Controller) *svcmocks.MockClickEventService {
 				return svcmocks.NewMockClickEventService(ctrl)
 			},
-			wantCode: http.StatusOK,
+			wantCode: http.StatusBadRequest,
 			wantBody: Result{Code: 4, Msg: "参数无效"},
 		},
 		{
@@ -81,7 +82,7 @@ func TestAIClickEventHandler_Click(t *testing.T) {
 			mock: func(ctrl *gomock.Controller) *svcmocks.MockClickEventService {
 				return svcmocks.NewMockClickEventService(ctrl)
 			},
-			wantCode: http.StatusOK,
+			wantCode: http.StatusBadRequest,
 			wantBody: Result{Code: 4, Msg: "参数错误"},
 		},
 		{
@@ -93,7 +94,7 @@ func TestAIClickEventHandler_Click(t *testing.T) {
 					Return(errors.New("db error"))
 				return svc
 			},
-			wantCode: http.StatusOK,
+			wantCode: http.StatusInternalServerError,
 			wantBody: Result{Code: 5, Msg: "系统错误"},
 		},
 	}
@@ -151,7 +152,7 @@ func TestAIClickEventHandler_Dashboard(t *testing.T) {
 				svc.EXPECT().Dashboard(gomock.Any()).Return(domain.ClickEventDashboard{}, errors.New("db error"))
 				return svc
 			},
-			wantCode: http.StatusOK,
+			wantCode: http.StatusInternalServerError,
 			wantBody: Result{Code: 5, Msg: "系统错误"},
 		},
 	}

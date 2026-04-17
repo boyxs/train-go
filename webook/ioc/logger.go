@@ -3,11 +3,12 @@ package ioc
 import (
 	"strings"
 
-	"gitee.com/train-cloud/geektime-basic-go/pkg/ginx"
-	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+
+	"github.com/webook/pkg/ginx"
+	"github.com/webook/pkg/logger"
 )
 
 func InitLogger() logger.LoggerX {

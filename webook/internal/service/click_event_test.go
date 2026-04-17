@@ -5,10 +5,11 @@ import (
 	"errors"
 	"testing"
 
-	"gitee.com/train-cloud/geektime-basic-go/internal/domain"
-	repomocks "gitee.com/train-cloud/geektime-basic-go/internal/repository/mocks"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
+
+	"github.com/webook/internal/domain"
+	repomocks "github.com/webook/internal/repository/mocks"
 )
 
 func TestAIClickEventService_RecordClick(t *testing.T) {

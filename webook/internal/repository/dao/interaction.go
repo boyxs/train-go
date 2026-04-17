@@ -45,7 +45,8 @@ func (d *GormInteractionDAO) IncrReadCount(ctx context.Context, biz string, bizI
 func (d *GormInteractionDAO) UpsertLike(ctx context.Context, uid int64, biz string, bizId int64, liked bool) error {
 	now := time.Now().UnixMilli()
 	return d.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		err := tx.Clauses(clause.OnConflict{
+		// MySQL ON DUPLICATE KEY affected rows: 1=INSERT, 2=UPDATE有变化, 0=UPDATE无变化
+		result := tx.Clauses(clause.OnConflict{
 			DoUpdates: clause.Assignments(map[string]any{
 				"liked":      liked,
 				"updated_at": now,
@@ -55,9 +56,13 @@ func (d *GormInteractionDAO) UpsertLike(ctx context.Context, uid int64, biz stri
 			BizId:  bizId,
 			Biz:    biz,
 			Liked:  liked,
-		}).Error
-		if err != nil {
-			return err
+		})
+		if result.Error != nil {
+			return result.Error
+		}
+		// 状态没变（重复点赞/重复取消），幂等跳过
+		if result.RowsAffected == 0 {
+			return nil
 		}
 		delta := int64(1)
 		if !liked {
@@ -79,7 +84,8 @@ func (d *GormInteractionDAO) UpsertLike(ctx context.Context, uid int64, biz stri
 func (d *GormInteractionDAO) UpsertCollect(ctx context.Context, uid int64, biz string, bizId int64, collected bool) error {
 	now := time.Now().UnixMilli()
 	return d.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		err := tx.Clauses(clause.OnConflict{
+		// MySQL ON DUPLICATE KEY affected rows: 1=INSERT, 2=UPDATE有变化, 0=UPDATE无变化
+		result := tx.Clauses(clause.OnConflict{
 			DoUpdates: clause.Assignments(map[string]any{
 				"collected":  collected,
 				"updated_at": now,
@@ -89,9 +95,13 @@ func (d *GormInteractionDAO) UpsertCollect(ctx context.Context, uid int64, biz s
 			BizId:     bizId,
 			Biz:       biz,
 			Collected: collected,
-		}).Error
-		if err != nil {
-			return err
+		})
+		if result.Error != nil {
+			return result.Error
+		}
+		// 状态没变（重复收藏/重复取消），幂等跳过
+		if result.RowsAffected == 0 {
+			return nil
 		}
 		delta := int64(1)
 		if !collected {
