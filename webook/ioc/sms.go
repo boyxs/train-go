@@ -3,10 +3,10 @@ package ioc
 import (
 	"os"
 
-	sms "gitee.com/train-cloud/geektime-basic-go/internal/service/sms"
-	"gitee.com/train-cloud/geektime-basic-go/internal/service/sms/memory"
-	"gitee.com/train-cloud/geektime-basic-go/internal/service/sms/tencent"
-	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
+	sms "github.com/webook/internal/service/sms"
+	"github.com/webook/internal/service/sms/memory"
+	"github.com/webook/internal/service/sms/tencent"
+	"github.com/webook/pkg/logger"
 	"github.com/redis/go-redis/v9"
 	"github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common"
 	"github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common/profile"

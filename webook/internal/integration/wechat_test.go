@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"gitee.com/train-cloud/geektime-basic-go/internal/consts"
-	"gitee.com/train-cloud/geektime-basic-go/internal/integration/setup"
-	"gitee.com/train-cloud/geektime-basic-go/internal/web"
+	"github.com/webook/internal/consts"
+	"github.com/webook/internal/integration/setup"
+	"github.com/webook/internal/web"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 )

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	aimocks "gitee.com/train-cloud/geektime-basic-go/internal/service/ai/mocks"
+	aimocks "github.com/webook/internal/service/ai/mocks"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 )

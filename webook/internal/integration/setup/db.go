@@ -1,7 +1,7 @@
 package setup
 
 import (
-	"gitee.com/train-cloud/geektime-basic-go/internal/repository/dao"
+	"github.com/webook/internal/repository/dao"
 	"github.com/spf13/viper"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"

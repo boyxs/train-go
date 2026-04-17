@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"testing"
 
-	"gitee.com/train-cloud/geektime-basic-go/internal/repository/cache/redismocks"
+	"github.com/webook/internal/repository/cache/redismocks"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"

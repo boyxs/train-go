@@ -1,9 +1,9 @@
 package ioc
 
 import (
-	"gitee.com/train-cloud/geektime-basic-go/internal/repository/dao"
-	gormprom "gitee.com/train-cloud/geektime-basic-go/pkg/gormx/prometheus"
-	loggerx "gitee.com/train-cloud/geektime-basic-go/pkg/logger"
+	"github.com/webook/internal/repository/dao"
+	gormprom "github.com/webook/pkg/gormx/prometheus"
+	loggerx "github.com/webook/pkg/logger"
 	"github.com/spf13/viper"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"

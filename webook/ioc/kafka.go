@@ -4,9 +4,9 @@ import (
 	"log"
 	"time"
 
-	"gitee.com/train-cloud/geektime-basic-go/internal/events"
-	intrevt "gitee.com/train-cloud/geektime-basic-go/internal/events/interaction"
-	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
+	"github.com/webook/internal/events"
+	intrevt "github.com/webook/internal/events/interaction"
+	"github.com/webook/pkg/logger"
 	"github.com/IBM/sarama"
 	"github.com/spf13/viper"
 )

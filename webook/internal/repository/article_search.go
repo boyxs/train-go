@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
-	"gitee.com/train-cloud/geektime-basic-go/internal/domain"
-	"gitee.com/train-cloud/geektime-basic-go/internal/repository/dao"
+	"github.com/webook/internal/domain"
+	"github.com/webook/internal/repository/dao"
 )
 
 // ErrSearchDocNotFound 搜索文档不存在（幂等删除用）

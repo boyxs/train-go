@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
+	"github.com/webook/pkg/logger"
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
 )

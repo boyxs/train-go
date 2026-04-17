@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	"gitee.com/train-cloud/geektime-basic-go/ioc"
+	"github.com/webook/ioc"
 	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"

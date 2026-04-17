@@ -1,4 +1,4 @@
-module gitee.com/train-cloud/geektime-basic-go
+module github.com/webook
 
 go 1.25.6
 

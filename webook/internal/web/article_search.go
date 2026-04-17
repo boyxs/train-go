@@ -3,9 +3,9 @@ package web
 import (
 	"strings"
 
-	"gitee.com/train-cloud/geektime-basic-go/internal/service"
-	"gitee.com/train-cloud/geektime-basic-go/pkg/ginx"
-	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
+	"github.com/webook/internal/service"
+	"github.com/webook/pkg/ginx"
+	"github.com/webook/pkg/logger"
 	"github.com/gin-gonic/gin"
 )
 

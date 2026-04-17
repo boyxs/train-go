@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"strings"
 
-	"gitee.com/train-cloud/geektime-basic-go/internal/domain"
-	"gitee.com/train-cloud/geektime-basic-go/internal/service/ai"
+	"github.com/webook/internal/domain"
+	"github.com/webook/internal/service/ai"
 )
 
 const polishPrompt = `你是一个中文技术文章润色助手。用户会提供文章标题和正文，你需要：

@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"strings"
 
-	"gitee.com/train-cloud/geektime-basic-go/internal/domain"
-	"gitee.com/train-cloud/geektime-basic-go/internal/repository"
-	"gitee.com/train-cloud/geektime-basic-go/internal/service/ai/embedding"
-	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
+	"github.com/webook/internal/domain"
+	"github.com/webook/internal/repository"
+	"github.com/webook/internal/service/ai/embedding"
+	"github.com/webook/pkg/logger"
 )
 
 const (

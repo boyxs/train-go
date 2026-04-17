@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"gitee.com/train-cloud/geektime-basic-go/internal/consts"
+	"github.com/webook/internal/consts"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"

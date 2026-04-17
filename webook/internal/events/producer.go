@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
+	"github.com/webook/pkg/logger"
 	"github.com/IBM/sarama"
 )
 

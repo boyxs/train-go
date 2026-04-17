@@ -2,7 +2,7 @@
 
 Go + Gin + GORM + Redis + Wire（DI）
 
-模块路径: `gitee.com/train-cloud/geektime-basic-go`
+模块路径: `github.com/webook`
 
 ## 常用命令
 

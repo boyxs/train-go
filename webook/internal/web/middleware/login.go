@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"time"
 
-	"gitee.com/train-cloud/geektime-basic-go/internal/consts"
-	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
+	"github.com/webook/internal/consts"
+	"github.com/webook/pkg/logger"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 )

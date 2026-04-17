@@ -3,10 +3,10 @@ package repository
 import (
 	"context"
 
-	"gitee.com/train-cloud/geektime-basic-go/internal/domain"
-	"gitee.com/train-cloud/geektime-basic-go/internal/repository/cache"
-	"gitee.com/train-cloud/geektime-basic-go/internal/repository/dao"
-	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
+	"github.com/webook/internal/domain"
+	"github.com/webook/internal/repository/cache"
+	"github.com/webook/internal/repository/dao"
+	"github.com/webook/pkg/logger"
 )
 
 type ConversationRepository interface {

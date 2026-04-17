@@ -7,8 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"gitee.com/train-cloud/geektime-basic-go/config"
-	"gitee.com/train-cloud/geektime-basic-go/internal/service/ai/embedding"
+	"github.com/webook/config"
+	"github.com/webook/internal/service/ai/embedding"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

@@ -3,9 +3,9 @@ package service
 import (
 	"context"
 
-	intrevt "gitee.com/train-cloud/geektime-basic-go/internal/events/interaction"
-	"gitee.com/train-cloud/geektime-basic-go/pkg/circuitbreaker"
-	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
+	intrevt "github.com/webook/internal/events/interaction"
+	"github.com/webook/pkg/circuitbreaker"
+	"github.com/webook/pkg/logger"
 )
 
 // KafkaInteractionService 装饰器

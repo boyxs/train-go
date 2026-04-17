@@ -4,9 +4,9 @@ import (
 	"context"
 	"database/sql"
 
-	"gitee.com/train-cloud/geektime-basic-go/internal/domain"
-	"gitee.com/train-cloud/geektime-basic-go/internal/repository/cache"
-	"gitee.com/train-cloud/geektime-basic-go/internal/repository/dao"
+	"github.com/webook/internal/domain"
+	"github.com/webook/internal/repository/cache"
+	"github.com/webook/internal/repository/dao"
 	"go.uber.org/zap"
 )
 

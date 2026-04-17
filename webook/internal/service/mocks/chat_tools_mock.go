@@ -13,8 +13,8 @@ import (
 	context "context"
 	reflect "reflect"
 
-	domain "gitee.com/train-cloud/geektime-basic-go/internal/domain"
-	ai "gitee.com/train-cloud/geektime-basic-go/internal/service/ai"
+	domain "github.com/webook/internal/domain"
+	ai "github.com/webook/internal/service/ai"
 	gomock "go.uber.org/mock/gomock"
 )
 

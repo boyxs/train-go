@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"gitee.com/train-cloud/geektime-basic-go/internal/domain"
-	"gitee.com/train-cloud/geektime-basic-go/internal/integration/setup"
-	"gitee.com/train-cloud/geektime-basic-go/internal/repository/dao"
+	"github.com/webook/internal/domain"
+	"github.com/webook/internal/integration/setup"
+	"github.com/webook/internal/repository/dao"
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"

@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"net/url"
 
-	"gitee.com/train-cloud/geektime-basic-go/internal/domain"
-	"gitee.com/train-cloud/geektime-basic-go/internal/service/oauth2"
+	"github.com/webook/internal/domain"
+	"github.com/webook/internal/service/oauth2"
 )
 
 type OAuth2Service struct {

@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"gitee.com/train-cloud/geektime-basic-go/internal/events"
-	"gitee.com/train-cloud/geektime-basic-go/internal/repository"
-	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
-	"gitee.com/train-cloud/geektime-basic-go/pkg/saramax"
+	"github.com/webook/internal/events"
+	"github.com/webook/internal/repository"
+	"github.com/webook/pkg/logger"
+	"github.com/webook/pkg/saramax"
 	"github.com/IBM/sarama"
 )
 

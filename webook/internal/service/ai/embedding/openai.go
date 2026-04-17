@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"gitee.com/train-cloud/geektime-basic-go/config"
+	"github.com/webook/config"
 )
 
 // OpenAIClient 兼容 OpenAI Embedding 协议（阿里百炼、SiliconFlow 等）

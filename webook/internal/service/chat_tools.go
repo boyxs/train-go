@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"gitee.com/train-cloud/geektime-basic-go/internal/domain"
-	"gitee.com/train-cloud/geektime-basic-go/internal/repository"
-	"gitee.com/train-cloud/geektime-basic-go/internal/service/ai"
-	"gitee.com/train-cloud/geektime-basic-go/pkg/logger"
+	"github.com/webook/internal/domain"
+	"github.com/webook/internal/repository"
+	"github.com/webook/internal/service/ai"
+	"github.com/webook/pkg/logger"
 )
 
 // chatToolDefinitions 聊天模块使用的工具定义（传给 LLM）

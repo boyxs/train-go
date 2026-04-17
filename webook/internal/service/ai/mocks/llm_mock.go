@@ -13,7 +13,7 @@ import (
 	context "context"
 	reflect "reflect"
 
-	ai "gitee.com/train-cloud/geektime-basic-go/internal/service/ai"
+	ai "github.com/webook/internal/service/ai"
 	gomock "go.uber.org/mock/gomock"
 )
 

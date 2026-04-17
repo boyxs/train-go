@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"time"
 
-	"gitee.com/train-cloud/geektime-basic-go/internal/consts"
-	"gitee.com/train-cloud/geektime-basic-go/internal/web"
-	myJwt "gitee.com/train-cloud/geektime-basic-go/internal/web/jwt"
+	"github.com/webook/internal/consts"
+	"github.com/webook/internal/web"
+	myJwt "github.com/webook/internal/web/jwt"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 )

@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"gitee.com/train-cloud/geektime-basic-go/internal/events"
+	"github.com/webook/internal/events"
 )
 
 // InteractionEventProducer 互动事件生产者接口

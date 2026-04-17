@@ -7,8 +7,8 @@ import (
 	"math/rand"
 	"time"
 
-	"gitee.com/train-cloud/geektime-basic-go/internal/consts"
-	"gitee.com/train-cloud/geektime-basic-go/internal/domain"
+	"github.com/webook/internal/consts"
+	"github.com/webook/internal/domain"
 	"github.com/redis/go-redis/v9"
 )
 

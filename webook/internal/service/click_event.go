@@ -3,8 +3,8 @@ package service
 import (
 	"context"
 
-	"gitee.com/train-cloud/geektime-basic-go/internal/domain"
-	"gitee.com/train-cloud/geektime-basic-go/internal/repository"
+	"github.com/webook/internal/domain"
+	"github.com/webook/internal/repository"
 )
 
 type ClickEventService interface {

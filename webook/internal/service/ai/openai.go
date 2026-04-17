@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"gitee.com/train-cloud/geektime-basic-go/config"
+	"github.com/webook/config"
 )
 
 // OpenAIClient 兼容 OpenAI 协议的通用客户端（DeepSeek、Kimi 等）

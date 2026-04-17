@@ -1,7 +1,7 @@
 package ioc
 
 import (
-	redisprom "gitee.com/train-cloud/geektime-basic-go/pkg/redisx/prometheus"
+	redisprom "github.com/webook/pkg/redisx/prometheus"
 	"github.com/redis/go-redis/v9"
 	"github.com/spf13/viper"
 )
