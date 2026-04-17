@@ -1,5 +1,6 @@
 IMAGE := train/webook:1.0.0
-MODULE := github.com/webook
+# 从 go.mod 第一行提取模块路径，单一真相源
+MODULE := $(shell head -1 go.mod | awk '{print $$2}')
 
 .PHONY: build dc up fmt fmt-check help
 
@@ -28,9 +29,14 @@ fmt:
 # CI 检查用：只报告未格式化的文件，不改动
 fmt-check:
 	@command -v goimports >/dev/null 2>&1 || go install golang.org/x/tools/cmd/goimports@latest
-	@goimports -local $(MODULE) -l . | tee /tmp/webook-fmt-diff.txt
-	@test ! -s /tmp/webook-fmt-diff.txt || (echo "❌ 以上文件 import 未按规范排序，请执行 make fmt" && rm -f /tmp/webook-fmt-diff.txt && exit 1)
-	@rm -f /tmp/webook-fmt-diff.txt
+	@TMPFILE=$$(mktemp) && \
+		goimports -local $(MODULE) -l . | tee $$TMPFILE && \
+		if [ -s $$TMPFILE ]; then \
+			echo "❌ 以上文件 import 未按规范排序，请执行 make fmt"; \
+			rm -f $$TMPFILE; \
+			exit 1; \
+		fi && \
+		rm -f $$TMPFILE
 	@echo "✅ import 顺序规范"
 
 help:

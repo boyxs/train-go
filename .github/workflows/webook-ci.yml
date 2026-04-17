@@ -21,6 +21,8 @@ defaults:
 jobs:
   lint-test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read        # 只需读代码，最小权限
     steps:
       - uses: actions/checkout@v5
 
