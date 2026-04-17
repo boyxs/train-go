@@ -1,55 +1,24 @@
-#.PHONY: docker clean
-#docker:
-#	@echo "--- [1/5] Compiling Go binary ---"
-#	@rm webook || true
-#	@go mod tidy
-#	# Build for Linux/AMD64 to ensure compatibility inside the container
-#	@CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -tags=k8s -o webook .
-#
-#	@echo "--- [2/5] Building Docker image ---"
-#	@docker rmi -f train/webook:1.0.0 || true
-#	@docker build -t train/webook:1.0.0 .
-#
-#	@echo "--- [3/5] Synchronizing image to K3s ---"
-#	# Exporting from Docker and importing to K3s containerd namespace
-#	@docker save train/webook:1.0.0 -o webook.tar
-#	@k3s ctr images import webook.tar
-#	@rm webook.tar
-#
-#	@echo "--- [4/5] Deploying to Kubernetes ---"
-#	# Apply YAML configuration and force a rollout to pick up the new image
-#	@kubectl apply -f k8s/k8s-webook-deployment.yaml
-#	@kubectl rollout restart deployment webook-record
-#
-#	@echo "--- [5/5] Managing Service (NodePort) ---"
-#	# Create service if it doesn't exist to expose the application
-#	@kubectl apply -f k8s/k8s-webook-service.yaml
-#	# 或者
-#	# @if ! kubectl get svc webook-record > /dev/null 2>&1; then \
-#	#	 kubectl expose deployment webook-record --type=NodePort --port=8089 --target-port=8089 --name=webook-record; \
-#	# fi
-#
-#
-#	@echo "--- [OK] Deployment complete! ---"
-#	@kubectl get pods -l app=webook-record
-#	@echo "--- Service Access INFO: ---"
-#	@kubectl get svc webook-record
-#
-#clean:
-#	@kubectl delete -f k8s/k8s-webook-deployment.yaml,k8s/k8s-webook-service.yaml --ignore-not-found
-## curl http://localhost:30908/hello
+IMAGE := train/webook:1.0.0
 
-.PHONY: docker
-docker:
-	@rm webook || true
+.PHONY: build dc up help
+
+# 宿主机编译 Linux 二进制（产物：./webook）
+build:
+	@rm -f webook
 	@go mod tidy
 	@CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -tags=k8s -o webook .
-	@docker rmi -f train/webook:1.0.0
-	@docker build -t train/webook:1.0.0 .
 
-dockercp:
+# docker compose 构建镜像 + 启动（需先 make build）
+dc:
+	@docker rmi -f $(IMAGE) || true
 	@docker compose build webook
 	@docker compose up -d webook
 
-# make docker
-# make dockercp
+# 一键：编译 + 构建镜像 + 启动
+up: build dc
+
+help:
+	@echo "make build              - 编译 Linux 二进制（./webook）"
+	@echo "make dc                 - 打镜像 + docker compose 启动 webook"
+	@echo "make up                 - 一键：build + dc"
+	@echo "make -f mk/k8s.mk help  - K3s 部署相关命令"
