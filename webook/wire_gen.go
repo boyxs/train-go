@@ -7,6 +7,9 @@
 package main
 
 import (
+	"github.com/gin-gonic/gin"
+	"github.com/google/wire"
+
 	"github.com/webook/internal/events"
 	"github.com/webook/internal/events/interaction"
 	"github.com/webook/internal/repository"
@@ -17,11 +20,7 @@ import (
 	"github.com/webook/internal/web/jwt"
 	"github.com/webook/ioc"
 	"github.com/webook/pkg/streamer"
-	"github.com/gin-gonic/gin"
-	"github.com/google/wire"
-)
 
-import (
 	_ "github.com/spf13/viper/remote"
 )
 

@@ -5,11 +5,12 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
+
 	"github.com/webook/internal/domain"
 	"github.com/webook/internal/repository"
 	repomocks "github.com/webook/internal/repository/mocks"
-	"github.com/stretchr/testify/assert"
-	"go.uber.org/mock/gomock"
 )
 
 func TestInternalUserService_Login(t *testing.T) {

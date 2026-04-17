@@ -66,11 +66,11 @@ func (d *GormArticleReaderDAO) Count(ctx context.Context) (int64, error) {
 
 // PublishedArticle 线上库模型
 type PublishedArticle struct {
-	Id        int64                 `gorm:"primaryKey"`
-	Title     string                `gorm:"type=varchar(4096)"`
-	Content   string                `gorm:"type=BLOB"`
-	Abstract  string                `gorm:"type=varchar(256)"`
-	AuthorId  int64                 `gorm:"index"`
+	Id        int64  `gorm:"primaryKey"`
+	Title     string `gorm:"type=varchar(4096)"`
+	Content   string `gorm:"type=BLOB"`
+	Abstract  string `gorm:"type=varchar(256)"`
+	AuthorId  int64  `gorm:"index"`
 	Status    uint8
 	CreatedAt int64                 `gorm:"autoCreateTime:milli"`
 	UpdatedAt int64                 `gorm:"autoUpdateTime:milli"`

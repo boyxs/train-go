@@ -5,8 +5,9 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/webook/pkg/logger"
 	"github.com/IBM/sarama"
+
+	"github.com/webook/pkg/logger"
 )
 
 // BatchConsumer 批量消费者

@@ -6,11 +6,12 @@ import (
 	"os"
 	"time"
 
-	"github.com/webook/ioc"
 	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	_ "github.com/spf13/viper/remote"
+
+	"github.com/webook/ioc"
 )
 
 func main() {

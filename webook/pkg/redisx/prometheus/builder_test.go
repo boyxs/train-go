@@ -370,4 +370,3 @@ func getSummaryCount(t *testing.T, reg *prometheus.Registry, name string, labels
 	}
 	return m.summaryCount
 }
-

@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 
+	"gorm.io/gorm"
+
 	"github.com/webook/internal/domain"
 	"github.com/webook/internal/repository/cache"
 	"github.com/webook/internal/repository/dao"
 	"github.com/webook/pkg/logger"
-	"gorm.io/gorm"
 )
 
 type InteractionRepository interface {

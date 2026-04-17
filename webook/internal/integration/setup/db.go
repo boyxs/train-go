@@ -1,10 +1,11 @@
 package setup
 
 import (
-	"github.com/webook/internal/repository/dao"
 	"github.com/spf13/viper"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
+
+	"github.com/webook/internal/repository/dao"
 )
 
 func InitDB() *gorm.DB {

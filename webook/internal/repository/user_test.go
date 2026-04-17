@@ -7,14 +7,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
+
 	"github.com/webook/internal/consts"
 	"github.com/webook/internal/domain"
 	"github.com/webook/internal/repository/cache"
 	cachemocks "github.com/webook/internal/repository/cache/mocks"
 	"github.com/webook/internal/repository/dao"
 	daomocks "github.com/webook/internal/repository/dao/mocks"
-	"github.com/stretchr/testify/assert"
-	"go.uber.org/mock/gomock"
 )
 
 func TestRedisUserRepository_FindById(t *testing.T) {

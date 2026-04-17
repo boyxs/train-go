@@ -6,14 +6,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/webook/internal/domain"
-	"github.com/webook/internal/repository/cache/mocks"
-	daomocks "github.com/webook/internal/repository/dao/mocks"
-	"github.com/webook/internal/repository/dao"
-	"github.com/webook/pkg/logger"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
+
+	"github.com/webook/internal/domain"
+	cachemocks "github.com/webook/internal/repository/cache/mocks"
+	"github.com/webook/internal/repository/dao"
+	daomocks "github.com/webook/internal/repository/dao/mocks"
+	"github.com/webook/pkg/logger"
 )
 
 func TestCacheArticleReaderRepository_Page(t *testing.T) {

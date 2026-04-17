@@ -11,6 +11,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
+	"golang.org/x/crypto/bcrypt"
+
 	"github.com/webook/internal/domain"
 	"github.com/webook/internal/repository"
 	"github.com/webook/internal/service"
@@ -18,11 +24,6 @@ import (
 	"github.com/webook/internal/web/jwt"
 	jwtmocks "github.com/webook/internal/web/jwt/mocks"
 	"github.com/webook/pkg/logger"
-	"github.com/gin-gonic/gin"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
-	"golang.org/x/crypto/bcrypt"
 )
 
 func TestPasswordEncrypt(t *testing.T) {

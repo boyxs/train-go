@@ -5,11 +5,12 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
+
 	"github.com/webook/internal/consts"
 	"github.com/webook/internal/web"
 	myJwt "github.com/webook/internal/web/jwt"
-	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
 )
 
 type LoginJwtMiddlewareBuilder struct {

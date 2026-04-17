@@ -3,10 +3,11 @@ package web
 import (
 	"strings"
 
+	"github.com/gin-gonic/gin"
+
 	"github.com/webook/internal/service"
 	"github.com/webook/pkg/ginx"
 	"github.com/webook/pkg/logger"
-	"github.com/gin-gonic/gin"
 )
 
 type ArticleSearchHandler interface {

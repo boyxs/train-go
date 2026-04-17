@@ -1,9 +1,10 @@
 package ioc
 
 import (
-	redisprom "github.com/webook/pkg/redisx/prometheus"
 	"github.com/redis/go-redis/v9"
 	"github.com/spf13/viper"
+
+	redisprom "github.com/webook/pkg/redisx/prometheus"
 )
 
 func InitRedis() redis.Cmdable {

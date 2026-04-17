@@ -8,14 +8,15 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
+
 	"github.com/webook/internal/consts"
 	"github.com/webook/internal/domain"
 	svcmocks "github.com/webook/internal/service/mocks"
 	"github.com/webook/internal/web/jwt"
 	"github.com/webook/pkg/logger"
-	"github.com/gin-gonic/gin"
-	"github.com/stretchr/testify/assert"
-	"go.uber.org/mock/gomock"
 )
 
 func TestSearchHandler_Search(t *testing.T) {

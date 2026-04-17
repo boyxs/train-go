@@ -5,10 +5,11 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/webook/internal/consts"
-	"github.com/webook/pkg/logger"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
+
+	"github.com/webook/internal/consts"
+	"github.com/webook/pkg/logger"
 )
 
 type LoginMiddlewareBuilder struct {

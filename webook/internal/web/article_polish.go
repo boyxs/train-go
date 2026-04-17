@@ -4,13 +4,14 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
+
 	"github.com/webook/internal/consts"
 	"github.com/webook/internal/service"
 	"github.com/webook/pkg/ginx"
 	"github.com/webook/pkg/logger"
 	"github.com/webook/pkg/ratelimit"
-	"github.com/gin-gonic/gin"
-	"github.com/redis/go-redis/v9"
 )
 
 type ArticlePolishHandler interface {

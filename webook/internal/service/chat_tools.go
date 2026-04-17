@@ -67,10 +67,10 @@ type ToolExecutor interface {
 
 // AIChatToolExecutor 实现 ToolExecutor，封装 3 个工具
 type AIChatToolExecutor struct {
-	search  ArticleSearchService
-	reader  ArticleReaderService
+	search   ArticleSearchService
+	reader   ArticleReaderService
 	intrRepo repository.InteractionRepository
-	l       logger.LoggerX
+	l        logger.LoggerX
 }
 
 func NewAIChatToolExecutor(

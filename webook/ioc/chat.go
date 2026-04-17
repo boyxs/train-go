@@ -3,12 +3,13 @@ package ioc
 import (
 	"time"
 
+	"github.com/redis/go-redis/v9"
+	"github.com/spf13/viper"
+
 	"github.com/webook/config"
 	"github.com/webook/internal/service/ai"
 	"github.com/webook/pkg/logger"
 	"github.com/webook/pkg/ratelimit"
-	"github.com/redis/go-redis/v9"
-	"github.com/spf13/viper"
 )
 
 func InitLLMConfig() config.LLMConfig {

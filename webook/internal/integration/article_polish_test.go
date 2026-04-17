@@ -9,15 +9,16 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/webook/internal/consts"
-	"github.com/webook/internal/integration/setup"
-	"github.com/webook/internal/web"
-	myJwt "github.com/webook/internal/web/jwt"
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"gorm.io/gorm"
+
+	"github.com/webook/internal/consts"
+	"github.com/webook/internal/integration/setup"
+	"github.com/webook/internal/web"
+	myJwt "github.com/webook/internal/web/jwt"
 )
 
 type ArticlePolishSuite struct {

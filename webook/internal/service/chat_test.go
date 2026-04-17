@@ -6,6 +6,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
+
 	"github.com/webook/internal/domain"
 	"github.com/webook/internal/repository"
 	repomocks "github.com/webook/internal/repository/mocks"
@@ -13,8 +16,6 @@ import (
 	aimocks "github.com/webook/internal/service/ai/mocks"
 	svcmocks "github.com/webook/internal/service/mocks"
 	"github.com/webook/pkg/logger"
-	"github.com/stretchr/testify/assert"
-	"go.uber.org/mock/gomock"
 )
 
 func TestChatService_SendMessage(t *testing.T) {
@@ -92,7 +93,6 @@ func TestChatService_SendMessage(t *testing.T) {
 
 			convRepo, msgRepo, llm, search := tc.mock(ctrl)
 			svc := NewAIChatService(convRepo, msgRepo, llm, search, nil, logger.NewNopLogger(), nil)
-
 
 			_, err := svc.SendMessage(context.Background(), tc.uid, tc.convId, tc.content)
 			if tc.wantErr != nil {

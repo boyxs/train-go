@@ -8,15 +8,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
+	"gorm.io/gorm"
+
 	"github.com/webook/internal/consts"
 	"github.com/webook/internal/domain"
 	"github.com/webook/internal/integration/setup"
 	"github.com/webook/internal/repository/dao"
 	myJwt "github.com/webook/internal/web/jwt"
-	"github.com/gin-gonic/gin"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/suite"
-	"gorm.io/gorm"
 )
 
 type ArticleAuthorHandlerSuite struct {
@@ -364,10 +365,10 @@ func (h *ArticleAuthorHandlerSuite) TestArticleAuthorHandler_Publish() {
 			},
 		},
 		{
-			name:   "发布时标题为空",
-			before: func(t *testing.T) {},
-			after:  func(t *testing.T) {},
-			req:    `{"title":"","content":"有内容"}`,
+			name:     "发布时标题为空",
+			before:   func(t *testing.T) {},
+			after:    func(t *testing.T) {},
+			req:      `{"title":"","content":"有内容"}`,
 			wantCode: http.StatusOK,
 			wantResult: Result[any]{
 				Code: 4,
@@ -543,10 +544,10 @@ func (h *ArticleAuthorHandlerSuite) TestArticleAuthorHandler_Withdraw() {
 			},
 		},
 		{
-			name:   "id为零",
-			before: func(t *testing.T) {},
-			after:  func(t *testing.T) {},
-			req:    `{"id":0}`,
+			name:     "id为零",
+			before:   func(t *testing.T) {},
+			after:    func(t *testing.T) {},
+			req:      `{"id":0}`,
 			wantCode: http.StatusOK,
 			wantResult: Result[any]{
 				Msg: "OK",
@@ -614,9 +615,9 @@ func (h *ArticleAuthorHandlerSuite) TestArticleAuthorHandler_Detail() {
 			},
 		},
 		{
-			name:   "获取不存在的文章",
-			before: func(t *testing.T) {},
-			req:    `{"id":999}`,
+			name:     "获取不存在的文章",
+			before:   func(t *testing.T) {},
+			req:      `{"id":999}`,
 			wantCode: http.StatusOK,
 			wantResult: Result[AuthorDetailVO]{
 				Msg: "系统错误",
@@ -639,9 +640,9 @@ func (h *ArticleAuthorHandlerSuite) TestArticleAuthorHandler_Detail() {
 			},
 		},
 		{
-			name:   "id为零",
-			before: func(t *testing.T) {},
-			req:    `{"id":0}`,
+			name:     "id为零",
+			before:   func(t *testing.T) {},
+			req:      `{"id":0}`,
 			wantCode: http.StatusOK,
 			wantResult: Result[AuthorDetailVO]{
 				Msg: "系统错误",
@@ -708,9 +709,9 @@ func (h *ArticleAuthorHandlerSuite) TestArticleAuthorHandler_Page() {
 			},
 		},
 		{
-			name:   "空列表",
-			before: func(t *testing.T) {},
-			req:    `{"page":1,"pageSize":10}`,
+			name:     "空列表",
+			before:   func(t *testing.T) {},
+			req:      `{"page":1,"pageSize":10}`,
 			wantCode: http.StatusOK,
 			wantResult: Result[ArticleListData]{
 				Data: ArticleListData{
@@ -854,8 +855,8 @@ func (h *ArticleAuthorHandlerSuite) TestArticleAuthorHandler_List() {
 			},
 		},
 		{
-			name:   "无文章返回空数组",
-			before: func(t *testing.T) {},
+			name:     "无文章返回空数组",
+			before:   func(t *testing.T) {},
 			wantCode: http.StatusOK,
 			wantResult: Result[[]ArticleVO]{
 				Data: []ArticleVO{},
@@ -976,20 +977,20 @@ func (h *ArticleAuthorHandlerSuite) TestArticleAuthorHandler_Delete() {
 			},
 		},
 		{
-			name:   "删除不存在的文章",
-			before: func(t *testing.T) {},
-			after:  func(t *testing.T) {},
-			req:    `{"id":999}`,
+			name:     "删除不存在的文章",
+			before:   func(t *testing.T) {},
+			after:    func(t *testing.T) {},
+			req:      `{"id":999}`,
 			wantCode: http.StatusOK,
 			wantResult: Result[any]{
 				Msg: "系统错误",
 			},
 		},
 		{
-			name:   "id为零",
-			before: func(t *testing.T) {},
-			after:  func(t *testing.T) {},
-			req:    `{"id":0}`,
+			name:     "id为零",
+			before:   func(t *testing.T) {},
+			after:    func(t *testing.T) {},
+			req:      `{"id":0}`,
 			wantCode: http.StatusOK,
 			wantResult: Result[any]{
 				Msg: "系统错误",

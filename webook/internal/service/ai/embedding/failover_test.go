@@ -5,12 +5,13 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/webook/internal/service/ai/embedding"
-	embmocks "github.com/webook/internal/service/ai/embedding/mocks"
-	"github.com/webook/pkg/logger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
+
+	"github.com/webook/internal/service/ai/embedding"
+	embmocks "github.com/webook/internal/service/ai/embedding/mocks"
+	"github.com/webook/pkg/logger"
 )
 
 func TestFailoverClient_Embed(t *testing.T) {

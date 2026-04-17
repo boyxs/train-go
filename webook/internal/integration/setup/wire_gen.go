@@ -7,6 +7,9 @@
 package setup
 
 import (
+	"github.com/gin-gonic/gin"
+	"github.com/google/wire"
+
 	"github.com/webook/internal/repository"
 	"github.com/webook/internal/repository/cache"
 	"github.com/webook/internal/repository/dao"
@@ -15,8 +18,6 @@ import (
 	"github.com/webook/internal/web/jwt"
 	"github.com/webook/ioc"
 	"github.com/webook/pkg/streamer"
-	"github.com/gin-gonic/gin"
-	"github.com/google/wire"
 )
 
 // Injectors from wire.go:

@@ -3,6 +3,9 @@
 package main
 
 import (
+	"github.com/gin-gonic/gin"
+	"github.com/google/wire"
+
 	"github.com/webook/internal/events"
 	intrevt "github.com/webook/internal/events/interaction"
 	"github.com/webook/internal/repository"
@@ -13,8 +16,6 @@ import (
 	"github.com/webook/internal/web/jwt"
 	"github.com/webook/ioc"
 	"github.com/webook/pkg/streamer"
-	"github.com/gin-gonic/gin"
-	"github.com/google/wire"
 )
 
 // searchProviderSet 搜索模块的 Wire Provider 集合（不含 Handler）

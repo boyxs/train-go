@@ -10,13 +10,14 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/gin-gonic/gin"
+
 	"github.com/webook/internal/consts"
 	"github.com/webook/internal/service"
 	"github.com/webook/internal/web/jwt"
 	"github.com/webook/pkg/ginx"
 	"github.com/webook/pkg/logger"
 	"github.com/webook/pkg/ratelimit"
-	"github.com/gin-gonic/gin"
 )
 
 type ChatHandler interface {

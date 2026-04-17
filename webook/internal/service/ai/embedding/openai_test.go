@@ -7,10 +7,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/webook/config"
-	"github.com/webook/internal/service/ai/embedding"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/webook/config"
+	"github.com/webook/internal/service/ai/embedding"
 )
 
 func newEmbedServer(statusCode int, body any) *httptest.Server {

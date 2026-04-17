@@ -6,11 +6,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/webook/internal/consts"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
+
+	"github.com/webook/internal/consts"
 )
 
 var ErrTokenInvalid = errors.New("token invalid")

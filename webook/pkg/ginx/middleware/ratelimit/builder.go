@@ -6,9 +6,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/webook/pkg/logger"
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
+
+	"github.com/webook/pkg/logger"
 )
 
 type Builder struct {

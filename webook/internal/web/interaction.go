@@ -1,12 +1,13 @@
 package web
 
 import (
+	"github.com/gin-gonic/gin"
+
 	"github.com/webook/internal/consts"
 	"github.com/webook/internal/domain"
 	"github.com/webook/internal/service"
 	"github.com/webook/pkg/ginx"
 	"github.com/webook/pkg/logger"
-	"github.com/gin-gonic/gin"
 )
 
 type InteractionHandler interface {

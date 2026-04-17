@@ -4,11 +4,12 @@ import (
 	"context"
 	"time"
 
+	"github.com/IBM/sarama"
+
 	"github.com/webook/internal/events"
 	"github.com/webook/internal/repository"
 	"github.com/webook/pkg/logger"
 	"github.com/webook/pkg/saramax"
-	"github.com/IBM/sarama"
 )
 
 // ConsumerConfig Consumer 配置

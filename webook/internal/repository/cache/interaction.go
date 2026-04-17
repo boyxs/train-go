@@ -8,9 +8,10 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/redis/go-redis/v9"
+
 	"github.com/webook/internal/consts"
 	"github.com/webook/internal/domain"
-	"github.com/redis/go-redis/v9"
 )
 
 //go:embed lua/incr_if_present.lua

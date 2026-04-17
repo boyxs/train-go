@@ -4,10 +4,11 @@ import (
 	"context"
 	"database/sql"
 
+	"go.uber.org/zap"
+
 	"github.com/webook/internal/domain"
 	"github.com/webook/internal/repository/cache"
 	"github.com/webook/internal/repository/dao"
-	"go.uber.org/zap"
 )
 
 var (

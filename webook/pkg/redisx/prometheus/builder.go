@@ -25,12 +25,14 @@ type Builder interface {
 //
 // cmd：命令名（get/set/del/hset 等），取 Cmder.Name() 小写
 // biz：业务名，从第一个 key 的 ":" 前缀解析（user/article/interaction/chat 等）
-//      多 key 命令（MGET 等）只按第一个 key 归类
+//
+//	多 key 命令（MGET 等）只按第一个 key 归类
+//
 // hit：仅 Counter 有，按命令返回类型判断：
-//      - nilCmds（get/hget/zscore 等）：redis.Nil → "false"
-//      - collectionCmds（hgetall/smembers/lrange 等）：空集合 → "false"
-//      - intCmds（exists/hexists/sismember）：0/false → "false"
-//      - 写命令 → ""（不参与命中率）
+//   - nilCmds（get/hget/zscore 等）：redis.Nil → "false"
+//   - collectionCmds（hgetall/smembers/lrange 等）：空集合 → "false"
+//   - intCmds（exists/hexists/sismember）：0/false → "false"
+//   - 写命令 → ""（不参与命中率）
 type PrometheusBuilder struct {
 	namespace  string
 	subsystem  string
@@ -101,7 +103,7 @@ func (b *PrometheusBuilder) WithSummary() *PrometheusBuilder {
 // 注：hrandfield/srandmember 带 count 参数时返回 slice，命中率语义不明，不纳入
 var nilCmds = map[string]bool{
 	"get": true, "getset": true, "getdel": true, "getex": true,
-	"hget": true,
+	"hget":   true,
 	"lindex": true,
 	"zscore": true, "zrank": true, "zrevrank": true,
 }
@@ -112,7 +114,7 @@ var collectionCmds = map[string]bool{
 	"smembers": true, "sinter": true, "sunion": true, "sdiff": true,
 	"lrange": true,
 	"zrange": true, "zrangebyscore": true, "zrevrange": true, "zrevrangebyscore": true,
-	"mget": true,
+	"mget":   true,
 	"xrange": true, "xrevrange": true,
 }
 

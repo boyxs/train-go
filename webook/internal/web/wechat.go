@@ -4,14 +4,15 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
+
 	"github.com/webook/internal/consts"
 	"github.com/webook/internal/service"
 	"github.com/webook/internal/service/oauth2"
 	myJwt "github.com/webook/internal/web/jwt"
 	"github.com/webook/pkg/ginx"
-	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
 )
 
 type OAuth2Handler interface {

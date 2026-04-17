@@ -5,9 +5,10 @@ import (
 	"errors"
 	"testing"
 
-	aimocks "github.com/webook/internal/service/ai/mocks"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
+
+	aimocks "github.com/webook/internal/service/ai/mocks"
 )
 
 func TestAIArticlePolishService_Polish(t *testing.T) {

@@ -10,16 +10,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/webook/internal/consts"
-	"github.com/webook/internal/domain"
-	"github.com/webook/internal/integration/setup"
-	"github.com/webook/internal/repository/dao"
-	"github.com/webook/internal/web"
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"gorm.io/gorm"
+
+	"github.com/webook/internal/consts"
+	"github.com/webook/internal/domain"
+	"github.com/webook/internal/integration/setup"
+	"github.com/webook/internal/repository/dao"
+	"github.com/webook/internal/web"
 )
 
 // testUid 测试用的固定登录 uid

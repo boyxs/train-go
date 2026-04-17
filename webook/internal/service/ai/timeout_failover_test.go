@@ -6,11 +6,12 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
+
 	"github.com/webook/internal/service/ai"
 	aimocks "github.com/webook/internal/service/ai/mocks"
 	"github.com/webook/pkg/logger"
-	"github.com/stretchr/testify/assert"
-	"go.uber.org/mock/gomock"
 )
 
 func TestTimeoutFailoverClient_ChatStream(t *testing.T) {

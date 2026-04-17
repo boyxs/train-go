@@ -44,13 +44,13 @@ func NewOpenAIClient(cfg config.LLMProviderConfig) *OpenAIClient {
 
 // openaiRequest OpenAI 兼容 API 请求体
 type openaiRequest struct {
-	Model         string            `json:"model"`
-	Messages      []ChatMessage     `json:"messages"`
-	Stream        bool              `json:"stream"`
-	StreamOptions *streamOptions    `json:"stream_options,omitempty"`
-	MaxTokens     int               `json:"max_tokens,omitempty"`
-	Temperature   float64           `json:"temperature,omitempty"`
-	Tools         []openaiTool      `json:"tools,omitempty"`
+	Model         string         `json:"model"`
+	Messages      []ChatMessage  `json:"messages"`
+	Stream        bool           `json:"stream"`
+	StreamOptions *streamOptions `json:"stream_options,omitempty"`
+	MaxTokens     int            `json:"max_tokens,omitempty"`
+	Temperature   float64        `json:"temperature,omitempty"`
+	Tools         []openaiTool   `json:"tools,omitempty"`
 }
 
 type streamOptions struct {

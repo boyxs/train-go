@@ -5,15 +5,16 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/redis/go-redis/v9"
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
+
 	"github.com/webook/internal/domain"
 	"github.com/webook/internal/repository/cache"
 	cachemocks "github.com/webook/internal/repository/cache/mocks"
 	"github.com/webook/internal/repository/dao"
 	daomocks "github.com/webook/internal/repository/dao/mocks"
 	"github.com/webook/pkg/logger"
-	"github.com/redis/go-redis/v9"
-	"github.com/stretchr/testify/assert"
-	"go.uber.org/mock/gomock"
 )
 
 func TestCacheAIClickEventRepository_RecordClick(t *testing.T) {
@@ -71,12 +72,12 @@ func TestCacheAIClickEventRepository_RecordClick(t *testing.T) {
 
 func TestCacheAIClickEventRepository_Dashboard(t *testing.T) {
 	cachedData := domain.ClickEventDashboard{
-		TotalClicks:    100,
-		UniqueUsers:    20,
-		UniqueArticles: 10,
+		TotalClicks:      100,
+		UniqueUsers:      20,
+		UniqueArticles:   10,
 		AvgClicksPerUser: 5.0,
-		DailyTrend:     []domain.DailyTrend{{Date: "2026-04-01", Clicks: 10}},
-		TopArticles:    []domain.TopArticle{{Rank: 1, ArticleId: 1, Title: "Go", Clicks: 50, UniqueUsers: 10}},
+		DailyTrend:       []domain.DailyTrend{{Date: "2026-04-01", Clicks: 10}},
+		TopArticles:      []domain.TopArticle{{Rank: 1, ArticleId: 1, Title: "Go", Clicks: 50, UniqueUsers: 10}},
 	}
 
 	testCases := []struct {

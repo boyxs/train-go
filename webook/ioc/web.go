@@ -5,6 +5,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gin-contrib/cors"
+	"github.com/gin-contrib/sessions"
+	redisSession "github.com/gin-contrib/sessions/redis"
+	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/redis/go-redis/v9"
+
 	"github.com/webook/internal/consts"
 	"github.com/webook/internal/web"
 	"github.com/webook/internal/web/jwt"
@@ -12,12 +19,6 @@ import (
 	"github.com/webook/pkg/ginx/middleware/metrics"
 	"github.com/webook/pkg/ginx/middleware/ratelimit"
 	"github.com/webook/pkg/logger"
-	"github.com/gin-contrib/cors"
-	"github.com/gin-contrib/sessions"
-	redisSession "github.com/gin-contrib/sessions/redis"
-	"github.com/gin-gonic/gin"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/redis/go-redis/v9"
 )
 
 func InitWebServer(

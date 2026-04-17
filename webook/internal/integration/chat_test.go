@@ -11,10 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/webook/internal/consts"
-	"github.com/webook/internal/integration/setup"
-	"github.com/webook/internal/repository/dao"
-	"github.com/webook/internal/web/jwt"
 	"github.com/gin-gonic/gin"
 	gojwt "github.com/golang-jwt/jwt/v5"
 	"github.com/redis/go-redis/v9"
@@ -22,6 +18,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"gorm.io/gorm"
+
+	"github.com/webook/internal/consts"
+	"github.com/webook/internal/integration/setup"
+	"github.com/webook/internal/repository/dao"
+	"github.com/webook/internal/web/jwt"
 )
 
 type ChatSuite struct {

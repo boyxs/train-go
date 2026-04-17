@@ -10,9 +10,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/webook/internal/integration/setup"
 	"github.com/webook/internal/web"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestInternalUserHandler_SendSMSCode(t *testing.T) {

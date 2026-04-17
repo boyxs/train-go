@@ -125,12 +125,12 @@ func (r *CacheArticleReaderRepository) Page(ctx context.Context, offset int, lim
 
 func (r *CacheArticleReaderRepository) toDomain(a dao.PublishedArticle) domain.Article {
 	return domain.Article{
-		Id:       a.Id,
-		Title:    a.Title,
-		Content:  a.Content,
-		Abstract: a.Abstract,
-		Author:   domain.Author{Id: a.AuthorId},
-		Status:  domain.ArticleStatus(a.Status),
+		Id:        a.Id,
+		Title:     a.Title,
+		Content:   a.Content,
+		Abstract:  a.Abstract,
+		Author:    domain.Author{Id: a.AuthorId},
+		Status:    domain.ArticleStatus(a.Status),
 		CreatedAt: a.CreatedAt,
 		UpdatedAt: a.UpdatedAt,
 	}

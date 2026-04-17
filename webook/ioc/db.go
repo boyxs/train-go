@@ -1,13 +1,14 @@
 package ioc
 
 import (
-	"github.com/webook/internal/repository/dao"
-	gormprom "github.com/webook/pkg/gormx/prometheus"
-	loggerx "github.com/webook/pkg/logger"
 	"github.com/spf13/viper"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
+
+	"github.com/webook/internal/repository/dao"
+	gormprom "github.com/webook/pkg/gormx/prometheus"
+	loggerx "github.com/webook/pkg/logger"
 )
 
 func InitDB(_ TimezoneReady, l loggerx.LoggerX) *gorm.DB {

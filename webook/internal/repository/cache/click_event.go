@@ -6,9 +6,10 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/redis/go-redis/v9"
+
 	"github.com/webook/internal/consts"
 	"github.com/webook/internal/domain"
-	"github.com/redis/go-redis/v9"
 )
 
 type ClickEventCache interface {
