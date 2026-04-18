@@ -61,7 +61,7 @@ services:
     image: train/webook:1.0.0
     container_name: webook-app
     build:
-      context: .
+      context: ./webook
       dockerfile: Dockerfile
     restart: always
     working_dir: /app
@@ -140,6 +140,54 @@ services:
     networks:
       extnetwork:
         ipv4_address: 172.21.0.7
+
+  # ── 前端 + 反向代理 ──────────────────────────────────────
+  webook-fe:
+    image: train/webook-fe:1.0.0
+    container_name: webook-fe
+    build:
+      context: ./webook-fe
+      dockerfile: Dockerfile
+      args:
+        # 同源部署：浏览器调 /api/*，nginx 剥前缀转后端
+        NEXT_PUBLIC_API_BASE_URL: /api
+    restart: always
+    mem_limit: 512m
+    environment:
+      NODE_ENV: production
+      NEXT_TELEMETRY_DISABLED: "1"
+    # 不直接对外暴露端口，统一走 nginx
+    expose:
+      - "3000"
+    networks:
+      extnetwork:
+        ipv4_address: 172.21.0.27
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: webook-nginx
+    restart: always
+    mem_limit: 128m
+    ports:
+      - "80:80"
+      # 上 HTTPS 后开 443 + 挂证书
+      # - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+    # 不挂 /var/log/nginx：保留官方镜像的 access.log → /dev/stdout / error.log → /dev/stderr 软链
+    # 让 docker 接管日志（docker logs / 配置 logrotate driver），避免文件无限增长
+    depends_on:
+      - webook
+      - webook-fe
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      extnetwork:
+        ipv4_address: 172.21.0.28
 
   # ── 监控链路 ──────────────────────────────────────────────
   prometheus:
@@ -228,6 +276,34 @@ services:
       extnetwork:
         ipv4_address: 172.21.0.25
 
+  # ── 追踪链路 ──────────────────────────────────────────────
+  zipkin:
+    image: openzipkin/zipkin:3.4
+    container_name: webook-zipkin
+    restart: always
+    # mem 存储足够用 512m；切 ES 存储后写入压力增大，建议调到 1024m
+    mem_limit: 512m
+    ports:
+      - "9411:9411"
+    environment:
+      # 暂时用内存存储：重启 trace 数据丢失，开发够用
+      STORAGE_TYPE: mem
+      JAVA_OPTS: "-Xms256m -Xmx256m"
+      # 切 ES 存储时打开下面三行（并把 STORAGE_TYPE 改成 elasticsearch）：
+      # ES_HOSTS: "http://elasticsearch:9200"
+      # ES_INDEX: "zipkin"
+      # ES_INDEX_REPLICAS: "0"   # 单节点 ES 必须 0，否则索引黄
+    # depends_on:                # 切 ES 时打开
+    #   - elasticsearch
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9411/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      extnetwork:
+        ipv4_address: 172.21.0.26
+
   # ── bitnami/kafka 备用配置（镜像源可用时切换） ──────────────
   # kafka:
   #   image: 'bitnami/kafka:3.6.0'
@@ -283,6 +359,12 @@ networks:
 #   docker compose up -d mysql redis kafka webook
 # 只启动监控栈:
 #   docker compose up -d prometheus grafana mysqld-exporter redis-exporter kafka-exporter
+# 启动追踪栈（Zipkin）:
+#   docker compose up -d zipkin
+#   # 浏览器访问 http://虚拟机IP:9411
+# 启动前端 + 反代（先 build 前端镜像）:
+#   docker compose build webook-fe && docker compose up -d webook-fe nginx
+#   # 浏览器访问 http://虚拟机IP（80 端口，nginx 同源代理后端 /api）
 # 构建并启动 webook:
 #   docker compose build webook && docker compose up -d webook
 # 强制重建（不用缓存）:

@@ -1,0 +1,52 @@
+# syntax=docker/dockerfile:1.7
+# 企业级 Next.js 镜像：多阶段 + standalone + 非 root + healthcheck
+
+ARG NODE_VERSION=20.18.0-alpine
+
+# ── deps：仅装依赖，最大化复用缓存 ───────────────────────────
+FROM node:${NODE_VERSION} AS deps
+WORKDIR /app
+RUN apk add --no-cache libc6-compat
+COPY package.json package-lock.json ./
+RUN npm ci --no-audit --no-fund
+
+# ── builder：build standalone 产物 ──────────────────────────
+FROM node:${NODE_VERSION} AS builder
+WORKDIR /app
+ENV NEXT_TELEMETRY_DISABLED=1
+ARG NEXT_PUBLIC_API_BASE_URL=/api
+ENV NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL}
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+RUN npm run build
+
+# ── runner：仅运行所需文件，非 root ──────────────────────────
+FROM node:${NODE_VERSION} AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
+
+RUN addgroup --system --gid 1001 nodejs \
+ && adduser  --system --uid 1001 nextjs
+
+# standalone 包含最小化 node_modules + server.js
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static    ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/public          ./public
+
+USER nextjs
+EXPOSE 3000
+
+# 健康检查：next standalone 没有 /healthz，用首页 200 判活
+HEALTHCHECK --interval=10s --timeout=5s --start-period=20s --retries=5 \
+  CMD wget -qO- http://127.0.0.1:3000/ >/dev/null || exit 1
+
+# OCI 标签（企业仓库会读取）
+LABEL org.opencontainers.image.title="webook-fe" \
+      org.opencontainers.image.description="Webook Next.js frontend (standalone)" \
+      org.opencontainers.image.source="https://github.com/webook" \
+      org.opencontainers.image.licenses="MIT"
+
+CMD ["node", "server.js"]
