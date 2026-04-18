@@ -26,7 +26,7 @@ docker compose logs -f prometheus
 ### prometheus.yml（Docker 版）
 
 ```yaml
-# webook/prometheus/prometheus.yml
+# prometheus/prometheus.yml（顶层 work/prometheus）
 global:
   scrape_interval: 15s      # 默认抓取间隔
   evaluation_interval: 15s   # 规则评估间隔
