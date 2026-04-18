@@ -2,13 +2,26 @@
 
 <!-- 新功能前插在此，日期降序 -->
 
+## [2026-04-18] 学习沙箱归档到 sandbox/
+
+**变更内容**: `work/` 顶层散落的 8 个独立 Go 学习模块统一归档到 `sandbox/`，主目录只剩项目核心（webook / webook-fe / 基础设施 / docs）
+**影响范围**:
+- 目录归并（git mv 保留历史）：`context/` `gin/` `gorm/` `mongodb/` `opentelemetry/` `sarama/` `syntax/` `wire/` → `sandbox/<name>/`
+- 文档同步：`docs/opentelemetry/` 共 7 处 `opentelemetry/` 路径引用 → `sandbox/opentelemetry/`
+**技术决策**:
+- 命名 `sandbox/` 而非 `learning/`：中性专业，不带学生味
+- 扁平结构（不按主题分组）：沙箱本来就孤立，分类反而增加查找深度
+- 各沙箱保留独立 go.mod，依赖树不互相污染
+**待办**: 无
+**会话**: 260418-refactor-沙箱归档
+
 ## [2026-04-18] 学习沙箱：context + opentelemetry trace
 
 **变更内容**: 新增两个独立 Go 学习沙箱
 **影响范围**:
-- `context/`（独立模块 `context-demo`，演示 WithValue/WithCancel/WithTimeout/父子传导/反向隔离，5 个测试）
-- `opentelemetry/`（独立模块 `otel-demo`，OTel SDK v1.32.0，stdout + Zipkin 双 exporter 测试）
-**技术决策**: 独立 go.mod 与主模块隔离，依赖树不互相污染；与 `mongodb/` `sarama/` `gin/` `gorm/` `wire/` `syntax/` 等已有学习沙箱风格一致
+- `sandbox/context/`（独立模块 `context-demo`，演示 WithValue/WithCancel/WithTimeout/父子传导/反向隔离，5 个测试）
+- `sandbox/opentelemetry/`（独立模块 `otel-demo`，OTel SDK v1.32.0，stdout + Zipkin 双 exporter 测试）
+**技术决策**: 独立 go.mod 与主模块隔离，依赖树不互相污染；与 `sandbox/mongodb/` `sandbox/sarama/` `sandbox/gin/` `sandbox/gorm/` `sandbox/wire/` `sandbox/syntax/` 等已有学习沙箱风格一致
 **待办**: 无
 **会话**: 260418-learning-context+OTel
 
