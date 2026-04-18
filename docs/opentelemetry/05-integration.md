@@ -1,6 +1,6 @@
 # 接入 webook
 
-学习阶段在独立模块 `opentelemetry/` 验证，下一步把 OTel 接入 `webook/`。本章给出**集成蓝图**，具体落地代码等正式扩展时再写。
+学习阶段在独立模块 `sandbox/opentelemetry/` 验证，下一步把 OTel 接入 `webook/`。本章给出**集成蓝图**，具体落地代码等正式扩展时再写。
 
 ## 一、整体接入策略
 

@@ -289,4 +289,4 @@ sdktrace.WithBatcher(exporter,            // 内部包成 BatchSpanProcessor
   tp.Shutdown(ctx) ──► flush 队列里所有 span
 ```
 
-下一篇 `03-quickstart.md` 用 `opentelemetry/` 测试代码逐行讲解。
+下一篇 `03-quickstart.md` 用 `sandbox/opentelemetry/` 测试代码逐行讲解。

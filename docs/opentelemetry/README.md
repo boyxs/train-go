@@ -1,6 +1,6 @@
 # OpenTelemetry 学习与实战文档
 
-webook 项目 OpenTelemetry（OTel）完整学习指南。配套示例代码：`opentelemetry/`（独立 Go 模块 `otel-demo`）。
+webook 项目 OpenTelemetry（OTel）完整学习指南。配套示例代码：`sandbox/opentelemetry/`（独立 Go 模块 `otel-demo`）。
 
 ## 目录
 
@@ -8,7 +8,7 @@ webook 项目 OpenTelemetry（OTel）完整学习指南。配套示例代码：`
 |------|------|
 | [01-concepts](01-concepts.md) | OTel 是什么、三大信号（Trace/Metric/Log）、整体架构、与 Prometheus 的关系 |
 | [02-tracing](02-tracing.md) | Tracing 核心模型：TracerProvider / Tracer / Span / Context / Sampler / Processor / Exporter |
-| [03-quickstart](03-quickstart.md) | 基于 `opentelemetry/` 测试代码的上手教程（stdout 版） |
+| [03-quickstart](03-quickstart.md) | 基于 `sandbox/opentelemetry/` 测试代码的上手教程（stdout 版） |
 | [04-exporters](04-exporters.md) | stdout / Zipkin / Jaeger / OTLP 四种 exporter 对比与选型 |
 | [05-integration](05-integration.md) | 接入 webook：otelgin / otelgorm / otelredis / 跨服务传播 |
 | [06-best-practices](06-best-practices.md) | Span 命名、属性、采样策略、利弊、踩坑清单 |
@@ -21,7 +21,7 @@ webook 项目 OpenTelemetry（OTel）完整学习指南。配套示例代码：`
 
 ```bash
 # 1. 跑示例测试（stdout，无外部依赖）
-cd C:/Go/work/opentelemetry
+cd C:/Go/work/sandbox/opentelemetry
 go test -v -run TestTracer
 
 # 2. 起本地 Zipkin，看 UI

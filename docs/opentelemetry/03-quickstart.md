@@ -1,6 +1,6 @@
 # 上手教程（基于示例代码）
 
-配套示例：`C:/Go/work/opentelemetry/`，独立 Go 模块 `otel-demo`。本章逐段拆解 `tracer_test.go`，跑通后你就有了完整的 Tracing 心智模型。
+配套示例：`C:/Go/work/sandbox/opentelemetry/`，独立 Go 模块 `otel-demo`。本章逐段拆解 `tracer_test.go`，跑通后你就有了完整的 Tracing 心智模型。
 
 ## 一、模块结构
 
@@ -144,7 +144,7 @@ func TestSpanAttributes(t *testing.T) {
 ## 四、运行 stdout 版
 
 ```bash
-cd C:/Go/work/opentelemetry
+cd C:/Go/work/sandbox/opentelemetry
 go test -v -run TestTracer
 ```
 
@@ -189,7 +189,7 @@ docker run -d --name zipkin -p 9411:9411 openzipkin/zipkin
 ### 5.2 跑测试
 
 ```bash
-cd C:/Go/work/opentelemetry
+cd C:/Go/work/sandbox/opentelemetry
 go test -v -run TestZipkin
 ```
 
