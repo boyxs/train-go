@@ -13,9 +13,10 @@ import (
 	context "context"
 	reflect "reflect"
 
+	gomock "go.uber.org/mock/gomock"
+
 	domain "github.com/webook/internal/domain"
 	ai "github.com/webook/internal/service/ai"
-	gomock "go.uber.org/mock/gomock"
 )
 
 // MockToolExecutor is a mock of ToolExecutor interface.

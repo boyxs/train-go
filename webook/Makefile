@@ -2,7 +2,7 @@ IMAGE := train/webook:1.0.0
 # 从 go.mod 第一行提取模块路径，单一真相源
 MODULE := $(shell head -1 go.mod | awk '{print $$2}')
 
-.PHONY: build dc up fmt fmt-check help
+.PHONY: build dc up fmt fmt-check wire help
 
 # 宿主机编译 Linux 二进制（产物：./webook）
 build:
@@ -39,10 +39,17 @@ fmt-check:
 		rm -f $$TMPFILE
 	@echo "✅ import 顺序规范"
 
+# 重新生成主 wire_gen.go + 集成测试 wire_gen.go，末尾自动格式化
+wire:
+	@wire ./...
+	@wire ./internal/integration/setup/...
+	@$(MAKE) fmt
+
 help:
 	@echo "make build              - 编译 Linux 二进制（./webook）"
 	@echo "make dc                 - 打镜像 + docker compose 启动 webook"
 	@echo "make up                 - 一键：build + dc"
 	@echo "make fmt                - goimports 格式化（本地包分组）"
 	@echo "make fmt-check          - 只检查不改动（CI 用）"
+	@echo "make wire               - 重新生成 wire_gen.go + 格式化"
 	@echo "make -f mk/k8s.mk help  - K3s 部署相关命令"
