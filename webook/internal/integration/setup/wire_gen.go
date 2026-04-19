@@ -9,6 +9,9 @@ package setup
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
+	"go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/trace/noop"
+
 	"github.com/webook/internal/repository"
 	"github.com/webook/internal/repository/cache"
 	"github.com/webook/internal/repository/dao"
@@ -17,8 +20,6 @@ import (
 	"github.com/webook/internal/web/jwt"
 	"github.com/webook/ioc"
 	"github.com/webook/pkg/streamer"
-	"go.opentelemetry.io/otel/trace"
-	"go.opentelemetry.io/otel/trace/noop"
 )
 
 // Injectors from wire.go:

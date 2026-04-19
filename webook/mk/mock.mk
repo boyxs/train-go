@@ -43,6 +43,8 @@ mockgen:
 	@mockgen -source=./internal/service/ai/embedding/types.go -package=embmocks -destination=./internal/service/ai/embedding/mocks/embedding_mock.go
 	#update dependencies
 	@go mod tidy
+	#格式化生成文件的 import 顺序，避免 CI goimports 校验失败
+	@$(MAKE) -f Makefile fmt
 
 build:
 	@rm webook || true

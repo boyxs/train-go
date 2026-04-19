@@ -13,8 +13,9 @@ import (
 	context "context"
 	reflect "reflect"
 
-	dao "github.com/webook/internal/repository/dao"
 	gomock "go.uber.org/mock/gomock"
+
+	dao "github.com/webook/internal/repository/dao"
 )
 
 // MockArticleReaderDAO is a mock of ArticleReaderDAO interface.
