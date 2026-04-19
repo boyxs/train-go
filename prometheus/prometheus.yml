@@ -33,3 +33,23 @@ scrape_configs:
   - job_name: 'node'
     static_configs:
       - targets: ['node-exporter:9100']
+
+  # Grafana 自监控：/metrics 在部分版本默认要 basic auth，显式带上避免 401
+  # 凭证与 docker-compose grafana 服务的 GF_SECURITY_ADMIN_USER/PASSWORD 一致
+  - job_name: 'grafana'
+    basic_auth:
+      username: admin
+      password: admin
+    static_configs:
+      - targets: ['grafana:3000']
+
+  # OTel Collector 自监控（需在 collector config 里 telemetry.metrics.address 暴露）
+  - job_name: 'otel-collector'
+    static_configs:
+      - targets: ['otel-collector:8888']
+
+  # Zipkin 自监控（micrometer 暴露在 /prometheus；slim 版无此端点）
+  - job_name: 'zipkin'
+    metrics_path: '/prometheus'
+    static_configs:
+      - targets: ['zipkin:9411']
