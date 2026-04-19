@@ -2,6 +2,20 @@
 
 <!-- 新功能前插在此，日期降序 -->
 
+## [2026-04-19] 服务总览 dashboard + 监控栈自监控（Grafana/OTel/Zipkin）
+
+**变更内容**: 新增 services-overview 大盘覆盖 up/主机/Go/MySQL/Redis/Kafka/监控栈/Zipkin 六大区；Prometheus 加 grafana/otel-collector/zipkin 三个 scrape job；OTel Collector 暴露 :8888 自监控；Zipkin 换 slim→full 以保留 /prometheus 端点
+
+**影响范围**:
+- `grafana/provisioning/dashboards/services-overview.json`（新）
+- `prometheus/prometheus.yml`（+3 jobs，grafana 带 basic_auth）
+- `otel-collector/config.yaml`（telemetry.metrics.address）
+- `docker-compose.yaml`（zipkin 镜像换 full）
+
+**技术决策**: grafana 显式带 basic_auth 兜底 metrics endpoint 可能 401；zipkin-slim 砍了 micrometer 所以换 full，+200MB 可接受
+
+**会话**: 260419-ops-服务总览
+
 ## [2026-04-19] 配置模板参考体系 + Grafana/Prometheus examples 目录
 
 **变更内容**: 为 `grafana/` 和 `prometheus/` 下每种配置文件建立完整注释的 `-example.yml` 模板 + 两份字段字典文档；Prometheus 启用 `--web.enable-lifecycle` 支持热 reload；Grafana dashboards 开启生产三件套

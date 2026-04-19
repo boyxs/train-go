@@ -46,3 +46,6 @@ service:
   telemetry:
     logs:
       level: info
+    metrics:
+      # 自监控指标：otelcol_receiver_accepted_spans / otelcol_exporter_sent_spans / queue_size ...
+      address: 0.0.0.0:8888
