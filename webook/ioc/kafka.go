@@ -55,23 +55,56 @@ func InitSaramaConfig(kc KafkaConfig) *sarama.Config {
 }
 
 // InitSaramaSyncProducer Kafka 连接失败不 panic，返回 nil
+// OTel：trace 注入/提取在 events.SaramaSyncProducer.ProduceEvent 和 pkg/saramax.BatchConsumer 里做
+// （因为 sarama.SendMessage 签名无 ctx，只能在高层接上 ctx 的地方做）
+//
+// 重试：应对 webook 启动早于 Kafka JVM ready 的竞态（指数退避 6 次，共约 63 秒窗口）
 func InitSaramaSyncProducer(kc KafkaConfig, cfg *sarama.Config) sarama.SyncProducer {
-	producer, err := sarama.NewSyncProducer(kc.Addrs, cfg)
-	if err != nil {
-		log.Printf("[Kafka] producer 连接失败，写操作将降级同步: %v", err)
+	producer, ok := retryConnect("Kafka producer", 6, time.Second, func() (sarama.SyncProducer, error) {
+		return sarama.NewSyncProducer(kc.Addrs, cfg)
+	})
+	if !ok {
+		log.Printf("[Kafka] producer 连接重试耗尽，写操作降级为 NoopProducer")
 		return nil
 	}
 	return producer
 }
 
-// InitSaramaClient Kafka 连接失败不 panic，返回 nil
+// InitSaramaClient Kafka 连接失败不 panic，返回 nil；同样带重试防启动竞态
 func InitSaramaClient(kc KafkaConfig, cfg *sarama.Config) sarama.Client {
-	client, err := sarama.NewClient(kc.Addrs, cfg)
-	if err != nil {
-		log.Printf("[Kafka] client 连接失败，consumer 不启动: %v", err)
+	client, ok := retryConnect("Kafka client", 6, time.Second, func() (sarama.Client, error) {
+		return sarama.NewClient(kc.Addrs, cfg)
+	})
+	if !ok {
+		log.Printf("[Kafka] client 连接重试耗尽，consumer 不启动")
 		return nil
 	}
 	return client
+}
+
+// retryConnect 通用连接重试：指数退避直到成功或次数耗尽。
+// backoff 每次翻倍，上限 30 秒。失败到达 attempts 次后返回零值 + false。
+// label 完整用作日志前缀，方便未来给 ES / Mongo 等其它中间件复用（不再写死 [Kafka]）。
+func retryConnect[T any](label string, attempts int, initialBackoff time.Duration, fn func() (T, error)) (T, bool) {
+	var zero T
+	backoff := initialBackoff
+	for i := 1; i <= attempts; i++ {
+		v, err := fn()
+		if err == nil {
+			if i > 1 {
+				log.Printf("[%s] 第 %d 次重试连接成功", label, i)
+			}
+			return v, true
+		}
+		log.Printf("[%s] 第 %d/%d 次连接失败: %v", label, i, attempts, err)
+		if i < attempts {
+			time.Sleep(backoff)
+			if backoff < 30*time.Second {
+				backoff *= 2
+			}
+		}
+	}
+	return zero, false
 }
 
 // InitInteractionConsumerConfig 互动 Consumer 的配置

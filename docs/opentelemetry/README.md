@@ -1,6 +1,32 @@
 # OpenTelemetry 学习与实战文档
 
-webook 项目 OpenTelemetry（OTel）完整学习指南。配套示例代码：`sandbox/opentelemetry/`（独立 Go 模块 `otel-demo`）。
+webook 项目 OpenTelemetry（OTel）完整学习指南。
+- 学习沙箱：`sandbox/opentelemetry/`（独立 Go 模块 `otel-demo`，stdout + Zipkin 双 exporter）
+- **生产接入**：已在 `webook/` 落地（HTTP + GORM + Redis + Kafka 全链路），详见 [05-integration.md](05-integration.md)
+
+## 当前生产接入状态（2026-04-19）
+
+```
+webook (Go)
+  ├─ otelgin Middleware             ← HTTP 入口 SERVER span
+  ├─ gorm tracing plugin            ← 每条 SQL CLIENT span
+  ├─ redisotel.InstrumentTracing    ← 每条 Redis 命令 CLIENT span
+  ├─ pkg/saramax.StartProducerSpan  ← Kafka Producer 注入 trace header
+  └─ pkg/saramax.startBatchConsumerSpan ← Kafka Consumer 提取 trace header
+        │
+        │ OTLP/gRPC (:4317)
+        ▼
+  otel-collector (contrib 0.88.0)   ← kernel 3.10 兼容版本
+        │
+        │ Zipkin v2 HTTP
+        ▼
+  Zipkin (openzipkin/zipkin-slim:3.4)
+        │
+        ▼
+  Grafana `Zipkin` 数据源 → Explore / `Webook / Tracing` dashboard
+```
+
+**典型 trace 规模**：一次 `POST /api/article/reader/page` 产生 **19 个 span**（1 HTTP SERVER + 18 CLIENT: Redis/GORM/Kafka）
 
 ## 目录
 

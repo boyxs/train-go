@@ -1,0 +1,20 @@
+apiVersion: 1
+
+# 告警路由（Notification Policies）
+# 所有告警按 alertname + severity 分组；critical 立即发，其它攒批
+policies:
+  - orgId: 1
+    receiver: webook-email          # root receiver（默认通道）
+    group_by: ['alertname', 'severity']
+    group_wait: 30s                 # 同组首次告警等待 30s 攒批
+    group_interval: 5m              # 同组后续告警间隔 5m
+    repeat_interval: 4h             # 持续 firing 状态 4h 重复提醒一次
+    routes:
+      # critical 立即发，不等攒批
+      - receiver: webook-email
+        matchers:
+          - severity = critical
+        group_wait: 0s
+        group_interval: 1m
+        repeat_interval: 1h
+        continue: false

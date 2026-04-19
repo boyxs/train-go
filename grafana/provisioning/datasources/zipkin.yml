@@ -1,0 +1,13 @@
+apiVersion: 1
+datasources:
+  - name: Zipkin
+    uid: zipkin
+    type: zipkin
+    access: proxy
+    url: http://webook-zipkin:9411
+    isDefault: false
+    editable: false
+    jsonData:
+      # 与 Prometheus 联动：trace 里点击关联指标时跳到 prometheus 数据源
+      tracesToMetrics:
+        datasourceUid: prometheus

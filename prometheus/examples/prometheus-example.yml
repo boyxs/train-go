@@ -1,0 +1,194 @@
+# ═══════════════════════════════════════════════════════════════
+# prometheus.yml  Prometheus 主配置
+#
+# 文档：https://prometheus.io/docs/prometheus/latest/configuration/configuration/
+# 生效：docker compose restart prometheus（或 curl -X POST /-/reload，需启 --web.enable-lifecycle）
+# ═══════════════════════════════════════════════════════════════
+
+# ─── global：全局默认值（单个 scrape 可覆盖）───────────────────────
+global:
+  scrape_interval: 15s              # 抓取周期；业务指标常 15s，基础设施可放宽到 30s/1m
+  scrape_timeout: 10s               # 单次抓取超时（必须 ≤ scrape_interval）
+  evaluation_interval: 15s          # 告警规则 / recording rules 评估周期
+  # 所有指标附加的 label（用于多集群 / 多环境区分）
+  external_labels:
+    cluster: webook-dev
+    replica: prom-0
+  # 查询日志（慢查询定位）
+  # query_log_file: /var/log/prometheus/queries.log
+
+# ─── alerting：Alertmanager 对接（Grafana 用 Grafana Alerting 则可省）─
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets: ['alertmanager:9093']
+#       scheme: http
+#       timeout: 10s
+#       api_version: v2
+
+# ─── rule_files：告警规则 / recording rules 文件（glob 支持）─────
+# rule_files:
+#   - "rules/*.rules.yml"           # 参考 prometheus/examples/alerts-example.yml
+
+# ─── scrape_configs：抓取目标（核心）───────────────────────────
+scrape_configs:
+
+  # ─── Prometheus 自监控 ─────────────────────────────────────
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # ─── Go 应用（最常见）─────────────────────────────────────
+  - job_name: 'webook-app'
+    metrics_path: '/metrics'         # 默认就是 /metrics，显式写便于一眼识别
+    scrape_interval: 15s             # 覆盖 global
+    scrape_timeout: 10s
+    honor_labels: false              # true=应用自带 label 优先；false=Prom 加的 label 优先
+    honor_timestamps: true
+    scheme: http                     # http / https
+    static_configs:
+      - targets:
+          - 'webook:8089'            # 容器名:端口（docker 网络内）
+        labels:
+          env: dev
+          service: webook
+          tier: backend
+
+    # 抓取前重写 labels（见下方"Relabel 详解"）
+    relabel_configs: []
+    # 抓取后过滤/改写指标（避免高基数）
+    metric_relabel_configs:
+      # 示例：丢弃某类指标减 Prom 压力
+      # - source_labels: [__name__]
+      #   regex: 'go_gc_duration_seconds.*'
+      #   action: drop
+
+    # HTTP 请求附加（需要鉴权时）
+    # basic_auth:
+    #   username: metrics
+    #   password_file: /etc/prometheus/metrics_pw
+    # authorization:
+    #   type: Bearer
+    #   credentials_file: /etc/prometheus/token
+    # tls_config:
+    #   insecure_skip_verify: true
+
+    # 连接 Proxy
+    # proxy_url: http://proxy.internal:3128
+
+  # ─── 多实例（负载均衡的应用）──────────────────────────────
+  - job_name: 'webook-cluster'
+    static_configs:
+      - targets:
+          - 'webook-1:8089'
+          - 'webook-2:8089'
+          - 'webook-3:8089'
+        labels: { env: prod, service: webook }
+
+  # ─── MySQL / Redis / Kafka Exporter（已有 exporter 暴露 /metrics）──
+  - job_name: 'mysql'
+    static_configs:
+      - targets: ['mysqld-exporter:9104']
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+  - job_name: 'kafka'
+    static_configs:
+      - targets: ['kafka-exporter:9308']
+  - job_name: 'node'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    # 给不同主机加 hostname label
+    # relabel_configs:
+    #   - source_labels: [__address__]
+    #     regex: '([^:]+).*'
+    #     target_label: host
+    #     replacement: '$1'
+
+  # ─── 文件 SD（运维加机器时改 YAML 即可，不用重启 Prom）────
+  # - job_name: 'file-sd-example'
+  #   file_sd_configs:
+  #     - files: ['targets/*.json']    # 相对于 prometheus.yml 的目录
+  #       refresh_interval: 30s
+
+  # ─── Consul SD（动态服务发现）────────────────────────────
+  # - job_name: 'consul-services'
+  #   consul_sd_configs:
+  #     - server: 'consul:8500'
+  #       services: ['webook', 'user-service']
+
+  # ─── Kubernetes SD ────────────────────────────────────
+  # - job_name: 'kubernetes-pods'
+  #   kubernetes_sd_configs:
+  #     - role: pod
+  #   relabel_configs:
+  #     - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+  #       action: keep
+  #       regex: true
+  #     - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+  #       action: replace
+  #       target_label: __metrics_path__
+  #       regex: (.+)
+
+  # ─── 通过 blackbox_exporter 黑盒探测 ─────────────────────
+  # - job_name: 'blackbox-http'
+  #   metrics_path: /probe
+  #   params:
+  #     module: [http_2xx]
+  #   static_configs:
+  #     - targets:
+  #         - https://webook.example.com
+  #         - https://api.webook.example.com/health
+  #   relabel_configs:
+  #     - source_labels: [__address__]
+  #       target_label: __param_target
+  #     - source_labels: [__param_target]
+  #       target_label: instance
+  #     - target_label: __address__
+  #       replacement: blackbox-exporter:9115
+
+# ─── remote_write：把指标推到远程存储（VictoriaMetrics / Thanos / Mimir）──
+# remote_write:
+#   - url: http://vm-insert:8428/api/v1/write
+#     queue_config:
+#       max_samples_per_send: 1000
+#       capacity: 10000
+#     write_relabel_configs:
+#       - source_labels: [__name__]
+#         regex: 'go_.*'               # 只推 go_ 开头的指标
+#         action: keep
+
+# ─── remote_read：从远程存储读历史指标（PromQL 可跨源）───
+# remote_read:
+#   - url: http://vm-select:8428/api/v1/read
+
+# ═════════════════════════════════════════════════════════════════
+# Relabel 详解
+#
+# relabel_configs 在抓取**之前**对 target 的 label 做改写；
+# metric_relabel_configs 在抓取**之后**对每个 sample 的 label 做改写。
+#
+# 语法：
+#   - source_labels: [label1, label2]   # 从哪些 label 取值（用分号连接成字符串）
+#     separator: ';'                    # 连接符
+#     regex: '(.+);(.+)'                # 匹配这个正则（整串）
+#     target_label: new_label           # 写到哪个 label
+#     replacement: '$1-$2'              # 写入什么值（可用 $1/$2 反引用）
+#     action: replace|keep|drop|labelmap|labelkeep|labeldrop|hashmod|...
+#
+# 常见 action：
+#   replace    改写 label（最常用）
+#   keep       只保留匹配 regex 的 target
+#   drop       丢弃匹配 regex 的 target
+#   labelmap   按 regex 把匹配的 label 名批量改写
+#   labelkeep  只保留匹配 regex 的 label
+#   labeldrop  丢弃匹配 regex 的 label
+#   hashmod    按 hash 分片（用于多 Prom 横向扩展）
+#
+# 常见元 label（Prom 抓前添加）：
+#   __address__         target 地址
+#   __scheme__          http / https
+#   __metrics_path__    /metrics 路径
+#   __param_<name>      URL 查询参数
+#   __meta_<sd>_*       服务发现添加的元 label
+# ═════════════════════════════════════════════════════════════════

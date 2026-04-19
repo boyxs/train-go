@@ -1,0 +1,48 @@
+# ═══════════════════════════════════════════════════════════════
+# dashboards.yml  Dashboard Provider 配置
+#
+# 告诉 Grafana 去哪里扫 dashboard 的 JSON 文件 + 怎么管理它们。
+# 这不是 dashboard 本身，是加载 dashboard 的"索引器"。
+# ═══════════════════════════════════════════════════════════════
+apiVersion: 1
+
+providers:
+  - name: 'webook'                         # provider 显示名
+    orgId: 1
+    folder: 'Webook'                       # Grafana UI 里的 folder（不存在会自动建）
+    folderUid: webook                      # ⭐ 固定 folder uid，便于权限引用
+    type: file                             # 从文件加载（目前只支持这种）
+
+    # ─── 生产加固三件套（强烈推荐）────────────────────────
+    # 三件套的目的：UI 只读，所有改动必须改 JSON + Git，防止 UI 改完被重启覆盖
+    disableDeletion: false                 # 生产推荐 true：UI 删了重启会回来
+    editable: true                         # 生产推荐 false：UI 不能改
+    allowUiUpdates: true                   # 生产推荐 false：UI 改了不写回文件（重启丢失）
+
+    updateIntervalSeconds: 30              # 多久扫一次目录（检测新增/修改）
+
+    options:
+      path: /etc/grafana/provisioning/dashboards     # 容器内路径
+      foldersFromFilesStructure: true      # 子目录自动变 Grafana folder，如：
+                                           #   dashboards/infra/linux-host.json
+                                           #   → folder=infra, dashboard=linux-host
+
+# ─── 多 provider 示例（按业务线分开管理）────────────────────
+#   - name: 'infra'
+#     folder: 'Infra'
+#     folderUid: infra
+#     type: file
+#     options:
+#       path: /etc/grafana/provisioning/dashboards/infra
+
+# ═════════════════════════════════════════════════════════════════
+# 生产三件套打开后的工作流：
+#
+#   1. 本地编辑 JSON
+#   2. git commit + PR
+#   3. merge → CI 推到服务器
+#   4. updateIntervalSeconds 内自动加载（无需重启）
+#   5. UI 上 dashboard 显示锁图标（只读）
+#
+# 紧急调试时临时改 editable=true，改完记得 commit + 切回 false
+# ═════════════════════════════════════════════════════════════════

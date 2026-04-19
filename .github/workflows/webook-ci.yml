@@ -2,16 +2,23 @@ name: Webook Backend CI
 
 on:
   push:
+    # 不用 paths 过滤：否则 tag push 指向 diff 不含 webook/** 的 commit 时会静默不触发
+    # 由 pull_request 的 paths 过滤保底，减少无关 PR 跑 CI 即可
     branches: [master, feature]
-    paths:
-      - 'webook/**'
-      - '.github/workflows/webook-ci.yml'
+    tags: ['webook-v*.*.*']
   pull_request:
     branches: [master]
     paths:
       - 'webook/**'
+      - '.github/workflows/webook-ci.yml'
+  workflow_dispatch:           # 允许手动触发调试
+
+permissions:
+  contents: read               # 默认最小权限，build-push job 自己 override
 
 env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/webook
   MODULE: github.com/webook
 
 defaults:
@@ -21,8 +28,7 @@ defaults:
 jobs:
   lint-test:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read        # 只需读代码，最小权限
+    # 继承顶层 permissions: contents: read
     steps:
       - uses: actions/checkout@v5
 
@@ -51,3 +57,50 @@ jobs:
 
       - name: 单元测试
         run: go test -race $(go list ./... | grep -v /integration)
+
+  build-push:
+    needs: lint-test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: 设置 Go 环境
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.25.6'
+          cache: true
+          cache-dependency-path: webook/go.sum
+
+      - name: 编译 Linux 二进制
+        # 简单 Dockerfile 期望 ./webook 二进制已就位；CI 在 docker build 前先编译
+        run: CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -tags=k8s -o webook .
+
+      - name: 提取镜像元数据
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=master-${{ github.sha }},enable=${{ github.ref == 'refs/heads/master' }}
+            type=raw,value=feature-${{ github.sha }},enable=${{ github.ref == 'refs/heads/feature' }}
+            type=match,pattern=webook-v(.*),group=1
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & Push
+        uses: docker/build-push-action@v5
+        with:
+          context: webook
+          file: webook/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha,scope=webook-backend
+          cache-to: type=gha,mode=max,scope=webook-backend

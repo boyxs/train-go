@@ -1,0 +1,48 @@
+# OpenTelemetry Collector 配置（contrib 0.88.0，兼容 CentOS 7 kernel 3.10）
+# 流向：webook (OTLP/gRPC) → 本 Collector → Zipkin
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  # 限制内存避免 OOM（docker-compose mem_limit 256MiB，给 runtime 留 ~80MiB）
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 150
+    spike_limit_mib: 30
+  # 攒批降低后端压力
+  batch:
+    timeout: 5s
+    send_batch_size: 512
+    send_batch_max_size: 1024
+
+exporters:
+  zipkin:
+    # 用 container_name 而非 service name，DNS 解析更明确
+    endpoint: http://webook-zipkin:9411/api/v2/spans
+    tls:
+      insecure: true
+  # 调试用：把 span 同时打到 collector 自己日志（verbosity=basic 只打计数，detailed 打每条 span 详情）
+  debug:
+    verbosity: basic
+
+extensions:
+  # /healthz 端点
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+service:
+  extensions: [health_check]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [zipkin, debug]
+  telemetry:
+    logs:
+      level: info

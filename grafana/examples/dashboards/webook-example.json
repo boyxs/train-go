@@ -1,0 +1,243 @@
+{
+  "__comment_header": "复制本文件去掉 .example 后缀即可加载。字段保持 $__comment 开头的是注释（Grafana 会忽略）。",
+
+  "title": "Webook / Example",
+  "uid": "webook-example",
+  "tags": ["webook", "example"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": false,
+  "refresh": "30s",
+  "time": {"from": "now-1h", "to": "now"},
+  "timepicker": {
+    "refresh_intervals": ["5s", "10s", "30s", "1m", "5m", "15m", "1h"]
+  },
+
+  "__comment_templating": "变量：用 $name 引用，用户可在页面顶部切换",
+  "templating": {
+    "list": [
+      {
+        "__comment": "从 Prometheus label_values 获取实例下拉",
+        "name": "instance",
+        "label": "实例",
+        "type": "query",
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "query": "label_values(up{job=\"webook-app\"}, instance)",
+        "refresh": 2,
+        "includeAll": true,
+        "multi": true,
+        "allValue": ".*",
+        "sort": 1
+      },
+      {
+        "__comment": "自定义静态列表",
+        "name": "env",
+        "label": "环境",
+        "type": "custom",
+        "query": "dev,staging,prod",
+        "includeAll": true,
+        "current": {"value": "prod"}
+      }
+    ]
+  },
+
+  "__comment_annotations": "事件标注（如：部署时间、故障点）可从数据源查询或手动添加",
+  "annotations": {"list": []},
+
+  "__comment_panels": "每个 panel 一个对象，gridPos 用 24 列 grid",
+  "panels": [
+
+    {
+      "__type": "Text - Markdown 说明",
+      "type": "text",
+      "title": "使用说明",
+      "gridPos": {"x": 0, "y": 0, "w": 24, "h": 3},
+      "options": {
+        "mode": "markdown",
+        "content": "## Webook 示例大盘\n- 顶部变量 `instance` / `env` 切换\n- 所有 panel 数据源都是 Prometheus\n- 点击 trace 跳 Zipkin（exemplar）"
+      }
+    },
+
+    {
+      "__type": "Stat - 单一大数字 + sparkline",
+      "type": "stat",
+      "title": "当前 QPS",
+      "gridPos": {"x": 0, "y": 3, "w": 6, "h": 6},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "expr": "sum(rate(webook_http_requests_total[5m]))",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "decimals": 2
+        }
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "value_and_name"
+      }
+    },
+
+    {
+      "__type": "Stat - 错误率（带阈值色块）",
+      "type": "stat",
+      "title": "5xx 错误率",
+      "gridPos": {"x": 6, "y": 3, "w": 6, "h": 6},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "expr": "sum(rate(webook_http_requests_total{status=~\"5..\"}[5m])) / sum(rate(webook_http_requests_total[5m]))",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 3,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 0.005},
+              {"color": "red", "value": 0.01}
+            ]
+          }
+        }
+      }
+    },
+
+    {
+      "__type": "Gauge - 仪表盘",
+      "type": "gauge",
+      "title": "CPU 使用率",
+      "gridPos": {"x": 12, "y": 3, "w": 6, "h": 6},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "expr": "rate(process_cpu_seconds_total{job=\"webook-app\"}[5m])",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 0.6},
+              {"color": "red", "value": 0.85}
+            ]
+          }
+        }
+      }
+    },
+
+    {
+      "__type": "Stat - Goroutine 数",
+      "type": "stat",
+      "title": "Goroutine 数",
+      "gridPos": {"x": 18, "y": 3, "w": 6, "h": 6},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"expr": "go_goroutines{job=\"webook-app\"}", "refId": "A", "instant": true}
+      ],
+      "fieldConfig": {"defaults": {"unit": "short"}}
+    },
+
+    {
+      "__type": "Time Series - 时间序列折线",
+      "type": "timeseries",
+      "title": "QPS 按路径分布",
+      "gridPos": {"x": 0, "y": 9, "w": 12, "h": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "expr": "sum by (pattern) (rate(webook_http_requests_total{instance=~\"$instance\"}[$__rate_interval]))",
+          "refId": "A",
+          "legendFormat": "{{pattern}}"
+        }
+      ],
+      "fieldConfig": {"defaults": {"unit": "reqps"}},
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": ["last", "max", "mean"]
+        },
+        "tooltip": {"mode": "multi"}
+      }
+    },
+
+    {
+      "__type": "Time Series - 分位数",
+      "type": "timeseries",
+      "title": "响应时间 P50/P95/P99",
+      "gridPos": {"x": 12, "y": 9, "w": 12, "h": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(webook_http_requests_duration_seconds_bucket[$__rate_interval])))",
+          "refId": "A",
+          "legendFormat": "p50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(webook_http_requests_duration_seconds_bucket[$__rate_interval])))",
+          "refId": "B",
+          "legendFormat": "p95"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(webook_http_requests_duration_seconds_bucket[$__rate_interval])))",
+          "refId": "C",
+          "legendFormat": "p99"
+        }
+      ],
+      "fieldConfig": {"defaults": {"unit": "s"}}
+    },
+
+    {
+      "__type": "Table - 实例详情表",
+      "type": "table",
+      "title": "实例状态",
+      "gridPos": {"x": 0, "y": 17, "w": 24, "h": 6},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "expr": "up{job=\"webook-app\"}",
+          "refId": "A",
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {"defaults": {"align": "auto"}}
+    }
+  ],
+
+  "__comment_links": "dashboard 顶部快捷链接",
+  "links": [
+    {
+      "title": "Zipkin Explore",
+      "url": "/explore?left=%5B%22now-15m%22,%22now%22,%22Zipkin%22,%7B%22queryType%22:%22Search%22%7D%5D",
+      "type": "link",
+      "icon": "external link",
+      "targetBlank": true
+    },
+    {
+      "title": "Webook Overview",
+      "url": "/d/webook-overview",
+      "type": "link",
+      "icon": "dashboard"
+    }
+  ]
+}

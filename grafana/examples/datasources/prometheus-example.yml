@@ -1,0 +1,46 @@
+# ═══════════════════════════════════════════════════════════════
+# Prometheus 数据源
+#
+# 生效：make -f mk/grafana.mk reload-datasources（或 restart grafana）
+# ═══════════════════════════════════════════════════════════════
+apiVersion: 1
+
+datasources:
+  - name: Prometheus                   # UI 里看到的显示名
+    uid: prometheus                    # ⭐ 固定 uid；dashboard/alert 用 datasource.uid 引用
+    type: prometheus
+    access: proxy                      # proxy（推荐）/ direct（已 deprecated）
+    url: http://webook-prometheus:9090 # 容器名；生产用域名或 K8s service
+    isDefault: true                    # Explore 默认选这个
+    editable: false                    # 生产推荐 false，改动走 Git
+    orgId: 1
+    version: 1                         # provisioning 版本号（改了递增）
+
+    jsonData:
+      # ── 查询行为 ────────────────────────────────────────
+      httpMethod: POST                 # 长查询用 POST 避免 URL 过长
+      timeInterval: "15s"              # 默认采集间隔（对齐 prometheus.yml 的 scrape_interval）
+      queryTimeout: "60s"              # 单次查询超时
+      cacheLevel: Medium               # None / Low / Medium / High
+
+      # ── 来源标识 ────────────────────────────────────────
+      prometheusType: Prometheus       # Prometheus / Mimir / Cortex / Thanos
+      prometheusVersion: 3.4.1
+
+      # ── 告警联动（可选）─────────────────────────────────
+      manageAlerts: false              # 是否让 Grafana 管 Prometheus 原生告警规则
+
+      # ── Exemplar（指标→Trace 联动，点 Histogram 峰值直达 Zipkin）──
+      # 需要应用侧在 Histogram.ObserveWithExemplar 时附 trace_id
+      exemplarTraceIdDestinations:
+        - name: trace_id               # 指标 exemplar 标签名
+          datasourceUid: zipkin        # 跳转到哪个 trace 数据源
+          # url: "$${__value.raw}"     # ⚠️ $$ 转义，YAML provisioning 会把 ${} 吞为 env var
+          # urlDisplayLabel: "Trace"   # 按钮文字
+
+      # ── 自定义 HTTP headers（需要鉴权时用）───────────────
+      # httpHeaderName1: "Authorization"
+      # httpMethod: GET
+
+    # secureJsonData:                  # 加密字段，存 grafana.db 不回显
+    #   httpHeaderValue1: "Bearer ${PROMETHEUS_TOKEN}"

@@ -2,6 +2,7 @@ apiVersion: 1
 
 datasources:
   - name: Prometheus
+    uid: prometheus     # 固定 uid，环境间一致；dashboard 与 Zipkin 关联引用用这个
     type: prometheus
     access: proxy
     url: http://webook-prometheus:9090

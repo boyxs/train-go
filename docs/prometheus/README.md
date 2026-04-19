@@ -13,6 +13,10 @@ webook 项目 Prometheus 监控完整指南。
 | [05-alerting](05-alerting.md) | 告警规则模板（HTTP/运行时/MySQL/Redis/Kafka） |
 | [06-best-practices](06-best-practices.md) | 命名规范、标签基数、PromQL 陷阱、排查清单、RED/USE 方法 |
 
+### 📂 即开即用的 example 文件
+
+**[`prometheus/examples/`](../../prometheus/examples/README.md)** — `prometheus.yml` 主配置全字段参考（scrape_configs / relabel / remote_write / SD）+ alert/recording rules 模板。
+
 ## 快速开始
 
 ```bash

@@ -164,34 +164,23 @@ func (b *PrometheusBuilder) Register(db *gorm.DB) error {
 	}
 
 	cb := db.Callback()
-	type pair struct {
-		typ      string
-		register func(name string, fn func(*gorm.DB)) error
+	hooks := []struct {
+		typ    string
+		before func(name string, fn func(*gorm.DB)) error
+		after  func(name string, fn func(*gorm.DB)) error
+	}{
+		{"create", cb.Create().Before("*").Register, cb.Create().After("*").Register},
+		{"query", cb.Query().Before("*").Register, cb.Query().After("*").Register},
+		{"update", cb.Update().Before("*").Register, cb.Update().After("*").Register},
+		{"delete", cb.Delete().Before("*").Register, cb.Delete().After("*").Register},
+		{"raw", cb.Raw().Before("*").Register, cb.Raw().After("*").Register},
+		{"row", cb.Row().Before("*").Register, cb.Row().After("*").Register},
 	}
-	pairs := []pair{
-		{"create", cb.Create().Before("*").Register},
-		{"query", cb.Query().Before("*").Register},
-		{"update", cb.Update().Before("*").Register},
-		{"delete", cb.Delete().Before("*").Register},
-		{"raw", cb.Raw().Before("*").Register},
-		{"row", cb.Row().Before("*").Register},
-	}
-	for _, p := range pairs {
-		if err := p.register("prometheus:"+p.typ+":before", before); err != nil {
+	for _, h := range hooks {
+		if err := h.before("prometheus:"+h.typ+":before", before); err != nil {
 			return err
 		}
-	}
-
-	afters := []pair{
-		{"create", cb.Create().After("*").Register},
-		{"query", cb.Query().After("*").Register},
-		{"update", cb.Update().After("*").Register},
-		{"delete", cb.Delete().After("*").Register},
-		{"raw", cb.Raw().After("*").Register},
-		{"row", cb.Row().After("*").Register},
-	}
-	for _, p := range afters {
-		if err := p.register("prometheus:"+p.typ+":after", after(p.typ)); err != nil {
+		if err := h.after("prometheus:"+h.typ+":after", after(h.typ)); err != nil {
 			return err
 		}
 	}

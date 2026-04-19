@@ -5,6 +5,8 @@ package setup
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
+	"go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/trace/noop"
 
 	"github.com/webook/internal/repository"
 	"github.com/webook/internal/repository/cache"
@@ -15,6 +17,11 @@ import (
 	"github.com/webook/ioc"
 	"github.com/webook/pkg/streamer"
 )
+
+// 集成测试不连真实 OTel Collector，注入 Noop TracerProvider 满足依赖
+func provideNoopTracerProvider() trace.TracerProvider {
+	return noop.NewTracerProvider()
+}
 
 // 这个需要登录权限
 func InitWebServer() *gin.Engine {
@@ -51,6 +58,7 @@ func InitWebServer() *gin.Engine {
 
 		ioc.InitMiddlewares,
 		ioc.InitWebServer,
+		provideNoopTracerProvider,
 	)
 	return gin.Default()
 }

@@ -1,0 +1,118 @@
+# ═══════════════════════════════════════════════════════════════
+# policies.yml  告警通知路由（按 label 路由到不同通道，控制 group/repeat）
+#
+# 用法：复制本文件为 policies.yml
+# 生效：make -f mk/grafana.mk reload
+# ═══════════════════════════════════════════════════════════════
+apiVersion: 1
+
+policies:
+  - orgId: 1
+    receiver: webook-email             # ⭐ 根 policy 必填：默认通道（无子路由匹配时用）
+
+    # ── 分组（group_by 一致的告警合并成一封通知，避免刷屏）─────────
+    # 建议至少含 alertname，可加 severity / team / instance
+    group_by: ['alertname', 'severity']
+
+    group_wait: 30s                    # 新组首次告警等多久（攒批首发）
+    group_interval: 5m                 # 同组新告警合批间隔
+    repeat_interval: 4h                # 持续 firing 重复提醒间隔
+
+    # ── 静默时段引用（见下方 muteTimes 定义）──────────────────────
+    # mute_time_intervals: ['weekend-silent']
+
+    # ── 子路由（按 label 匹配路由到不同 receiver）─────────────────
+    routes:
+
+      # critical 立即发，短间隔重复
+      - receiver: webook-email
+        matchers:
+          - severity = critical
+        group_wait: 0s                 # 0 秒 = 立刻发
+        group_interval: 1m
+        repeat_interval: 1h
+        continue: false                # 匹配到就停
+
+      # high 快速通知但稍慢
+      - receiver: webook-email
+        matchers:
+          - severity = high
+        group_wait: 30s
+        group_interval: 5m
+        repeat_interval: 4h
+
+      # ── 下列为示例，按需取消注释 ─────────────────────────────────
+
+      # data 团队告警走自己的通道
+      # - receiver: data-team-email
+      #   matchers:
+      #     - team = data
+      #   continue: false
+
+      # 正则匹配多环境：只发 prod
+      # - receiver: webook-email
+      #   matchers:
+      #     - env =~ "prod.*"
+
+      # label 不等
+      # - receiver: low-priority
+      #   matchers:
+      #     - severity != critical
+
+      # 白天不发 low 告警
+      # - receiver: webook-email
+      #   matchers:
+      #     - severity = low
+      #   mute_time_intervals: ['work-hours']
+
+      # continue=true：匹配后继续往下（同时发多个通道）
+      # - receiver: webook-webhook
+      #   matchers:
+      #     - severity = critical
+      #   continue: true                # 继续匹配后面的 route
+
+# ── 静默时段（引用在 policy 的 mute_time_intervals）──────────────
+# muteTimes:
+#   - name: work-hours                 # 工作时间不发特定告警
+#     time_intervals:
+#       - weekdays: ["monday:friday"]
+#         times:
+#           - start_time: "09:00"
+#             end_time: "18:00"
+#         location: "Asia/Shanghai"
+#
+#   - name: weekend-silent             # 周末全天静默
+#     time_intervals:
+#       - weekdays: ["saturday", "sunday"]
+#         location: "Asia/Shanghai"
+#
+#   - name: maintenance-window         # 维护窗口（指定日期）
+#     time_intervals:
+#       - months: ["4"]
+#         days_of_month: ["1:3"]       # 4 月 1-3 日
+#         location: "Asia/Shanghai"
+
+# ═════════════════════════════════════════════════════════════════
+# group_by 含义示例：
+#   alert1 = {alertname: UP, severity: critical, instance: A}
+#   alert2 = {alertname: UP, severity: critical, instance: B}
+#   alert3 = {alertname: UP, severity: high,     instance: A}
+#
+#   group_by: ['alertname', 'severity']
+#     → 分 2 组：{UP, critical}（含 1+2）+ {UP, high}（含 3）
+#
+#   group_by: []
+#     → 每个 alert 一组（最吵）
+#
+# matcher 运算符：
+#   =   等于
+#   !=  不等
+#   =~  正则匹配
+#   !~  正则不匹配
+#
+# 生产推荐 timing：
+#   critical : group_wait=0s  interval=1m  repeat=1h
+#   high     : 30s            5m           4h
+#   medium   : 1m             10m          12h
+#   low      : 5m             30m          24h
+# ═════════════════════════════════════════════════════════════════

@@ -13,9 +13,8 @@ import (
 	context "context"
 	reflect "reflect"
 
-	gomock "go.uber.org/mock/gomock"
-
 	ai "github.com/webook/internal/service/ai"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockLLMClient is a mock of LLMClient interface.

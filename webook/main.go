@@ -18,15 +18,19 @@ func main() {
 	// initViper()
 	// initViperV1()
 	initViperV2()
-	app := InitWebServer()
+	app, cleanup, err := InitWebServer()
+	if err != nil {
+		panic(err)
+	}
+	// wire 收集的 cleanup（含 OTel TracerProvider.Shutdown），进程退出前 flush 队列里的 span
+	defer cleanup()
 	// 后台启动 Kafka 消费者
 	go func() {
 		if err := app.Consumer.Start(context.Background()); err != nil {
 			log.Printf("[Kafka] consumer exited: %v", err)
 		}
 	}()
-	err := app.Server.Run(":8089")
-	if err != nil {
+	if err := app.Server.Run(":8089"); err != nil {
 		panic(err)
 	}
 }

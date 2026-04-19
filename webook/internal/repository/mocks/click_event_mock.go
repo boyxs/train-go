@@ -13,9 +13,8 @@ import (
 	context "context"
 	reflect "reflect"
 
-	gomock "go.uber.org/mock/gomock"
-
 	domain "github.com/webook/internal/domain"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockClickEventRepository is a mock of ClickEventRepository interface.

@@ -1,6 +1,54 @@
 # 接入 webook
 
-学习阶段在独立模块 `sandbox/opentelemetry/` 验证，下一步把 OTel 接入 `webook/`。本章给出**集成蓝图**，具体落地代码等正式扩展时再写。
+> ✅ **已落地**（2026-04-19）。本章记录实际接入方案 + 踩过的坑 + 生产验证结果。
+> 学习阶段示例代码仍在 `sandbox/opentelemetry/`，可作为对照。
+
+## 当前接入状态
+
+| 组件 | 状态 | 说明 |
+|------|------|------|
+| **HTTP 入口**（otelgin） | ✅ | `ioc/web.go` 中间件链紧随 Prometheus 之后 |
+| **GORM** | ✅ | `db.Use(tracing.NewPlugin(...))`，每条 SQL 自动生成 span |
+| **Redis** | ✅ | `redisotel.InstrumentTracing(client)`，每条命令自动 span |
+| **Kafka Producer** | ✅ | 自写 `pkg/saramax` 包装，注入 trace context 到 Kafka headers |
+| **Kafka Consumer** | ✅ | 从 headers 提取，Producer 和 Consumer 串成同一 trace |
+| **Service 层手动埋点** | ⏭️ 待做 | 关键业务动作（Publish / Chat.Send）加 attribute + RecordError |
+| **Exporter 选型** | OTLP/gRPC → otel-collector → Zipkin | CentOS 7 kernel 3.10 要用 `0.88.0` 老版 Collector |
+
+## ⚠️ 关键踩坑（必读）
+
+### 1. `gin.Engine.ContextWithFallback = true` 必开
+
+Gin 1.11 `*gin.Context.Value()` 默认**不** fallback 到 `c.Request.Context()`。otelgin 把 span 写进 `c.Request.Context()`，handler 把 `*gin.Context` 作为 context.Context 传下去时，gorm/redisotel 拿到 **noop span** → DB/Redis span 全部成为独立 trace（不挂 HTTP span 下）。
+
+修复：
+```go
+server := gin.Default()
+server.ContextWithFallback = true  // ← 必须开
+```
+
+验证：`webook/ioc/web_ctx_propagation_test.go` 单元测试复现了 true/false 两种情况。
+
+### 2. Kafka 启动竞态
+
+webook 启动比 Kafka JVM 快，`InitSaramaSyncProducer` 一次性连接失败 → 降级 NoopProducer。运行期不会重连。
+
+双保险：
+- **代码层**：`retryConnect` 指数退避重试 6 次（`webook/ioc/kafka.go`）
+- **编排层**：`docker-compose.yaml` 加 Kafka healthcheck + webook `depends_on.kafka.condition: service_healthy`
+
+### 3. Kafka OTel：IBM/sarama 无官方适配
+
+`go.opentelemetry.io/contrib/instrumentation/github.com/IBM/sarama/otelsarama` 不存在。自写 `webook/pkg/saramax/otel.go`：
+- `ProducerHeadersCarrier` / `ConsumerHeadersCarrier` 实现 `propagation.TextMapCarrier`
+- `StartProducerSpan` / `StartConsumerSpan` / `startBatchConsumerSpan`
+- `BatchHandler` / `Handler` 签名加 ctx 参数让链路贯通
+
+### 4. OTel Collector 版本与 Linux kernel 兼容
+
+生产环境 CentOS 7 kernel 3.10 → Collector 0.116.0（2025-01 构建）报 `exec /otelcol-contrib: no such file or directory`（glibc 太老）→ 降到 **0.88.0**（2023-11）兼容。
+
+## 实际落地代码
 
 ## 一、整体接入策略
 

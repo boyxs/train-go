@@ -1,0 +1,218 @@
+# ═══════════════════════════════════════════════════════════════
+# rules.yml  告警规则
+#
+# 用法：复制本文件为 rules.yml
+# 生效：make -f mk/grafana.mk reload
+#
+# ⚠️ 评估链路必须：Query → Reduce（压成单值）→ Threshold
+#    Threshold 直接接时间序列会报：
+#    "invalid format of evaluation results ... only reduced data can be alerted on"
+# ═══════════════════════════════════════════════════════════════
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: webook-core                  # 组名（同组一起评估，共享 interval）
+    folder: Webook                     # ⭐ 必须是已有 folder（Grafana 启动时自动建）
+    interval: 1m                       # 评估周期
+    rules:
+
+      # ══════════════════════════════════════════════════════════
+      # 规则 1：简单阈值（Query → Reduce → Threshold）
+      # 适合：单指标阈值判定（up / cpu / memory / queue_length）
+      # ══════════════════════════════════════════════════════════
+      - uid: example-simple-threshold          # ⭐ 固定 uid，跨环境稳定
+        title: "示例：服务不可达"
+        condition: C                           # 哪个 refId 是触发条件（Threshold 节点）
+        for: 1m                                # 持续多久才 firing（避免抖动）
+        noDataState: NoData                    # 查不到数据时的状态：NoData / OK / Alerting
+        execErrState: Error                    # 评估出错时的状态：Error / OK / Alerting
+        labels:                                # 供 policies.yml 路由匹配
+          severity: critical                   # critical / high / medium / low
+          team: backend
+          env: prod
+        annotations:
+          summary: "实例 {{ $labels.instance }} 不可达"
+          description: "更详细的多行描述"
+          runbook_url: "https://wiki/runbook/xxx"
+        data:
+          # ── 节点 A：从 Prometheus 查 ───────────────────────
+          - refId: A
+            relativeTimeRange: { from: 60, to: 0 }   # 查过去 60 秒，to=0 表示 now
+            datasourceUid: prometheus              # ⭐ 匹配 datasources 里的 uid
+            model:
+              expr: 'up{job="webook-app"}'        # PromQL
+              refId: A
+              instant: true                        # true=单时间点查询；false=范围查询
+
+          # ── 节点 B：Reduce 压成单值（必须）──────────────────
+          - refId: B
+            datasourceUid: __expr__                # 固定：内置表达式引擎
+            model:
+              type: reduce
+              expression: A                        # 引用 refId=A 的结果
+              reducer: last                        # last/mean/min/max/sum/count/median
+              refId: B
+
+          # ── 节点 C：Threshold 判定 ─────────────────────────
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B                        # 引用 refId=B 的单值
+              refId: C
+              conditions:
+                - evaluator:
+                    type: lt                       # gt/lt/within_range/outside_range
+                    params: [1]                    # gt/lt 传 1 个；range 类传 2 个 [min,max]
+                # 可选：恢复阈值（防抖）
+                # unloadEvaluator:
+                #   type: gt
+                #   params: [0.95]
+
+
+      # ══════════════════════════════════════════════════════════
+      # 规则 2：比率型告警（两查询 → 两 Reduce → Math → Threshold）
+      # 适合：错误率 / 命中率 / 饱和度
+      # ══════════════════════════════════════════════════════════
+      - uid: example-ratio-alert
+        title: "示例：5xx 错误率 > 1%"
+        condition: F                             # 最后的 Threshold 节点
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: high
+          team: backend
+        annotations:
+          summary: "5xx 错误率 {{ $values.E.Value | humanizePercentage }}"
+          runbook_url: "https://wiki/runbook/5xx"
+        data:
+          # 分子：5xx rate（时间序列）
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              expr: 'sum(rate(webook_http_requests_total{status=~"5.."}[5m]))'
+              refId: A
+          # 分母：总 rate（时间序列）
+          - refId: B
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              expr: 'sum(rate(webook_http_requests_total[5m]))'
+              refId: B
+          # 分子 Reduce
+          - refId: C
+            datasourceUid: __expr__
+            model: { type: reduce, expression: A, reducer: last, refId: C }
+          # 分母 Reduce
+          - refId: D
+            datasourceUid: __expr__
+            model: { type: reduce, expression: B, reducer: last, refId: D }
+          # Math 求比例（$refId 引用单值）
+          - refId: E
+            datasourceUid: __expr__
+            model:
+              type: math
+              expression: '$C / $D'
+              refId: E
+          # Threshold
+          - refId: F
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: E
+              refId: F
+              conditions:
+                - evaluator: { type: gt, params: [0.01] }
+
+
+      # ══════════════════════════════════════════════════════════
+      # 规则 3：分位数延迟告警
+      # 适合：P99 延迟 / 读写耗时
+      # ══════════════════════════════════════════════════════════
+      - uid: example-p99-latency
+        title: "示例：HTTP P99 > 500ms"
+        condition: C
+        for: 10m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: medium
+          team: backend
+        annotations:
+          summary: "P99 {{ $values.B.Value }}s"
+          runbook_url: "https://wiki/runbook/latency"
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              expr: 'histogram_quantile(0.99, sum by (le) (rate(webook_http_requests_duration_seconds_bucket[5m])))'
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model: { type: reduce, expression: A, reducer: last, refId: B }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              refId: C
+              conditions:
+                - evaluator: { type: gt, params: [0.5] }    # 500ms
+
+
+      # ══════════════════════════════════════════════════════════
+      # 规则 4：容量告警（使用率比例）
+      # 适合：连接池 / 内存 / 磁盘
+      # ══════════════════════════════════════════════════════════
+      - uid: example-saturation
+        title: "示例：MySQL 连接使用率 > 80%"
+        condition: C
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: high
+          team: backend
+        annotations:
+          summary: "MySQL 连接使用率 {{ $values.B.Value | humanizePercentage }}"
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              expr: 'mysql_global_status_threads_connected / mysql_global_variables_max_connections'
+              refId: A
+              instant: true
+          - refId: B
+            datasourceUid: __expr__
+            model: { type: reduce, expression: A, reducer: last, refId: B }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              refId: C
+              conditions:
+                - evaluator: { type: gt, params: [0.8] }
+
+# ═════════════════════════════════════════════════════════════════
+# annotations 里可用模板变量：
+#   $labels                 - 当前 alert 的 labels（$labels.instance）
+#   $values                 - map[refId]Value（$values.A.Value 拿数值）
+# 可用函数：
+#   humanize / humanizePercentage / humanizeDuration / printf
+#
+# evaluator 类型：
+#   gt              大于         params:[阈值]
+#   lt              小于         params:[阈值]
+#   within_range    在范围内     params:[min,max]
+#   outside_range   范围外       params:[min,max]
+#   no_value        无值         params:[]
+#
+# reducer 类型：
+#   last / mean / min / max / sum / count / median / diff / diff_abs / percent_diff
+# ═════════════════════════════════════════════════════════════════

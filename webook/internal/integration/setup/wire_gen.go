@@ -9,7 +9,6 @@ package setup
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
-
 	"github.com/webook/internal/repository"
 	"github.com/webook/internal/repository/cache"
 	"github.com/webook/internal/repository/dao"
@@ -18,6 +17,8 @@ import (
 	"github.com/webook/internal/web/jwt"
 	"github.com/webook/ioc"
 	"github.com/webook/pkg/streamer"
+	"go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/trace/noop"
 )
 
 // Injectors from wire.go:
@@ -27,7 +28,8 @@ func InitWebServer() *gin.Engine {
 	cmdable := InitRedis()
 	jwtHandler := jwt.NewRedisJwtHandler(cmdable)
 	loggerX := InitLogger()
-	v := ioc.InitMiddlewares(jwtHandler, loggerX, cmdable)
+	tracerProvider := provideNoopTracerProvider()
+	v := ioc.InitMiddlewares(jwtHandler, loggerX, cmdable, tracerProvider)
 	db := InitDB()
 	userDAO := dao.NewGormUserDAO(db)
 	userCache := cache.NewRedisUserCache(cmdable)
@@ -196,6 +198,11 @@ func InitChatHandler() web.ChatHandler {
 }
 
 // wire.go:
+
+// 集成测试不连真实 OTel Collector，注入 Noop TracerProvider 满足依赖
+func provideNoopTracerProvider() trace.TracerProvider {
+	return noop.NewTracerProvider()
+}
 
 var infraSvcProvider = wire.NewSet(
 	InitRedis,

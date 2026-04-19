@@ -13,9 +13,8 @@ import (
 	context "context"
 	reflect "reflect"
 
-	gomock "go.uber.org/mock/gomock"
-
 	dao "github.com/webook/internal/repository/dao"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockUserDAO is a mock of UserDAO interface.

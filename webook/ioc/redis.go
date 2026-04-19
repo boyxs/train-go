@@ -1,6 +1,7 @@
 package ioc
 
 import (
+	"github.com/redis/go-redis/extra/redisotel/v9"
 	"github.com/redis/go-redis/v9"
 	"github.com/spf13/viper"
 
@@ -27,5 +28,9 @@ func InitRedis() redis.Cmdable {
 		WithHistogram().
 		WithSummary().
 		Build())
+	// OTel：每条 Redis 命令自动产生 span（kind=Client）+ db.system="redis" 属性
+	if err := redisotel.InstrumentTracing(client); err != nil {
+		panic(err)
+	}
 	return client
 }
