@@ -1,0 +1,56 @@
+# ═══════════════════════════════════════════════════════════════
+# MySQL 数据源（用于业务报表 / 运营大盘）
+# ⚠️ 强制要求：只读账号；走从库不走主库；SQL 加 LIMIT
+# ═══════════════════════════════════════════════════════════════
+apiVersion: 1
+
+datasources:
+  - name: WebookDB
+    uid: webook-mysql
+    type: mysql
+    url: webook-mysql:3306             # 注意：host:port，不带 http://
+    user: grafana_ro                   # ⭐ 必须只读账号（仅 SELECT 权限）
+    editable: false
+
+    jsonData:
+      database: webook
+      # ── 连接池 ─────────────────────────────────────────
+      maxOpenConns: 10                 # 最大连接数（避免吃光数据库连接）
+      maxIdleConns: 2
+      connMaxLifetime: 14400           # 秒（4 小时）
+
+      # ── TLS ────────────────────────────────────────────
+      tlsAuth: false
+      tlsAuthWithCACert: false
+      tlsSkipVerify: true              # 内网可 skip；生产外网必须 false + 挂证书
+
+      # ── 时区（MySQL 里 timestamp 列依赖这个）───────────
+      timezone: "Asia/Shanghai"
+
+    secureJsonData:
+      password: "${GRAFANA_MYSQL_PASSWORD}"    # 走环境变量，不写死
+      # tlsCACert: "..."
+      # tlsClientCert: "..."
+      # tlsClientKey: "..."
+
+# ─── 在 SQL 里建只读账号 ──────────────────────────────────────
+#   CREATE USER 'grafana_ro'@'%' IDENTIFIED BY 'xxx';
+#   GRANT SELECT ON webook.* TO 'grafana_ro'@'%';
+#   FLUSH PRIVILEGES;
+#
+# ─── Panel 里查业务数据示例 ───────────────────────────────────
+#   dashboard panel query:
+#     SELECT
+#       DATE_FORMAT(FROM_UNIXTIME(created_at/1000), '%Y-%m-%d') AS time,
+#       COUNT(*) AS users
+#     FROM user
+#     WHERE created_at BETWEEN $__from * 1000 AND $__to * 1000
+#     GROUP BY time
+#     ORDER BY time
+#     LIMIT 1000                       ← 必须 LIMIT
+#
+# ─── Grafana 内置变量 ─────────────────────────────────────────
+#   $__from    - 时间范围起点（毫秒 unix）
+#   $__to      - 时间范围终点
+#   $__timeFilter(col)  - 产生 "col BETWEEN from AND to"
+#   $__interval_s        - 适配图表宽度的步长（秒）

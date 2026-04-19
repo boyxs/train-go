@@ -1,0 +1,43 @@
+# ═══════════════════════════════════════════════════════════════
+# Zipkin 数据源（分布式追踪）
+# ═══════════════════════════════════════════════════════════════
+apiVersion: 1
+
+datasources:
+  - name: Zipkin
+    uid: zipkin                        # ⭐ 被 prometheus.yml 的 exemplarTraceIdDestinations 引用
+    type: zipkin
+    access: proxy
+    url: http://webook-zipkin:9411     # Zipkin HTTP API
+    isDefault: false
+    editable: false
+
+    jsonData:
+      # ── Trace → Metrics 联动（Zipkin UI 里"View metrics"）───
+      tracesToMetrics:
+        datasourceUid: prometheus
+        # tags：trace span 的哪些 label 可用来筛选 Prometheus 指标
+        tags:
+          - key: service.name
+            value: service              # 映射到 Prometheus label 名
+        # 预置查询：点击直接跳
+        queries:
+          - name: "请求 QPS"
+            query: 'sum(rate(webook_http_requests_total{$__tags}[5m]))'
+          - name: "P99 延迟"
+            query: 'histogram_quantile(0.99, sum by (le) (rate(webook_http_requests_duration_seconds_bucket{$__tags}[5m])))'
+
+      # ── Trace → Logs 联动（接 Loki 才用）────────────────
+      # tracesToLogsV2:
+      #   datasourceUid: loki
+      #   tags:
+      #     - key: service.name
+      #     - key: trace_id
+      #   filterByTraceID: true        # 日志按 trace_id 过滤
+      #   filterBySpanID: false
+      #   spanStartTimeShift: "-1m"    # 查日志时间范围偏移
+      #   spanEndTimeShift: "1m"
+
+      # ── Service Map（Zipkin 不支持，要 Tempo 的 metrics_generator）──
+      # serviceMap:
+      #   datasourceUid: prometheus

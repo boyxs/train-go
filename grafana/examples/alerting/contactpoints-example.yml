@@ -1,0 +1,102 @@
+# ═══════════════════════════════════════════════════════════════
+# contactpoints.yml  告警通知通道（Email / Webhook / Slack ...）
+#
+# 用法：复制本文件为 contactpoints.yml 按需修改
+# 生效：改完后 docker compose restart grafana（reload API 不刷 contactpoints）
+#
+# ⚠️ Grafana 用 Alertmanager template（不是完整 Go template）
+# ⚠️ .GroupLabels/.Labels 是 KV 类型，迭代用 .SortedPairs（不是 range $k,$v）
+# 详见 docs/grafana/08-alerting-template-reference.md
+# ═══════════════════════════════════════════════════════════════
+apiVersion: 1
+
+contactPoints:
+  - orgId: 1
+    name: webook-email                 # 通道名（policies.yml 里用这个名引用）
+    receivers:
+      - uid: webook-email              # ⭐ 固定 uid，跨环境同步用
+        type: email                    # email / webhook / slack / dingding / wecom / ...
+        disableResolveMessage: false   # 告警恢复时也发通知
+
+        settings:
+          addresses: "ops@example.com;alerts@example.com"  # 多收件人 ; 或 , 分隔
+          singleEmail: false           # true=一封群发；false=每人一封
+
+          # ── 邮件主题 ─────────────────────────────────────────
+          # 可用 top-level 字段：.Status / .GroupLabels / .CommonLabels / .Alerts / .ExternalURL
+          subject: '[{{ .Status | toUpper }}][{{ .CommonLabels.severity }}] {{ .GroupLabels.alertname }} ({{ len .Alerts.Firing }}F/{{ len .Alerts.Resolved }}R)'
+
+          # ── 邮件正文 ─────────────────────────────────────────
+          # KV 迭代必须用 .SortedPairs ;  单条 alert 字段必须在 {{ range .Alerts }} 里
+          message: |
+            状态：{{ .Status }}
+            Firing：{{ len .Alerts.Firing }}  Resolved：{{ len .Alerts.Resolved }}
+            Grafana：{{ .ExternalURL }}
+
+            ── 分组标签 ──────────────────────────────
+            {{ range .GroupLabels.SortedPairs }}{{ .Name }}={{ .Value }} {{ end }}
+
+            ── 共同标签 ──────────────────────────────
+            {{ range .CommonLabels.SortedPairs }}{{ .Name }}={{ .Value }} {{ end }}
+
+            ══════════════════════════════════════════
+            ━━━ Firing ({{ len .Alerts.Firing }}) ━━━
+            {{ range .Alerts.Firing }}
+            【{{ .Labels.alertname }}】{{ .Annotations.summary }}
+            ├─ 开始：{{ .StartsAt.Format "2006-01-02 15:04:05" }}
+            ├─ 持续：{{ humanizeDuration (sub now.Unix .StartsAt.Unix) }}
+            ├─ 严重：{{ .Labels.severity }}
+            ├─ 团队：{{ .Labels.team }}
+            ├─ 实例：{{ .Labels.instance }}
+            ├─ 当前值：{{ .ValueString }}
+            ├─ Runbook：{{ .Annotations.runbook_url }}
+            ├─ 规则详情：{{ .GeneratorURL }}
+            └─ 静默：{{ .SilenceURL }}
+            {{ end }}
+
+            {{ if .Alerts.Resolved -}}
+            ━━━ Resolved ({{ len .Alerts.Resolved }}) ━━━
+            {{ range .Alerts.Resolved }}
+            ✓ {{ .Labels.alertname }}
+            ├─ 开始：{{ .StartsAt.Format "2006-01-02 15:04:05" }}
+            ├─ 结束：{{ .EndsAt.Format "2006-01-02 15:04:05" }}
+            └─ 持续：{{ humanizeDuration (sub .EndsAt.Unix .StartsAt.Unix) }}
+            {{ end }}
+            {{- end }}
+
+  # ─── 其它通道示例（按需启用）──────────────────────────────────
+
+  # 钉钉群机器人
+  # - orgId: 1
+  #   name: webook-dingtalk
+  #   receivers:
+  #     - uid: webook-dingtalk
+  #       type: dingding
+  #       settings:
+  #         url: "https://oapi.dingtalk.com/robot/send?access_token=xxx"
+  #         message: "{{ template \"default.message\" . }}"
+  #         msgType: link
+
+  # 通用 Webhook（对接自建告警平台）
+  # - orgId: 1
+  #   name: webook-webhook
+  #   receivers:
+  #     - uid: webook-webhook
+  #       type: webhook
+  #       settings:
+  #         url: "https://alerts.internal/api/v1/receive"
+  #         httpMethod: POST
+  #         username: grafana
+  #       secureSettings:
+  #         password: "${ALERT_WEBHOOK_PASSWORD}"
+
+  # Slack（国外团队用）
+  # - orgId: 1
+  #   name: webook-slack
+  #   receivers:
+  #     - uid: webook-slack
+  #       type: slack
+  #       settings:
+  #         url: "https://hooks.slack.com/services/xxx/yyy/zzz"
+  #         title: "{{ .GroupLabels.alertname }}"
+  #         text: "{{ range .Alerts }}{{ .Annotations.summary }}\n{{ end }}"

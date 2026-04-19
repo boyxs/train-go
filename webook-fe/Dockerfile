@@ -1,14 +1,21 @@
 # syntax=docker/dockerfile:1.7
 # 企业级 Next.js 镜像：多阶段 + standalone + 非 root + healthcheck
 
-ARG NODE_VERSION=20.18.0-alpine
+# 用 20-alpine 滚动 tag（Node 20 LTS，至 2026-04 维护）：国内镜像源缓存命中率最高
+# 想要可复现构建，CI 里传 --build-arg NODE_VERSION=20.x.y-alpine 显式钉死
+ARG NODE_VERSION=20-alpine
 
 # ── deps：仅装依赖，最大化复用缓存 ───────────────────────────
 FROM node:${NODE_VERSION} AS deps
 WORKDIR /app
 RUN apk add --no-cache libc6-compat
 COPY package.json package-lock.json ./
-RUN npm ci --no-audit --no-fund
+# npm 镜像源按需切换：
+#   CI（海外 runner）走默认官方源
+#   本地/国内虚拟机可传 --build-arg NPM_REGISTRY=https://registry.npmmirror.com
+ARG NPM_REGISTRY=https://registry.npmjs.org
+RUN npm config set registry "$NPM_REGISTRY" \
+ && npm ci --no-audit --no-fund
 
 # ── builder：build standalone 产物 ──────────────────────────
 FROM node:${NODE_VERSION} AS builder

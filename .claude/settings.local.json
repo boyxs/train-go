@@ -22,7 +22,12 @@
       "mcp__claude_ai_Notion__notion-create-pages",
       "mcp__claude_ai_Notion__notion-update-page",
       "mcp__claude_ai_Notion__notion-fetch",
-      "mcp__plugin_claude-mem_mcp-search__search"
+      "mcp__plugin_claude-mem_mcp-search__search",
+      "Bash(cp C:/Go/tools/workflow/hooks/parse-entry.js \"C:/Users/SPACE/.claude/plugins/cache/workflow-marketplace/workflow/1.1.0/hooks/parse-entry.js\")",
+      "Bash(cp C:/Go/tools/workflow/skills/done/scripts/check-review-passed.sh \"C:/Users/SPACE/.claude/plugins/cache/workflow-marketplace/workflow/1.1.0/skills/done/scripts/check-review-passed.sh\")",
+      "Bash(mkdir -p \"C:/Users/SPACE/.claude/plugins/cache/workflow-marketplace/workflow/1.1.0/skills/review/scripts\")",
+      "Bash(cp C:/Go/tools/workflow/skills/review/scripts/review-mode.sh \"C:/Users/SPACE/.claude/plugins/cache/workflow-marketplace/workflow/1.1.0/skills/review/scripts/review-mode.sh\")",
+      "Bash(cp C:/Go/tools/workflow/skills/review/SKILL.md \"C:/Users/SPACE/.claude/plugins/cache/workflow-marketplace/workflow/1.1.0/skills/review/SKILL.md\")"
     ]
   },
   "enableAllProjectMcpServers": true,

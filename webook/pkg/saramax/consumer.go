@@ -1,6 +1,7 @@
 package saramax
 
 import (
+	"context"
 	"encoding/json"
 
 	"github.com/IBM/sarama"
@@ -35,15 +36,24 @@ func (c *Consumer[T]) ConsumeClaim(session sarama.ConsumerGroupSession, claim sa
 			session.MarkMessage(msg, "")
 			continue
 		}
-		if err := c.handler(msg, event); err != nil {
-			c.l.Error("处理消息失败",
-				logger.String("topic", msg.Topic),
-				logger.Int64("offset", msg.Offset),
-				logger.Error(err))
-			// 处理失败：不标记，下次重新消费
-			continue
-		}
-		session.MarkMessage(msg, "")
+		c.handleOne(session, msg, event)
 	}
 	return nil
+}
+
+// handleOne 单条处理：extract → start span → defer End → handle
+// 抽出来是为了 defer span.End() 覆盖 handler panic 场景
+func (c *Consumer[T]) handleOne(session sarama.ConsumerGroupSession, msg *sarama.ConsumerMessage, event T) {
+	ctx, span := StartConsumerSpan(context.Background(), msg)
+	defer span.End()
+	if err := c.handler(ctx, msg, event); err != nil {
+		RecordSpanError(span, err)
+		c.l.Error("处理消息失败",
+			logger.String("topic", msg.Topic),
+			logger.Int64("offset", msg.Offset),
+			logger.Error(err))
+		// 处理失败：不标记，下次重新消费
+		return
+	}
+	session.MarkMessage(msg, "")
 }

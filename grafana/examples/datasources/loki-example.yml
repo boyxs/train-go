@@ -1,0 +1,41 @@
+# ═══════════════════════════════════════════════════════════════
+# Loki 数据源（日志，未来接入）
+# 前提：docker compose 起 loki + promtail 容器
+# ═══════════════════════════════════════════════════════════════
+apiVersion: 1
+
+datasources:
+  - name: Loki
+    uid: loki                          # ⭐ zipkin.yml 的 tracesToLogsV2 引用
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    isDefault: false
+    editable: false
+
+    jsonData:
+      maxLines: 1000                   # 单次查询返回的最大日志行数
+
+      # ── 日志 → Trace 联动（日志里的 trace_id 跳 Zipkin）─
+      derivedFields:
+        - name: TraceID
+          matcherRegex: 'trace_id=(\w+)'   # 从日志行匹配 trace_id
+          url: "$${__value.raw}"            # $$ 转义：$$__value.raw 最终是 ${__value.raw}
+          datasourceUid: zipkin
+          urlDisplayLabel: "View trace"
+
+        - name: RequestID
+          matcherRegex: 'request_id=([a-f0-9-]+)'
+          url: ""                        # 仅展示不跳转
+
+      # ── HTTP headers（需要 tenant 隔离时用）─────────────
+      # httpHeaderName1: "X-Scope-OrgID"
+
+    # secureJsonData:
+    #   httpHeaderValue1: "tenant-1"
+
+# ─── 在 Grafana Explore 里查日志的 LogQL 示例 ────────────────
+#   {app="webook"} |= "error"                 ← 包含 error 的
+#   {app="webook"} |= "trace_id=abc"          ← 按 trace 查
+#   {app="webook"} | json | level="error"     ← JSON 日志按字段过滤
+#   rate({app="webook"}[5m])                  ← 错误日志率

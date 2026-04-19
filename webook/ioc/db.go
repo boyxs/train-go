@@ -5,6 +5,7 @@ import (
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
+	"gorm.io/plugin/opentelemetry/tracing"
 
 	"github.com/webook/internal/repository/dao"
 	gormprom "github.com/webook/pkg/gormx/prometheus"
@@ -35,6 +36,14 @@ func InitDB(_ TimezoneReady, l loggerx.LoggerX) *gorm.DB {
 		WithHistogram().
 		WithSummary().
 		Register(db); err != nil {
+		panic(err)
+	}
+	// OTel：每条 SQL 自动产生 span（kind=Client）+ db.statement / db.system 等 semconv 属性
+	// 用 WithoutMetrics 避免与 gormprom 重复采集；WithoutQueryVariables 隐藏 SQL 参数防泄敏
+	if err := db.Use(tracing.NewPlugin(
+		tracing.WithoutMetrics(),
+		tracing.WithoutQueryVariables(),
+	)); err != nil {
 		panic(err)
 	}
 	err = dao.InitTable(db)

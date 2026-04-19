@@ -2,6 +2,19 @@
 
 把 JSON 格式的 dashboard 文件放到本目录下会自动加载。
 
+## 项目自有 Dashboard（已 provisioned）
+
+| 文件 | UID | 用途 |
+|------|-----|------|
+| `webook-overview.json` | `webook-overview` | SRE 主大盘：HTTP/Go/DB/Cache 核心指标 |
+| `webook-ops.json` | `webook-ops` | 运维深度：慢查询、GC、连接池、goroutine |
+| `webook-tracing.json` | `webook-tracing` | Tracing 入口：HTTP 概览 + Zipkin Explore/UI 跳转指引 |
+| `linux-host.json` | `linux-host` | 宿主机 CPU/内存/磁盘/网络 |
+
+**Tracing 查看路径**（打开 `Webook / Tracing` 后按提示操作）：
+1. Explore 方式：左侧切换 `Zipkin` 数据源 → Query Type: `Search` → Service `webook`
+2. 直连 Zipkin UI：`http://<host>:9411`
+
 ## 推荐开源模板
 
 启动后登录 Grafana（默认 admin/admin），手动导入以下 dashboard：

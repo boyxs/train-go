@@ -9,7 +9,6 @@ package main
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
-
 	"github.com/webook/internal/events"
 	"github.com/webook/internal/events/interaction"
 	"github.com/webook/internal/repository"
@@ -20,17 +19,23 @@ import (
 	"github.com/webook/internal/web/jwt"
 	"github.com/webook/ioc"
 	"github.com/webook/pkg/streamer"
+)
 
+import (
 	_ "github.com/spf13/viper/remote"
 )
 
 // Injectors from wire.go:
 
-func InitWebServer() App {
+func InitWebServer() (App, func(), error) {
 	cmdable := ioc.InitRedis()
 	jwtHandler := jwt.NewRedisJwtHandler(cmdable)
 	loggerX := ioc.InitLogger()
-	v := ioc.InitMiddlewares(jwtHandler, loggerX, cmdable)
+	tracerProvider, cleanup, err := ioc.InitOTel()
+	if err != nil {
+		return App{}, nil, err
+	}
+	v := ioc.InitMiddlewares(jwtHandler, loggerX, cmdable, tracerProvider)
 	timezoneReady := ioc.InitTimezone()
 	db := ioc.InitDB(timezoneReady, loggerX)
 	userDAO := dao.NewGormUserDAO(db)
@@ -99,7 +104,9 @@ func InitWebServer() App {
 		Server:   engine,
 		Consumer: consumer,
 	}
-	return app
+	return app, func() {
+		cleanup()
+	}, nil
 }
 
 // wire.go:

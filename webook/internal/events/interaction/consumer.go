@@ -81,8 +81,8 @@ func (c *SaramaInteractionEventConsumer) Start(ctx context.Context) error {
 }
 
 // handleBatch 业务逻辑：批量处理互动事件
-func (c *SaramaInteractionEventConsumer) handleBatch(_ []*sarama.ConsumerMessage, events []InteractionEvent) error {
-	ctx := context.Background()
+// ctx 从 Kafka message headers 提取 trace context 而来，下游 repo/dao 的 OTel span 自动挂到 consumer span 下
+func (c *SaramaInteractionEventConsumer) handleBatch(ctx context.Context, _ []*sarama.ConsumerMessage, events []InteractionEvent) error {
 	for _, evt := range events {
 		switch evt.Type {
 		case "read":

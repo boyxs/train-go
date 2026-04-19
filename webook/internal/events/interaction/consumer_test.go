@@ -51,7 +51,7 @@ func TestHandleBatch_Read(t *testing.T) {
 	r := &mockRepo{}
 	c := &SaramaInteractionEventConsumer{repo: r, l: logger.NewNopLogger()}
 
-	err := c.handleBatch(nil, []InteractionEvent{
+	err := c.handleBatch(context.Background(), nil, []InteractionEvent{
 		{Type: "read", Biz: "article", BizId: 123},
 		{Type: "read", Biz: "article", BizId: 456},
 	})
@@ -65,7 +65,7 @@ func TestHandleBatch_UnknownTypeIgnored(t *testing.T) {
 	r := &mockRepo{}
 	c := &SaramaInteractionEventConsumer{repo: r, l: logger.NewNopLogger()}
 
-	err := c.handleBatch(nil, []InteractionEvent{
+	err := c.handleBatch(context.Background(), nil, []InteractionEvent{
 		{Type: "unknown", Biz: "article", BizId: 1},
 		{Type: "read", Biz: "article", BizId: 2},
 	})
@@ -78,7 +78,7 @@ func TestHandleBatch_RepoError(t *testing.T) {
 	r := &mockRepo{err: errors.New("db down")}
 	c := &SaramaInteractionEventConsumer{repo: r, l: logger.NewNopLogger()}
 
-	err := c.handleBatch(nil, []InteractionEvent{
+	err := c.handleBatch(context.Background(), nil, []InteractionEvent{
 		{Type: "read", Biz: "article", BizId: 1},
 	})
 	assert.Error(t, err)

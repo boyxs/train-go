@@ -1,0 +1,50 @@
+apiVersion: 1
+
+# 通知通道（Contact Points）
+# SMTP 凭证由 docker-compose 通过 GF_SMTP_* 环境变量注入到 Grafana
+# 这里只配置"发给谁"，不重复填 SMTP server / 账号
+#
+# ⚠️ 文件 provisioning 的 contact point 在 UI 上**只读**（provenance=file），
+#    修改必须改本文件 + **重启** Grafana。contact point 的 /api/admin/provisioning/alerting/reload
+#    只 reload rules，不 reload contact points，必须 restart。
+#
+# ⚠️ Grafana 告警用 Alertmanager template（不是标准 Go template）。关键差异：
+#    - GroupLabels / CommonLabels / Labels / Annotations 是 KV 类型，
+#      迭代用 `.SortedPairs`（产生 {Name, Value} 对象），而非 `range $k, $v := map`
+#    - Alert 的字段：.StartsAt / .EndsAt / .Labels / .Annotations / .SilenceURL / .Fingerprint
+#    - 参考：https://prometheus.io/docs/alerting/latest/notifications/#data-structures
+contactPoints:
+  - orgId: 1
+    name: webook-email
+    receivers:
+      - uid: webook-email
+        type: email
+        settings:
+          addresses: "3236447743@qq.com"
+          singleEmail: false
+          # ── 模板上下文说明 ────────────────────────────────────────
+          # top-level 可用：.Status / .GroupLabels / .CommonLabels /
+          #                .CommonAnnotations / .Alerts / .ExternalURL
+          # 每条 alert 字段必须在 {{ range .Alerts }} 里：
+          #   .StartsAt / .EndsAt / .Labels / .Annotations /
+          #   .SilenceURL / .GeneratorURL / .Fingerprint
+          subject: '[Webook][{{ .Status }}] {{ .GroupLabels.alertname }}'
+          message: |
+            **告警状态**：{{ .Status }}（firing {{ len .Alerts.Firing }} 条 / resolved {{ len .Alerts.Resolved }} 条）
+            **Group Labels**：{{ range .GroupLabels.SortedPairs }}{{ .Name }}={{ .Value }} {{ end }}
+            **Common Labels**：{{ range .CommonLabels.SortedPairs }}{{ .Name }}={{ .Value }} {{ end }}
+            **Grafana**：{{ .ExternalURL }}
+
+            ─────────────────────────────────────────────
+            {{ range .Alerts }}
+            【{{ .Status }}】{{ .Labels.alertname }}
+            告警时间：{{ .StartsAt.Format "2006-01-02 15:04:05 MST" }}
+            {{ if ne .Status "firing" }}恢复时间：{{ .EndsAt.Format "2006-01-02 15:04:05 MST" }}
+            {{ end -}}
+            严重级：{{ .Labels.severity }}
+            团队：{{ .Labels.team }}
+            Summary：{{ .Annotations.summary }}
+            Runbook：{{ .Annotations.runbook_url }}
+            Silence：{{ .SilenceURL }}
+            ─────────────────────────────────────────────
+            {{ end }}

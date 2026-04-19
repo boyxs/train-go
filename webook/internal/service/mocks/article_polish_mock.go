@@ -13,9 +13,8 @@ import (
 	context "context"
 	reflect "reflect"
 
-	gomock "go.uber.org/mock/gomock"
-
 	domain "github.com/webook/internal/domain"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockArticlePolishService is a mock of ArticlePolishService interface.

@@ -2,6 +2,148 @@
 
 <!-- 新功能前插在此，日期降序 -->
 
+## [2026-04-19] 配置模板参考体系 + Grafana/Prometheus examples 目录
+
+**变更内容**: 为 `grafana/` 和 `prometheus/` 下每种配置文件建立完整注释的 `-example.yml` 模板 + 两份字段字典文档；Prometheus 启用 `--web.enable-lifecycle` 支持热 reload；Grafana dashboards 开启生产三件套
+
+**影响范围**:
+- 新增 `grafana/examples/`（独立目录，不被 Grafana 加载）：
+  - `alerting/{contactpoints,policies,rules}-example.yml`（4 种告警范式、Alertmanager 模板语法、路由 + matcher + 静默时段）
+  - `dashboards/{dashboards-example.yml, webook-example.json}`（provider 生产三件套 + 8 种 Panel 骨架 + 变量 + gridPos）
+  - `datasources/{prometheus,zipkin,mysql,loki}-example.yml`（exemplar 联动、tracesToMetrics/Logs、只读账号、derivedFields）
+  - `README.md` 对照表 + 使用流程
+- 新增 `prometheus/examples/`：
+  - `prometheus-example.yml`（global/scrape_configs/alerting/relabel/remote_write/多种 SD）
+  - `alerts-example.yml`（Prom 原生告警规则 + recording rules + 模板变量说明）
+  - `README.md` 解释两种告警方式（Prom 原生 vs Grafana Alerting）对比
+- 新增文档：
+  - `docs/grafana/08-alerting-template-reference.md`（Contact Point 邮件模板全字段字典 + Alertmanager template 语法 + 陷阱 cheatsheet）
+  - `docs/grafana/09-provisioning-reference.md`（datasources/dashboards/rules/policies/Makefile 字段字典，定位为参考不是模板）
+- 文档索引：`docs/grafana/README.md` + `docs/prometheus/README.md` 加"即开即用 example"板块
+- 生产三件套落地：`grafana/provisioning/dashboards/dashboards.yml` 三件套全关（`disableDeletion:true editable:false allowUiUpdates:false`），UI 只读防误改
+- Prometheus reload API 开启：`docker-compose.yaml` prometheus 服务加 `--web.enable-lifecycle`，`curl -X POST /-/reload` 即可热加载规则
+- 模板修复（上轮未完全收敛）：
+  - `grafana/provisioning/alerting/contactpoints.yml` 改成 Alertmanager template 语法（`.SortedPairs` 代替 `range $k,$v`）
+  - `grafana/provisioning/alerting/rules.yml` 所有规则补 Reduce 节点，不再 "invalid format of evaluation results"
+  - `otel-collector/config.yaml` verbosity 改回 basic（调试结束，detailed 日志量过大）
+- 新增 `grafana/mk/grafana.mk`：Makefile 封装 reload / test-email / restart 命令
+
+**技术决策**:
+- `-example.yml` 文件单独放 `examples/` 不放 provisioning 下：Grafana 按扩展名加载，避免"测试模板被当真实数据源"；`.example` 后缀也能达到同样效果但 `-example.yml` + 独立目录更直观
+- 文档 vs example 双份存在的定位：文档是"字段字典 + 坑速查"，examples 是"复制即用"。都改时以 examples 为准，文档只更新字段释义
+- dashboards 生产三件套全关：UI 改动被重启覆盖会产生"诡异现象"（改完又消失），强制 Git 化唯一 source of truth
+
+**待办**: 无
+**会话**: 260419-template-reference-体系建设
+
+## [2026-04-19] OTel 调用链完整串联 + Kafka 连接重试 + Grafana tracing dashboard
+
+**变更内容**: 两个关键 bug 修复让 OTel trace 真正成为一棵完整的树；Kafka producer 启动竞态修复；Grafana 增加 tracing 入口 dashboard + 文档同步
+
+**影响范围**:
+- Bug 1：HTTP span 与 DB/Redis span 断成独立 trace
+  - 根因：Gin 1.11 `*gin.Context.Value()` 默认不 fallback 到 `c.Request.Context()`
+  - 修：`webook/ioc/web.go` `server.ContextWithFallback = true`
+  - 测：`webook/ioc/web_ctx_propagation_test.go` 单测复现 true/false 两种行为
+- Bug 2：Kafka producer 降级为 NoopProducer
+  - 根因：webook 启动早于 Kafka JVM ready，`InitSaramaSyncProducer` 一次性失败返回 nil
+  - 修（代码）：`webook/ioc/kafka.go` 新增 `retryConnect` 泛型工具，指数退避重试 6 次（共约 63s）；Producer + Client 都用
+  - 修（编排）：`docker-compose.yaml` Kafka 加 healthcheck + webook `depends_on.kafka.condition: service_healthy`
+  - 测：`webook/ioc/kafka_test.go` 3 用例（成功/耗尽/指数 backoff）
+- Grafana tracing dashboard：`grafana/provisioning/dashboards/webook-tracing.json`
+  - 5 个 panel：Text 说明 + QPS/错误率/P99/Goroutine Stat + HTTP QPS by path + 分位趋势
+  - 顶部 link 跳 Zipkin UI + Webook/Overview
+- Collector 版本：`otel/opentelemetry-collector-contrib:0.116.0` → `0.88.0`（CentOS 7 kernel 3.10 兼容）
+- 文档同步：
+  - `docs/opentelemetry/05-integration.md`：从"集成蓝图"改成"已落地 + 4 大踩坑记录"
+  - `docs/opentelemetry/README.md`：加生产接入状态图（5 层 instrumentation + OTLP → Collector → Zipkin）
+  - `docs/opentelemetry/06-best-practices.md`：踩坑清单追加 #13-16（Gin fallback / 启动竞态 / Collector kernel / IBM sarama）
+  - `grafana/provisioning/dashboards/README.md`：新增"项目自有 Dashboard"表格
+
+**技术决策**:
+- ContextWithFallback=true 是 Gin + OTel 必选，单测保护防回归
+- Kafka 重试走双保险：compose 层解决启动顺序，代码层解决运行期抖动
+- retryConnect 抽成泛型工具，Producer/Client 共享，单测独立验证
+- Collector 降到 0.88.0 兼容老 kernel，直接转发 OTLP → Zipkin，业务代码零改动
+
+**生产验证（SSH）**:
+- `Container webook-kafka Healthy` → webook 等 Kafka healthy 才起
+- `docker logs webook-app | grep kafka` 空 → 无连接失败
+- Zipkin API `?serviceName=webook&spanName=/article/reader/page` → 19 个 span 完整树形
+- `[SERVER] /article/reader/page` 根下挂 `eval/get/select published_article×2/set/hgetall×10/select interaction`
+
+**待办**: Service 层手动埋点（Article.Publish / Chat.Send）；Prometheus exemplar（Histogram observe 附 trace_id 实现大盘跳 trace）
+
+**会话**: 260419-otel-fix-ctx-propagation+kafka-retry
+
+## [2026-04-18] OpenTelemetry 全链路接入 + Grafana 邮件告警
+
+**变更内容**: webook 集成 OpenTelemetry（OTLP/gRPC → otel-collector → zipkin），覆盖 HTTP 入口（otelgin）/ SQL（otelgorm）/ Redis（redisotel）；Grafana 接 Zipkin 数据源 + 配置 5 条核心告警 + QQ 邮箱 SMTP 通知
+
+**影响范围**:
+- OTel SDK 初始化：`webook/ioc/otel.go`（OTLP/gRPC exporter + Resource + ParentBased(TraceIDRatioBased) sampler + BatchSpanProcessor + W3C TraceContext propagator + wire cleanup）
+- Wire 注入：`webook/wire.go` 加 `ioc.InitOTel`，签名改为 `(App, func(), error)`；集成测试 setup wire 加 `noop.NewTracerProvider`
+- HTTP：`webook/ioc/web.go` `InitMiddlewares` 加 `tp trace.TracerProvider` 参数，挂 `otelgin.Middleware("webook", WithTracerProvider(tp))` 紧随 Prometheus 之后
+- DB：`webook/ioc/db.go` `db.Use(tracing.NewPlugin(WithoutMetrics(), WithoutQueryVariables()))`
+- Redis：`webook/ioc/redis.go` `redisotel.InstrumentTracing(client)`
+- Kafka：`webook/ioc/kafka.go` 暂保留 TODO 注释（otelsarama 未适配 IBM/sarama）
+- main：`webook/main.go` 处理 wire cleanup，进程退出 flush span
+- 配置：`webook/config/{dev,prod}.yaml` 加 `otel` 块（dev → `localhost:4317`，prod → `otel-collector:4317`）
+- 依赖：`webook/go.mod` 加 OTel SDK v1.32.0 + otlptracegrpc v1.32.0 + otelgin v0.57.0 + gorm.io/plugin/opentelemetry v0.1.16 + redisotel/v9 v9.18.0
+- Mock 重生：`make -f mk/mock.mk mockgen`（go-redis 因 redisotel 升级，旧 mock 缺新方法）
+- Collector：`otel-collector/config.yaml` 新增（OTLP receiver + memory_limiter + batch processor + zipkin exporter）
+- Compose：`docker-compose.yaml` 加 `otel-collector` 服务（image `otel/opentelemetry-collector:0.116.0`，IP 172.21.0.29，port 4317）
+- Grafana 数据源：`grafana/provisioning/datasources/zipkin.yml` 新增（uid=zipkin，关联 prometheus）；`prometheus.yml` 加 uid=prometheus 固定
+- Grafana 告警：`grafana/provisioning/alerting/{contactpoints,policies,rules}.yml` 三件套
+  - rules：5 条核心告警（服务 up / 5xx 率 > 1% / P99 > 500ms / Goroutine > 10000 / MySQL 连接 > 80%）
+  - policies：按 alertname+severity 分组，critical 立即发，其它攒批 5m
+  - contactpoints：邮件，收件人 `3236447743@qq.com`
+- Grafana SMTP：`docker-compose.yaml` grafana 服务加 `GF_SMTP_*` 环境变量（QQ 邮箱 587 STARTTLS），凭证从 `.env` 注入
+- 凭证管理：`.env`（本地真实，已 .gitignore）+ `.env.example`（模板，可入库）；`.gitignore` 加 `.env` `.env.*` 规则
+
+**技术决策**:
+- Exporter 选 OTLP/gRPC（CNCF 标准）+ otel-collector 中转：换后端只改 collector 出口，业务代码零改动；未来加 Tempo/Datadog 多 fan-out 也只动 collector
+- Collector 用 core 版（80MB）而非 contrib（350MB）：仅需 OTLP receiver + zipkin exporter，core 全覆盖
+- otelgin 紧随 Prometheus 之后：让所有下游中间件 / handler 都在 root span 上下文里
+- Init 走 wire `(T, func(), error)` cleanup pattern：与项目既有 wire 风格一致，BatchSpanProcessor 队列退出时 flush
+- Sampler 用 `ParentBased(TraceIDRatioBased)`：跨服务时跟随上游决策，避免一条 trace 一半在一半丢
+- Kafka 暂未接 OTel：otelsarama 未适配 IBM/sarama，等社区或自己写包装；当前 producer/consumer span 缺失，TODO 标记
+- gormopentelemetry 用 `WithoutMetrics()`：与现有 gormprom 互斥避免重复采集
+- gormopentelemetry 用 `WithoutQueryVariables()`：SQL 参数可能含 PII，默认隐藏
+
+**部署步骤（VM 上）**:
+1. `git pull` 同步代码
+2. `cp .env.example .env && vi .env` 填 SMTP 授权码（或 scp 已填好的 .env 过去）
+3. `docker pull otel/opentelemetry-collector:0.116.0`（或国内镜像 retag）
+4. `docker compose build webook && docker compose up -d`
+5. 验证 trace：`curl http://192.168.150.101/api/user/login` → Zipkin UI `:9411` 看到 root span + DB/Redis 子 span；Grafana `:3001` Explore 选 Zipkin 也能查
+6. 验证告警邮件：手动触发（如 stop webook → up == 0）等 1m 后收 QQ 邮箱
+
+**待办**:
+- Phase 3：service 层手动埋点（Article.Publish / Chat.Send / User.Login 等关键路径加 attribute / RecordError）
+- Kafka OTel：自写 sarama producer interceptor / consumer middleware 注入 trace context 到 Kafka header
+- Grafana exemplar：Prometheus Histogram observe 时附 trace_id，大盘高延迟点直跳 Zipkin
+
+**会话**: 260418-otel-Phase1to5全链路接入
+
+## [2026-04-18] 前后端 CI 完善 + GHCR 镜像推送 + nginx 同源部署
+
+**变更内容**: 补齐前端 CI；前后端 CI 均扩展 `build-push` job 推镜像到 GHCR；docker-compose 新增 webook-fe + nginx 同源反代，实现浏览器只见一个域名、零 CORS
+**影响范围**:
+- 前端 CI 新建：`.github/workflows/webook-fe-ci.yml`（eslint + tsc + next build；master/feature/webook-fe-v 三种 tag 推 `ghcr.io/<user>/webook-fe`）
+- 后端 CI 扩展：`.github/workflows/webook-ci.yml` 加 `build-push` job，先 `go build -tags=k8s` 再 docker build（保留简单 Dockerfile 策略）；tag `webook-v*.*.*` 也触发
+- 前端 Dockerfile：`webook-fe/Dockerfile` npm registry 改 `ARG NPM_REGISTRY` 可传参（默认官方源，CI 用默认，本地按需切 npmmirror）
+- 部署栈：`docker-compose.yaml` 加 `webook-fe`（3000 仅 expose）+ `nginx`（80 对外，同源反代：`/` → 前端，`/api/*` → 后端）
+- nginx 配置：`nginx/nginx.conf` + `nginx/conf.d/webook.conf`（upstream + 安全头 + healthz + 代理参数）
+- Workflow 完善：两个 workflow 加 `workflow_dispatch`（可手动触发）和顶层 `permissions: contents: read`
+**技术决策**:
+- 同源部署：前端 `NEXT_PUBLIC_API_BASE_URL=/api`（相对路径）**一次构建多环境通用**，不用再为不同 API 地址构建多个镜像
+- Workflow `paths` 过滤移除：否则 tag push 指向的 commit 若 diff 不含目标目录会静默不触发，发版失败
+- 后端不改 Dockerfile 走简单单阶段：与项目既有决策一致（commit 36e8dbe 回归精简），构建责任在 CI 外部
+- npmmirror 改成构建参数而非硬编码：CI 走官方源避免海外 runner 访问国内镜像站失败
+**待办**: GitHub 仓库 Settings → Actions → Workflow permissions 勾选 "Read and write permissions" 否则 GHCR 推送 403；设置分支保护强制 PR + CI 绿
+**会话**: 260418-infra-CI完善前端部署
+
 ## [2026-04-18] 学习沙箱归档到 sandbox/
 
 **变更内容**: `work/` 顶层散落的 8 个独立 Go 学习模块统一归档到 `sandbox/`，主目录只剩项目核心（webook / webook-fe / 基础设施 / docs）

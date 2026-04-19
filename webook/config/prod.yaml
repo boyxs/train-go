@@ -71,6 +71,14 @@ logger:
 #    maxResLen: 2048
 #    maxPathLen: 1024
 
+otel:
+  # 容器网络内地址：webook → otel-collector → zipkin
+  endpoint: "otel-collector:4317"
+  serviceName: "webook"
+  serviceVersion: "0.1.0"
+  env: "prod"
+  sampleRatio: 0.1          # 生产 10% 采样；学习阶段如需全采可在 etcd 临时覆盖为 1.0
+
 #etcdctl --endpoints=127.0.0.1:2379 /webook < config/k8s.yaml
 
 #dev.yaml 开发 (development)

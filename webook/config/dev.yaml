@@ -68,6 +68,14 @@ embedding:
   dims: 1024
   timeout: 30
 
+otel:
+  # 本地开发：要 docker compose up -d otel-collector 把 4317 暴露到宿主机
+  endpoint: "localhost:4317"
+  serviceName: "webook"
+  serviceVersion: "0.1.0"
+  env: "dev"
+  sampleRatio: 1.0          # dev 全采样
+
 #etcdctl --endpoints=127.0.0.1:2379 put /webook < config/dev.yaml
 
 #dev.yaml 开发 (development)

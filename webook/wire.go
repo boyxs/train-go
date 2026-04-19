@@ -76,10 +76,11 @@ type App struct {
 	Consumer events.Consumer
 }
 
-func InitWebServer() App {
+func InitWebServer() (App, func(), error) {
 	wire.Build(
 		//infra
 		ioc.InitDB, ioc.InitRedis, ioc.InitLogger, ioc.InitTimezone,
+		ioc.InitOTel,
 		//dao
 		dao.NewGormUserDAO,
 		dao.NewGormArticleAuthorDAO,
@@ -128,5 +129,5 @@ func InitWebServer() App {
 		ioc.InitWebServer,
 		wire.Struct(new(App), "*"),
 	)
-	return App{}
+	return App{}, nil, nil
 }

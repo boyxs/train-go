@@ -7299,6 +7299,20 @@ func (mr *MockCmdableMockRecorder) XAutoClaimJustID(ctx, a any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "XAutoClaimJustID", reflect.TypeOf((*MockCmdable)(nil).XAutoClaimJustID), ctx, a)
 }
 
+// XCfgSet mocks base method.
+func (m *MockCmdable) XCfgSet(ctx context.Context, a *redis.XCfgSetArgs) *redis.StatusCmd {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "XCfgSet", ctx, a)
+	ret0, _ := ret[0].(*redis.StatusCmd)
+	return ret0
+}
+
+// XCfgSet indicates an expected call of XCfgSet.
+func (mr *MockCmdableMockRecorder) XCfgSet(ctx, a any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "XCfgSet", reflect.TypeOf((*MockCmdable)(nil).XCfgSet), ctx, a)
+}
+
 // XClaim mocks base method.
 func (m *MockCmdable) XClaim(ctx context.Context, a *redis.XClaimArgs) *redis.XMessageSliceCmd {
 	m.ctrl.T.Helper()

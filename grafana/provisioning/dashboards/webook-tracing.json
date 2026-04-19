@@ -1,0 +1,171 @@
+{
+  "title": "Webook / Tracing",
+  "uid": "webook-tracing",
+  "tags": ["webook", "tracing", "zipkin"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": false,
+  "refresh": "30s",
+  "time": {"from": "now-1h", "to": "now"},
+  "templating": {"list": []},
+  "annotations": {"list": []},
+  "panels": [
+    {
+      "type": "text",
+      "title": "如何查看调用链",
+      "gridPos": {"x": 0, "y": 0, "w": 24, "h": 4},
+      "options": {
+        "mode": "markdown",
+        "content": "## 调用链查看指南\n\n- **Grafana Explore**（推荐）→ 左侧切到 `Zipkin` 数据源 → Query Type: `Search` → Service Name 选 `webook` → Run Query\n- **Zipkin UI 直连**：访问 `http://<host>:9411`（host 替换成当前部署的 IP / 域名）\n\n常用 Span Name：\n- `/article/reader/page` · `/article/reader/detail` · `/interaction/like` · `/user/login`\n- `select article` · `select interaction`（GORM 子 span）\n- `hgetall` · `set` · `eval`（Redis 子 span）\n- `kafka send interactions`（Producer span）· `kafka consume interactions`（Consumer span）\n\n> 一条 HTTP 请求 trace 通常含 20-40 个 span（HTTP → Service → DB → Redis → Kafka）。\n"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "HTTP QPS（全服务）",
+      "gridPos": {"x": 0, "y": 4, "w": 6, "h": 6},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "expr": "sum(rate(webook_http_requests_total[5m]))",
+          "refId": "A",
+          "legendFormat": "qps"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "decimals": 2
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "HTTP 5xx 错误率",
+      "gridPos": {"x": 6, "y": 4, "w": 6, "h": 6},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "expr": "sum(rate(webook_http_requests_total{status=~\"5..\"}[5m])) / sum(rate(webook_http_requests_total[5m]))",
+          "refId": "A",
+          "legendFormat": "rate"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 3,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 0.005},
+              {"color": "red", "value": 0.01}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "HTTP P99 延迟",
+      "gridPos": {"x": 12, "y": 4, "w": 6, "h": 6},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(webook_http_requests_duration_seconds_bucket[5m])))",
+          "refId": "A",
+          "legendFormat": "p99"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 3,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 0.3},
+              {"color": "red", "value": 0.5}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Go Goroutine 数",
+      "gridPos": {"x": 18, "y": 4, "w": 6, "h": 6},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "expr": "go_goroutines{job=\"webook-app\"}",
+          "refId": "A",
+          "legendFormat": "goroutines"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {"unit": "short"}
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "HTTP 请求 QPS（按路径）",
+      "gridPos": {"x": 0, "y": 10, "w": 12, "h": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "expr": "sum by (pattern) (rate(webook_http_requests_total[$__rate_interval]))",
+          "refId": "A",
+          "legendFormat": "{{pattern}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {"unit": "reqps"}
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "HTTP 响应时间分位（P50 / P95 / P99）",
+      "gridPos": {"x": 12, "y": 10, "w": 12, "h": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(webook_http_requests_duration_seconds_bucket[$__rate_interval])))",
+          "refId": "A",
+          "legendFormat": "p50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(webook_http_requests_duration_seconds_bucket[$__rate_interval])))",
+          "refId": "B",
+          "legendFormat": "p95"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(webook_http_requests_duration_seconds_bucket[$__rate_interval])))",
+          "refId": "C",
+          "legendFormat": "p99"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {"unit": "s"}
+      }
+    }
+  ],
+  "links": [
+    {
+      "title": "Zipkin Explore",
+      "url": "/explore?left=%5B%22now-15m%22,%22now%22,%22Zipkin%22,%7B%22query%22:%22%22,%22queryType%22:%22Search%22%7D%5D",
+      "type": "link",
+      "icon": "external link",
+      "targetBlank": true,
+      "tooltip": "Grafana Explore 里打开 Zipkin 数据源（跨环境可用）"
+    },
+    {
+      "title": "Webook / Overview",
+      "url": "/d/webook-overview",
+      "type": "link",
+      "icon": "dashboard"
+    }
+  ]
+}
