@@ -1,20 +1,26 @@
 # Grafana provisioning 运维命令
-# 用法：make -f mk/grafana.mk <target>（在 grafana/ 目录下执行）
+# 用法：cd deploy/grafana && make ENV=<local|dev|staging|prod> <target>
+#   默认 ENV=dev。restart / test-email-real 依赖 ENV 来定位对应 project 的容器。
 # 环境变量可覆盖：
+#   ENV=dev                          # 目标部署环境
 #   GRAFANA_HOST=192.168.150.101:3001
 #   GRAFANA_USER=admin
 #   GRAFANA_PASS=admin
 
+ENV          ?= dev
 GRAFANA_HOST ?= 192.168.150.101:3001
 GRAFANA_USER ?= admin
 GRAFANA_PASS ?= admin
 GRAFANA_URL  := http://$(GRAFANA_HOST)
 AUTH         := -u $(GRAFANA_USER):$(GRAFANA_PASS)
 
+# docker compose 命令带上 project 名和对应 env 文件，确保操作到正确 env 的容器
+COMPOSE      := docker compose -p webook-$(ENV) --env-file ../.env.$(ENV) -f ../docker-compose.yaml
+
 .PHONY: help reload reload-alerting reload-datasources reload-dashboards reload-all test-email test-email-ui test-email-real restart
 
 help:
-	@echo "make -f mk/grafana.mk <target>"
+	@echo "make <target>"
 	@echo ""
 	@echo "  reload             reload 告警配置（最常用）"
 	@echo "  reload-alerting    reload alerting（rules + contactpoints + policies）"
@@ -79,15 +85,15 @@ test-email-real:
 	@echo "🚨 即将停 webook 触发真告警（webook-up 规则，for=1m）"
 	@echo "   期间 webook 服务中断约 90 秒。生产环境慎用！"
 	@read -p "确认继续? [y/N] " ans; [ "$$ans" = "y" ] || [ "$$ans" = "Y" ] || { echo "已取消"; exit 0; }
-	@docker compose -f ../docker-compose.yaml stop webook
+	@$(COMPOSE) stop webook
 	@echo "⏳ 等 90s 让告警 firing + policy group_wait + SMTP 发送..."
 	@sleep 90
-	@docker compose -f ../docker-compose.yaml up -d webook
+	@$(COMPOSE) up -d webook
 	@echo "✅ webook 已恢复。邮箱应收到告警 + 稍后的 resolved 通知"
 	@echo "   Alerting 状态：http://$(GRAFANA_HOST)/alerting/list"
 
 # 兜底：API reload 失败 / 想重建容器时用
 restart:
 	@echo "🔄 重启 Grafana 容器..."
-	@docker compose -f ../docker-compose.yaml restart grafana
+	@$(COMPOSE) restart grafana
 	@echo "✅ 重启完成"

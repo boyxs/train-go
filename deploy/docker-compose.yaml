@@ -1,0 +1,354 @@
+# ===================================================
+# 文件：deploy/docker-compose.yaml（也是服务器 ~/webook-deploy/docker-compose.yaml）
+# 作用：L1 一份 compose 覆盖"本地开发 + 服务器部署"
+#   服务器：./deploy.sh <dev|staging|prod>
+#     → docker compose -p webook-<env> --env-file .env.<env> -f docker-compose.yaml up -d
+#   本地：./deploy.sh local
+#     → docker compose -p webook-local --env-file .env.local \
+#         -f docker-compose.yaml -f docker-compose.local.yaml up -d
+#     （local override 把 image 换成 build + 暴露宿主端口给 go run / DBeaver 等用）
+# ===================================================
+# 多环境如何隔离：
+#   - project 名按 env 分（webook-dev / webook-prod） → volume 自然独立
+#   - container_name 全 docker 唯一（webook-app / webook-mysql ...） → 同时只跑一套
+#   - APP_ENV 从 .env.<env> 注入，webook 加载不同 yaml（local/dev/staging/prod）
+#   - yaml 里直接写明文密码（学习项目）；L2 K8s 再用 Secret + envFrom 做敏感隔离
+# ===================================================
+services:
+  # ── 业务 ─────────────────────────────────────────────────
+  webook:
+    image: ghcr.io/${GH_USER}/webook:${IMAGE_TAG}
+    container_name: webook-app
+    restart: always
+    environment:
+      APP_ENV: "${APP_ENV}"              # .env.<env> 指定 config/<env>.yaml
+      DEPLOY_ENV: "${DEPLOY_ENV}"
+      TZ: "Asia/Shanghai"
+    depends_on:
+      webook-mysql:   {condition: service_healthy}
+      webook-redis:   {condition: service_healthy}
+      webook-kafka:   {condition: service_healthy}
+      webook-es:      {condition: service_healthy}
+
+  # ── 前端 + 反向代理 ──────────────────────────────────────
+  webook-fe:
+    image: ghcr.io/${GH_USER}/webook-fe:${FE_IMAGE_TAG}
+    container_name: webook-fe
+    restart: always
+    mem_limit: ${FE_MEM:-512m}
+    environment:
+      NODE_ENV: production
+      NEXT_TELEMETRY_DISABLED: "1"
+    # 不直接对外暴露端口，统一走 nginx
+
+  # ── 中间件 ───────────────────────────────────────────────
+  webook-mysql:
+    image: mysql:8.0
+    container_name: webook-mysql
+    restart: always
+    mem_limit: ${MYSQL_MEM:-768m}       # 实机验证：<400m 首次 InnoDB init 会 cgroup OOM
+    environment:
+      MYSQL_ROOT_PASSWORD: "${MYSQL_PASS}"
+      MYSQL_DATABASE: webook
+      TZ: "Asia/Shanghai"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      # CMD-SHELL 稳：shell 解析参数；-h 127.0.0.1 比 localhost 稳（mysql 8 socket 处理有坑）
+      # 不传 -p：ping 不需要认证，密码不同步时不误判
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 --silent || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s                  # 首次 init 宽限期
+
+  webook-redis:
+    image: redis:7.2-alpine
+    container_name: webook-redis
+    restart: always
+    mem_limit: ${REDIS_MEM:-128m}
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASS}
+      --appendonly yes
+      --bind 0.0.0.0
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASS}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      # docker inspect --format='{{json .State.Health}}' webook-redis
+
+  webook-etcd:
+    image: bitnami/etcd:3.5.17
+    container_name: webook-etcd
+    restart: always
+    mem_limit: ${ETCD_MEM:-128m}
+    environment:
+      # ALLOW_NONE_AUTHENTICATION 语义反直觉：
+      #   yes = 允许无认证（etcd 开放）
+      #   no  = 必须有 ETCD_ROOT_PASSWORD（etcd 要认证）
+      # webook 远程配置加载失败会 fallback 本地 yaml，所以 yes 对开发更省事
+      ALLOW_NONE_AUTHENTICATION: "${ETCD_ALLOW_NONE:-yes}"
+      ETCD_ROOT_PASSWORD: "${ETCD_PASS:-13520}"
+      ETCD_ADVERTISE_CLIENT_URLS: "http://webook-etcd:2379"
+      ETCD_LISTEN_CLIENT_URLS: "http://0.0.0.0:2379"
+    volumes:
+      - etcd-data:/bitnami/etcd
+
+  webook-kafka:
+    image: apache/kafka:3.7.0
+    container_name: webook-kafka
+    restart: always
+    mem_limit: ${KAFKA_MEM:-768m}
+    environment:
+      KAFKA_NODE_ID: 0
+      KAFKA_PROCESS_ROLES: controller,broker
+      # PLAINTEXT 供容器间通信（用容器名 webook-kafka:9092）
+      # EXTERNAL 供宿主机外部访问：local 模式 localhost:9094，server 模式填服务器 IP (如 192.168.150.101:9094)
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,EXTERNAL://0.0.0.0:9094
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://webook-kafka:9092,EXTERNAL://${KAFKA_EXTERNAL_HOST:-localhost}:${KAFKA_EXTERNAL_PORT:-9094}"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 0@webook-kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      # 允许自动创建 topic，线上不要开启
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      # 单节点必须设为 1，默认值 3 会因副本不足无法创建内部 topic
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      # 实机验证：<-Xmx384m 会 java.lang.OutOfMemoryError（LogCleaner 启动时）
+      KAFKA_HEAP_OPTS: "${KAFKA_HEAP:--Xmx512m -Xms512m}"
+      # 固定集群 ID，重启不丢数据
+      CLUSTER_ID: webook-kafka-cluster
+    volumes:
+      - kafka-data:/tmp/kraft-combined-logs
+    healthcheck:
+      # Kafka 真 ready 的标志：能列出 topics（空列表也 OK，返回非零才算失败）
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s       # JVM 启动 + metadata 加载需要时间
+
+  webook-es:
+    image: elasticsearch:8.12.2
+    container_name: webook-es
+    restart: always
+    mem_limit: ${ES_MEM:-1024m}
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      xpack.security.http.ssl.enabled: "false"
+      ES_JAVA_OPTS: "${ES_HEAP:--Xms512m -Xmx512m}"
+    volumes:
+      - es-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  webook-ollama:
+    image: ollama/ollama:0.6.2
+    container_name: webook-ollama
+    restart: always
+    mem_limit: ${OLLAMA_MEM:-2048m}
+    profiles: ["llm"]                    # COMPOSE_PROFILES=llm ./deploy.sh <env> 启用
+    volumes:
+      - ollama-data:/root/.ollama
+
+  # ── Exporters ────────────────────────────────────────────
+  webook-mysqld-exporter:
+    image: prom/mysqld-exporter:v0.15.0
+    container_name: webook-mysqld-exporter
+    restart: always
+    mem_limit: ${MYSQLD_EXPORTER_MEM:-64m}
+    environment:
+      MYSQLD_EXPORTER_PASSWORD: "${MYSQL_PASS}"
+    command:
+      - "--mysqld.username=root"
+      - "--mysqld.address=webook-mysql:3306"
+    depends_on:
+      webook-mysql: {condition: service_healthy}
+
+  webook-redis-exporter:
+    image: oliver006/redis_exporter:v1.58.0
+    container_name: webook-redis-exporter
+    restart: always
+    mem_limit: ${REDIS_EXPORTER_MEM:-64m}
+    environment:
+      REDIS_ADDR: "redis://webook-redis:6379"
+      REDIS_PASSWORD: "${REDIS_PASS}"
+    depends_on:
+      webook-redis: {condition: service_healthy}
+
+  webook-kafka-exporter:
+    image: danielqsj/kafka-exporter:v1.7.0
+    container_name: webook-kafka-exporter
+    restart: always
+    mem_limit: ${KAFKA_EXPORTER_MEM:-64m}
+    command:
+      - "--kafka.server=webook-kafka:9092"
+    depends_on:
+      webook-kafka: {condition: service_healthy}
+
+  webook-node-exporter:
+    image: prom/node-exporter:v1.7.0
+    container_name: webook-node-exporter
+    restart: always
+    mem_limit: ${NODE_EXPORTER_MEM:-64m}
+    command:
+      - "--path.rootfs=/host"
+    # /:/host:ro,rslave 把宿主机根目录只读挂进容器，让 node-exporter 读宿主 CPU/MEM/磁盘
+    # 仅 Linux 部署生效（Mac/Windows Docker Desktop 挂的是 VM，指标不准）
+    volumes:
+      - /:/host:ro,rslave
+
+  # ── 监控链路 ─────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v3.4.1
+    container_name: webook-prometheus
+    restart: always
+    mem_limit: ${PROMETHEUS_MEM:-512m}
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    # --web.enable-lifecycle 启用 /-/reload 热重载 API（改规则 / scrape_configs 不用重启）
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
+      - "--web.console.templates=/usr/share/prometheus/consoles"
+      - "--web.enable-lifecycle"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/alerting:/etc/prometheus/alerting:ro
+      - prometheus-data:/prometheus
+    extra_hosts:
+      # Linux 上让容器能访问宿主机（Mac/Windows Docker Desktop 已原生支持）
+      - "host.docker.internal:host-gateway"
+
+  grafana:
+    image: grafana/grafana:11.6.0
+    container_name: webook-grafana
+    restart: always
+    mem_limit: ${GRAFANA_MEM:-256m}
+    ports:
+      - "${GRAFANA_PORT:-3001}:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: "${GRAFANA_USER:-admin}"
+      GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_PASS:-admin}"
+      # ── SMTP（告警邮件）凭证从 .env.<env> 注入 ──
+      GF_SMTP_ENABLED: "${GRAFANA_SMTP_ENABLED:-false}"
+      GF_SMTP_HOST: "${GRAFANA_SMTP_HOST:-smtp.qq.com:587}"
+      GF_SMTP_USER: "${GRAFANA_SMTP_USER:-}"
+      GF_SMTP_PASSWORD: "${GRAFANA_SMTP_PASSWORD:-}"
+      GF_SMTP_FROM_ADDRESS: "${GRAFANA_SMTP_FROM_ADDRESS:-}"
+      GF_SMTP_FROM_NAME: "${GRAFANA_SMTP_FROM_NAME:-Webook Monitor}"
+      GF_SMTP_SKIP_VERIFY: "false"
+      GF_SMTP_STARTTLS_POLICY: "MandatoryStartTLS"
+      # 提供给 alerting provisioning 的 contactpoints.yml 用 $__env{ALERT_EMAIL_TO} 读
+      ALERT_EMAIL_TO: "${ALERT_EMAIL_TO}"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana-data:/var/lib/grafana
+
+  # ── 追踪链路 ─────────────────────────────────────────────
+  zipkin:
+    # 用 full 版（比 slim 大约 +200MB）：保留 micrometer /prometheus 自监控端点
+    # 想省体积切回 slim 只会失去自监控，不影响功能
+    image: openzipkin/zipkin:3.4
+    container_name: webook-zipkin
+    restart: always
+    # mem 存储足够用 512m；切 ES 存储后写入压力增大，建议调到 1024m
+    mem_limit: ${ZIPKIN_MEM:-512m}
+    ports:
+      - "${ZIPKIN_PORT:-9411}:9411"
+    environment:
+      # 暂时用内存存储：重启 trace 数据丢失，开发够用
+      STORAGE_TYPE: mem
+      JAVA_OPTS: "${ZIPKIN_HEAP:--Xms256m -Xmx256m}"
+      # 切 ES 存储时打开下面三行（并把 STORAGE_TYPE 改成 elasticsearch）：
+      # ES_HOSTS: "http://webook-es:9200"
+      # ES_INDEX: "zipkin"
+      # ES_INDEX_REPLICAS: "0"   # 单节点 ES 必须 0，否则索引黄
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9411/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # OTel Collector：标准 OTLP 入口，转发到 zipkin（未来可加 Tempo/Datadog 等多 exporter）
+  # 用 contrib 版：二进制路径 /otelcol-contrib，exporter/receiver 齐全，国内镜像缓存更好
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.105.0
+    container_name: webook-otel-collector
+    restart: always
+    mem_limit: ${OTEL_MEM:-256m}
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    volumes:
+      - ./otel-collector/config.yaml:/etc/otelcol-contrib/config.yaml:ro
+    depends_on:
+      - zipkin
+
+  # ── 反代 ─────────────────────────────────────────────────
+  nginx:
+    # 1.26.x 是当前 stable 分支（LTS），patch 版本指定到位，重建可复现
+    image: nginx:1.26.3-alpine
+    container_name: webook-nginx
+    restart: always
+    mem_limit: ${NGINX_MEM:-128m}
+    ports:
+      - "${NGINX_PORT:-80}:80"
+      # 上 HTTPS 后开 443 + 挂证书
+      # - "${NGINX_HTTPS_PORT:-443}:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+    # 不挂 /var/log/nginx：保留官方镜像的 access.log → /dev/stdout / error.log → /dev/stderr 软链
+    # 让 docker 接管日志（docker logs / 配置 logrotate driver），避免文件无限增长
+    depends_on:
+      - webook
+      - webook-fe
+    healthcheck:
+      # 用 127.0.0.1 而非 localhost：避免 BusyBox wget 优先解析 IPv6 ::1（nginx 默认只监听 IPv4）失败
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  # ── bitnami/kafka 备用配置（镜像源可用时切换） ──────────────
+  # kafka:
+  #   image: 'bitnami/kafka:3.6.0'
+  #   container_name: webook-kafka
+  #   restart: always
+  #   mem_limit: 512m
+  #   ports:
+  #     - '9092:9092'
+  #     - '9094:9094'
+  #   environment:
+  #     - KAFKA_CFG_NODE_ID=0
+  #     - KAFKA_CFG_PROCESS_ROLES=controller,broker
+  #     - KAFKA_CFG_LISTENERS=PLAINTEXT://0.0.0.0:9092,CONTROLLER://:9093,EXTERNAL://0.0.0.0:9094
+  #     - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092,EXTERNAL://localhost:9094
+  #     - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT,PLAINTEXT:PLAINTEXT
+  #     - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=0@kafka:9093
+  #     - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+  #     - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
+  #     - KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+  #     - KAFKA_CFG_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
+  #     - KAFKA_CFG_TRANSACTION_STATE_LOG_MIN_ISR=1
+  #     - KAFKA_HEAP_OPTS=-Xmx256m -Xms256m
+  #     - KAFKA_KRAFT_CLUSTER_ID=webook-kafka-kraft-cluster-id
+  #   volumes:
+  #     - kafka-data:/bitnami/kafka
+volumes:
+  mysql-data:
+  redis-data:
+  etcd-data:
+  kafka-data:
+  es-data:
+  ollama-data:
+  prometheus-data:
+  grafana-data:

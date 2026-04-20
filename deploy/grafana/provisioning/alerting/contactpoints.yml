@@ -20,7 +20,9 @@ contactPoints:
       - uid: webook-email
         type: email
         settings:
-          addresses: "3236447743@qq.com"
+          # 收件人用 Grafana 的 $__env{} 语法，从容器环境变量读（docker-compose 注入）
+          # 多收件人用分号分隔，例 "ops@a.com;oncall@b.com"
+          addresses: "$__env{ALERT_EMAIL_TO}"
           singleEmail: false
           # ── 模板上下文说明 ────────────────────────────────────────
           # top-level 可用：.Status / .GroupLabels / .CommonLabels /

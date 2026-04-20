@@ -26,7 +26,7 @@ docker compose logs -f prometheus
 ### prometheus.yml（Docker 版）
 
 ```yaml
-# prometheus/prometheus.yml（顶层 work/prometheus）
+# deploy/prometheus/prometheus.yml（项目路径 work/deploy/prometheus/）
 global:
   scrape_interval: 15s      # 默认抓取间隔
   evaluation_interval: 15s   # 规则评估间隔
@@ -129,7 +129,7 @@ Exporter 不对外暴露端口，只在 Docker 网络内供 Prometheus 抓取。
 
 ### 数据源（已自动配置）
 
-`grafana/provisioning/datasources/prometheus.yml` 自动将 Prometheus 配为默认数据源。
+`deploy/grafana/provisioning/datasources/prometheus.yml` 自动将 Prometheus 配为默认数据源。
 
 ### 导入面板
 

@@ -3,8 +3,11 @@ name: Webook Frontend CI
 on:
   push:
     # 不用 paths 过滤：否则 tag push 指向 diff 不含 webook-fe/** 的 commit 时会静默不触发
-    branches: [master, feature]
+    branches: [master, 'feature/**']
     tags: ['webook-fe-v*.*.*']
+    paths-ignore:
+      - 'webook/**'
+      - '**.md'
   pull_request:
     branches: [master]
     paths:
@@ -68,8 +71,12 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
+            # master 分支：master-latest（滚动）+ master-<sha>（可回溯）
+            type=raw,value=master-latest,enable=${{ github.ref == 'refs/heads/master' }}
             type=raw,value=master-${{ github.sha }},enable=${{ github.ref == 'refs/heads/master' }}
-            type=raw,value=feature-${{ github.sha }},enable=${{ github.ref == 'refs/heads/feature' }}
+            # feature/** 分支：feature-<sha>
+            type=raw,value=feature-${{ github.sha }},enable=${{ startsWith(github.ref, 'refs/heads/feature/') }}
+            # tag webook-fe-v1.2.3 → 1.2.3
             type=match,pattern=webook-fe-v(.*),group=1
 
       - uses: docker/setup-buildx-action@v3
@@ -89,5 +96,8 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           build-args: |
             NEXT_PUBLIC_API_BASE_URL=/api
+          # 关掉 attestation（同 webook-ci.yml，老版 docker-compose 解析不了）
+          provenance: false
+          sbom: false
           cache-from: type=gha,scope=webook-fe
           cache-to: type=gha,mode=max,scope=webook-fe

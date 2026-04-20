@@ -35,7 +35,7 @@ webook 启动比 Kafka JVM 快，`InitSaramaSyncProducer` 一次性连接失败 
 
 双保险：
 - **代码层**：`retryConnect` 指数退避重试 6 次（`webook/ioc/kafka.go`）
-- **编排层**：`docker-compose.yaml` 加 Kafka healthcheck + webook `depends_on.kafka.condition: service_healthy`
+- **编排层**：`deploy/docker-compose.yaml` 加 Kafka healthcheck + webook `depends_on.webook-kafka.condition: service_healthy`
 
 ### 3. Kafka OTel：IBM/sarama 无官方适配
 
@@ -146,14 +146,14 @@ func InitOTel() func(context.Context) error {
 }
 ```
 
-**配置示例（config/dev.yaml）**：
+**配置示例（config/local.yaml）**：
 
 ```yaml
 otel:
   endpoint: "localhost:4317"
   serviceName: "webook"
-  env: "dev"
-  sampleRatio: 1.0       # dev 全采样；prod 改 0.1
+  env: "local"
+  sampleRatio: 1.0       # local 全采样；prod 改 0.1
 ```
 
 **main.go 收尾**：

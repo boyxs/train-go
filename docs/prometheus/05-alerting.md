@@ -235,7 +235,7 @@ groups:
 告警触发后需要 Alertmanager 做路由和通知：
 
 ```yaml
-# docker-compose.yaml 新增
+# deploy/docker-compose.yaml 新增
 alertmanager:
   image: prom/alertmanager:v0.27.0
   ports: ["9093:9093"]
