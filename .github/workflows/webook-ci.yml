@@ -8,6 +8,10 @@ on:
     tags: ['webook-v*.*.*']
     paths-ignore:
       - 'webook-fe/**'
+      - 'deploy/**'
+      - 'docs/**'
+      - 'sandbox/**'
+      - 'prd/**'
       - '**.md'
   pull_request:
     branches: [master]
@@ -19,10 +23,17 @@ on:
 permissions:
   contents: read               # 默认最小权限，build-push job 自己 override
 
+# 同一 ref 的新 push 自动取消还在跑的旧 run，省 runner 时间（快速 amend + push 场景）
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository_owner }}/webook
   MODULE: github.com/webook
+  # 禁止 CI 里修改 go.sum；依赖漂移必须本地先提交，防 CI 偷偷改依赖
+  GOFLAGS: "-mod=readonly"
 
 defaults:
   run:
@@ -42,8 +53,8 @@ jobs:
           cache: true
           cache-dependency-path: webook/go.sum
 
-      - name: 安装 goimports
-        run: go install golang.org/x/tools/cmd/goimports@latest
+      - name: 安装 goimports（走 setup-go cache，已装就跳过）
+        run: test -x "$(go env GOPATH)/bin/goimports" || go install golang.org/x/tools/cmd/goimports@v0.26.0
 
       - name: 检查 import 顺序
         run: |
@@ -59,7 +70,13 @@ jobs:
         run: go vet ./...
 
       - name: 单元测试
-        run: go test -race $(go list ./... | grep -v /integration)
+        # master 和 tag 发布路径跑 -race（慢 2-5x 但抓并发 bug）；feature 开发快速反馈
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/master" ]] || [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            go test -race $(go list ./... | grep -v /integration)
+          else
+            go test $(go list ./... | grep -v /integration)
+          fi
 
   build-push:
     needs: lint-test
