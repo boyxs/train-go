@@ -77,6 +77,18 @@ otel:
   serviceName: "webook"
   serviceVersion: "0.1.0"
   env: "prod"
+  # ── 采样率计算公式（请勿删除，后续改动请同步）──────────────────────
+  # sampleRatio = min(1.0, TargetTracesPerSec / AvgQPS)
+  #   AvgQPS            当前服务平均 QPS（看 Grafana: rate(webook_http_requests_total[5m])）
+  #   TargetTracesPerSec 后端期望保留的 trace 数/秒（Zipkin/Tempo 存储承受量）
+  #                     学习/调试 = AvgQPS（即 1.0 全采）
+  #                     小规模生产 = 10~50
+  #                     大规模生产 = 100~500
+  # 例：AvgQPS=500, 目标 50 traces/s → ratio=0.1
+  # 例：AvgQPS=10,  想全看                → ratio=1.0
+  # 改完重启应用生效（ioc/otel.go 未注册 viper.OnConfigChange，推 etcd 不热更）。
+  # 错误/慢请求全留要在 Collector 配 tail_sampling processor，应用侧做不到。
+  # 详见 docs/opentelemetry/06-best-practices.md「四、采样策略」。
   sampleRatio: 0.1          # 生产 10% 采样；学习阶段如需全采可在 etcd 临时覆盖为 1.0
 
 #etcdctl --endpoints=127.0.0.1:2379 /webook < config/k8s.yaml
