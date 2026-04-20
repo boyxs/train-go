@@ -345,7 +345,7 @@ services:
   # OTel Collector：标准 OTLP 入口，转发到 zipkin（未来可加 Tempo/Datadog 等多 exporter）
   # 用 contrib 版：二进制路径 /otelcol-contrib，exporter/receiver 齐全，国内镜像缓存更好
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.88.0
+    image: otel/opentelemetry-collector-contrib:0.105.0
     container_name: webook-otel-collector
     restart: always
     mem_limit: 256m

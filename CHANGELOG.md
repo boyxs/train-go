@@ -2,6 +2,22 @@
 
 <!-- 新功能前插在此，日期降序 -->
 
+## [2026-04-20] OTel Collector 升级 + 采样率公式文档化
+
+**变更内容**: otel-collector 镜像 `0.88.0 → 0.105.0`；`webook/config/prod.yaml` 新增 `sampleRatio` 计算公式注释（`min(1.0, TargetTracesPerSec / AvgQPS)`）并在 `docs/opentelemetry/06-best-practices.md` 同步；`dev.yaml` 加公式引用注释。
+
+**影响范围**:
+- `docker-compose.yaml`（collector 版本）
+- `otel-collector/config.yaml`（版本注释同步）
+- `webook/config/prod.yaml` / `webook/config/dev.yaml`（采样率说明块）
+- `docs/opentelemetry/06-best-practices.md`（新增「采样率计算公式」小节）
+
+**技术决策**: 未选 0.116.0 因 CentOS 7 kernel 3.10 跑不起（`exec: no such file or directory`，实为新 Go runtime syscall 不兼容）；0.105.0 是经验证可运行的上限。采样率公式两处同步（配置 + 文档），注释明确标注"请勿删除"。
+
+**待办**: 后续内核升级到 ≥5.x 或迁移 Rocky/Alma 9 后，可尝试升到 0.116+。
+
+**会话**: 260420-observability-采样率公式
+
 ## [2026-04-19] 服务总览 dashboard + 监控栈自监控（Grafana/OTel/Zipkin）
 
 **变更内容**: 新增 services-overview 大盘覆盖 up/主机/Go/MySQL/Redis/Kafka/监控栈/Zipkin 六大区；Prometheus 加 grafana/otel-collector/zipkin 三个 scrape job；OTel Collector 暴露 :8888 自监控；Zipkin 换 slim→full 以保留 /prometheus 端点

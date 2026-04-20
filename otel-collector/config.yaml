@@ -1,4 +1,4 @@
-# OpenTelemetry Collector 配置（contrib 0.88.0，兼容 CentOS 7 kernel 3.10）
+# OpenTelemetry Collector 配置（contrib 0.105.0）
 # 流向：webook (OTLP/gRPC) → 本 Collector → Zipkin
 
 receivers:

@@ -113,6 +113,32 @@ sdktrace.WithSampler(
 | 1k ~ 10k | 0.01 ~ 0.1 |
 | > 10k | 0.001 + 尾部采样（错误/慢请求全留） |
 
+### 采样率计算公式
+
+```
+sampleRatio = min(1.0, TargetTracesPerSec / AvgQPS)
+```
+
+| 变量 | 含义 | 怎么取 |
+|------|------|--------|
+| `AvgQPS` | 服务平均 QPS | Grafana: `rate(webook_http_requests_total[5m])` |
+| `TargetTracesPerSec` | 后端期望保留的 trace 数/秒 | 学习/调试 = `AvgQPS`（全采）<br>小规模生产 = 10~50<br>大规模生产 = 100~500（看 Zipkin/Tempo 存储成本） |
+
+**示例**
+
+| 场景 | AvgQPS | TargetTracesPerSec | sampleRatio |
+|------|--------|--------------------|-------------|
+| 本地调试 | 10 | 10（=AvgQPS） | 1.0 |
+| 小流量生产 | 500 | 50 | 0.1 |
+| 中等流量 | 5 000 | 100 | 0.02 |
+| 高流量 | 50 000 | 500 | 0.01 |
+
+**选 `TargetTracesPerSec` 的依据**：Zipkin in-memory 单节点大约能扛 1 000 spans/s 持续写入；Tempo + 对象存储能扛 10k+。先从后端容量倒推，再除以 AvgQPS。
+
+**现象排查**：如果观察到"很多请求只收到一两个 trace"，先确认不是 sampleRatio 过低导致的——按公式反算一下 `AvgQPS × sampleRatio` 是否符合预期。
+
+> 此公式也同步在 `webook/config/prod.yaml` 的 `otel.sampleRatio` 注释中，改动请保持两处一致。
+
 ### 错误/慢请求全留怎么做
 
 头部采样 + 业务侧覆盖：

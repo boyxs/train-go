@@ -74,7 +74,8 @@ otel:
   serviceName: "webook"
   serviceVersion: "0.1.0"
   env: "dev"
-  sampleRatio: 1.0          # dev 全采样
+  # 采样率公式详见 config/prod.yaml 注释或 docs/opentelemetry/06-best-practices.md。
+  sampleRatio: 1.0          # dev 全采样（学习/调试全量看）
 
 #etcdctl --endpoints=127.0.0.1:2379 put /webook < config/dev.yaml
 
