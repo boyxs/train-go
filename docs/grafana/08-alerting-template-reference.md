@@ -1,6 +1,6 @@
 # Grafana Alerting 模板完整参考
 
-写 / 改 `grafana/provisioning/alerting/contactpoints.yml` 的 `subject` / `message` 时的**所有可用字段 + 函数 + 陷阱**。
+写 / 改 `deploy/grafana/provisioning/alerting/contactpoints.yml` 的 `subject` / `message` 时的**所有可用字段 + 函数 + 陷阱**。
 
 ## 一、模板引擎说明
 

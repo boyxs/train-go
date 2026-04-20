@@ -16,7 +16,40 @@ wire ./internal/integration/setup/... # 重新生成集成测试 wire_gen.go
 make -f mk/mock.mk mockgen           # 重新生成 Mock
 make -f mk/es.mk help                # ES 管理命令
 make -f mk/infra.mk help             # 基础设施管理
+
+# 启动示例（默认用 config/local.yaml）
+APP_ENV=config/local.yaml go run main.go
 ```
+
+## 环境说明
+
+应用配置命名标准（**config 层**，不同于部署层 `.env.<env>`）：
+
+| 文件 | 角色 | 谁用 | 特征 |
+|------|------|------|------|
+| `config/local.yaml` | 本地开发 | 你 Windows `go run`、IDE 调试 | 明文密码连本机 docker compose |
+| `config/dev.yaml` | 团队共享 dev / CI 集成测试 | 部署 `webook-dev` project | `otel.env=dev`, `sampleRatio=1.0`, logger debug |
+| `config/staging.yaml` | 预发布 | 部署 `webook-staging` project | `otel.env=staging`, `sampleRatio=0.5` |
+| `config/prod.yaml` | 生产 | 部署 `webook-prod` project | `otel.env=prod`, `sampleRatio=0.1`, logger info |
+
+**配置方案**（L1 学习项目）：
+- 四份 yaml 同构但按环境差异化（otel.env / sampleRatio / logger / 密码等）
+- 密码/API key 直接写在 yaml 里（`mysql.dsn` / `redis.password` / `llm.providers[].apiKey`）
+- 应用进 docker 部署时，`.env.<env>` 的 `APP_ENV` 决定加载哪份 yaml
+- `.env.<env>` 的 `MYSQL_PASS` / `REDIS_PASS` 必须和 yaml 里的密码一致（中间件容器起动用，不同步会连不上）
+
+**docker-compose 动态选 yaml**：`APP_ENV: "${APP_ENV}"`，`.env.<env>` 里填 `config/<env>.yaml`。
+
+**L2 K8s 演进**：yaml 进 ConfigMap，密码剥到 K8s Secret，`envFrom.secretRef` 注入容器环境变量，应用侧加 `viper.BindEnv("mysql.dsn", "MYSQL_DSN")` 显式绑定 env key → yaml 字段（纯 AutomaticEnv 对嵌套 key 不生效已实测验证）。
+
+**L1 部署层**（`deploy/` 目录，项目部署唯一真相源）：
+- `docker-compose.yaml` + 四份 `.env.<env>`（local/dev/staging/prod）
+- `./deploy.sh local`：本地开发（build 代码 + 暴露宿主端口给 go run / DBeaver）
+- `./deploy.sh <dev|staging|prod>`：服务器部署（pull ghcr 镜像）
+- 同时只跑一套（container_name 唯一），volume 按 project 隔离（`webook-<env>_*`）不串
+- K8s 将来新开 `k8s/` 或 `helm/` 目录与 `deploy/` 并列，不挤压这里
+
+完整 CI/CD 演进路线见 `C:\Go\notes\cicd-webook-roadmap.md`。
 
 ## 导航
 

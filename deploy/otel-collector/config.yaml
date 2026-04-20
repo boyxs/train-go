@@ -1,5 +1,5 @@
 # OpenTelemetry Collector 配置（contrib 0.105.0）
-# 流向：webook (OTLP/gRPC) → 本 Collector → Zipkin
+# 流向：webook (OTLP/gRPC) → 本 Collector → Zipkin（同 project 内 service name DNS）
 
 receivers:
   otlp:
@@ -23,7 +23,7 @@ processors:
 
 exporters:
   zipkin:
-    # 用 container_name 而非 service name，DNS 解析更明确
+    # 用 container_name（也是 service name），同 project DNS 解析更明确
     endpoint: http://webook-zipkin:9411/api/v2/spans
     tls:
       insecure: true

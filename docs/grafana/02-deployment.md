@@ -1,8 +1,11 @@
 # 部署与配置
 
-## 一、当前部署（webook docker-compose）
+## 一、当前部署（deploy/docker-compose.yaml）
 
-`webook/docker-compose.yaml`：
+> 2026-04-20 起部署配置统一到 `deploy/` 目录。下面 compose 片段里的 `./grafana/...`
+> 相对路径基于 `deploy/` 当前目录生效，结构等价迁移。
+
+`deploy/docker-compose.yaml`：
 
 ```yaml
 grafana:
@@ -26,7 +29,7 @@ grafana:
 **目录结构**：
 
 ```
-grafana/                       # 顶层 work/grafana
+deploy/grafana/                # 项目路径 work/deploy/grafana
 └── provisioning/
     ├── datasources/
     │   └── prometheus.yml          # Prometheus 数据源

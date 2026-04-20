@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -53,7 +54,7 @@ func initViperV1() {
 	env := pflag.String("env", os.Getenv("APP_ENV"), "运行环境")
 	pflag.Parse()
 	if *env == "" {
-		*env = "config/dev.yaml"
+		*env = "config/local.yaml"
 	}
 	viper.SetConfigFile(*env)
 	viper.AutomaticEnv()
@@ -71,12 +72,16 @@ func initViperV2() {
 	env := pflag.String("env", os.Getenv("APP_ENV"), "运行环境")
 	pflag.Parse()
 	if *env == "" {
-		*env = "config/dev.yaml"
+		*env = "config/local.yaml"
 	}
 	viper.SetConfigFile(*env)
 	if err := viper.ReadInConfig(); err != nil {
 		panic(err)
 	}
+	// 环境变量覆盖 yaml 配置（L2 预埋钩子）：例如 MYSQL_DSN 覆盖 viper.GetString("mysql.dsn")
+	// K8s 时代由 envFrom.secretRef 注入 Secret 的敏感字段，yaml 降级为默认值模板
+	viper.AutomaticEnv()
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	var cfg = EtcdConfig{
 		Endpoint: "http://127.0.0.1:2379",
 		Path:     "/webook",

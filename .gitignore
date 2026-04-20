@@ -14,6 +14,8 @@ go.work
 /out/
 
 # 环境变量（敏感凭证：SMTP 授权码 / API key 等）
-.env
-.env.*
-!.env.example
+# .env
+# .env.*
+# !.env.local
+# !.env.example
+# !.env.*.example

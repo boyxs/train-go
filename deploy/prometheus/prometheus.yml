@@ -1,0 +1,63 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  # 由 .env.<env> 的 DEPLOY_ENV 透传到 webook 应用、otel trace；
+  # prometheus 配置是静态文件，需要 env 区分指标时手动改或用 file_sd_configs
+  external_labels:
+    cluster: "webook"
+
+# 告警规则目录（可选填，deploy/prometheus/alerting/ 空时 prometheus 无规则运行不影响）
+rule_files:
+  - /etc/prometheus/alerting/*.yml
+
+scrape_configs:
+  # Prometheus 自身
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # webook 应用
+  - job_name: 'webook-app'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['webook:8089']
+
+  # MySQL
+  - job_name: 'mysql'
+    static_configs:
+      - targets: ['webook-mysqld-exporter:9104']
+
+  # Redis
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['webook-redis-exporter:9121']
+
+  # Kafka
+  - job_name: 'kafka'
+    static_configs:
+      - targets: ['webook-kafka-exporter:9308']
+
+  # 宿主机（Node Exporter）
+  - job_name: 'node'
+    static_configs:
+      - targets: ['webook-node-exporter:9100']
+
+  # Grafana 自监控：/metrics 部分版本默认要 basic auth，显式带上避免 401
+  # 凭证与 .env.<env> 的 GRAFANA_USER/GRAFANA_PASS 一致（Prometheus YAML 不展开 env，写死）
+  - job_name: 'grafana'
+    basic_auth:
+      username: admin
+      password: admin
+    static_configs:
+      - targets: ['webook-grafana:3000']
+
+  # OTel Collector 自监控（需在 collector config 里 telemetry.metrics.address 暴露）
+  - job_name: 'otel-collector'
+    static_configs:
+      - targets: ['webook-otel-collector:8888']
+
+  # Zipkin 自监控（micrometer 暴露在 /prometheus；slim 版无此端点）
+  - job_name: 'zipkin'
+    metrics_path: '/prometheus'
+    static_configs:
+      - targets: ['webook-zipkin:9411']

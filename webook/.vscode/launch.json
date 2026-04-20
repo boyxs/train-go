@@ -12,11 +12,11 @@
       "program": "${workspaceFolder}",
       "console": "integratedTerminal",
       "env": {
-        "APP_ENV": "config/dev.yaml", // k8s
+        "APP_ENV": "config/local.yaml", // 本地调试默认；CI/dev 服务器改 config/dev.yaml；生产用 config/prod.yaml
         "GOMEMLIMIT": "512MiB",
         "GOGC": "80"
       },
-      // "args": ["--env=config/dev.yaml"], //优先于env
+      // "args": ["--env=config/local.yaml"], //优先于env
     }
   ]
 }

@@ -4,8 +4,11 @@ on:
   push:
     # 不用 paths 过滤：否则 tag push 指向 diff 不含 webook/** 的 commit 时会静默不触发
     # 由 pull_request 的 paths 过滤保底，减少无关 PR 跑 CI 即可
-    branches: [master, feature]
+    branches: [master, 'feature/**']
     tags: ['webook-v*.*.*']
+    paths-ignore:
+      - 'webook-fe/**'
+      - '**.md'
   pull_request:
     branches: [master]
     paths:
@@ -85,8 +88,12 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
+            # master 分支：master-latest（滚动）+ master-<sha>（可回溯）
+            type=raw,value=master-latest,enable=${{ github.ref == 'refs/heads/master' }}
             type=raw,value=master-${{ github.sha }},enable=${{ github.ref == 'refs/heads/master' }}
-            type=raw,value=feature-${{ github.sha }},enable=${{ github.ref == 'refs/heads/feature' }}
+            # feature/** 分支：feature-<sha>
+            type=raw,value=feature-${{ github.sha }},enable=${{ startsWith(github.ref, 'refs/heads/feature/') }}
+            # tag webook-v1.2.3 → 1.2.3
             type=match,pattern=webook-v(.*),group=1
 
       - uses: docker/setup-buildx-action@v3
@@ -104,5 +111,12 @@ jobs:
           file: webook/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
+          build-args: |
+            VERSION=${{ github.sha }}
+          # 关掉 provenance / sbom attestation，产纯 manifest 而非 OCI index
+          # 老版 docker-compose（CentOS 7 自带的 v1）解析 OCI index 里 unknown/unknown
+          # attestation manifest 会报 "manifest unknown"
+          provenance: false
+          sbom: false
           cache-from: type=gha,scope=webook-backend
           cache-to: type=gha,mode=max,scope=webook-backend

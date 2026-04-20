@@ -1,0 +1,64 @@
+# ===================================================
+# 本地开发 override（叠加在 docker-compose.yaml 上）
+# 用法：./deploy.sh local
+#   等价于 docker compose -p webook-local --env-file .env.local \
+#     -f docker-compose.yaml -f docker-compose.local.yaml up -d
+# ===================================================
+# 差异点：
+#   - webook / webook-fe：image 换成本地 tag + pull_policy=never，强制 build
+#   - 中间件：暴露宿主端口，方便 Windows 上的 go run / DBeaver / RedisInsight 连
+#   - 宿主端口全由 .env.local 的 *_HOST_PORT 变量控制，不硬编码
+# ===================================================
+services:
+  webook:
+    image: webook:local
+    pull_policy: never              # 不尝试从 registry 拉，只用本地 build 出来的
+    build:
+      context: ../webook
+      dockerfile: Dockerfile
+      args:
+        VERSION: local
+    ports:
+      - "${WEBOOK_HOST_PORT:-8089}:8089"
+
+  webook-fe:
+    image: webook-fe:local
+    pull_policy: never
+    build:
+      context: ../webook-fe
+      dockerfile: Dockerfile
+      args:
+        # 同源部署：浏览器调 /api/*，nginx 剥前缀转后端
+        NEXT_PUBLIC_API_BASE_URL: /api
+        # 国内本地构建用淘宝镜像加速（CI 走默认官方源）
+        NPM_REGISTRY: https://registry.npmmirror.com
+
+  webook-mysql:
+    ports:
+      - "${MYSQL_HOST_PORT:-3306}:3306"
+
+  webook-redis:
+    ports:
+      - "${REDIS_HOST_PORT:-6379}:6379"
+
+  webook-etcd:
+    ports:
+      - "${ETCD_HOST_PORT:-2379}:2379"
+
+  webook-kafka:
+    ports:
+      - "${KAFKA_HOST_PORT:-9092}:9092"                   # PLAINTEXT（容器名 advertised，主机连不通，仅端口可用）
+      - "${KAFKA_EXTERNAL_HOST_PORT:-9094}:9094"          # EXTERNAL（advertised 为 KAFKA_EXTERNAL_HOST，主机 go run 走这个）
+
+  webook-es:
+    ports:
+      - "${ES_HOST_PORT:-9200}:9200"
+
+  webook-ollama:
+    ports:
+      - "${OLLAMA_HOST_PORT:-11434}:11434"
+
+  # OTLP 端口暴露给 Windows 上的 go run（IDE 起 webook 时 otel.endpoint 指 localhost:4317）
+  otel-collector:
+    ports:
+      - "${OTEL_HOST_PORT:-4317}:4317"

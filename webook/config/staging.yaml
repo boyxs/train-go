@@ -1,6 +1,6 @@
-# dev 环境配置 - 部署到团队共享 dev 服务器 / CI 集成测试使用
-# 同构 prod.yaml，差异点：otel.env="dev" / sampleRatio=1.0 / logger debug
-# 敏感字段（mysql.dsn 的密码、redis.password）由 .env.dev 经 AutomaticEnv 覆盖
+# staging 环境配置 - 预发布，贴近 prod
+# 同构 prod.yaml，差异点：otel.env="staging" / sampleRatio=0.5（中等采样）
+# 敏感字段由 .env.staging 经 AutomaticEnv 覆盖
 
 etcd:
   endpoint: "http://webook-etcd:2379"
@@ -61,8 +61,8 @@ embedding:
 
 logger:
   level:
-    l: -1              # debug 级，dev 看详细日志
-  development: true    # dev 开发模式（zap 打更多字段 / 堆栈）
+    l: 0                # info 级，对齐 prod
+  development: false
   encoding: 'json'
   outputPaths: [ 'stdout' ]
   errorOutputPaths: [ 'stderr' ]
@@ -71,5 +71,5 @@ otel:
   endpoint: "otel-collector:4317"
   serviceName: "webook"
   serviceVersion: "0.1.0"
-  env: "dev"            # 打到 span attribute deployment.environment
-  sampleRatio: 1.0      # dev 全采样
+  env: "staging"
+  sampleRatio: 0.5      # staging 中等采样（dev 1.0、prod 0.1 之间）
