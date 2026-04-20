@@ -15,12 +15,13 @@ func TestTicker(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 	for {
+		//be:
 		select {
 		case <-ctx.Done():
 			t.Log("超时了，或者被取消了")
 			// break 不会退出循环
 			goto end
-			//break end
+			//break be
 		case now := <-tm.C:
 			t.Log(now.Unix())
 		}
