@@ -2,6 +2,17 @@
 
 <!-- 新功能前插在此，日期降序 -->
 
+## [2026-04-20] GORM tracing 避开 AutoMigrate 启动噪音
+
+**变更内容**: `webook/ioc/db.go` 把 `dao.InitTable(db)` 从 `tracing.NewPlugin` 注册之后调整到之前，让 AutoMigrate 的 `SELECT information_schema.statistics ...` 等系统表查询不再产生 `gorm.Query` / `gorm.Row` span。
+
+**影响范围**:
+- `webook/ioc/db.go`（仅调整 InitTable 与 tracing plugin 的注册顺序）
+
+**技术决策**: gorm opentelemetry plugin 不支持按 database/table 过滤 span；`WithDBSystem` 只贴属性、不过滤。评估过 Collector 侧 filter processor（事后丢弃，浪费）、移除 Row callback（治标不治本）、换 uptrace/otelgorm（依赖变更大），最终选顺序调整——最小改动解决"启动期 information_schema 噪音"这个主要痛点。gormprom 保留在 InitTable 前，启动 SQL 仍会进 Prometheus metrics（聚合值影响忽略）。
+
+**会话**: 260420-observability-采样率公式
+
 ## [2026-04-20] OTel Collector 升级 + 采样率公式文档化
 
 **变更内容**: otel-collector 镜像 `0.88.0 → 0.105.0`；`webook/config/prod.yaml` 新增 `sampleRatio` 计算公式注释（`min(1.0, TargetTracesPerSec / AvgQPS)`）并在 `docs/opentelemetry/06-best-practices.md` 同步；`dev.yaml` 加公式引用注释。
