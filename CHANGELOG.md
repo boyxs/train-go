@@ -2,6 +2,41 @@
 
 <!-- 新功能前插在此，日期降序 -->
 
+## [2026-04-21] v1.0.0 基础设施增强：端口避让 + ghcr 源切换 + 懒拉镜像
+
+**变更内容**: 围绕 prod 正式发版 (`webook-v1.0.0` / `webook-fe-v1.0.0`) 做了三件部署基建的事：
+
+1. **prometheus 宿主端口重排**：dev/staging/prod 从 9090/9091/9092 → 9090/9190/9290，与 `KAFKA_EXTERNAL_PORT`（9094/9194/9294）百位 tier 对齐；prod 原 9092 撞 Kafka 业界默认端口
+2. **ghcr 镜像源可切换**：`.env.*` 加 `GHCR_REGISTRY`（默认 `ghcr.io`），`deploy.sh` 加 `--ghcr <host>` / `--ghcr=<host>` flag 单次覆盖（不改 env 文件）；配合 README 新增的阿里云 ACR 反代教程，为国内 prod 拉取慢提供方案
+3. **up 不再自动拉镜像**：compose 17 个 service 全加 `pull_policy: missing`，`deploy.sh` 的 `up` 分支删掉 `$COMPOSE pull`——镜像缺失才拉，已有直接启动；想显式刷新走 `./deploy.sh <env> pull`
+
+**影响范围**:
+- `deploy/docker-compose.yaml`（webook/webook-fe image 路径变量化、17 service 加 pull_policy）
+- `deploy/deploy.sh`（新增 `--ghcr` flag 解析、删 up 里的 auto pull）
+- `deploy/.env.{local,dev,staging,prod}` + 4 份 `.example`（新增 `GHCR_REGISTRY`、改 `PROMETHEUS_PORT`）
+- `deploy/README.md`（端口表 + ghcr 切换节 + 阿里云 ACR 反代节 + pull_policy 说明）
+
+**技术决策**:
+- **端口**：百位 tier 对齐 kafka 系，dev 保持社区默认 9090；Grafana → Prometheus 走容器内 `webook-prometheus:9090`，不受宿主端口改动影响
+- **ghcr 源**：只做 ghcr，不碰 Docker Hub（后者走 daemon `registry-mirrors` 更标准）；CLI flag 用 shell export 覆盖 `--env-file`，优先级天然更高。**实测公共 pull-through 代理（nju 等）拉不了私有 GHCR package**（404 manifest unknown），因此仓内默认官方源；要用加速域需把 package 改 public，或走阿里云 ACR 反代（教程见 README）
+- **pull_policy**：默认非强制 pull 提速启动；显式刷新和容器启动分离，心智清晰。local 保持 `$COMPOSE build`，和 `docker-compose.local.yaml` 里 `pull_policy: never` 一起保证永远用本地构建产物
+
+**坑**:
+- **同 tag 远端被重推**：`pull_policy: missing` 判定"镜像已存在"不拉，继续用旧镜像。v1.0.0 force-tag 场景必须 `./deploy.sh <env> pull` 显式刷新后再 up
+- **防火墙/安全组**：服务器若放通过 9091/9092 入站，需改放通 9190/9290
+
+**用法**:
+```bash
+# 按需切 ghcr 源（前提：package 已 public）
+./deploy.sh prod --ghcr <mirror>
+# 或改 .env.prod: GHCR_REGISTRY=<mirror>（永久）
+
+# 同 tag 刷新要显式 pull 再 up
+./deploy.sh prod pull && ./deploy.sh prod
+```
+
+**会话**: 260421-cicd-L1发版v1.0.0
+
 ## [2026-04-20] deploy/ 合并根目录残留文件 + Makefile 重命名
 
 **变更内容**: 上一轮合并时遗漏的根目录内容完整搬进 deploy/：

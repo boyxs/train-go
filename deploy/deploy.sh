@@ -10,6 +10,9 @@
 #   ./deploy.sh <env> pull                    # 只拉镜像（local 模式是 build）
 #   ./deploy.sh <env> restart <service>       # 重启某服务
 #   ./deploy.sh list                          # 看所有 env 残留
+# 可选 flag：
+#   --ghcr <host>   覆盖 .env.<env> 的 GHCR_REGISTRY（仅本次生效，不改文件）
+#                   例：./deploy.sh prod --ghcr ghcr.nju.edu.cn
 # 环境隔离：project 名 webook-<env>，volume 按 env 独立保留
 # 同时只跑一套：container_name 全局唯一，强制切换前停旧的
 # local vs dev/staging/prod：
@@ -20,6 +23,37 @@
 set -e
 
 cd "$(dirname "$0")"
+
+# ── 预解析 --ghcr 可选 flag（可出现在任意位置，不打乱位置参数）────────
+GHCR_OVERRIDE=""
+_args=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --ghcr)
+      [ -z "$2" ] && { echo "❌ --ghcr 需要参数，如 --ghcr ghcr.nju.edu.cn"; exit 1; }
+      GHCR_OVERRIDE="$2"
+      shift 2
+      ;;
+    --ghcr=*)
+      GHCR_OVERRIDE="${1#--ghcr=}"
+      [ -z "$GHCR_OVERRIDE" ] && { echo "❌ --ghcr= 需要非空值"; exit 1; }
+      shift
+      ;;
+    *)
+      _args+=("$1")
+      shift
+      ;;
+  esac
+done
+set -- "${_args[@]}"
+# 去尾斜杠规范化（支持 ghcr.io// 这种多余写法）
+while [[ "$GHCR_OVERRIDE" == */ ]]; do GHCR_OVERRIDE="${GHCR_OVERRIDE%/}"; done
+
+# 导出到子进程：docker compose 的 shell env 会覆盖 --env-file 同名项
+if [ -n "$GHCR_OVERRIDE" ]; then
+  export GHCR_REGISTRY="$GHCR_OVERRIDE"
+  echo "ℹ️  ghcr 源覆盖：$GHCR_OVERRIDE"
+fi
 
 ENV=$1
 ACTION=${2:-up}
@@ -35,6 +69,7 @@ fi
 if [[ ! "$ENV" =~ ^(local|dev|staging|prod)$ ]]; then
   echo "用法：./deploy.sh <local|dev|staging|prod> [down|nuke|logs|status|pull|restart]"
   echo "     ./deploy.sh list"
+  echo "     可选: --ghcr <host>   覆盖 ghcr 源（如 ghcr.nju.edu.cn），单次生效不改 env 文件"
   exit 1
 fi
 
@@ -68,10 +103,10 @@ case "$ACTION" in
       fi
     done
     echo "📦 启动 $ENV (project=$PROJECT, APP_ENV=$(grep ^APP_ENV= $ENV_FILE | cut -d= -f2))"
+    # local 必须 build；非 local 依赖 compose 里 pull_policy
+    # （镜像缺失才拉）。想显式刷新走 ./deploy.sh <env> pull
     if [ "$ENV" = "local" ]; then
       $COMPOSE build
-    else
-      $COMPOSE pull
     fi
     $COMPOSE up -d
     sleep 3
