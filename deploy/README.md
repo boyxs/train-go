@@ -1,126 +1,558 @@
 # L1 部署 - 一份 compose + env 切换
 
-项目**唯一的部署真相源**。根目录的 docker-compose.yaml / nginx/ / prometheus/ / grafana/ / otel-collector/ 已经全部合并到这里。将来 K8s 等并列新开目录（`k8s/` 或 `helm/`）。
+> 项目**部署唯一真相源**。根目录的 docker-compose.yaml / nginx/ / prometheus/ / grafana/ / otel-collector/ 全部合并到这里。K8s 将来并列开 `k8s/` 或 `helm/` 目录。
 
-## 四种启动方式
+## 速查目录
 
-| 模式 | 镜像来源 | 宿主端口 | 适合 |
-|------|---------|---------|------|
-| `./deploy.sh local` | 本地 build（override） | 中间件都暴露 | Windows 开发机，go run / DBeaver 连中间件 |
-| `./deploy.sh dev` | ghcr pull master-latest | 只暴露监控栈 | 团队共享 dev 服务器 |
-| `./deploy.sh staging` | 同上 | 端口和 dev 错开 | 预发布 |
-| `./deploy.sh prod` | ghcr pull 语义化版本 | 端口再错开 | 生产 |
+- [快速开始](#快速开始)
+- [CI/CD 流程](#cicd-流程按-env-讲清楚)
+- [日常操作](#日常操作)
+- [环境配置](#环境配置env变量清单)
+- [调试与排障](#调试与排障查问题解问题)
+- [文件布局](#文件布局)
+- [L2 K8s 迁移对照](#l2-k8s-迁移对照)
 
-**同时只能跑一个**（container_name 全局唯一天然阻止），切换时 deploy.sh 自动 stop 旧的。volume 按 project 独立保留（`webook-<env>_mysql-data` 等），切回来数据还在。
+---
 
-## 一切都在 `.env.<env>` 里
+## 快速开始
+
+### 四种启动模式
+
+| 命令 | 镜像来源 | 业务中间件端口 | 监控端口 | 适合场景 |
+|------|---------|--------------|--------|---------|
+| `./deploy.sh local` | 本地 build | **全暴露**（3306/6379/9092/9200 等） | 80/3001/9090/9411 | Windows 开发，`go run` / DBeaver 连中间件 |
+| `./deploy.sh dev` | ghcr pull `master-latest` | 不暴露 | 80/3001/9090/9411 | 团队 dev 服务器 |
+| `./deploy.sh staging` | 同上 | 不暴露 | **81/3011/9091/9412** | 预发布 |
+| `./deploy.sh prod` | ghcr pull `1.0.0`（语义化版本） | 不暴露 | **82/3021/9092/9413** | 生产 |
+
+**关键约束**：
+- 同时只能跑一个（container_name 全 docker 唯一）
+- 切 env 自动 stop 旧的
+- volume 按 project 隔离（`webook-<env>_mysql-data`），切回数据还在
+- 想访问 staging 时一定走 `:81`；访问 prod 走 `:82`
+
+### 首次部署
+
+**本地开发**：
+```bash
+cd deploy
+./deploy.sh local                # build 代码 + 起全套
+# 访问：http://localhost  (API: /api)
+```
+
+**服务器部署**：
+```bash
+# 1. 传文件
+scp -r deploy/ user@server:~/webook-deploy/
+
+# 2. 服务器配置
+ssh user@server
+cd ~/webook-deploy
+chmod +x deploy.sh
+
+# 3. 登录 GHCR（镜像 private 时）
+echo "ghp_xxx" | docker login ghcr.io -u YOUR-GH-USER --password-stdin
+
+# 4. 改 .env.<env>（至少 GH_USER；prod 改强密码）
+vim .env.dev
+
+# 5. 起
+./deploy.sh dev
+```
+
+---
+
+## CI/CD 流程（按 env 讲清楚）
+
+### 整体架构
 
 ```
-deploy/.env.local / .env.dev / .env.staging / .env.prod
+开发者电脑
+  ↓ git push
+GitHub
+  ↓ 触发 workflow
+GitHub Actions
+  ├── lint-test (go vet + goimports + go test)
+  └── build-push (go build + docker build + push ghcr)
+       ↓
+ghcr.io/<user>/webook:<tag> + webook-fe:<tag>
+       ↓ ./deploy.sh <env> 去拉
+部署机（CentOS/Linux）
+  ↓
+webook-<env> project（17 个容器）
 ```
 
-全部可调项都通过环境变量控制（compose 里都是 `${VAR:-default}` 带默认值）：
+### CI：分支 / tag 推什么镜像
+
+CI 配置在 `.github/workflows/webook-ci.yml`（后端）+ `webook-fe-ci.yml`（前端）。
+
+| 事件 | 后端镜像 tag | 前端镜像 tag | 说明 |
+|------|------------|------------|------|
+| `git push feature/<anything>` | `feature-<sha>` | `feature-<sha>` | 验证分支，不一定部署 |
+| `git push master` | `master-latest` + `master-<sha>` | 同上 | 日常集成，dev/staging 拉 |
+| `git tag webook-v1.0.0 && git push --tags` | `1.0.0` | — | 后端发版专用 |
+| `git tag webook-fe-v1.0.0 && git push --tags` | — | `1.0.0` | 前端独立发版 |
+
+CI 做了哪些加速（`perf(ci): 4 项加速改造`）：
+- `concurrency.cancel-in-progress: true` — 快速连推取消旧 run
+- `feature/**` 分支跳 `-race`（单测快 2-5x）
+- `paths-ignore: deploy/ docs/ sandbox/ prd/ **.md` — 改这些不触发后端 CI
+- goimports 条件安装 + pin 版本走 setup-go cache
+- `GOFLAGS: -mod=readonly` — 禁 CI 改 go.sum 防依赖漂移
+
+### CD：各 env 的部署流程
+
+#### 📘 Local（本地开发，不走 CI）
+
+```bash
+# Windows / 本地 docker desktop
+cd deploy
+./deploy.sh local    # 自动 build 本地代码 + up
+```
+
+- 镜像：**本地 build**（不拉 ghcr）
+- `docker-compose.local.yaml` override 暴露全部中间件端口给 DBeaver / IDE
+- 改 Go 代码 → 再跑 `./deploy.sh local build && ./deploy.sh local` 重 build
+- 前端改代码同理，Next.js build 较慢（2-3min）
+
+#### 📗 Dev（团队共享 dev 服务器）
+
+```bash
+# === 开发者侧 ===
+git checkout -b feature/xxx
+# 改代码...
+git push origin feature/xxx
+# CI 自动推 ghcr.io/<user>/webook:feature-<sha>
+# 想合就开 PR → merge 到 master
+# master push 触发 CI → 推 master-latest + master-<sha>
+
+# === 服务器侧（dev 机）===
+ssh dev-server
+cd ~/webook-deploy
+./deploy.sh dev
+# 从 ghcr 拉 master-latest，起 webook-dev project
+# 访问：http://<dev-server>/
+```
+
+- `.env.dev` 的 `IMAGE_TAG=master-latest` → 每次 `./deploy.sh dev` 都拉最新 master
+- 想回退到某个特定 sha：改 `.env.dev` 的 `IMAGE_TAG`：
+  ```bash
+  sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=master-a1b2c3d|" .env.dev
+  ./deploy.sh dev pull && ./deploy.sh dev
+  ```
+- CI 在 master 走 `-race` 测试，质量闸门保留
+
+#### 📒 Staging（预发布）
+
+```bash
+# 和 dev 拉同一个 master-latest，只是资源规格贴近 prod + 端口错开
+ssh staging-server
+cd ~/webook-deploy
+./deploy.sh staging
+# 访问：http://<staging-server>:81/
+```
+
+- `.env.staging` 的 `IMAGE_TAG=master-latest`（和 dev 同源）
+- 用途：上 prod 前在 staging 跑一轮 smoke test / E2E
+- 如果用独立 staging 机，和 dev 完全隔离；如果和 dev 同机会互相 stop（container_name 冲突）
+
+#### 📕 Prod（生产）
+
+```bash
+# === 发版人侧 ===
+# master 充分测试后打 tag
+git tag webook-v1.0.0
+git push origin webook-v1.0.0
+# CI 触发 → 推 ghcr.io/<user>/webook:1.0.0
+# 同理前端：
+git tag webook-fe-v1.0.0
+git push origin webook-fe-v1.0.0
+# → ghcr.io/<user>/webook-fe:1.0.0
+
+# === 服务器侧（prod 机）===
+ssh prod-server
+cd ~/webook-deploy
+
+# 改 .env.prod 的 IMAGE_TAG（发版 / 回滚都走这个）
+sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=1.0.0|" .env.prod
+sed -i "s|^FE_IMAGE_TAG=.*|FE_IMAGE_TAG=1.0.0|" .env.prod
+
+./deploy.sh prod pull   # 先拉新镜像（失败不覆盖现有容器）
+./deploy.sh prod        # up 新版本
+# 访问：http://<prod-server>:82/
+```
+
+- **prod 建议只填语义化版本**（`x.y.z`）到 `.env.prod` 的 `IMAGE_TAG`，不要填 `master-latest`（防止手滑把未验证版本发到生产）
+- **回滚**：改 `.env.prod` 的 `IMAGE_TAG` 回旧版本（例 `1.0.0`）然后 `./deploy.sh prod pull && ./deploy.sh prod`
+- GHCR 上的 tag 只要没手动删就永久保留，回滚无时效限制
+
+### 发版 checklist（prod 上线）
+
+```bash
+# 1. 代码合到 master 且 CI 绿灯
+# 2. 在 dev / staging 跑过 smoke test
+# 3. 打 tag
+git tag webook-v1.2.3
+git tag webook-fe-v1.2.3   # 前后端独立发版，tag 不必对齐但习惯上对齐
+git push --tags
+
+# 4. 等 CI 绿灯（https://github.com/<user>/<repo>/actions）
+#    CI 会把 1.2.3 推到 GHCR
+
+# 5. SSH 到 prod 服务器改 .env.prod 的 IMAGE_TAG 再部署
+ssh prod-server
+cd ~/webook-deploy
+sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=1.2.3|" .env.prod
+sed -i "s|^FE_IMAGE_TAG=.*|FE_IMAGE_TAG=1.2.3|" .env.prod
+./deploy.sh prod pull    # 先拉镜像，确保都能拉下来
+./deploy.sh prod         # up 新版本
+
+# 6. 验证
+./deploy.sh prod status
+curl http://<prod-server>:82/healthz
+
+# 7. 出问题立即回滚（把 IMAGE_TAG 改回旧版本重来）
+sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=1.2.2|" .env.prod
+sed -i "s|^FE_IMAGE_TAG=.*|FE_IMAGE_TAG=1.2.2|" .env.prod
+./deploy.sh prod pull && ./deploy.sh prod
+```
+
+### 前后端独立发版
+
+CI 通过 `paths-ignore` 严格分离：后端改动不触发前端 CI，反之亦然。所以：
+
+- 只改后端：`git push master` → 只触发后端 CI → 只更新 `webook:master-latest`
+- 只改前端：同上触发前端
+- 前端 bug 紧急修：不用动后端，独立发版
+
+### CI 的镜像哪里看
+
+```
+https://github.com/<user>?tab=packages
+```
+
+看 `webook` / `webook-fe` 两个 package，各自的 Versions 标签列出所有 tag。
+
+### 触发 CI 的排错
+
+CI 没跑起来？按顺序检查：
+1. **最常见：commit 被 `paths-ignore` 跳过** — 后端 CI 忽略 `deploy/ docs/ sandbox/ prd/ webook-fe/ **.md`；前端 CI 忽略 `deploy/ docs/ sandbox/ prd/ webook/ **.md`。**这是故意的**，不是 bug
+2. **feature 分支名不是 `feature/xxx`**（注意是斜杠不是下划线）→ 不在 `branches: ['feature/**']` 列表，不触发
+3. **workflow 文件有语法错误** → Actions 页面会报 `Startup failure`
+4. **GITHUB_TOKEN 权限不够** → 看 Settings → Actions → Workflow permissions 是否 `Read and write`
+5. **push 被 concurrency cancel** — 快速连推时旧 run 会被新 run 取消，Actions 页面显示 `Cancelled` 是正常行为
+
+---
+
+## 日常操作
+
+### 基本命令
+
+```bash
+./deploy.sh <env>                   # up（自动 stop 其他 env）
+./deploy.sh <env> down              # 停（volume 保留）
+./deploy.sh <env> nuke              # 停 + 清 volume（prod 需二次确认）
+./deploy.sh <env> logs [service]    # 跟日志（默认 webook）
+./deploy.sh <env> status            # docker compose ps
+./deploy.sh <env> pull              # 只拉镜像（local 用 build）
+./deploy.sh <env> build             # 只 build（local）
+./deploy.sh <env> restart <service> # 重启某服务
+./deploy.sh list                    # 所有 env 残留总览
+```
+
+### 启用 LLM（ollama，默认关）
+
+```bash
+COMPOSE_PROFILES=llm ./deploy.sh dev
+```
+
+### 发版
+
+```bash
+# 本地
+git tag webook-v1.0.1
+git tag webook-fe-v1.0.1
+git push --tags
+# CI 触发后推 ghcr.io/<user>/webook:1.0.1 + webook-fe:1.0.1
+
+# 服务器（等 CI 绿灯）
+ssh prod-server
+cd ~/webook-deploy
+sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=1.0.1|" .env.prod
+sed -i "s|^FE_IMAGE_TAG=.*|FE_IMAGE_TAG=1.0.1|" .env.prod
+./deploy.sh prod pull && ./deploy.sh prod
+```
+
+详细发版 checklist + 回滚方法见 [CD 流程 - Prod 章节](#-prod生产)。
+
+---
+
+## 环境配置（env 变量清单）
+
+全部 env 变量都通过 `compose` 里的 `${VAR:-default}` 带默认值。改 `.env.<env>` 覆盖。
 
 | 类别 | 变量 |
 |------|------|
 | 镜像 | `GH_USER`、`IMAGE_TAG`、`FE_IMAGE_TAG` |
 | webook 配置 | `APP_ENV`（选哪份 yaml）、`DEPLOY_ENV` |
-| 凭证 | `MYSQL_PASS` / `REDIS_PASS`（必须和 `webook/config/<env>.yaml` 里 `mysql.dsn` / `redis.password` 一致） |
+| 凭证 | `MYSQL_PASS` / `REDIS_PASS`（**必须和 `webook/config/<env>.yaml` 里 `mysql.dsn` / `redis.password` 一致**） |
+| Kafka EXTERNAL | `KAFKA_EXTERNAL_HOST`（主机访问 kafka 的 advertised 地址，local=`localhost`，server=服务器 IP）、`KAFKA_EXTERNAL_PORT` |
+| etcd | `ETCD_ALLOW_NONE`（yes=无认证，no=带 `ETCD_PASS`）、`ETCD_PASS`、`ETCD_MEM` |
 | 业务/中间件内存 | `MYSQL_MEM`、`REDIS_MEM`、`KAFKA_MEM`、`KAFKA_HEAP`、`ES_MEM`、`ES_HEAP`、`FE_MEM`、`OLLAMA_MEM` |
 | 监控栈内存 | `PROMETHEUS_MEM`、`GRAFANA_MEM`、`ZIPKIN_MEM`、`ZIPKIN_HEAP`、`OTEL_MEM`、`NGINX_MEM` |
-| 宿主端口 | `NGINX_PORT`、`PROMETHEUS_PORT`、`GRAFANA_PORT`、`ZIPKIN_PORT`（四份 env 错开以免多 env 同时跑冲突） |
-| 宿主端口（local only） | `WEBOOK_HOST_PORT`、`MYSQL_HOST_PORT`、`REDIS_HOST_PORT`、`ETCD_HOST_PORT`、`KAFKA_HOST_PORT`、`ES_HOST_PORT`、`OLLAMA_HOST_PORT`、`OTEL_HOST_PORT` |
+| Exporter 内存 | `MYSQLD_EXPORTER_MEM`、`REDIS_EXPORTER_MEM`、`KAFKA_EXPORTER_MEM`、`NODE_EXPORTER_MEM` |
+| 宿主端口（业务监控） | `NGINX_PORT`、`PROMETHEUS_PORT`、`GRAFANA_PORT`、`ZIPKIN_PORT`（四份 env 错开） |
+| 宿主端口（local 专有） | `WEBOOK_HOST_PORT`、`MYSQL_HOST_PORT`、`REDIS_HOST_PORT`、`ETCD_HOST_PORT`、`KAFKA_HOST_PORT`、`KAFKA_EXTERNAL_HOST_PORT`、`ES_HOST_PORT`、`OLLAMA_HOST_PORT`、`OTEL_HOST_PORT` |
 | Grafana | `GRAFANA_USER`、`GRAFANA_PASS`、`GRAFANA_SMTP_*`、`ALERT_EMAIL_TO` |
 
-## 首次部署
+---
+
+## webook 应用配置 yaml 对应关系
+
+镜像里打包 4 份 yaml：`webook/config/{local,dev,staging,prod}.yaml`。`.env.<env>` 的 `APP_ENV` 指定加载哪份。
+
+| .env.<env> | APP_ENV | webook 容器加载 | 用途 |
+|-----------|---------|----------------|------|
+| `.env.local` | `config/dev.yaml` | service name DNS | 本地 Docker 部署 |
+| `.env.dev` | `config/dev.yaml` | 同上 | 团队 dev 服务器 |
+| `.env.staging` | `config/staging.yaml` | 同上 | 预发 |
+| `.env.prod` | `config/prod.yaml` | 同上 | 生产 |
+
+Windows 上 `go run main.go` 时用 `APP_ENV=config/local.yaml`（里面是 localhost 地址），**不走 docker 部署**——IDE 直连宿主端口。
+
+---
+
+## 调试与排障（查问题解问题）
+
+### 🔧 从外部连容器内中间件（DBeaver / RedisInsight 等图形工具）
+
+服务器部署模式（dev/staging/prod）下中间件**不暴露宿主端口**。要从本地工具连服务器数据库，用 **socat 桥**临时代理：
 
 ```bash
-# 本地
+# 服务器上起桥（mysql 为例，--network 跟着当前 env 走，dev=webook-dev_default）
+ssh root@server
+docker run -d --name mysql-bridge --rm \
+  --network webook-dev_default \
+  -p 3306:3306 \
+  alpine/socat TCP-LISTEN:3306,fork,reuseaddr TCP:webook-mysql:3306
+
+# 本地 DBeaver 连 server-ip:3306，用户 root，密码见 .env.<env> 的 MYSQL_PASS
+
+# 用完停桥
+docker stop mysql-bridge
+```
+
+**其他中间件**（改容器名和端口）：
+
+| 目标 | network | 目标容器 | 端口 |
+|------|---------|--------|------|
+| MySQL | `webook-<env>_default` | `webook-mysql` | 3306 |
+| Redis | 同 | `webook-redis` | 6379 |
+| Kafka | 同 | `webook-kafka` | 9092（PLAINTEXT） |
+| ES | 同 | `webook-es` | 9200 |
+| etcd | 同 | `webook-etcd` | 2379 |
+| Ollama | 同 | `webook-ollama` | 11434 |
+
+**优点**：不改 compose、不动数据、用完即停、不影响生产。
+
+### 🔧 直接在容器里跑命令（不用本地工具）
+
+```bash
+# 导入 SQL 文件
+cat data.sql | docker exec -i webook-mysql mysql -uroot -p13520 webook
+
+# 交互式 SQL
+docker exec -it webook-mysql mysql -uroot -p13520 webook
+
+# 导入（从宿主文件）
+scp data.sql root@server:/tmp/
+ssh root@server 'docker exec -i webook-mysql mysql -uroot -p13520 webook < /tmp/data.sql'
+
+# Redis
+docker exec -it webook-redis redis-cli -a 13520
+
+# Kafka topics
+docker exec webook-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list
+
+# ES
+docker exec webook-es curl -s localhost:9200/_cat/indices
+```
+
+### 🔧 Windows 本地 `go run` 连容器内中间件
+
+`./deploy.sh local` 模式下，docker-compose.local.yaml override 暴露全部中间件端口到宿主：
+
+```
+MySQL  :3306
+Redis  :6379
+Kafka  :9092（PLAINTEXT）+ 9094（EXTERNAL，go run 要用这个）
+ES     :9200
+etcd   :2379
+```
+
+Windows 上 `APP_ENV=config/local.yaml go run main.go`，local.yaml 里地址写 `localhost:*`，直接连。
+
+---
+
+## 常见问题排查
+
+### 问 1：nginx 返回 504 Gateway Timeout
+
+**症状**：POST 或 GET `/api/...` 60 秒后返回 504。
+
+**根因链路**：webook-app 容器在 **restart loop**（不断 panic），nginx 转发到 webook 连接 hang。
+
+**查**：
+```bash
+docker ps --filter "name=webook-app" --format "{{.Status}}"
+# 如果显示 "Restarting (2) XX seconds ago" → 确认是 restart loop
+docker logs webook-app --tail 30
+# 找 panic 原因：常见 "failed to connect database"
+```
+
+**最常见原因**：
+- `webook/config/<env>.yaml` 的 `mysql.dsn` 密码和 `.env.<env>` 的 `MYSQL_PASS` 不一致
+- → 改 yaml 或改 env 让两者一致，然后 `./deploy.sh <env> build && ./deploy.sh <env>`
+
+### 问 2：docker pull 报 manifest unknown
+
+**症状**：`./deploy.sh dev` 时某个镜像报 `manifest unknown`。
+
+**排查**：
+```bash
+# 1. GHCR 上真有这个 tag 吗？
+# 打开 https://github.com/YOUR_USER?tab=packages 看
+
+# 2. 本地 docker 能直接 pull 吗？
+docker pull ghcr.io/YOUR_USER/webook:master-latest
+```
+
+**常见原因**：
+- `.env.<env>` 里 `IMAGE_TAG` 被 deploy.sh 意外写坏（比如 `down` 当 tag）→ 看 `grep IMAGE_TAG .env.dev`
+- GHCR package 被删了或没推过 → 重新 push master 触发 CI 重建
+
+### 问 3：容器频繁 Restarting + OOM
+
+**症状**：某容器 Status 一直 Restarting，`docker inspect ... OOMKilled` 不一定为 true（cgroup OOM 不设这个标志），exit code 137。
+
+**已知 OOM 阈值**（实机踩坑）：
+- **MySQL 8.0 InnoDB init**：`MYSQL_MEM < 400m` 会被 cgroup OOM kill → 至少 **512m**
+- **Kafka LogCleaner**：`KAFKA_HEAP < -Xmx384m` 会 Java OOM → 至少 **-Xmx512m**
+
+**查**：
+```bash
+docker inspect <container> --format 'OOM={{.State.OOMKilled}} Exit={{.State.ExitCode}} Restarts={{.RestartCount}}'
+# Exit=137 几乎必 OOM
+```
+
+**修**：改 `.env.<env>` 对应 `_MEM` / `_HEAP` 变量，`./deploy.sh <env> restart <service>` 或重跑 up。
+
+### 问 4：MySQL healthcheck unhealthy
+
+**症状**：`docker compose ps` 显示 webook-mysql `(health: starting)` 很久没变 healthy，业务 depends_on 挂不起来。
+
+**排查**：
+```bash
+docker inspect webook-mysql --format '{{range .State.Health.Log}}exit={{.ExitCode}} {{.Output}}{{end}}' | tail -3
+```
+
+**常见原因**：
+- mysql 还在首次 init（40-60s 正常）→ 等
+- init 中被 OOM kill 留下半损坏 volume（看到 "Access denied for user 'root'@'localhost' (using password: YES)" 即使密码对）
+  - 清 volume：`docker compose -p webook-<env> down -v` 或 `./deploy.sh <env> nuke`
+
+### 问 5：staging/prod 访问不了
+
+**别访问错端口**。端口按 env 错开：
+
+| env | nginx | grafana | prometheus | zipkin |
+|-----|-------|---------|------------|--------|
+| local / dev | 80 | 3001 | 9090 | 9411 |
+| staging | **81** | **3011** | **9091** | **9412** |
+| prod | **82** | **3021** | **9092** | **9413** |
+
+先 `./deploy.sh list` 确认 staging/prod project 真在跑（container_name 冲突可能静默阻止）。
+
+### 问 6：kafka Windows go run 连不上
+
+**症状**：webook 本地跑（Windows）连 kafka 报 `dial tcp 127.0.0.1:9094: connect: connection refused` 或 metadata 错 `webook-kafka:9092` 解析失败。
+
+**原因**：kafka 的 EXTERNAL listener advertised 地址不对。
+
+**local 模式设置**：`.env.local` 里 `KAFKA_EXTERNAL_HOST=localhost`、`KAFKA_EXTERNAL_PORT=9094`，webook 连 `localhost:9094` 才能成功。
+
+### 问 7：Grafana SMTP 告警邮件没收到
+
+```bash
+cd deploy/grafana
+make ENV=dev test-email    # 先用 UI Test 按钮验证 SMTP 通
+make ENV=dev test-email-real # 触发真告警（停 webook 90s）
+```
+
+如果 UI Test 都收不到：
+- `.env.<env>` 的 `GRAFANA_SMTP_ENABLED=true`、`GRAFANA_SMTP_USER/PASSWORD` 填了没
+- QQ 邮箱走 STARTTLS 587 端口（已默认）
+- 首次改 `.env` 后 Grafana 容器要重建：`./deploy.sh <env> restart grafana`
+
+### 问 8：查看具体 env 变量注入到容器了没
+
+```bash
+docker inspect webook-app --format '{{range .Config.Env}}{{println .}}{{end}}' | grep -E 'MYSQL|REDIS|APP_ENV'
+```
+
+### 问 9：compose config 展开后到底长啥样
+
+调试变量替换问题时用：
+```bash
 cd deploy
-./deploy.sh local                # 自动 build + up
-
-# 服务器
-scp -r deploy/ user@server:~/webook-deploy/
-ssh user@server
-cd ~/webook-deploy
-chmod +x deploy.sh
-echo "ghp_xxx" | docker login ghcr.io -u YOUR-GH-USER --password-stdin
-vim .env.prod                    # 至少改 GH_USER + 上线前改强密码
-./deploy.sh prod
+docker compose -p webook-dev --env-file .env.dev -f docker-compose.yaml config | head -50
 ```
 
-## 日常操作
+会输出展开后的完整 YAML，所有 `${VAR}` 都被替换，能看清实际 container 配置。
 
-```bash
-./deploy.sh local                          # 本地 build + up
-./deploy.sh dev                            # 切 dev，自动 stop local
-./deploy.sh prod 1.0.1                     # prod 指定 tag（会写回 .env.prod）
-./deploy.sh dev logs [service]             # 日志（默认 webook）
-./deploy.sh dev status                     # ps
-./deploy.sh dev pull                       # 只拉镜像（local 用 build）
-./deploy.sh dev build                      # 只 build（local）
-./deploy.sh dev restart webook             # 重启某服务
-./deploy.sh dev down                       # 停（volume 保留）
-./deploy.sh dev nuke                       # 停 + 清 volume（prod 需确认）
-./deploy.sh list                           # 所有 env 残留总览
-
-# 启用 LLM（ollama）
-COMPOSE_PROFILES=llm ./deploy.sh dev
-```
+---
 
 ## 文件布局
 
 ```
 deploy/
 ├── docker-compose.yaml              # 基础定义（17 服务）
-├── docker-compose.local.yaml        # local override：build + 暴露宿主端口
-├── .env.local(.example)             # 四份 env 切换
-├── .env.dev(.example)
-├── .env.staging(.example)
-├── .env.prod(.example)
+├── docker-compose.local.yaml        # local override：build 代码 + 暴露宿主端口
+├── .env.{local,dev,staging,prod}(.example)
 ├── deploy.sh                        # ./deploy.sh <local|dev|staging|prod>
 ├── nginx/
-│   ├── nginx.conf
-│   └── conf.d/default.conf
+│   ├── nginx.conf                   # 主配置（JSON 日志、gzip、限流）
+│   └── conf.d/default.conf          # /api → 后端 / 其余 → 前端
 ├── prometheus/
-│   ├── prometheus.yml
-│   ├── prometheus.local.yml           # 本地独立 prometheus.exe 跑时用（targets localhost:8089，只采集 webook 应用）
-│   ├── alerting/                      # 告警规则（可选填）
-│   └── examples/                      # 参考示例（不加载）
+│   ├── prometheus.yml               # 容器内部署用（service name 目标）
+│   ├── prometheus.local.yml         # Windows 独立跑 prometheus.exe 用（localhost:8089）
+│   ├── alerting/                    # 告警规则（可选填）
+│   └── examples/                    # 参考示例（不加载）
 ├── grafana/
-│   ├── provisioning/                  # Grafana 自动装载
-│   │   ├── datasources/               # prometheus + zipkin
-│   │   ├── dashboards/                # 大盘 JSON
-│   │   └── alerting/                  # contactpoints / policies / rules
-│   ├── examples/                      # 参考示例（不装载）
-│   └── Makefile                       # reload / test-email / restart 等运维命令
+│   ├── provisioning/                # Grafana 自动装载
+│   │   ├── datasources/             # prometheus + zipkin
+│   │   ├── dashboards/              # 大盘 JSON
+│   │   └── alerting/                # contactpoints / policies / rules
+│   ├── examples/                    # 参考示例（不装载）
+│   └── Makefile                     # make ENV=dev reload / test-email / restart
 ├── otel-collector/config.yaml
 └── README.md
 ```
 
-## webook 应用配置 yaml 对应关系
+---
 
-镜像里打包 4 份 yaml：`webook/config/{local,dev,staging,prod}.yaml`。
+## L2 K8s 迁移对照
 
-| .env.<env> | APP_ENV | webook 加载 | 用途 |
-|-----------|---------|-----------|------|
-| `.env.local` | `config/dev.yaml` | 容器里走 service name DNS | 本地 Docker 部署 |
-| `.env.dev` | `config/dev.yaml` | 同上 | 团队 dev 服务器 |
-| `.env.staging` | `config/staging.yaml` | 同上 | 预发 |
-| `.env.prod` | `config/prod.yaml` | 同上 | 生产 |
+`deploy/` 是 docker-compose 的世界。K8s 的 Helm chart / manifest 将来新开 `k8s/` 或 `helm/` 目录与之并列，不混在一起。
 
-Windows 上 `go run main.go` 时 `APP_ENV=config/local.yaml`（localhost 地址），**不走这里**——IDE 直连 host 端口。
-
-## 为什么 K8s 不挤进来
-
-`deploy/` 是 docker-compose 的世界。K8s 的 Helm chart / manifest 将来新开 `k8s/` 或 `helm/` 目录与之并列，不混在一起。迁到 K8s 时：
-
-| L1 这里 | K8s 等价 |
-|---------|---------|
+| L1 这里 | L2 K8s |
+|---------|--------|
 | compose project `webook-<env>` | namespace `<env>` |
 | `.env.<env>` | Secret + ConfigMap |
-| compose `environment:` 注入 | `envFrom.secretRef` |
-| Viper AutomaticEnv（已预埋） | 同 |
+| compose `environment:` 注入 | `envFrom.secretRef` / `envFrom.configMapRef` |
 | container_name 冲突阻止并发 | namespace 隔离，天然可并发 |
+| volume 按 project 隔离 | PVC 按 namespace 隔离 |
+| `nginx` 反代 | Ingress Controller + Ingress 规则 |
+| 固定端口错开（80/81/82） | Ingress host-based routing（真域名） |
 
 详见 `C:\Go\notes\cicd-webook-roadmap.md`。
