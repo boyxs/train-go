@@ -21,9 +21,11 @@
 | 命令 | 镜像来源 | 业务中间件端口 | 监控端口 | 适合场景 |
 |------|---------|--------------|--------|---------|
 | `./deploy.sh local` | 本地 build | **全暴露**（3306/6379/9092/9200 等） | 80/3001/9090/9411 | Windows 开发，`go run` / DBeaver 连中间件 |
-| `./deploy.sh dev` | ghcr pull `master-latest` | 不暴露 | 80/3001/9090/9411 | 团队 dev 服务器 |
-| `./deploy.sh staging` | 同上 | 不暴露 | **81/3011/9091/9412** | 预发布 |
-| `./deploy.sh prod` | ghcr pull `1.0.0`（语义化版本） | 不暴露 | **82/3021/9092/9413** | 生产 |
+| `./deploy.sh dev` | ghcr (`master-latest`) | 不暴露 | 80/3001/9090/9411 | 团队 dev 服务器 |
+| `./deploy.sh staging` | 同上 | 不暴露 | **81/3011/9190/9412** | 预发布 |
+| `./deploy.sh prod` | ghcr (`1.0.0`，语义化版本) | 不暴露 | **82/3021/9290/9413** | 生产 |
+
+> 💡 `up` 只在镜像**缺失时**拉取（compose `pull_policy: missing`）。**同 tag 远端更新**需显式 `./deploy.sh <env> pull` 后再 up，否则继续用本地缓存。
 
 **关键约束**：
 - 同时只能跑一个（container_name 全 docker 唯一）
@@ -59,6 +61,74 @@ vim .env.dev
 # 5. 起
 ./deploy.sh dev
 ```
+
+### ghcr 镜像源切换
+
+默认 `GHCR_REGISTRY=ghcr.io`（官方原站）。国内服务器拉取慢时，按需换加速域。
+
+> ⚠️ **前提**：GHCR package 已在 GitHub → Packages → visibility 改为 **public**。私有 package 请保持默认 `ghcr.io` + `docker login`，第三方加速域（nju 等公共 pull-through cache）对私有包一律返回 404。
+
+**改 `.env.<env>` 永久生效**：
+```bash
+# vim .env.prod
+GHCR_REGISTRY=<你验证过的 ghcr 加速域>      # 例：ghcr.nju.edu.cn
+```
+
+**`--ghcr` flag 单次覆盖（不改文件）**：
+```bash
+./deploy.sh prod --ghcr <mirror>
+./deploy.sh prod pull --ghcr <mirror>      # 只拉不起
+```
+
+注意事项：
+- `--ghcr` 值**不带尾斜杠**；脚本自动规范化
+- 加速域未同步到最新 tag 时会 404——用 `--ghcr ghcr.io` 回退官方
+- **只影响自家 ghcr 镜像**（webook / webook-fe）；Docker Hub 镜像走 daemon `registry-mirrors`，和本 flag 无关
+
+#### 方案：阿里云 ACR 做 ghcr 反代（推荐，支持私有包）
+
+公共 ghcr 加速域（nju 等）拉不到私有 package；阿里云 ACR 的「镜像同步」能把 ghcr.io 私有镜像拉进你自己的阿里命名空间，prod 再从阿里拉，速度快且私有。
+
+**1. 开通阿里云 ACR 个人版**
+
+[容器镜像服务 ACR](https://cr.console.aliyun.com) → 开通个人实例（免费）→ 选地域（推荐 `cn-hangzhou` 或离部署机最近的）→ 创建命名空间（下文记为 `<ACR_NS>`，公开/私有都行）。
+
+**2. 绑定 ghcr 为「访问凭证来源」**
+
+ACR 控制台 → 实例列表 → 选中实例 → 「镜像仓库 → 仓库同步 → 访问凭证」→ 添加 `ghcr.io` 凭证（用户名：GitHub 用户名；密码：GitHub PAT，勾 `read:packages` 权限）。
+
+**3. 创建同步规则**
+
+ACR「仓库同步 → 同步规则 → 新建」：
+- 源仓库：`ghcr.io/<你的 GH 用户名>/webook`
+- 目标仓库：`<你的 ACR 实例>/<ACR_NS>/webook`
+- tag 过滤：`1.*` 或 `.*`
+- 触发：手动 / 定时 / 源有变更就触发（推荐最后一种）
+- `webook-fe` 重复一次
+
+**4. 改 `.env.<env>`**
+
+```bash
+# .env.prod（只有这两个变量要改）
+GHCR_REGISTRY=registry.cn-hangzhou.aliyuncs.com
+GH_USER=<ACR_NS>                                # 改成阿里云命名空间名
+```
+
+compose 里 `${GHCR_REGISTRY}/${GH_USER}/webook:${IMAGE_TAG}` 渲染成 `registry.cn-hangzhou.aliyuncs.com/<ACR_NS>/webook:1.0.0`。
+
+**5. 服务器 docker login 阿里云**
+
+```bash
+# 用 --password-stdin 避免密码进 shell history / ps 输出
+echo '<ACR 访问凭证>' | docker login registry.cn-hangzhou.aliyuncs.com -u <阿里账号> --password-stdin
+# ACR 访问凭证：控制台「实例 → 访问凭证」页生成（和阿里主账密码分开）
+```
+
+注意事项：
+- **同步延迟**：源有变更触发的规则通常 1-3 min 内完成；定时规则看配置。发版后 prod 拉不到新 tag 先查同步状态
+- **私有→私有**：阿里 ACR 命名空间设私有即可，对外不可拉；`docker login` 凭证只发给 prod
+- **配额**：个人版 ACR 有免费额度（具体配额以[控制台](https://cr.console.aliyun.com)为准）；企业版按量付费
+- 想省事可以用「主账号 → AccessKey」做 docker login，但权限过大；推荐走 ACR 「访问凭证」只给 pull 权限
 
 ---
 
@@ -273,6 +343,9 @@ COMPOSE_PROFILES=llm ./deploy.sh dev
 git tag webook-v1.0.1
 git tag webook-fe-v1.0.1
 git push --tags
+
+# 或者一行链式
+git tag webook-v1.0.1 && git tag webook-fe-v1.0.1 && git push --tags
 # CI 触发后推 ghcr.io/<user>/webook:1.0.1 + webook-fe:1.0.1
 
 # 服务器（等 CI 绿灯）
@@ -293,7 +366,7 @@ sed -i "s|^FE_IMAGE_TAG=.*|FE_IMAGE_TAG=1.0.1|" .env.prod
 
 | 类别 | 变量 |
 |------|------|
-| 镜像 | `GH_USER`、`IMAGE_TAG`、`FE_IMAGE_TAG` |
+| 镜像 | `GH_USER`、`IMAGE_TAG`、`FE_IMAGE_TAG`、`GHCR_REGISTRY`（默认 `ghcr.io`；私有 package 必须走官方源 + docker login） |
 | webook 配置 | `APP_ENV`（选哪份 yaml）、`DEPLOY_ENV` |
 | 凭证 | `MYSQL_PASS` / `REDIS_PASS`（**必须和 `webook/config/<env>.yaml` 里 `mysql.dsn` / `redis.password` 一致**） |
 | Kafka EXTERNAL | `KAFKA_EXTERNAL_HOST`（主机访问 kafka 的 advertised 地址，local=`localhost`，server=服务器 IP）、`KAFKA_EXTERNAL_PORT` |
@@ -468,8 +541,8 @@ docker inspect webook-mysql --format '{{range .State.Health.Log}}exit={{.ExitCod
 | env | nginx | grafana | prometheus | zipkin |
 |-----|-------|---------|------------|--------|
 | local / dev | 80 | 3001 | 9090 | 9411 |
-| staging | **81** | **3011** | **9091** | **9412** |
-| prod | **82** | **3021** | **9092** | **9413** |
+| staging | **81** | **3011** | **9190** | **9412** |
+| prod | **82** | **3021** | **9290** | **9413** |
 
 先 `./deploy.sh list` 确认 staging/prod project 真在跑（container_name 冲突可能静默阻止）。
 

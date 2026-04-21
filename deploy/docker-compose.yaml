@@ -17,9 +17,10 @@
 services:
   # ── 业务 ─────────────────────────────────────────────────
   webook:
-    image: ghcr.io/${GH_USER}/webook:${IMAGE_TAG}
+    image: ${GHCR_REGISTRY:-ghcr.io}/${GH_USER}/webook:${IMAGE_TAG}
     container_name: webook-app
     restart: always
+    pull_policy: missing
     environment:
       APP_ENV: "${APP_ENV}"              # .env.<env> 指定 config/<env>.yaml
       DEPLOY_ENV: "${DEPLOY_ENV}"
@@ -32,9 +33,10 @@ services:
 
   # ── 前端 + 反向代理 ──────────────────────────────────────
   webook-fe:
-    image: ghcr.io/${GH_USER}/webook-fe:${FE_IMAGE_TAG}
+    image: ${GHCR_REGISTRY:-ghcr.io}/${GH_USER}/webook-fe:${FE_IMAGE_TAG}
     container_name: webook-fe
     restart: always
+    pull_policy: missing
     mem_limit: ${FE_MEM:-512m}
     environment:
       NODE_ENV: production
@@ -46,6 +48,7 @@ services:
     image: mysql:8.0
     container_name: webook-mysql
     restart: always
+    pull_policy: missing
     mem_limit: ${MYSQL_MEM:-768m}       # 实机验证：<400m 首次 InnoDB init 会 cgroup OOM
     environment:
       MYSQL_ROOT_PASSWORD: "${MYSQL_PASS}"
@@ -66,6 +69,7 @@ services:
     image: redis:7.2-alpine
     container_name: webook-redis
     restart: always
+    pull_policy: missing
     mem_limit: ${REDIS_MEM:-128m}
     command: >
       redis-server
@@ -85,6 +89,7 @@ services:
     image: bitnami/etcd:3.5.17
     container_name: webook-etcd
     restart: always
+    pull_policy: missing
     mem_limit: ${ETCD_MEM:-128m}
     environment:
       # ALLOW_NONE_AUTHENTICATION 语义反直觉：
@@ -102,6 +107,7 @@ services:
     image: apache/kafka:3.7.0
     container_name: webook-kafka
     restart: always
+    pull_policy: missing
     mem_limit: ${KAFKA_MEM:-768m}
     environment:
       KAFKA_NODE_ID: 0
@@ -137,6 +143,7 @@ services:
     image: elasticsearch:8.12.2
     container_name: webook-es
     restart: always
+    pull_policy: missing
     mem_limit: ${ES_MEM:-1024m}
     environment:
       discovery.type: single-node
@@ -155,6 +162,7 @@ services:
     image: ollama/ollama:0.6.2
     container_name: webook-ollama
     restart: always
+    pull_policy: missing
     mem_limit: ${OLLAMA_MEM:-2048m}
     profiles: ["llm"]                    # COMPOSE_PROFILES=llm ./deploy.sh <env> 启用
     volumes:
@@ -165,6 +173,7 @@ services:
     image: prom/mysqld-exporter:v0.15.0
     container_name: webook-mysqld-exporter
     restart: always
+    pull_policy: missing
     mem_limit: ${MYSQLD_EXPORTER_MEM:-64m}
     environment:
       MYSQLD_EXPORTER_PASSWORD: "${MYSQL_PASS}"
@@ -178,6 +187,7 @@ services:
     image: oliver006/redis_exporter:v1.58.0
     container_name: webook-redis-exporter
     restart: always
+    pull_policy: missing
     mem_limit: ${REDIS_EXPORTER_MEM:-64m}
     environment:
       REDIS_ADDR: "redis://webook-redis:6379"
@@ -189,6 +199,7 @@ services:
     image: danielqsj/kafka-exporter:v1.7.0
     container_name: webook-kafka-exporter
     restart: always
+    pull_policy: missing
     mem_limit: ${KAFKA_EXPORTER_MEM:-64m}
     command:
       - "--kafka.server=webook-kafka:9092"
@@ -199,6 +210,7 @@ services:
     image: prom/node-exporter:v1.7.0
     container_name: webook-node-exporter
     restart: always
+    pull_policy: missing
     mem_limit: ${NODE_EXPORTER_MEM:-64m}
     command:
       - "--path.rootfs=/host"
@@ -212,6 +224,7 @@ services:
     image: prom/prometheus:v3.4.1
     container_name: webook-prometheus
     restart: always
+    pull_policy: missing
     mem_limit: ${PROMETHEUS_MEM:-512m}
     ports:
       - "${PROMETHEUS_PORT:-9090}:9090"
@@ -234,6 +247,7 @@ services:
     image: grafana/grafana:11.6.0
     container_name: webook-grafana
     restart: always
+    pull_policy: missing
     mem_limit: ${GRAFANA_MEM:-256m}
     ports:
       - "${GRAFANA_PORT:-3001}:3000"
@@ -262,6 +276,7 @@ services:
     image: openzipkin/zipkin:3.4
     container_name: webook-zipkin
     restart: always
+    pull_policy: missing
     # mem 存储足够用 512m；切 ES 存储后写入压力增大，建议调到 1024m
     mem_limit: ${ZIPKIN_MEM:-512m}
     ports:
@@ -286,6 +301,7 @@ services:
     image: otel/opentelemetry-collector-contrib:0.105.0
     container_name: webook-otel-collector
     restart: always
+    pull_policy: missing
     mem_limit: ${OTEL_MEM:-256m}
     command: ["--config=/etc/otelcol-contrib/config.yaml"]
     volumes:
@@ -299,6 +315,7 @@ services:
     image: nginx:1.26.3-alpine
     container_name: webook-nginx
     restart: always
+    pull_policy: missing
     mem_limit: ${NGINX_MEM:-128m}
     ports:
       - "${NGINX_PORT:-80}:80"
