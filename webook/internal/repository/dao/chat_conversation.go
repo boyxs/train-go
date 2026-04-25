@@ -72,10 +72,10 @@ func (d *GormConversationDAO) Delete(ctx context.Context, uid int64, convId int6
 // Conversation GORM 模型
 type Conversation struct {
 	Id        int64  `gorm:"primaryKey,autoIncrement"`
-	UserId    int64  `gorm:"index:idx_user_updated;not null"`
+	UserId    int64  `gorm:"index:idx_conversation_user_updated;not null"`
 	Title     string `gorm:"type:varchar(128);not null;default:''"`
 	CreatedAt int64  `gorm:"autoCreateTime:milli"`
-	UpdatedAt int64  `gorm:"autoUpdateTime:milli;index:idx_user_updated"`
+	UpdatedAt int64  `gorm:"autoUpdateTime:milli;index:idx_conversation_user_updated"`
 }
 
 func (Conversation) TableName() string {

@@ -16,6 +16,35 @@
 - 相同逻辑出现两次以上且可复用时，按情况抽成公共函数/组件/工具（后端提到 `pkg/` 或对应层，前端提到 `hooks/` 或 `utils/`）
 - **错误处理零容忍**：后端禁止 `_ = err`，所有错误必须处理或显式向上传播；前端 API 调用必须有 `.catch` 或 try/catch，用户可感知的失败必须有提示
 
+## 侦察优先
+
+触碰项目里已重复出现的模式前，必须先 grep 或 read 现成实现对齐，禁止自行发明：
+
+| 动作 | 必做的侦察 |
+|------|-----------|
+| 新列表 / 分页 | `Grep Pagination views/` → 对齐 `views/article/list.tsx` |
+| 滚动容器 | `globals.css` 是否已有全局规则；禁止逐文件 inline |
+| CSS 布局 bug | DevTools 定位真正 overflow / scroll 生效的元素，禁止猜 `html` / `body` |
+| `.pen` 原型修改 | `batch_get` 读目标 frame；做类似页面用 `C()` 复制，禁止 `I()` 从零搭 |
+| 后端字段不生效 | grep 字段赋值链查是否被某层硬覆盖，禁止直接怀疑前端 |
+| 新常量 / 枚举 | `internal/consts/` 或 `constants/` 是否已有同类，禁止平行新增 |
+
+## Pencil 原型修改
+
+1. 动手前 `get_editor_state` + `batch_get` 读结构
+2. 做类似页面用 `C(源id, parent, {x,y,width,...})`，禁止从零 `I()` 搭
+3. 不确定 `iconFontName` 合法性时先 `get_guidelines(category:"icons")` 查
+4. 复制来的 frame 里硬编码尺寸（如进度条 `width`）必须按新 viewport 比例重算
+5. pen 改完必须 `export_nodes` 覆盖 PNG + 更新 PRD.md 原型章节
+
+## 动手前先出方案
+
+所有代码 / 配置改动（含改版本号 / 调顺序）先给一句话方案等用户确认再动手。下列必做：
+
+- 修 bug：先指明改哪个文件 / 元素 / 字段，为什么是那个
+- 改 API 签名或 DB 结构：先说影响范围
+- 原型大改：按骨架 → Tab → Top3 → 其余 → 分页分阶段确认，禁止一次画完
+
 ## 导航
 
 ```

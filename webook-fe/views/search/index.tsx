@@ -11,6 +11,8 @@ import * as searchApi from '@/api/search';
 import { useRequest } from '@/hooks/useRequest';
 import type { Article } from '@/types';
 
+import RankingBoard from './RankingBoard';
+
 const { Text } = Typography;
 
 const dotColors = ['#0D9488', '#6366F1', '#22C55E', '#FCD34D', '#D97706'];
@@ -76,11 +78,7 @@ function SearchPage() {
         </div>
       )}
 
-      {!loading && !query && (
-        <div className='bg-white rounded-xl p-8'>
-          <Empty description='输入关键词开始搜索' />
-        </div>
-      )}
+      {!loading && !query && <RankingBoard />}
 
       {!loading && articles.length > 0 && (
         <>

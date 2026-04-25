@@ -7,6 +7,7 @@ type Article struct {
 	Abstract  string        `json:"abstract"`
 	Author    Author        `json:"author"`
 	Status    ArticleStatus `json:"status"`
+	Category  string        `json:"category"`
 	CreatedAt int64         `json:"createdAt"`
 	UpdatedAt int64         `json:"updatedAt"`
 }

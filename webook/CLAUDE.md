@@ -83,6 +83,7 @@ Handler (web/) → Service (service/) → Repository (repository/) → DAO (dao/
 - **缓存只能在 `cache/` 层**：Service 层禁止直接操作 Redis（包括装饰器缓存）
 - **子包按能力拆分**：同一目录下两种独立能力（如 LLM 聊天 vs 文本向量化）必须拆子包，不平铺
 - **接口命名避免歧义**：子包内接口用完整名（`EmbeddingClient` 而非 `Client`），调用方读 `embedding.EmbeddingClient` 一眼能分清
+- **Handler / Service / Repository / DAO 构造函数必须返回接口**，不返回具体指针；实现用 `Internal` 或技术前缀（`InternalChatHandler` / `AIClickEventHandler` / `GormArticleAuthorDAO`）。入参也依赖接口，方便 Wire 注入和单测 mock。
 
 ## 命名规范
 
@@ -90,6 +91,7 @@ Handler (web/) → Service (service/) → Repository (repository/) → DAO (dao/
 |------|------|------|
 | 接口 | `[实体][业务角色][层]` | `ArticleAuthorDAO` |
 | 实现 | `[技术限定][实体][业务角色][层]` | `GormArticleAuthorDAO` |
+| 表名 | **单数**，下划线分词 | `article` / `published_article` / `user_interaction`（❌ `articles`） |
 | 文件 | 按业务角色，不按技术 | `article_author.go`（非 `article_dao.go`） |
 | receiver | 类型首字母小写 | `func (s *chatService) Send()` |
 | 查询方法 | `Find`(单条) `Page`(分页) `List`(列表) | `FindByXx` / `PageXxs` / `ListXxs` |
@@ -98,6 +100,40 @@ Handler (web/) → Service (service/) → Repository (repository/) → DAO (dao/
 | 自定义切片 | `xxxs` | `ids := make([]int64, 0, len(articleList))` |
 | 索引/映射 | `xxxMap` | `authorMap := make(map[int64]Author)` |
 | 单条查询 | 原名或无后缀 | `article, err := dao.FindById()` |
+
+## 数据表规范
+
+新建表或改表结构时，**CREATE TABLE 必须满足以下全部项**，否则 review 直接打回：
+
+1. **表名**：单数 + 下划线（`article` / `user_interaction`，见命名规范表）
+2. **表级注释**：`ENGINE=... ROW_FORMAT=Dynamic COMMENT='业务说明'`，一句话讲清这张表存什么
+3. **每列必须有 COMMENT**：短句即可，重点讲枚举值含义 / 单位 / 业务约束
+   - 例：`status tinyint COMMENT '状态：1=未发表 2=已发表 3=仅自己可见'`
+   - 例：`created_at bigint COMMENT '创建时间（Unix 毫秒）'`
+4. **时间字段**：统一 `bigint`（Unix 毫秒戳），不用 `datetime` / `timestamp`。对应 GORM `autoCreateTime:milli` / `autoUpdateTime:milli`
+5. **软删除**：`deleted_at bigint NOT NULL DEFAULT 0`，0=未删；对应 GORM `softDelete:milli`
+6. **字符集**：默认 `utf8mb4` + `utf8mb4_0900_ai_ci`（MySQL 8），字段需 CJK 的显式指定
+7. **索引命名**（**必须带 table 前缀**，避免跨表索引名撞车）：
+   - 唯一索引：`uni_{table}_{field}`（单字段）/ `uk_{table}_{业务语义}`（复合，如 `uk_ai_click_events_dedup`）
+   - 普通索引：`idx_{table}_{field1}[_{field2}...]`
+   - **豁免**：规则添加前已建好的索引可保持现状，不强制迁移；新建表 / 新加索引严格遵守
+8. **主键**：`id bigint NOT NULL AUTO_INCREMENT COMMENT '主键'`
+9. **Go 对应**：新表 struct 要加 `TableName()` 方法写明表名；字段 tag `gorm:"type:xxx;..."` 与 DDL 对齐
+10. **脚本同步**：所有表结构改动必须同步到 `webook/scripts/webook.sql`（含列注释），不止改 Go struct 让 AutoMigrate 发挥；视图 `v_xxx` 也同步更新
+
+**DDL 模板**（最小可复制）：
+```sql
+DROP TABLE IF EXISTS `xxx`;
+CREATE TABLE `xxx` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `biz_field` varchar(32) NOT NULL DEFAULT '' COMMENT '字段说明',
+  `created_at` bigint NOT NULL DEFAULT 0 COMMENT '创建时间（Unix 毫秒）',
+  `updated_at` bigint NOT NULL DEFAULT 0 COMMENT '更新时间（Unix 毫秒）',
+  `deleted_at` bigint NOT NULL DEFAULT 0 COMMENT '软删除时间（0=未删）',
+  PRIMARY KEY (`id`) USING BTREE,
+  INDEX `idx_xxx_biz_field` (`biz_field` ASC) USING BTREE
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic COMMENT = '一句话讲这张表';
+```
 
 ## 复用已有工具包（禁止重复造轮子）
 
@@ -124,3 +160,15 @@ Handler (web/) → Service (service/) → Repository (repository/) → DAO (dao/
 - 错误必须处理，禁止 `_ = err`
 - 测试假数据用 `// ===== TODO: 测试假数据 START/END =====` 包裹
 - 大数据量查询优先在数据库内完成过滤和聚合，避免全量加载到内存
+
+## 提交前必跑 goimports
+
+CI 用 `goimports -local github.com/webook -l .` 检查 import 顺序，乱了直接 fail。**任何 commit 前必须在 `webook/` 跑一次原生命令**：
+
+```bash
+cd webook && goimports -local github.com/webook -w .
+```
+
+把本地 import 自动分组到第三组，避免 CI 红 + 二次 commit。`workflow:done` 流水 build/lint 之前必须先跑这条命令再继续验证。
+
+**禁止套 `make fmt`**——直接调底层二进制，规则透明可审计，不依赖 Makefile 黑盒。

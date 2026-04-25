@@ -4,6 +4,19 @@
 /* antd 和 Tailwind 共存：声明 layer 优先级 */
 @layer tw-base, antd, tw-utilities;
 
+/* 滚动条槽位全局保留：用 @layer tw-utilities 确保赢过 Tailwind 的 overflow 工具类，避免滚动条出没导致 15-17px 横向抖动
+   main.flex-1 精确匹配 AppLayout 的主滚动容器，不影响其他可能的 <main> */
+@layer tw-utilities {
+  html,
+  main.flex-1,
+  .overflow-auto,
+  .overflow-y-auto,
+  .overflow-scroll,
+  .overflow-y-scroll {
+    scrollbar-gutter: stable;
+  }
+}
+
 /* 全局滚动条美化 */
 * {
   scrollbar-width: thin;
@@ -32,4 +45,21 @@
 @keyframes dotBounce {
   0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
   30% { transform: translateY(-4px); opacity: 1; }
+}
+
+/* 顶部进度条：细条从左滑到右循环，用于"请求进行中"的无内容型反馈 */
+@keyframes topProgressSlide {
+  0%   { left: -30%; }
+  100% { left: 100%; }
+}
+.top-progress-bar {
+  position: absolute;
+  top: 0;
+  left: -30%;
+  width: 30%;
+  height: 2px;
+  background: #0D9488;
+  border-radius: 2px;
+  animation: topProgressSlide 1.2s ease-in-out infinite;
+  pointer-events: none;
 }

@@ -37,6 +37,11 @@ mockgen:
 	@mockgen -source=./internal/service/click_event.go -package=svcmocks -destination=./internal/service/mocks/click_event_mock.go
 	#article polish
 	@mockgen -source=./internal/service/article_polish.go -package=svcmocks -destination=./internal/service/mocks/article_polish_mock.go
+	#article ranking
+	@mockgen -source=./internal/repository/dao/ranking.go -package=daomocks -destination=./internal/repository/dao/mocks/ranking_mock.go
+	@mockgen -source=./internal/repository/cache/ranking.go -package=cachemocks -destination=./internal/repository/cache/mocks/ranking_mock.go
+	@mockgen -source=./internal/repository/ranking.go -package=repomocks -destination=./internal/repository/mocks/ranking_mock.go
+	@mockgen -source=./internal/service/ranking.go -package=svcmocks -destination=./internal/service/mocks/ranking_mock.go
 	#ai
 	@mockgen -source=./internal/service/ai/llm.go -package=aimocks -destination=./internal/service/ai/mocks/llm_mock.go
 	#embedding

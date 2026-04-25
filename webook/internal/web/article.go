@@ -189,7 +189,7 @@ func (h *InternalArticleAuthorHandler) Page(ctx *gin.Context, req pageReq, uc Us
 			UpdatedAt: a.UpdatedAt,
 		})
 	}
-	return ginx.Result{Data: gin.H{"list": list, "total": total}}, nil
+	return ginx.Result{Data: ginx.PageResult{List: list, Total: total}}, nil
 }
 
 func (h *InternalArticleAuthorHandler) List(ctx *gin.Context, uc UserClaims) (ginx.Result, error) {
@@ -325,5 +325,5 @@ func (h *InternalArticleReaderHandler) Page(ctx *gin.Context, req pageReq) (ginx
 			UpdatedAt: a.UpdatedAt,
 		})
 	}
-	return ginx.Result{Data: gin.H{"list": list, "total": total}}, nil
+	return ginx.Result{Data: ginx.PageResult{List: list, Total: total}}, nil
 }

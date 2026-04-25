@@ -34,6 +34,7 @@ func InitWebServer(
 	searchHandler web.ArticleSearchHandler,
 	clickEventHandler web.ClickEventHandler,
 	polishHandler web.ArticlePolishHandler,
+	rankingHandler web.RankingHandler,
 ) *gin.Engine {
 	server := gin.Default()
 	// 开启后 *gin.Context.Value() 会 fallback 到 c.Request.Context().Value()；
@@ -52,6 +53,7 @@ func InitWebServer(
 	searchHandler.RegisterRoutes(server)
 	clickEventHandler.RegisterRoutes(server)
 	polishHandler.RegisterRoutes(server)
+	rankingHandler.RegisterRoutes(server)
 	return server
 }
 
@@ -137,6 +139,8 @@ func loginJwtMiddleware(hdl jwt.JwtHandler) gin.HandlerFunc {
 			"/article/reader/page",
 			"/interaction/view",
 			"/interaction/detail",
+			"/article/ranking/page",
+			"/article/ranking/archive/dates",
 			"/metrics", // Prometheus 抓取端点，由 nginx /metrics 的 IP 白名单层把关
 		).
 		Build()

@@ -5,9 +5,11 @@ package main
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
+	"github.com/robfig/cron/v3"
 
 	"github.com/webook/internal/events"
 	intrevt "github.com/webook/internal/events/interaction"
+	"github.com/webook/internal/job"
 	"github.com/webook/internal/repository"
 	"github.com/webook/internal/repository/cache"
 	"github.com/webook/internal/repository/dao"
@@ -42,6 +44,16 @@ var polishProviderSet = wire.NewSet(
 	service.NewAIArticlePolishService,
 )
 
+// articleRankingProviderSet 文章榜单模块
+var articleRankingProviderSet = wire.NewSet(
+	dao.NewGormArticleRankingDAO,
+	cache.NewRedisArticleRankingCache,
+	repository.NewCacheArticleRankingRepository,
+	service.NewArticleRankingService,
+	job.NewRankingJob,
+	web.NewArticleRankingHandler,
+)
+
 // kafkaProviderSet Kafka 基础设施 + 互动事件
 var kafkaProviderSet = wire.NewSet(
 	ioc.InitKafkaConfig,
@@ -72,8 +84,9 @@ var chatProviderSet = wire.NewSet(
 
 // App 应用入口，包含 Web 服务和后台消费者
 type App struct {
-	Server   *gin.Engine
-	Consumer events.Consumer
+	Server      *gin.Engine
+	Consumer    events.Consumer
+	RankingCron *cron.Cron
 }
 
 func InitWebServer() (App, func(), error) {
@@ -122,9 +135,12 @@ func InitWebServer() (App, func(), error) {
 		clickEventProviderSet,
 		// 文章润色
 		polishProviderSet,
+		// 文章榜单
+		articleRankingProviderSet,
 		// kafka + 互动事件
 		kafkaProviderSet,
 
+		ioc.InitCron,
 		ioc.InitMiddlewares,
 		ioc.InitWebServer,
 		wire.Struct(new(App), "*"),

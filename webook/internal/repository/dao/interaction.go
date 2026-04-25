@@ -168,8 +168,8 @@ func (d *GormInteractionDAO) ListHotBizIds(ctx context.Context, biz string, limi
 // Interaction 互动聚合计数表（通用，biz+biz_id 标识业务对象）
 type Interaction struct {
 	Id           int64  `gorm:"primaryKey,autoIncrement"`
-	Biz          string `gorm:"type:varchar(64);uniqueIndex:uk_biz"`
-	BizId        int64  `gorm:"uniqueIndex:uk_biz"`
+	Biz          string `gorm:"type:varchar(64);uniqueIndex:uk_interaction_biz"`
+	BizId        int64  `gorm:"uniqueIndex:uk_interaction_biz"`
 	ReadCount    int64
 	LikeCount    int64
 	CollectCount int64
@@ -184,9 +184,9 @@ func (Interaction) TableName() string {
 // UserInteraction 用户操作记录表（通用）
 type UserInteraction struct {
 	Id        int64  `gorm:"primaryKey,autoIncrement"`
-	Biz       string `gorm:"type:varchar(64);uniqueIndex:uk_user_biz"`
-	BizId     int64  `gorm:"uniqueIndex:uk_user_biz"`
-	UserId    int64  `gorm:"uniqueIndex:uk_user_biz"`
+	Biz       string `gorm:"type:varchar(64);uniqueIndex:uk_user_interaction_biz"`
+	BizId     int64  `gorm:"uniqueIndex:uk_user_interaction_biz"`
+	UserId    int64  `gorm:"uniqueIndex:uk_user_interaction_biz"`
 	Liked     bool
 	Collected bool
 	CreatedAt int64 `gorm:"autoCreateTime:milli"`

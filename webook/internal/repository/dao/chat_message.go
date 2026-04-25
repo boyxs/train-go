@@ -108,13 +108,13 @@ func reverse(msgs []Message) {
 // Message GORM 模型
 type Message struct {
 	Id             int64   `gorm:"primaryKey,autoIncrement"`
-	ConversationId int64   `gorm:"index:idx_conv_created;not null"`
+	ConversationId int64   `gorm:"index:idx_message_conversation_created;not null"`
 	Role           string  `gorm:"type:varchar(16);not null"`
 	Content        string  `gorm:"type:text;not null"`
 	ToolCalls      *string `gorm:"type:json"`
 	TokenUsed      int     `gorm:"not null;default:0"`
 	Feedback       int8    `gorm:"not null;default:0"`
-	CreatedAt      int64   `gorm:"autoCreateTime:milli;index:idx_conv_created"`
+	CreatedAt      int64   `gorm:"autoCreateTime:milli;index:idx_message_conversation_created"`
 }
 
 func (Message) TableName() string {

@@ -2,6 +2,65 @@
 
 <!-- 新功能前插在此，日期降序 -->
 
+## [2026-04-23] 榜单移动端适配 + 切 tab 体验 + 后端并发 perf
+
+**变更内容**: 榜单搜索页 5 项移动端响应式 + URL 状态持久化 + 200ms 延迟清空策略 + 后端并发优化 + trend bug fix；三份 CLAUDE.md 补硬规则
+
+**影响范围**:
+- 前端 `views/search/RankingBoard.tsx`：Header 堆叠、Tabs flex-wrap、Item meta 两行、Pagination simple + 对齐 `article/list.tsx`；URL 参数驱动（`dim/rcat/rdate/rpage/rsize`）；Spin 冻结 + minHeight 锁高 + 200ms 延迟清空；抽 `RankingItem` + `React.memo` 防 countdown tick 触发全量 re-render
+- 全局 `app/globals.css`：`@layer tw-utilities` 全局 `scrollbar-gutter: stable`；`AppLayout.tsx` `<main>` 改 `overflow-y-auto`
+- 后端 `repository/ranking.go`：`fallbackFromDAO` 删覆盖 snapshot trend 的 2 行（bug fix，归档 JSON 里原本就有 `trend:"up/down/new"` 被静默覆盖成 same）；`Top()` 用 `errgroup` 并发 `GetDetails` + `GetPrevRanks`
+- 后端 `service/ranking.go`：`RecomputeHot` 5 分区 fan-out `errgroup`
+- `scripts/webook.sql`：article / published_article 扩到 25 条；prev1 hot 归档扩到 25 条，满足 pageSize=20 分页阈值
+- 原型：`prd/chat/chat.pen` 新增 `08-榜单-移动端` frame（tVVgY）；`prd/ranking/ranking-search-page-mobile.png`；PRD.md §6.2 移动端章节
+- 规范：根 `CLAUDE.md` 加「侦察优先」「Pencil 原型修改」「动手前先出方案」；`webook-fe/CLAUDE.md` 加「列表分页状态规则」「跨页面模式对齐」「Effect 依赖稳定性」「常量集中」「CSS 规则就近 vs 全局」
+
+**技术决策**:
+- 移动端 pen 从 `rSwsj` 复制而非从零搭；硬编码进度条 width 按新 viewport 比例重算（225/175/158/119/99/86）
+- URL 参数 `r` 前缀避免和 `/search?page=` 搜索分页撞名
+- 切 tab 用"延迟 200ms 清空 + Skeleton 兜底"：快响应直接 commit 无感切换，慢响应才露 Skeleton
+- `scrollbar-gutter` 挂在 `<main>` 而非 `html/body`（AppLayout `overflow-hidden` 下 body 不滚）；`@layer tw-utilities` 压过 Tailwind utility
+- Pagination 完全对齐 `article/list.tsx`：`showTotal + showSizeChanger + showQuickJumper + size='small' + pageSizeOptions=['10','20','50']`
+
+**待办**:
+- 默认值魔数（`'hot'` / `'tech'` / `1` / `20`）可抽 `DEFAULTS` 常量
+- `searchParams.get('dim')` 建议加白名单校验
+- 748 行的 `RankingBoard.tsx` 可进一步拆 Header/Tabs 子组件
+
+**会话**: 260423-ranking-移动端-规则沉淀
+
+**发布**: 待补
+
+## [2026-04-22] 文章日榜 Top100
+
+**变更内容**: 搜索页落地文章日榜（热度/最新/最佳/分区 4 维度 Top100），支持实时刷新 + 次日归档 + 历史回看
+
+**影响范围**:
+- 后端全栈新增：`dao/ranking.go` / `cache/ranking.go` / `repository/ranking.go` / `service/ranking.go` + `ranking_scorer.go` + `ranking_hook.go` / `web/ranking.go`
+- cron 业务层新建 `internal/job/` 目录（`ioc/cron.go` 只做生命周期）
+- `article` / `published_article` 表加 `category` 列 + 索引；新增 `article_ranking` 表 + 视图 `v_article_ranking`
+- 前端 `views/search/RankingBoard.tsx` + `api/ranking.ts` + `types/ranking.ts`；搜索页无 query 时默认落地榜单
+- 通用工具：`pkg/ginx/page_result.go`（`PageResult{List any, Total int64}`），同步 `article.go` 两处分页接口复用
+- 规范：`CLAUDE.md` 补"Handler/Service/Repo/DAO 构造函数必须返回接口"+"表名单数"
+
+**技术决策**:
+- 公式：热度 `(click + 3·like + 5·collect) / (hours+2)^1.5`；最佳 Wilson 下界（`clicks ≥ 50`）；最新按 `publish_ts`（24h + `clicks ≥ 10`）
+- 存储：Redis ZSet 实时（1min 重算 + 增量 ZINCRBY）+ MySQL 归档；cron 分布式锁用 Redis SETNX
+- cron 库：`robfig/cron/v3`，多实例靠 SETNX 抢占实现分布式
+- date 字段：`varchar(10) 'YYYY-MM-DD'` 作日分区键（行业标准，非 int64 毫秒戳）；业务时区 **Asia/Shanghai**，三端对齐（后端 `carbon.Now()` 走全局 TZ、前端 `toLocaleDateString('sv-SE', {timeZone:'Asia/Shanghai'})`、SQL `CONVERT_TZ(UTC_TIMESTAMP(), '+00:00', '+08:00')`）
+- 接口命名：泛型接口 `RankingService/Repository/Cache/DAO`，实体实现 `ArticleRankingService` 等（未来 `UserRanking...` 可共享同接口）
+- 分页响应：`ginx.PageResult{List any, Total int64}` 对齐前端 `types.PageResult<T>`
+- 点击追踪：`ClickEvent.source` 编码为 `"ranking:{dim}:{rank}"`，不改表结构
+
+**待办**:
+- cron 仍是测试节奏（10s/15s/5s/10min），上线前切回生产节奏（1min/5min/30s/每日 00:10）
+- `rankingCandidates=2000` / `bestMinClicks=50` / `newMinClicks=10` 可配置化
+- 归档页面路由 `/ranking/archive?date=...` 未单独实现，通过 Drawer 切换日期达成
+
+**会话**: 260422-ranking-文章榜单
+
+**发布**: 待补
+
 ## [2026-04-21] v1.0.0 基础设施增强：端口避让 + ghcr 源切换 + 懒拉镜像
 
 **变更内容**: 围绕 prod 正式发版 (`webook-v1.0.0` / `webook-fe-v1.0.0`) 做了三件部署基建的事：
@@ -37,288 +96,62 @@
 
 **会话**: 260421-cicd-L1发版v1.0.0
 
-## [2026-04-20] deploy/ 合并根目录残留文件 + Makefile 重命名
+## [2026-04-20] L1 部署体系：deploy/ 单源 + 一份 compose + 多 env 切换
 
-**变更内容**: 上一轮合并时遗漏的根目录内容完整搬进 deploy/：
-- `prometheus/examples/` → `deploy/prometheus/examples/`
-- `prometheus/prometheus.local.yml` → `deploy/prometheus/prometheus.local.yml`
-- `grafana/examples/` → `deploy/grafana/examples/`
-- `grafana/mk/grafana.mk` → `deploy/grafana/Makefile`（改名 + 上提一级目录）
-- 根目录 `docker-compose.yaml` / `nginx/` / `prometheus/` / `grafana/` / `otel-collector/` 全部清空
+**变更内容**: 完成 L1 部署 + CI 体系，最终落地的状态：
 
-**影响范围**:
-- `deploy/prometheus/` / `deploy/grafana/`（新增文件）
-- `deploy/grafana/Makefile`（从 mk/ 移出 + 重命名）
-- `deploy/README.md`（文件清单完整化）
+- `deploy/` 是部署唯一真相源（根目录原 `docker-compose.yaml` / `nginx/` / `prometheus/` / `grafana/` / `otel-collector/` 全部清空）
+- `deploy/docker-compose.yaml`：一份 all-in-one（17 服务：webook + webook-fe + 中间件 + 监控栈 + exporters + nginx）
+- `deploy/docker-compose.local.yaml`：override 文件，本地从 ghcr 改成本地 build + 暴露宿主端口
+- `deploy/.env.{local,dev,staging,prod}(.example)`：四份 env 模板入库（占位 `CHANGE_ME`），真实 `.env.*` gitignored
+- `deploy/deploy.sh <env>`：一键切换，`local|dev|staging|prod`，子命令 `up/down/nuke/logs/status/pull/restart`
+- `deploy/nginx/conf.d/default.conf`：一份配置（通配 `server_name _`），不再按 env 拆
+- `deploy/prometheus/` + `deploy/grafana/` + `deploy/otel-collector/`：完整 provisioning + examples（教学参考）
+- `deploy/grafana/Makefile`：Grafana 运维命令（仪表盘导出/导入等）
+- `deploy/README.md`：架构图 + 端口表 + 首次部署序列 + 日常操作
 
-**技术决策**:
-- 保留示例目录（`examples/`）：Grafana/Prometheus provisioning 只加载 `provisioning/` 和 `prometheus.yml`，examples/ 放旁边做教学参考不会干扰
-- Makefile 放 grafana/ 根下而非 mk/ 子目录：`cd deploy/grafana && make <target>` 直接可用，路径更短
-- prometheus.local.yml 保留：Windows 本地独立跑 prometheus.exe 时用（targets: localhost:8089），和 prometheus.yml（容器内用 service name）并存不冲突
+**多环境机制**:
+- project 名按 env 分（`webook-dev` / `webook-prod`）→ volume 自然隔离 `webook-<env>_*`
+- container_name 不带 env 前缀（`webook-app` / `webook-mysql`）→ docker 全局唯一，**同时只能跑一套**（切换前自动 stop）
+- `APP_ENV` 由 `.env.<env>` 注入 → webook 加载对应 `config/<env>.yaml`
+- 切环境 volume 不清，dev 数据切到 prod 再切回还在；显式清要 `nuke` 子命令
 
-**实机验证（192.168.150.101）**: `./deploy.sh dev` 全部 17 服务启动成功 (nginx/grafana/prometheus/zipkin/etc 各自暴露端口，业务容器走 service name DNS)
+**配置体系（混合方案）**:
+- `webook/config/{local,dev,staging,prod}.yaml` 同构按 env 差异化（otel.env / sampleRatio / logger 级别）
+- 敏感字段（`mysql.dsn` / `redis.password`）yaml 占位 `OVERRIDE_VIA_ENV`，运行时由 `.env.<env>` 注入
+- `webook/main.go` `initViperV2` 加 `viper.AutomaticEnv()` + `SetEnvKeyReplacer('.','_')` —— L2 K8s Secret 注入直接可用
 
-**会话**: 260420-cicd-L1阶段一与命名标准化
+**服务引用 K8s 心智对齐**:
+- nginx / prometheus / grafana / otel-collector 跨服务引用全用 service name DNS（不写 IP）
+- L2 K8s Service name 一一对应，提前练 K8s 思维
 
-## [2026-04-20] deploy/ 成为唯一真相源 + 全 env 化
-
-**变更内容**:
-1. **删除根目录的部署配置**，合并进 deploy/：
-   - `/docker-compose.yaml` → `deploy/docker-compose.yaml`（合并有价值的注释和配置）
-   - `/nginx/` / `/prometheus/` / `/grafana/` / `/otel-collector/` → 整目录删除（deploy/ 已有同名内容）
-
-2. **新增 local 模式**：
-   - `deploy/docker-compose.local.yaml`：override 文件，webook/fe 从 ghcr pull 改本地 build，中间件+OTel 暴露宿主端口
-   - `deploy/.env.local(.example)`：本地开发用
-   - `deploy.sh local`：自动叠加 override + build + up
-
-3. **全面 env 化**（消除硬编码）：
-   - 监控栈内存：`PROMETHEUS_MEM` / `GRAFANA_MEM` / `ZIPKIN_MEM` / `ZIPKIN_HEAP` / `OTEL_MEM` / `NGINX_MEM`
-   - 宿主端口：`NGINX_PORT` / `PROMETHEUS_PORT` / `GRAFANA_PORT` / `ZIPKIN_PORT`（dev/staging/prod 错开）
-   - local 模式特有：`WEBOOK_HOST_PORT` / `MYSQL_HOST_PORT` / `REDIS_HOST_PORT` 等中间件宿主端口
-   - compose 里全部 `${VAR:-default}` 带默认值，.env 不设也能跑
-
-4. **从根目录挪过来的注释**（教学价值的）：
-   - Kafka：`KAFKA_AUTO_CREATE_TOPICS_ENABLE` 线上不要开；`KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR` 单节点必须 1；healthcheck 解释
-   - Zipkin：full vs slim 对比；mem 存储 vs ES 存储切换指引
-   - Nginx：1.26.x LTS 注释；/var/log/nginx 不挂的 log forwarding 设计
-   - Prometheus：`--web.enable-lifecycle` 热重载；host.docker.internal 加 extra_hosts
-   - Grafana：`GF_SMTP_STARTTLS_POLICY: MandatoryStartTLS`
-   - OTel：contrib 版选择理由
+**CI 流水线**:
+- `.github/workflows/webook-ci.yml` + `webook-fe-ci.yml`：master/feature push 触发，build → push ghcr，tag 含 `master-latest` 滚动 + 版本 tag
+- `webook/Dockerfile` `ARG VERSION` + `LABEL org.opencontainers.image.version`，CI 注入版本元数据
+- `paths-ignore '**.md'` 文档改不触发 CI
 
 **影响范围**:
-- **删**：根 `/docker-compose.yaml` / `nginx/` / `prometheus/` / `grafana/` / `otel-collector/`
-- **新建**：`deploy/docker-compose.local.yaml` / `deploy/.env.local(.example)`
-- **改**：`deploy/docker-compose.yaml`（全 env 化 + 注释迁移）、`deploy/deploy.sh`（加 local 分支）、四份 `.env.<env>(.example)`（统一全变量）、`deploy/README.md`、`webook/CLAUDE.md`
-
-**技术决策**:
-- **dev/staging/prod 宿主端口错开**（80/81/82、9090/9091/9092 等）：container_name 冲突已阻止并发，但万一切换间隙短暂并行时不打架
-- **local 用 config/dev.yaml**：local.yaml 是为 go run + localhost 设计的，容器内用不通；local 部署用 dev.yaml 最省事
-- **docker-compose 的 `!reset null`**：清 base image 字段给 local override 用，是 compose v2.20+ 特性
-- **.env 里默认值 vs compose `${VAR:-default}`**：两处都有默认，优先级 .env > compose default。.env 里写全是为了可读，compose default 是兜底
-
-**待办**:
-- 服务器 192.168.150.101 `git pull` 后 volume 名保持 `webook-dev_*`（无迁移成本），直接 `./deploy.sh dev` 即可
-
-**会话**: 260420-cicd-L1阶段一与命名标准化
-
-## [2026-04-20] L1 部署方案彻底简化：一份 compose + env 切换
-
-**变更内容**: 推翻之前"业务/infra 拆 project + 跨 project extnetwork 共享 + 固定 IP 段"的复杂设计，回归最小可用方案：
-- `deploy/docker-compose.yaml`：**一份** all-in-one（17 服务：webook/fe/中间件/监控栈/exporters/nginx）
-- `deploy/.env.{dev,staging,prod}(.example)`：简化（去掉 IP_PREFIX / ENV_NAME，加 APP_ENV）
-- `deploy/deploy.sh`：重写，`./deploy.sh <env>` 切换；`list` / `down` / `nuke` / `logs` / `status` / `pull` / `restart` 子命令；裸操作子命令拦截
-- `deploy/nginx/conf.d/default.conf`：**一份**（通配 `server_name _`），替代原 4 份（common/dev/staging/prod/monitor）
-- `deploy/prometheus/prometheus.yml`：简化（target 用 service name 而非跨 project 容器名）
-- `deploy/grafana/provisioning/datasources/*.yml`：URL 改 service name
-- `deploy/otel-collector/config.yaml`：zipkin endpoint 改 service name
-
-### 删除
-- `deploy/docker-compose.deploy.yml` / `docker-compose.infra.yml`（合并）
-- `deploy/docker-compose.infra.yml`、`deploy-infra.sh`
-- `deploy/.env.infra` / `.env.infra.example`（并入各 env）
-- `deploy/nginx/conf.d/{00-common,10-dev,10-staging,10-prod,20-monitor}.conf`（合并）
-
-### 多环境新机制
-- **project 名按 env 分**（`webook-dev` / `webook-prod`）→ volume 按 `webook-<env>_mysql-data` 自然隔离
-- **container_name 不加前缀**（`webook-app`、`webook-mysql`）→ docker 全局唯一，**同时只能跑一套**（切换前 deploy.sh 自动 stop 别的 env）
-- **APP_ENV 由 `.env.<env>` 注入** → webook 加载对应 `config/<env>.yaml`
-- **切换 env 数据保留**：webook-dev 切到 webook-prod 再切回来，dev 的 mysql 数据还在
-
-**影响范围**:
-- `deploy/**`（大重构，新建 1 / 删除 10 / 改写 8）
-- `webook/CLAUDE.md`（环境说明小段更新）
-- `CHANGELOG.md`（本条）
-
-**技术决策**:
-- **不做多环境同机并行**：故障域耦合、资源浪费、和真实生产不匹配；团队化多环境等 L2 K8s namespace
-- **靠 container_name 冲突阻止并发**：简单粗暴正确；不用代码校验，compose 自己报错
-- **切换不清 volume**：数据留着，随时切回来有历史；nuke 子命令显式清理
-- **监控不跨 env 共享**：每切一次 env 监控栈重建；prometheus 数据单 env 独立不混淆
-- **webook/config/{local,dev,staging,prod}.yaml 四份保留**：yaml 选一份运行 = 模拟多环境配置，教学价值足；敏感字段继续走 Viper AutomaticEnv 覆盖
-
-**待办**:
-- 服务器 192.168.150.101 迁移：`git pull` + `./deploy.sh dev --nuke` 用新脚本重起（volume 名 `webook-dev_*` 与旧 project 一致，无需迁移数据）
-- roadmap 笔记 1.17 共享 infra 章节删除，替换为"L1 = 单机单环境切换"
-
-**会话**: 260420-cicd-L1阶段一与命名标准化
-
-## [2026-04-20] L1 阶段二 · 完整服务栈 + 共享 infra + 固定 IP
-
-**变更内容**: `deploy/` 目录从 6 文件扩到 20+ 文件，按 roadmap 1.7~1.9 + "共享 infra" 增强模式落地：
-
-### 业务栈（每环境独立）
-- `deploy/docker-compose.deploy.yml` 重写：新增 `webook-fe`、4 个 exporters（mysqld/redis/kafka/node）、`webook-ollama`（profile `llm` 默认关闭）；所有服务接入外部 `extnetwork` 并用 `${IP_PREFIX}` 变量驱动固定 IP；业务容器不再直接暴露宿主端口（改由 infra nginx 反代）
-- `.env.{dev,staging,prod}.example` 重写：新增 `IP_PREFIX=172.21.{1,2,3}` / `FE_IMAGE_TAG` / `FE_MEM` / `OLLAMA_MEM`
-
-### 共享 infra（跨环境一份）
-- `deploy/docker-compose.infra.yml`：新建，含 nginx（`.28`）+ prometheus（`.20`）+ grafana（`.21`）+ zipkin（`.26`）+ otel-collector（`.29`，带 alias `otel-collector` 让业务容器原短名可解析）
-- `deploy/.env.infra.example`：新建，含 Grafana 凭证 + SMTP 凭证
-- `deploy/deploy-infra.sh`：新建，支持 `up/down/status/logs/reload`（nginx + prometheus 热更）
-- `deploy/nginx/`：从根目录 `nginx/` 迁移，新建 `conf.d/{dev,staging,prod}.conf` 按子域名路由（`<env>.webook.local`）+ `monitor.conf`（grafana/prometheus/zipkin 子域名）
-- `deploy/prometheus/prometheus.yml`：新建，跨环境固定 IP scrape（三环境 × 四种 exporter + 业务应用），每个 target 带 `env` label
-- `deploy/grafana/provisioning/`：从根目录复制 datasources / dashboards / alerting，datasources URL 改成 infra 固定 IP
-- `deploy/otel-collector/config.yaml`：新建，Zipkin exporter 指向固定 IP `172.21.0.26:9411`
-
-### 脚本与 CI
-- `deploy/deploy.sh` 重写：加外部网络自动创建、支持 `--profile llm` 参数、保留 prod 发版语义化版本闸门
-- `.github/workflows/webook-fe-ci.yml`：和 backend CI 对齐 3 处增量（`feature/**` glob、`master-latest` 滚动 tag、`paths-ignore '**.md'`）
-
-### 文档
-- `deploy/README.md` 大改：含架构图、IP 分配表、首次部署命令序列、日常操作、资源估算、子域名规划
-
-**影响范围**:
-- `deploy/**`（新增 15+ 文件 / 覆盖 5 个）
-- `.github/workflows/webook-fe-ci.yml`（增量 3 处）
-- `CHANGELOG.md`（本条）
-- `C:\Go\notes\cicd-webook-roadmap.md`（待后续同步）
-
-**技术决策**:
-- **路由方式选子域名**（而非路径前缀）：子域名下前端零改动（`NEXT_PUBLIC_API_BASE_URL=/api` 全环境通用），nginx `server_name` 区分 upstream；路径前缀需要 Next.js `basePath` + 每环境独立构建前端镜像，成本过高
-- **exporter 每环境独立**：符合 L1 "每 project 独立全套"哲学，infra 只放跨环境共享的服务，prometheus scrape 按固定 IP 写死（三环境 × 四种 = 12 target）
-- **ollama 做成 `profiles: ["llm"]`**：默认不启（2G 内存太大），按需 `./deploy.sh <env> --profile llm` 拉起
-- **固定 IP 而非容器名解析**：对齐根目录 `docker-compose.yaml` 风格，prometheus 配置可读性 + 稳定性更高；业务内部的容器连接仍用容器名（`webook-mysql:3306` 之类）保持简单
-- **otel-collector 容器加 network alias** `otel-collector`：webook 镜像里 `config/prod.yaml` 写死了这个短名，alias 让跨 project 解析成功
-- **nginx 子域名 `*.webook.local`**：本地测试改 `/etc/hosts` 即可；上线换真实域名只改 `server_name`
-
-**待办**:
-- 实机验证：scp 到 Linux 机器跑 `./deploy-infra.sh up` + `./deploy.sh prod`
-- L2：K3s + ArgoCD + Helm（阶段一 AutomaticEnv 钩子已预埋，Secret 注入方案就绪）
-
-**会话**: 260420-cicd-L1阶段一与命名标准化
-
-## [2026-04-20] L1 真环境隔离：混合配置方案（yaml + AutomaticEnv secrets 注入）
-
-**变更内容**: 基于 L1 AutomaticEnv 钩子实现团队场景的真环境配置隔离：
-- **新建 `webook/config/dev.yaml`** / **`staging.yaml`**：同构 prod.yaml，按环境差异化 `otel.env` / `sampleRatio` / logger 级别
-- **`webook/config/prod.yaml`**：`mysql.dsn` / `redis.password` 改占位 `OVERRIDE_VIA_ENV`（敏感值不再硬编码）
-- **`deploy/docker-compose.deploy.yml`**：`APP_ENV: "config/${ENV_NAME}.yaml"` 动态选 yaml；webook service 加 `MYSQL_DSN` / `REDIS_PASSWORD` env 注入
-- **`.env.<env>.example` / `.env.<env>`**：加 `MYSQL_DSN` / `REDIS_PASSWORD` 覆盖变量
-- `webook/CLAUDE.md` 环境说明重写，展示四段 yaml + 混合方案
-- `deploy/README.md` 新增"混合配置方案"小节 + 密码同步 checklist
-
-**影响范围**:
-- `webook/config/{dev,staging,prod}.yaml`（+2 新建 + 1 改）
-- `deploy/docker-compose.deploy.yml`、`.env.{dev,staging,prod}.example`、真实 `.env.*`
-- `webook/CLAUDE.md`、`deploy/README.md`、`CHANGELOG.md`
-
-**技术决策**:
-- **yaml 分环境**比纯 env 注入对团队更友好：PR review "改 dev 配置" 直接看 dev.yaml diff；微服务 N 个服务 × M 环境不用维护 N×M 组 env 变量
-- **敏感字段（密码）走 env 覆盖**：yaml 不进 git 敏感信息；`.env.*` 真实文件 gitignored
-- **LLM API key 留 yaml**：`llm.providers` 是 slice-of-struct，Viper AutomaticEnv 不支持数组元素覆盖；学习场景全环境共用可接受；L2 真分离走 K8s Secret + JSON string 注入或重构为 map 结构
-- **密码必须两处同步**（`MYSQL_PASS` 和 `MYSQL_DSN` 里嵌的密码）：接受手动一致性成本，换取 .env 无变量展开的简单性
-- **1:1 对齐 L2 K8s**：yaml → ConfigMap、.env → Secret、docker-compose environment → envFrom.secretRef，应用代码零改动
-
-**待办**: prod 上线前执行密码同步 checklist（deploy/README.md 列了 6 步）
-
-**会话**: 260420-cicd-L1阶段一与命名标准化
-
-## [2026-04-20] L1 阶段二：IP 引用改容器名，对齐 K8s 心智模型
-
-**变更内容**: nginx / prometheus / grafana / otel-collector 的跨服务引用从固定 IP 改成容器名（`dev-webook-app:8089` / `webook-infra-prometheus:9090` 等），共 **30 处替换**。compose 层 `ipv4_address` 保留作为"网络规划底图"。
-
-**影响范围**:
-- `deploy/nginx/conf.d/10-{dev,staging,prod}.conf`（upstream app/fe 共 6 处）
-- `deploy/nginx/conf.d/20-monitor.conf`（grafana/prometheus/zipkin proxy_pass 3 处）
-- `deploy/prometheus/prometheus.yml`（15 个 env target + 3 个 infra target）
-- `deploy/grafana/provisioning/datasources/{prometheus,zipkin}.yml`（2 处）
-- `deploy/otel-collector/config.yaml`（zipkin exporter 1 处）
-- `deploy/README.md`（新增"为什么引用用容器名"说明）
-
-**技术决策**:
-- **L2 心智对齐**：K8s 里没人手写 IP，全是 Service name DNS；L1 用容器名就是提前练这套思维。从思维训练角度比固定 IP 更有价值
-- **维护成本**：改 IP 规划只动 compose 层 `ipv4_address`，监控/反代配置全不用改
-- **底图保留**：`.env.<env>` 的 `IP_PREFIX` 和 compose 的 `ipv4_address` 不动，`tcpdump` / `iptables` 按段诊断仍可用
-- **`allow 172.21.0.0/16`**：nginx metrics 端点的子网 allow 保留（子网过滤不是 host 引用）
-
-**会话**: 260420-cicd-L1阶段一与命名标准化
-
-## [2026-04-20] L1 阶段二 Hardening：DNS 隔离 + 密码占位 + Prometheus 认证
-
-**变更内容**: 基于首轮 review 的 Important/Suggestion 修复：
-- **网络隔离**：`deploy/docker-compose.deploy.yml` 每个 service 同时挂载 `default`（项目内 DNS）和 `extnetwork`（固定 IP 跨项目），避免三环境 `webook-mysql` service name 在共享外部网络上冲突
-- **密码占位**：`.env.{dev,staging,prod,infra}.example` 中所有密码改 `CHANGE_ME`，仓库不再泄漏明文；真实 `.env.*` 保留有效值（gitignored）
-- **Prometheus 配置修复**：`deploy/prometheus/prometheus.yml` 的 Grafana basic_auth 去掉 `${GRAFANA_PASS:-admin}` 占位（Prometheus YAML 不支持 env var 展开），改写死 `admin/admin` + 警告注释
-- **nginx conf 顺序化**：`_common.conf` → `00-common.conf`，环境 conf 加 `10-`，监控加 `20-`，显式加载顺序不依赖下划线字母序
-- **prometheus mem_limit**：256m → 512m，应对跨环境 × 多 exporter 的数据量
-- **node-exporter 挂载注释**：说明 `/:/host:ro,rslave` 仅 Linux 生效
-- **webook/main.go:41**：`initViper()`（V0 死代码）default env 从"local"回退"dev"，减少 review 噪音
-
-**影响范围**:
-- `deploy/docker-compose.deploy.yml`（每 service +1 `default` 网络，+1 网络声明）
-- `deploy/docker-compose.infra.yml`（prometheus mem_limit）
-- `deploy/prometheus/prometheus.yml`（Grafana basic_auth）
-- `deploy/.env.{dev,staging,prod,infra}.example`（密码占位）
-- `deploy/nginx/conf.d/*.conf`（5 个文件重命名加前缀）
-- `deploy/README.md`（文件清单更新）
-- `webook/main.go`（initViper 回退）
-
-**技术决策**:
-- **两网合一方案**：project 默认网络做 service-name DNS 隔离、extnetwork 做固定 IP 跨项目，两网各司其职；prometheus 走固定 IP 抓取（不靠 DNS），nginx 走固定 IP 反代（同理），应用内部连中间件走 service name DNS
-- **Prometheus basic_auth 写死**：YAML 展开环境变量需要 Prometheus 2.45+ 的 `--enable-feature=expand-external-labels` 且语法受限，L1 阶段不值得引入；接受写死 + 文档提醒的妥协
-- **example 用 `CHANGE_ME`**：强制部署者主动填密码，比示例写 `13520` 显得"可直接用"更安全
-
-**待办**: 实机验证时确认两网方案的 compose v2 行为符合预期
-
-**会话**: 260420-cicd-L1阶段一与命名标准化
-
-## [2026-04-20] L1 阶段二 · 服务器部署模板落地（deploy/）
-
-**变更内容**: 新建 `deploy/` 目录，按 roadmap 1.7~1.9 落地 L1 阶段二全部文件：
-- `deploy/docker-compose.deploy.yml`：变量驱动的多环境部署清单（webook + MySQL + Redis + etcd + Kafka + ES），`-p webook-<env>` project 名隔离
-- `deploy/.env.dev.example` / `.env.staging.example` / `.env.prod.example`：三环境变量模板，真实 `.env.<env>` 由 `.gitignore` 排除
-- `deploy/deploy.sh`：一键部署脚本，按 env 参数拉镜像/启停/清理，prod 有额外闸门（`--down` 确认、`--nuke` 禁用、tag 必须语义化 x.y.z）
-- `deploy/README.md`：使用说明 + 与根 `docker-compose.yaml` 的区别对照
-
-**影响范围**:
-- `deploy/*`（新目录 6 文件）
+- `deploy/`（新建目录 + 完整文件集 ~25 文件）
+- `webook/Dockerfile` / `webook/main.go`（CI 元数据 + AutomaticEnv 钩子）
+- `webook/config/{local,dev,staging,prod}.yaml`（命名标准化 + 混合配置）
+- `.github/workflows/webook-ci.yml` / `webook-fe-ci.yml`
+- 根目录大量删除（旧 `docker-compose.yaml` / `nginx/` / `prometheus/` / `grafana/` / `otel-collector/`）
+- `webook/CLAUDE.md` 加「环境说明」+「部署层」章节
 - `.gitignore`（加 `!.env.*.example` 允许模板入库）
-- `CHANGELOG.md`（本条）
 
 **技术决策**:
-- `.env.*` 只入库 `.example` 模板，真实文件永远不进 git，避免密码泄露（即使本项目密码明文也是 13520）
-- 服务器侧使用路径 `~/webook-deploy/`，但仓库内放在根目录 `deploy/`，避免和 `webook/`（后端代码）混在一起
-- prod tag 强校验 `x.y.z` 语义化版本，倒逼走 `git tag webook-v*` 流程，不允许乱推 `master-<sha>` 上 prod
-- 维持 L1 三环境同密码（13520）的限制，不在阶段二引入环境变量注入——那是 L2 的活
+- 一份 compose + env 切换 vs 多 project 拆分 + 共享 infra：选前者，避免跨 project extnetwork 复杂度；故障域简单清晰
+- 切 env 不清 volume：保留历史数据可随时切回；显式 nuke 才清
+- 监控栈每环境重建：prometheus 数据单 env 独立不混淆，符合 L1「每 project 独立全套」哲学
+- 服务引用用 service name 不用固定 IP：对齐 L2 K8s 心智模型（K8s 没人手写 IP）
+- yaml 分环境 + env 注 secrets 的混合方案：PR review "改 dev 配置" 直接看 dev.yaml diff；微服务 N×M 不用维护 N×M env 变量
+- prod tag 强校验语义化版本（`x.y.z`）：倒逼走 `git tag webook-v*` 流程，不允许 `master-<sha>` 上 prod
+- example 用 `CHANGE_ME` 占位：强制部署者主动填密码，比示例写明文更安全
 
 **待办**:
-- L2：K3s + ArgoCD + Helm + Secret 分环境（webook/main.go 的 AutomaticEnv 钩子阶段一已预埋）
-- 实机验证：需要一台 Linux 机器跑 `scp -r deploy/ user@server:~/webook-deploy/` → `./deploy.sh prod`
-
-**会话**: 260420-cicd-L1阶段一与命名标准化
-
-## [2026-04-20] L1 阶段一 · CI 镜像流水线 + 配置命名标准化
-
-**变更内容**:
-1. **L1 阶段一（CI 打镜像闭环）**：
-   - `webook/Dockerfile` 加 `ARG VERSION` + `LABEL org.opencontainers.image.version` + `ENV APP_ENV=config/prod.yaml`，CI 可注入版本元数据
-   - `.github/workflows/webook-ci.yml` 增量补：`feature/**` 分支 glob、`master-latest` 滚动 tag、`VERSION` build-arg、`paths-ignore '**.md'`
-   - `webook/main.go` `initViperV2` 加 `viper.AutomaticEnv()` + `SetEnvKeyReplacer('.', '_')`——**L2 钩子预埋**，现阶段零行为影响，未来 K8s Secret 经环境变量覆盖 yaml 时直接可用
-2. **配置命名标准化（local/dev/prod 三段式）**：
-   - `git mv webook/config/dev.yaml → config/local.yaml`，语义对齐"本地开发"实际用途
-   - `config/dev.yaml` 本轮**不新建**，预留给未来 CI 集成测试 / 远端 dev 服务器
-   - `main.go` 三个 initViper 版本的 default env 和 fallback 路径统一指向 `config/local.yaml`
-   - `.vscode/launch.json` / `.idea/workspace.xml`（本地）/ IDE 环境变量指向 local.yaml
-   - `local.yaml` / `prod.yaml` 尾部注释更新命名说明
-   - `docs/opentelemetry/05-integration.md` 配置示例同步
-
-**影响范围**:
-- `webook/Dockerfile` / `.github/workflows/webook-ci.yml` / `webook/main.go`
-- `webook/config/local.yaml`（新命名） / `webook/config/prod.yaml`（注释）
-- `webook/CLAUDE.md`（加「环境说明」小节 + 启动命令示例）
-- `docs/opentelemetry/05-integration.md`（配置示例）
-- `C:\Go\notes\cicd-webook-roadmap.md`（外部笔记，补命名标准）
-
-**技术决策**:
-- 不走 C 方案的 `${WEBOOK_*}` + `os.ExpandEnv`——三份 yaml 各写各的值即是"环境适配"本身，环境变量占位对本项目无实际收益（roadmap 1.13 也印证这一点）
-- L1 接受"三环境镜像里 yaml 同密码"的限制，真正分离等 L2 走 K8s Secret + `envFrom.secretRef` + Viper AutomaticEnv 链路
-- `main.go` 的 V1/V0 是死代码但同步修改，保持一致防将来切换翻车
-- `config/dev.yaml` 暂缓新建——没有真实使用者（CI 集成测试还没上）时建空配置徒增误导
-
-**待办**:
-- L1 阶段二：`~/webook-deploy/` 服务器侧 `docker-compose.deploy.yml` + `.env.<env>` + `deploy.sh`，等部署机就绪后做
-- L2：K3s + ArgoCD + Helm + Secret 分环境，支持 prod 独立强密码
-- CI 接入集成测试（需要 MySQL + Redis + Kafka + ES services，性能/成本另议）
+- L2：K3s + ArgoCD + Helm + Secret 分环境（AutomaticEnv 钩子已预埋，Secret 注入链路就绪）
+- CI 接入集成测试（需 MySQL + Redis + Kafka + ES services，性能 / 成本另议）
+- 实机验证：服务器 192.168.150.101 `git pull` + `./deploy.sh dev` 全 17 服务启动成功
 
 **会话**: 260420-cicd-L1阶段一与命名标准化
 
