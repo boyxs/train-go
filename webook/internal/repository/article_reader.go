@@ -131,6 +131,7 @@ func (r *CacheArticleReaderRepository) toDomain(a dao.PublishedArticle) domain.A
 		Abstract:  a.Abstract,
 		Author:    domain.Author{Id: a.AuthorId},
 		Status:    domain.ArticleStatus(a.Status),
+		Category:  a.Category,
 		CreatedAt: a.CreatedAt,
 		UpdatedAt: a.UpdatedAt,
 	}

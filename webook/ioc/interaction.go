@@ -10,13 +10,15 @@ import (
 	"github.com/webook/pkg/logger"
 )
 
-// InitInteractionService 组装互动 Service：Kafka 装饰器包装同步实现
+// InitInteractionService 组装互动 Service：RankingAware → Kafka → Internal
 func InitInteractionService(
 	repo repository.InteractionRepository,
+	rankRepo repository.RankingRepository,
 	producer intrevt.InteractionEventProducer,
 	l logger.LoggerX,
 ) service.InteractionService {
 	inner := service.NewInternalInteractionService(repo)
 	breaker := circuitbreaker.NewBreaker(3, 30*time.Second)
-	return service.NewKafkaInteractionService(inner, producer, breaker, l)
+	withKafka := service.NewKafkaInteractionService(inner, producer, breaker, l)
+	return service.NewArticleRankingAwareInteractionService(withKafka, rankRepo, l)
 }

@@ -55,6 +55,8 @@ func InitWebServer() *gin.Engine {
 		clickEventSvcProvider,
 		// 文章润色
 		polishSvcProvider,
+		// 文章榜单
+		articleRankingSvcProvider,
 
 		ioc.InitMiddlewares,
 		ioc.InitWebServer,
@@ -179,6 +181,15 @@ var clickEventSvcProvider = wire.NewSet(
 
 var polishSvcProvider = wire.NewSet(
 	service.NewAIArticlePolishService,
+)
+
+// 文章榜单：集成测试不拉起 cron
+var articleRankingSvcProvider = wire.NewSet(
+	dao.NewGormArticleRankingDAO,
+	cache.NewRedisArticleRankingCache,
+	repository.NewCacheArticleRankingRepository,
+	service.NewArticleRankingService,
+	web.NewArticleRankingHandler,
 )
 
 var chatSvcProvider = wire.NewSet(

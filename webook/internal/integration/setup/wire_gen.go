@@ -85,7 +85,12 @@ func InitWebServer() *gin.Engine {
 	clickEventHandler := web.NewAIClickEventHandler(clickEventService, loggerX)
 	articlePolishService := service.NewAIArticlePolishService(llmClient)
 	articlePolishHandler := web.NewAIArticlePolishHandler(articlePolishService, cmdable, loggerX)
-	engine := ioc.InitWebServer(v, userHandler, articleAuthorHandler, articleReaderHandler, interactionHandler, oAuth2Handler, chatHandler, articleSearchHandler, clickEventHandler, articlePolishHandler)
+	rankingCache := cache.NewRedisArticleRankingCache(cmdable, loggerX)
+	rankingDAO := dao.NewGormArticleRankingDAO(db)
+	rankingRepository := repository.NewCacheArticleRankingRepository(rankingCache, rankingDAO, loggerX)
+	rankingService := service.NewArticleRankingService(rankingRepository, articleReaderRepository, interactionRepository, clickEventService, loggerX)
+	rankingHandler := web.NewArticleRankingHandler(rankingService, loggerX)
+	engine := ioc.InitWebServer(v, userHandler, articleAuthorHandler, articleReaderHandler, interactionHandler, oAuth2Handler, chatHandler, articleSearchHandler, clickEventHandler, articlePolishHandler, rankingHandler)
 	return engine
 }
 
@@ -226,5 +231,8 @@ var interactionSvcProvider = wire.NewSet(dao.NewGormInteractionDAO, cache.NewRed
 var clickEventSvcProvider = wire.NewSet(dao.NewGormAIClickEventDAO, cache.NewRedisAIClickEventCache, repository.NewCacheAIClickEventRepository, service.NewAIClickEventService)
 
 var polishSvcProvider = wire.NewSet(service.NewAIArticlePolishService)
+
+// 文章榜单：集成测试不拉起 cron
+var articleRankingSvcProvider = wire.NewSet(dao.NewGormArticleRankingDAO, cache.NewRedisArticleRankingCache, repository.NewCacheArticleRankingRepository, service.NewArticleRankingService, web.NewArticleRankingHandler)
 
 var chatSvcProvider = wire.NewSet(ioc.InitLLMConfig, ioc.InitLLMClient, ioc.InitChatLimiter, dao.NewGormConversationDAO, dao.NewGormMessageDAO, cache.NewRedisConversationCache, cache.NewRedisMessageCache, repository.NewCacheConversationRepository, repository.NewCacheMessageRepository, service.NewAIChatService, service.NewAIChatToolExecutor, streamer.NewRedisStreamer)

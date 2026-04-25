@@ -9,9 +9,11 @@ package main
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
+	"github.com/robfig/cron/v3"
 
 	"github.com/webook/internal/events"
 	"github.com/webook/internal/events/interaction"
+	"github.com/webook/internal/job"
 	"github.com/webook/internal/repository"
 	"github.com/webook/internal/repository/cache"
 	"github.com/webook/internal/repository/dao"
@@ -62,12 +64,15 @@ func InitWebServer() (App, func(), error) {
 	interactionDAO := dao.NewGormInteractionDAO(db)
 	interactionCache := cache.NewRedisInteractionCache(cmdable)
 	interactionRepository := repository.NewCacheInteractionRepository(interactionDAO, interactionCache, loggerX)
+	rankingCache := cache.NewRedisArticleRankingCache(cmdable, loggerX)
+	rankingDAO := dao.NewGormArticleRankingDAO(db)
+	rankingRepository := repository.NewCacheArticleRankingRepository(rankingCache, rankingDAO, loggerX)
 	kafkaConfig := ioc.InitKafkaConfig()
 	config := ioc.InitSaramaConfig(kafkaConfig)
 	syncProducer := ioc.InitSaramaSyncProducer(kafkaConfig, config)
 	producer := ioc.InitEventProducer(syncProducer, loggerX)
 	interactionEventProducer := interaction.NewSaramaInteractionEventProducer(producer)
-	interactionService := ioc.InitInteractionService(interactionRepository, interactionEventProducer, loggerX)
+	interactionService := ioc.InitInteractionService(interactionRepository, rankingRepository, interactionEventProducer, loggerX)
 	articleAuthorHandler := web.NewInternalArticleAuthorHandler(articleAuthorService, interactionService, loggerX)
 	articleReaderService := service.NewInternalArticleReaderService(articleReaderRepository)
 	articleReaderHandler := web.NewInternalArticleReaderHandler(articleReaderService, interactionService, loggerX)
@@ -95,13 +100,18 @@ func InitWebServer() (App, func(), error) {
 	clickEventHandler := web.NewAIClickEventHandler(clickEventService, loggerX)
 	articlePolishService := service.NewAIArticlePolishService(llmClient)
 	articlePolishHandler := web.NewAIArticlePolishHandler(articlePolishService, cmdable, loggerX)
-	engine := ioc.InitWebServer(v, userHandler, articleAuthorHandler, articleReaderHandler, interactionHandler, oAuth2Handler, chatHandler, articleSearchHandler, clickEventHandler, articlePolishHandler)
+	rankingService := service.NewArticleRankingService(rankingRepository, articleReaderRepository, interactionRepository, clickEventService, loggerX)
+	rankingHandler := web.NewArticleRankingHandler(rankingService, loggerX)
+	engine := ioc.InitWebServer(v, userHandler, articleAuthorHandler, articleReaderHandler, interactionHandler, oAuth2Handler, chatHandler, articleSearchHandler, clickEventHandler, articlePolishHandler, rankingHandler)
 	client := ioc.InitSaramaClient(kafkaConfig, config)
 	consumerConfig := ioc.InitInteractionConsumerConfig(kafkaConfig)
 	consumer := interaction.NewSaramaInteractionEventConsumer(client, interactionRepository, consumerConfig, loggerX)
+	rankingJob := job.NewRankingJob(rankingService, loggerX)
+	cron := ioc.InitCron(rankingJob, loggerX)
 	app := App{
-		Server:   engine,
-		Consumer: consumer,
+		Server:      engine,
+		Consumer:    consumer,
+		RankingCron: cron,
 	}
 	return app, func() {
 		cleanup()
@@ -119,6 +129,9 @@ var clickEventProviderSet = wire.NewSet(dao.NewGormAIClickEventDAO, cache.NewRed
 // polishProviderSet 文章润色模块
 var polishProviderSet = wire.NewSet(service.NewAIArticlePolishService)
 
+// articleRankingProviderSet 文章榜单模块
+var articleRankingProviderSet = wire.NewSet(dao.NewGormArticleRankingDAO, cache.NewRedisArticleRankingCache, repository.NewCacheArticleRankingRepository, service.NewArticleRankingService, job.NewRankingJob, web.NewArticleRankingHandler)
+
 // kafkaProviderSet Kafka 基础设施 + 互动事件
 var kafkaProviderSet = wire.NewSet(ioc.InitKafkaConfig, ioc.InitSaramaConfig, ioc.InitSaramaSyncProducer, ioc.InitSaramaClient, ioc.InitEventProducer, ioc.InitInteractionConsumerConfig, interaction.NewSaramaInteractionEventProducer, interaction.NewSaramaInteractionEventConsumer)
 
@@ -127,6 +140,7 @@ var chatProviderSet = wire.NewSet(ioc.InitLLMConfig, ioc.InitLLMClient, ioc.Init
 
 // App 应用入口，包含 Web 服务和后台消费者
 type App struct {
-	Server   *gin.Engine
-	Consumer events.Consumer
+	Server      *gin.Engine
+	Consumer    events.Consumer
+	RankingCron *cron.Cron
 }

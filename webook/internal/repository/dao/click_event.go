@@ -71,11 +71,11 @@ func (d *GormAIClickEventDAO) Dashboard(ctx context.Context, startMs int64, sour
 
 type ClickEvent struct {
 	Id             int64                 `gorm:"primaryKey,autoIncrement"`
-	UserId         int64                 `gorm:"not null;uniqueIndex:uk_dedup"`
-	ArticleId      int64                 `gorm:"not null;uniqueIndex:uk_dedup;index:idx_article"`
-	ConversationId int64                 `gorm:"not null;uniqueIndex:uk_dedup"`
-	Source         string                `gorm:"type:varchar(32);not null;default:'ai_chat';uniqueIndex:uk_dedup"`
-	CreatedAt      int64                 `gorm:"autoCreateTime:milli;index:idx_created"`
+	UserId         int64                 `gorm:"not null;uniqueIndex:uk_ai_click_events_dedup"`
+	ArticleId      int64                 `gorm:"not null;uniqueIndex:uk_ai_click_events_dedup;index:idx_ai_click_events_article_id"`
+	ConversationId int64                 `gorm:"not null;uniqueIndex:uk_ai_click_events_dedup"`
+	Source         string                `gorm:"type:varchar(32);not null;default:'ai_chat';uniqueIndex:uk_ai_click_events_dedup"`
+	CreatedAt      int64                 `gorm:"autoCreateTime:milli;index:idx_ai_click_events_created_at"`
 	UpdatedAt      int64                 `gorm:"autoUpdateTime:milli"`
 	DeletedAt      soft_delete.DeletedAt `gorm:"softDelete:milli"`
 }

@@ -28,7 +28,7 @@ func (d *GormArticleReaderDAO) Upsert(ctx context.Context, article PublishedArti
 	article.Abstract = ensureAbstract(article.Abstract, article.Content)
 	return d.db.WithContext(ctx).Clauses(clause.OnConflict{
 		DoUpdates: clause.AssignmentColumns([]string{
-			"title", "content", "abstract", "status", "updated_at",
+			"title", "content", "abstract", "status", "category", "updated_at",
 		}),
 	}).Create(&article).Error
 }
@@ -51,7 +51,7 @@ func (d *GormArticleReaderDAO) FindById(ctx context.Context, id int64) (Publishe
 func (d *GormArticleReaderDAO) Page(ctx context.Context, offset int, limit int) ([]PublishedArticle, error) {
 	var articles []PublishedArticle
 	err := d.db.WithContext(ctx).
-		Select("id, title, abstract, author_id, status, created_at, updated_at").
+		Select("id, title, abstract, author_id, status, category, created_at, updated_at").
 		Order("id DESC").
 		Offset(offset).Limit(limit).
 		Find(&articles).Error
@@ -72,6 +72,7 @@ type PublishedArticle struct {
 	Abstract  string `gorm:"type=varchar(256)"`
 	AuthorId  int64  `gorm:"index"`
 	Status    uint8
+	Category  string                `gorm:"type=varchar(32);default:'';index"`
 	CreatedAt int64                 `gorm:"autoCreateTime:milli"`
 	UpdatedAt int64                 `gorm:"autoUpdateTime:milli"`
 	DeletedAt soft_delete.DeletedAt `gorm:"softDelete:milli"`
