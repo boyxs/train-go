@@ -20,7 +20,6 @@ services:
     image: ${GHCR_REGISTRY:-ghcr.io}/${GH_USER}/webook:${IMAGE_TAG}
     container_name: webook-app
     restart: always
-    pull_policy: missing
     environment:
       APP_ENV: "${APP_ENV}"              # .env.<env> 指定 config/<env>.yaml
       DEPLOY_ENV: "${DEPLOY_ENV}"
@@ -36,7 +35,6 @@ services:
     image: ${GHCR_REGISTRY:-ghcr.io}/${GH_USER}/webook-fe:${FE_IMAGE_TAG}
     container_name: webook-fe
     restart: always
-    pull_policy: missing
     mem_limit: ${FE_MEM:-512m}
     environment:
       NODE_ENV: production
@@ -86,22 +84,16 @@ services:
       # docker inspect --format='{{json .State.Health}}' webook-redis
 
   webook-etcd:
-    image: bitnami/etcd:3.5.17
+    image: quay.io/coreos/etcd:v3.5.17
     container_name: webook-etcd
     restart: always
     pull_policy: missing
     mem_limit: ${ETCD_MEM:-128m}
     environment:
-      # ALLOW_NONE_AUTHENTICATION 语义反直觉：
-      #   yes = 允许无认证（etcd 开放）
-      #   no  = 必须有 ETCD_ROOT_PASSWORD（etcd 要认证）
-      # webook 远程配置加载失败会 fallback 本地 yaml，所以 yes 对开发更省事
-      ALLOW_NONE_AUTHENTICATION: "${ETCD_ALLOW_NONE:-yes}"
-      ETCD_ROOT_PASSWORD: "${ETCD_PASS:-13520}"
       ETCD_ADVERTISE_CLIENT_URLS: "http://webook-etcd:2379"
       ETCD_LISTEN_CLIENT_URLS: "http://0.0.0.0:2379"
     volumes:
-      - etcd-data:/bitnami/etcd
+      - etcd-data:/etcd-data
 
   webook-kafka:
     image: apache/kafka:3.7.0
@@ -335,6 +327,27 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  # ── 旧 bitnami/etcd 配置（保留作切回参考，不启用）─────────────────
+  # 切回方法：把上面 webook-etcd 块注释掉，再把下面这块取消注释
+  # webook-etcd:
+  #   image: bitnami/etcd:3.5.17
+  #   container_name: webook-etcd
+  #   restart: always
+  #   pull_policy: missing
+  #   mem_limit: ${ETCD_MEM:-128m}
+  #   environment:
+  #     # ALLOW_NONE_AUTHENTICATION 语义反直觉：
+  #     #   yes = 允许无认证（etcd 开放）
+  #     #   no  = 必须有 ETCD_ROOT_PASSWORD（etcd 要认证）
+  #     # webook 远程配置加载失败会 fallback 本地 yaml，所以 yes 对开发更省事
+  #     ALLOW_NONE_AUTHENTICATION: "${ETCD_ALLOW_NONE:-yes}"
+  #     ETCD_ROOT_PASSWORD: "${ETCD_PASS:-13520}"
+  #     ETCD_ADVERTISE_CLIENT_URLS: "http://webook-etcd:2379"
+  #     ETCD_LISTEN_CLIENT_URLS: "http://0.0.0.0:2379"
+  #   volumes:
+  #     - etcd-data:/bitnami/etcd
+
   # ── bitnami/kafka 备用配置（镜像源可用时切换） ──────────────
   # kafka:
   #   image: 'bitnami/kafka:3.6.0'
