@@ -91,6 +91,19 @@ type(scope): description
 
 新功能用 `/rename` 命名会话：`YYMMDD-模块-功能中文`。
 
+## 发版流程
+
+推送 `webook-v*.*.*` 或 `webook-fe-v*.*.*` tag 后**必须同步更新** `deploy/.env.prod.example`：
+
+| 字段 | 对应 tag | 示例 |
+|------|---------|------|
+| `IMAGE_TAG` | `webook-v*.*.*` | `IMAGE_TAG=1.1.0` |
+| `FE_IMAGE_TAG` | `webook-fe-v*.*.*` | `FE_IMAGE_TAG=1.1.0` |
+
+不更新 → `./deploy.sh prod` 仍拉旧镜像，等于没发版。dev/staging 用 `master-latest` 滚动 tag 不动；只有 prod 走语义化版本固定。
+
+实际 `.env.prod`（gitignored）由部署者按 example 手工同步。
+
 ## 注释风格
 
 禁止用 `// ===` 或 `// ---` 做分隔线。区域分隔用 Makefile 风格：
