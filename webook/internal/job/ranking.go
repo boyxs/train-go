@@ -14,14 +14,14 @@ import (
 
 // 测试节奏 vs 生产节奏：本地开发用短间隔；上线前改回生产节奏
 const (
-	specHot     = "*/10 * * * * *" // 测试每 10s；生产 "0 */1 * * * *"
-	specBest    = "*/15 * * * * *" // 测试每 15s；生产 "0 */5 * * * *"
-	specNew     = "*/5 * * * * *"  // 测试每 5s ；生产 "*/30 * * * * *"
-	specArchive = "0 */10 * * * *" // 测试每 10min；生产 "0 10 0 * * *"
-	//specHot     = "0 */1 * * * *"
-	//specBest    = "0 */5 * * * *"
-	//specNew     = "*/30 * * * * *"
-	//specArchive = "0 10 0 * * *"
+	//specHot     = "*/10 * * * * *" // 测试每 10s；生产 "0 */1 * * * *"
+	//specBest    = "*/15 * * * * *" // 测试每 15s；生产 "0 */5 * * * *"
+	//specNew     = "*/5 * * * * *"  // 测试每 5s ；生产 "*/30 * * * * *"
+	//specArchive = "0 */10 * * * *" // 测试每 10min；生产 "0 10 0 * * *"
+	specHot     = "0 */1 * * * *"
+	specBest    = "0 */5 * * * *"
+	specNew     = "*/30 * * * * *"
+	specArchive = "0 10 0 * * *"
 
 	jobTimeout     = 55 * time.Second
 	archiveTimeout = 2 * time.Minute
