@@ -11,9 +11,14 @@ import (
 
 // redisLock 包装 bsm Lock，加 Watchdog goroutine。
 // stop chan 同时承担"已 Unlock"信号；sync.Once 保证 Unlock 重入只关一次 chan。
+//
+// innerMu 保护 inner / ttl 的并发访问：watchdog goroutine 周期 Refresh，
+// 用户可能从其它 goroutine 调 Refresh / Unlock。bsm/redislock 没保证 Lock
+// 跨 goroutine 调用安全，必须串行化 inner 访问，否则 -race 必报。
 type redisLock struct {
-	inner *redislock.Lock
-	ttl   time.Duration // Watchdog 续约用，Refresh 后会更新
+	innerMu sync.Mutex
+	inner   *redislock.Lock
+	ttl     time.Duration // Watchdog 续约用，Refresh 后会更新（受 innerMu 保护）
 
 	stop     chan struct{}
 	stopOnce sync.Once
@@ -58,21 +63,27 @@ func (l *redisLock) safeOnRefresh() {
 }
 
 func (l *redisLock) Refresh(ctx context.Context, ttl time.Duration) error {
+	l.innerMu.Lock()
 	err := l.inner.Refresh(ctx, ttl, nil)
+	if err == nil {
+		l.ttl = ttl
+	}
+	l.innerMu.Unlock()
+
 	if errors.Is(err, redislock.ErrNotObtained) {
 		return ErrLockNotHeld
 	}
-	if err != nil {
-		return err
-	}
-	l.ttl = ttl
-	return nil
+	return err
 }
 
 func (l *redisLock) Unlock(ctx context.Context) error {
 	// 先停 watchdog，避免 Unlock 后 ticker 又把 key 续回来
 	l.stopOnce.Do(func() { close(l.stop) })
+
+	l.innerMu.Lock()
 	err := l.inner.Release(ctx)
+	l.innerMu.Unlock()
+
 	if errors.Is(err, redislock.ErrLockNotHeld) {
 		return ErrLockNotHeld
 	}
@@ -92,7 +103,9 @@ func (l *redisLock) runWatchdog(interval time.Duration) {
 			return
 		case <-ticker.C:
 			ctx, cancel := context.WithTimeout(context.Background(), interval)
+			l.innerMu.Lock()
 			err := l.inner.Refresh(ctx, l.ttl, nil)
+			l.innerMu.Unlock()
 			cancel()
 			if errors.Is(err, redislock.ErrNotObtained) {
 				l.safeOnLost(ErrLockNotHeld)
