@@ -1,0 +1,125 @@
+# ═══════════════════════════════════════════════════════════════
+# recording-rules-example.yml  Prometheus Recording Rules 模板（与 alerts-example.yml 对仗）
+#
+# 本目录的 -example.yml 是注释模板，Prometheus 不加载（参考 README.md）。
+# 项目告警走 Grafana Alerting（不用 Alertmanager），所以 Prometheus 这边只放 Recording rules。
+#
+# 实际生效路径：deploy/prometheus/rules/<domain>.rules.yml
+#   现有：webook-jobs.rules.yml（后台任务）
+#   未来：webook-search.rules.yml / webook-payment.rules.yml 等域，复用本模板风格
+# ═══════════════════════════════════════════════════════════════
+
+# 命名约定（与 alerts-example.yml 对齐）：
+#   - record 名格式：项目:指标:聚合方式
+#     例：webook:cron_success_rate:rate5m
+#   - 评估周期 interval：30s（业务指标够，CPU/IO 友好）
+#   - 标签 (labels)：通过 by () 保留必要维度，避免基数爆炸
+
+groups:
+
+  # ─────────────────────────────────────────────────────────────
+  # cron 任务侧（来自 pkg/cronx/prometheus 的 4 组指标）
+  #
+  # 原始指标：
+  #   webook_cron_runs_total{task,result=success/failed/skipped/panic}  Counter
+  #   webook_cron_duration_seconds{task}                                 Histogram
+  #   webook_cron_in_flight{task}                                        Gauge
+  #   webook_cron_last_success_timestamp{task}                           Gauge (Unix 秒)
+  # ─────────────────────────────────────────────────────────────
+  - name: webook-jobs-cron-recording
+    interval: 30s
+    rules:
+
+      # 任务成功率（按 task 分组，5m 滑动）
+      # 用法：Grafana stat 直接画百分比；告警判定 < 95% 触发
+      # 注意：分母用 sum(rate(... 全部 result))，不是 success+failed，因为还有 skipped/panic
+      - record: webook:cron_success_rate:rate5m
+        expr: |
+          sum by (task) (rate(webook_cron_runs_total{result="success"}[5m]))
+          /
+          sum by (task) (rate(webook_cron_runs_total[5m]))
+
+      # 任务耗时分位数（按 task 分组，三档同时 record）
+      # histogram_quantile 必须 by (le, ...) 才正确（_bucket 自带 le 标签）
+      # ── 性能要点 ──
+      # Dashboard 同时画 P50/P95/P99 时若不预计算，每次 refresh 都跑 3 个
+      # histogram_quantile（Prometheus CPU 大头）。把三档都 record 出来，
+      # Dashboard 直接读 record 名，开销降至常量。
+      - record: webook:cron_duration_p50:rate5m
+        expr: |
+          histogram_quantile(0.50,
+            sum by (task, le) (rate(webook_cron_duration_seconds_bucket[5m]))
+          )
+
+      - record: webook:cron_duration_p95:rate5m
+        expr: |
+          histogram_quantile(0.95,
+            sum by (task, le) (rate(webook_cron_duration_seconds_bucket[5m]))
+          )
+
+      - record: webook:cron_duration_p99:rate5m
+        expr: |
+          histogram_quantile(0.99,
+            sum by (task, le) (rate(webook_cron_duration_seconds_bucket[5m]))
+          )
+
+      # 任务"距上次成功的滞后秒数" — 告警核心指标
+      # last_success_timestamp 是 Unix 秒，time() 也是，相减即得 age
+      # 业务用：CronTaskStale 告警直接用 webook:cron_last_success_age:seconds > 600
+      # 注意：只对成功执行过至少一次的 task 有值；从未跑过的 task 此 metric 不存在
+      - record: webook:cron_last_success_age:seconds
+        expr: time() - webook_cron_last_success_timestamp
+
+      # 可选：panic 率（按 task 分组，5m 滑动）
+      # 业务关心：哪个 task 在炸；告警阈值 > 0 即报
+      # - record: webook:cron_panic_rate:rate5m
+      #   expr: sum by (task) (rate(webook_cron_runs_total{result="panic"}[5m]))
+
+  # ─────────────────────────────────────────────────────────────
+  # 分布式锁侧（来自 pkg/redislockx/prometheus 的 4 组指标）
+  #
+  # 原始指标：
+  #   webook_lock_acquire_total{result=success/busy/error}  Counter
+  #   webook_lock_held_seconds                              Histogram (无 task 标签，基数控制)
+  #   webook_lock_wait_seconds                              Histogram (Lock 阻塞模式实际等待)
+  #   webook_lock_watchdog_lost_total                       Counter (锁中途丢失)
+  # ─────────────────────────────────────────────────────────────
+  - name: webook-jobs-lock-recording
+    interval: 30s
+    rules:
+
+      # 抢锁错误率（Redis 抖动 / 连接异常）
+      # 注意 result=error 与 busy 语义不同：busy 是"被别实例占着"（正常），error 才是异常
+      - record: webook:lock_acquire_error_rate:rate5m
+        expr: |
+          sum(rate(webook_lock_acquire_total{result="error"}[5m]))
+          /
+          sum(rate(webook_lock_acquire_total[5m]))
+
+      # 阻塞 Lock() 等待 P99（业务 Lock 越快越好）
+      # 用 by (le) 因为 wait_seconds 没有其他标签维度
+      - record: webook:lock_wait_p99:rate5m
+        expr: |
+          histogram_quantile(0.99,
+            sum by (le) (rate(webook_lock_wait_seconds_bucket[5m]))
+          )
+
+      # 锁持有时长 P99（任务跑多久）
+      # held_seconds 在 Unlock 时观测，等于"业务跑完所用时间"
+      - record: webook:lock_held_p99:rate5m
+        expr: |
+          histogram_quantile(0.99,
+            sum by (le) (rate(webook_lock_held_seconds_bucket[5m]))
+          )
+
+# ═══════════════════════════════════════════════════════════════
+# 校验：
+#   docker exec webook-prometheus promtool check rules /etc/prometheus/rules/webook-jobs.rules.yml
+#
+# 热加载：
+#   curl -X POST http://localhost:9090/-/reload
+#
+# 查询验证（在 Prometheus UI 试 record 名，应能查出值）：
+#   webook:cron_success_rate:rate5m
+#   webook:cron_last_success_age:seconds
+# ═══════════════════════════════════════════════════════════════

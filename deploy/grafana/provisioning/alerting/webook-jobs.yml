@@ -1,0 +1,222 @@
+apiVersion: 1
+
+# 后台任务 (cron + 分布式锁) 6 条核心告警
+# 评估周期 1m；触发条件持续 1-10m 才正式 firing（避免抖动）
+# 评估链路：Query (A) → Reduce (B) → Threshold (C) — 必须 reduced 才能 alert
+groups:
+  - orgId: 1
+    name: webook-jobs
+    folder: Webook
+    interval: 1m
+    rules:
+
+      # ── ① 任务长时间没成功（业务侧最关心）─────────────────────
+      - uid: webook-cron-stale
+        title: Cron 任务 10 分钟没成功
+        condition: C
+        for: 1m
+        noDataState: NoData
+        execErrState: Error
+        labels:
+          severity: high
+          team: backend
+          component: cron
+        annotations:
+          summary: "任务 {{ $labels.task }} 已 {{ $values.B.Value | humanizeDuration }} 没成功执行"
+          description: |
+            webook:cron_last_success_age:seconds{task="{{ $labels.task }}"} 超过 600s。
+            可能原因：业务 panic / 锁一直被占 / Redis 故障。
+          runbook_url: "https://wiki.internal/runbook/cron-task-stale"
+        data:
+          - refId: A
+            relativeTimeRange: { from: 60, to: 0 }
+            datasourceUid: prometheus
+            model:
+              expr: 'webook:cron_last_success_age:seconds{task=~"ranking_.*"}'
+              refId: A
+              instant: true
+          - refId: B
+            datasourceUid: __expr__
+            model: { type: reduce, expression: A, reducer: last, refId: B }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions: [{ evaluator: { type: gt, params: [600] } }]
+              refId: C
+
+      # ── ② 任务 panic（业务代码 bug）──────────────────────────
+      - uid: webook-cron-panic
+        title: Cron 任务出现 panic
+        condition: C
+        for: 1m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: critical
+          team: backend
+          component: cron
+        annotations:
+          summary: "任务 {{ $labels.task }} 5 分钟内出现 panic"
+          description: "查 webook_cron_runs_total{task,result=panic}，并对照应用日志的 stack 字段。"
+          runbook_url: "https://wiki.internal/runbook/cron-panic"
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              expr: 'sum by (task) (rate(webook_cron_runs_total{result="panic"}[5m]))'
+              refId: A
+              instant: true
+          - refId: B
+            datasourceUid: __expr__
+            model: { type: reduce, expression: A, reducer: last, refId: B }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions: [{ evaluator: { type: gt, params: [0] } }]
+              refId: C
+
+      # ── ③ Watchdog 续约失败（锁中途丢失，幻觉持锁）──────────────
+      - uid: webook-lock-watchdog-lost
+        title: 分布式锁中途丢失（watchdog 续约失败）
+        condition: C
+        for: 1m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: high
+          team: backend
+          component: lock
+        annotations:
+          summary: "watchdog_lost_total 5 分钟内增长 {{ $values.B.Value }} 次"
+          description: |
+            分布式锁中途被抢或 Redis 抖动导致续约失败。
+            危险：业务以为自己持锁但实际已丢，多实例下可能并发执行同一任务。
+          runbook_url: "https://wiki.internal/runbook/watchdog-lost"
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              expr: 'rate(webook_lock_watchdog_lost_total[5m])'
+              refId: A
+              instant: true
+          - refId: B
+            datasourceUid: __expr__
+            model: { type: reduce, expression: A, reducer: last, refId: B }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions: [{ evaluator: { type: gt, params: [0] } }]
+              refId: C
+
+      # ── ④ 抢锁错误率（Redis / 网络问题）─────────────────────
+      - uid: webook-lock-acquire-error-rate
+        title: 分布式锁抢锁错误率 > 1%
+        condition: C
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: medium
+          team: backend
+          component: lock
+        annotations:
+          summary: "抢锁错误率 {{ $values.B.Value | humanizePercentage }}"
+          description: "对照 redis 健康度（webook-redis-exporter）+ 应用日志查 root cause。"
+          runbook_url: "https://wiki.internal/runbook/lock-acquire-error"
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              expr: 'webook:lock_acquire_error_rate:rate5m'
+              refId: A
+              instant: true
+          - refId: B
+            datasourceUid: __expr__
+            model: { type: reduce, expression: A, reducer: last, refId: B }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions: [{ evaluator: { type: gt, params: [0.01] } }]
+              refId: C
+
+      # ── ⑤ 阻塞 Lock 等待 P99 异常 ─────────────────────────
+      - uid: webook-lock-wait-p99-high
+        title: 阻塞 Lock 等待 P99 > 5s
+        condition: C
+        for: 10m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: medium
+          team: backend
+          component: lock
+        annotations:
+          summary: "Lock 阻塞 P99 = {{ $values.B.Value | humanizeDuration }}"
+          description: "业务侧 Lock() 阻塞过久，调用方可能堆积；查 hot lock key 是否被长任务占用。"
+          runbook_url: "https://wiki.internal/runbook/lock-wait-p99"
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              expr: 'webook:lock_wait_p99:rate5m'
+              refId: A
+              instant: true
+          - refId: B
+            datasourceUid: __expr__
+            model: { type: reduce, expression: A, reducer: last, refId: B }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions: [{ evaluator: { type: gt, params: [5] } }]
+              refId: C
+
+      # ── ⑥ Cron in_flight 异常（>1 暗示锁失效或任务卡死）────────────
+      - uid: webook-cron-in-flight-stuck
+        title: Cron in_flight 异常 (>1 持续 5 分钟)
+        condition: C
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: medium
+          team: backend
+          component: cron
+        annotations:
+          summary: "任务 {{ $labels.task }} in_flight = {{ $values.B.Value }}"
+          description: |
+            单机部署正常情况下 in_flight ≤ 1。多于 1 暗示：
+            (a) 锁失效，多实例并发跑同一任务（见 watchdog_lost 告警）
+            (b) 任务卡死，cron 又触发新的实例
+          runbook_url: "https://wiki.internal/runbook/cron-in-flight-stuck"
+        data:
+          - refId: A
+            relativeTimeRange: { from: 60, to: 0 }
+            datasourceUid: prometheus
+            model:
+              expr: 'max by (task) (webook_cron_in_flight)'
+              refId: A
+              instant: true
+          - refId: B
+            datasourceUid: __expr__
+            model: { type: reduce, expression: A, reducer: last, refId: B }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions: [{ evaluator: { type: gt, params: [1] } }]
+              refId: C

@@ -1,13 +1,16 @@
 # ═══════════════════════════════════════════════════════════════
-# Prometheus 告警规则 / Recording rules 文件
+# ⚠️ 本文件是 Prometheus 原生告警（Alertmanager 路径）的**学习参考**
+# ⚠️ 项目实际用 Grafana Alerting，本文件不被加载，不要复制到 rules/ 目录
+# ⚠️ 实际告警写在 deploy/grafana/provisioning/alerting/{webook-core,webook-jobs}.yml
+# ⚠️ Recording rules 写在 deploy/prometheus/rules/webook-*.rules.yml
 #
-# 引用方式：在 prometheus.yml 里 rule_files: ["rules/*.rules.yml"]
+# Prometheus 告警规则 / Recording rules 完整字段参考
+#
+# 引用方式（如要启用）：在 prometheus.yml 里 rule_files: ["rules/*.rules.yml"]
 # 热更新：curl -X POST http://prometheus:9090/-/reload
 #         （需启动时加 --web.enable-lifecycle）
 #
-# 注意：这是 Prometheus 原生告警（发到 Alertmanager）。
-#       项目目前用 Grafana Alerting 管理告警，Prometheus 侧不配这个文件也 OK。
-#       只有想把告警规则"贴近数据源"或"跨 Grafana 复用"时才配。
+# 何时会想用此文件：迁移到 Alertmanager / 想把告警规则"贴近数据源"。
 # ═══════════════════════════════════════════════════════════════
 
 groups:

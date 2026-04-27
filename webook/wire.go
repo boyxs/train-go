@@ -141,6 +141,9 @@ func InitWebServer() (App, func(), error) {
 		kafkaProviderSet,
 
 		ioc.InitCron,
+		ioc.InitCronMetrics,
+		ioc.InitCronWrapper,
+		ioc.InitLockClient,
 		ioc.InitMiddlewares,
 		ioc.InitWebServer,
 		wire.Struct(new(App), "*"),

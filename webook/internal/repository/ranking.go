@@ -31,8 +31,6 @@ type RankingRepository interface {
 
 	Archive(ctx context.Context, date string) error
 	ListArchiveDates(ctx context.Context) ([]string, error)
-
-	TryLock(ctx context.Context, dim, date string) (bool, error)
 }
 
 type CacheArticleRankingRepository struct {
@@ -193,10 +191,6 @@ func (r *CacheArticleRankingRepository) archiveOne(ctx context.Context, date, di
 
 func (r *CacheArticleRankingRepository) ListArchiveDates(ctx context.Context) ([]string, error) {
 	return r.dao.ListArchiveDates(ctx)
-}
-
-func (r *CacheArticleRankingRepository) TryLock(ctx context.Context, dim, date string) (bool, error) {
-	return r.cache.TryLock(ctx, dim, date)
 }
 
 // ── 内部 ─────────────────────────────────────────────────────────────────

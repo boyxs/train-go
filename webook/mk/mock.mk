@@ -46,6 +46,8 @@ mockgen:
 	@mockgen -source=./internal/service/ai/llm.go -package=aimocks -destination=./internal/service/ai/mocks/llm_mock.go
 	#embedding
 	@mockgen -source=./internal/service/ai/embedding/types.go -package=embmocks -destination=./internal/service/ai/embedding/mocks/embedding_mock.go
+	#pkg redislockx 分布式锁
+	@mockgen -source=./pkg/redislockx/types.go -package=lockmocks -destination=./pkg/redislockx/mocks/lock_mock.go
 	#update dependencies
 	@go mod tidy
 	#格式化生成文件的 import 顺序，避免 CI goimports 校验失败

@@ -108,19 +108,6 @@ func TestRedisRankingCache_PrevRanksCategoryIsolation(t *testing.T) {
 	assert.False(t, hasTech, "career 不应看到 tech 的快照")
 }
 
-func TestRedisRankingCache_TryLock(t *testing.T) {
-	_, c := newRankingCache(t)
-	ctx := context.Background()
-
-	ok, err := c.TryLock(ctx, "hot", "2026-04-21")
-	assert.NoError(t, err)
-	assert.True(t, ok)
-
-	ok2, err := c.TryLock(ctx, "hot", "2026-04-21")
-	assert.NoError(t, err)
-	assert.False(t, ok2, "第二次抢锁必须失败")
-}
-
 func TestRedisRankingCache_DelDay(t *testing.T) {
 	_, c := newRankingCache(t)
 	ctx := context.Background()

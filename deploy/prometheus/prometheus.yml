@@ -6,9 +6,10 @@ global:
   external_labels:
     cluster: "webook"
 
-# 告警规则目录（可选填，deploy/prometheus/alerting/ 空时 prometheus 无规则运行不影响）
+# Recording Rules 目录（项目用 Grafana Alerting，Prometheus 这边只放预计算规则）
+# 空目录时 Prometheus 也能正常跑，不报错
 rule_files:
-  - /etc/prometheus/alerting/*.yml
+  - /etc/prometheus/rules/*.rules.yml
 
 scrape_configs:
   # Prometheus 自身

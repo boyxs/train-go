@@ -128,18 +128,3 @@ func (mr *MockRankingRepositoryMockRecorder) Top(ctx, date, dim, cat, limit any)
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Top", reflect.TypeOf((*MockRankingRepository)(nil).Top), ctx, date, dim, cat, limit)
 }
-
-// TryLock mocks base method.
-func (m *MockRankingRepository) TryLock(ctx context.Context, dim, date string) (bool, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "TryLock", ctx, dim, date)
-	ret0, _ := ret[0].(bool)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// TryLock indicates an expected call of TryLock.
-func (mr *MockRankingRepositoryMockRecorder) TryLock(ctx, dim, date any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TryLock", reflect.TypeOf((*MockRankingRepository)(nil).TryLock), ctx, dim, date)
-}
