@@ -9,7 +9,9 @@
 |---------------------------|---------|---------|
 | `provisioning/alerting/contactpoints.yml` | `examples/alerting/contactpoints-example.yml` | 邮件模板（Alertmanager template）/ 钉钉 / Webhook / Slack |
 | `provisioning/alerting/policies.yml` | `examples/alerting/policies-example.yml` | 路由 / matcher / group_by / repeat_interval / mute_times |
-| `provisioning/alerting/rules.yml` | `examples/alerting/rules-example.yml` | 4 种告警范式（阈值 / 比率 / 分位数 / 容量）+ 评估链路 |
+| `provisioning/alerting/webook-core.yml` | `examples/alerting/rules-example.yml` | HTTP / 基础设施核心告警 5 条；4 种告警范式（阈值 / 比率 / 分位数 / 容量）+ 评估链路 |
+| `provisioning/alerting/<domain>.yml`（现有 `webook-core.yml` / `webook-jobs.yml`） | `examples/alerting/rules-recording-example.yml` | 配合 Recording Rules 写告警的 3 种模式（直接读 record / Counter 增量 / 比率） |
+| `provisioning/dashboards/webook-jobs.json` | `examples/dashboards/webook-jobs-example.json` | 后台任务专题 14 panel（每 panel 带 description） |
 | `provisioning/dashboards/dashboards.yml` | `examples/dashboards/dashboards-example.yml` | Provider 配置 + 生产三件套 |
 | `provisioning/dashboards/*.json` | `examples/dashboards/webook-example.json` | 8 种 Panel 骨架 + 变量 + gridPos + 链接 |
 | `provisioning/datasources/prometheus.yml` | `examples/datasources/prometheus-example.yml` | Prometheus + exemplar → Trace 联动 |

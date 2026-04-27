@@ -26,9 +26,13 @@ global:
 #       timeout: 10s
 #       api_version: v2
 
-# ─── rule_files：告警规则 / recording rules 文件（glob 支持）─────
-# rule_files:
-#   - "rules/*.rules.yml"           # 参考 prometheus/examples/alerts-example.yml
+# ─── rule_files：Recording / 告警规则文件（glob 支持）─────
+# 项目用 Grafana Alerting，此处只放 Recording rules（PromQL 预计算）。
+# 实际生效见 deploy/prometheus/rules/webook-jobs.rules.yml
+# 模板参考 prometheus/examples/recording-rules-example.yml（推荐）
+#         或 prometheus/examples/alerts-example.yml（Alertmanager 路径，仅学习用）
+rule_files:
+  - "rules/*.rules.yml"
 
 # ─── scrape_configs：抓取目标（核心）───────────────────────────
 scrape_configs:

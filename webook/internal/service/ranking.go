@@ -85,17 +85,8 @@ func (s *ArticleRankingService) Page(ctx context.Context, date, dim, cat string,
 }
 
 // RecomputeHot 重算当日热度榜（总榜 + 5 个分区榜）。
-// 分布式锁：多实例部署时同一 tick 多个实例都会进这个函数，
-// TryLock 抢不到就 return nil（不报错），保证同一时刻只有一个实例做全量重算。
+// 分布式锁由 job 层统一处理（pkg/redislockx），service 不感知部署形态。
 func (s *ArticleRankingService) RecomputeHot(ctx context.Context, date string) error {
-	ok, err := s.repo.TryLock(ctx, string(domain.DimensionHot), date)
-	if err != nil {
-		return err
-	}
-	if !ok {
-		s.l.Debug("hot 重算锁被另一实例占用，跳过", logger.String("date", date))
-		return nil
-	}
 	candidates, err := s.loadCandidates(ctx)
 	if err != nil {
 		return err
@@ -130,14 +121,6 @@ func (s *ArticleRankingService) RecomputeHot(ctx context.Context, date string) e
 }
 
 func (s *ArticleRankingService) RecomputeBest(ctx context.Context, date string) error {
-	ok, err := s.repo.TryLock(ctx, string(domain.DimensionBest), date)
-	if err != nil {
-		return err
-	}
-	if !ok {
-		s.l.Debug("best 重算锁被另一实例占用，跳过", logger.String("date", date))
-		return nil
-	}
 	candidates, err := s.loadCandidates(ctx)
 	if err != nil {
 		return err
@@ -158,14 +141,6 @@ func (s *ArticleRankingService) RecomputeBest(ctx context.Context, date string) 
 }
 
 func (s *ArticleRankingService) RecomputeNew(ctx context.Context, date string) error {
-	ok, err := s.repo.TryLock(ctx, string(domain.DimensionNew), date)
-	if err != nil {
-		return err
-	}
-	if !ok {
-		s.l.Debug("new 重算锁被另一实例占用，跳过", logger.String("date", date))
-		return nil
-	}
 	candidates, err := s.loadCandidates(ctx)
 	if err != nil {
 		return err

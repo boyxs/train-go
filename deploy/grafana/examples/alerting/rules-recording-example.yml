@@ -1,0 +1,158 @@
+# ═══════════════════════════════════════════════════════════════
+# rules-recording-example.yml  Grafana Alerting 配合 Prometheus Recording Rules 的写法模板
+#
+# 与同目录 rules-example.yml 区分：
+#   rules-example.yml          —— 4 种通用告警范式（阈值 / 比率 / 分位数 / 容量），从原始指标算起
+#   rules-recording-example.yml —— 3 种"配合 record"模式（直接读 / Counter 增量 / 比率短查询）
+#
+# 实际生效路径：deploy/grafana/provisioning/alerting/<domain>.yml
+#   现有：webook-core.yml（HTTP/infra）、webook-jobs.yml（后台任务）
+#   生效命令：make -f mk/grafana.mk reload
+#
+# Grafana Alerting 评估链路硬性约束：
+#   Query (A) → Reduce (B) → Threshold (C) → condition
+#   不 Reduce 直接接时间序列必报："only reduced data can be alerted on"
+# ═══════════════════════════════════════════════════════════════
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: webook-jobs
+    folder: Webook                       # 必须是 Grafana 已有 folder（启动时自动建）
+    interval: 1m                         # 评估周期；与 prometheus rule_files 的 interval 独立
+    rules:
+
+      # ─────────────────────────────────────────────────────────
+      # 模式 1：基于 Recording rule 的简单阈值
+      # 适合：先在 Prometheus 侧 record 预计算，Grafana 直接读 record 名
+      # 优点：表达式短，跨 panel/告警复用；CPU 友好
+      # ─────────────────────────────────────────────────────────
+      - uid: webook-cron-stale            # 固定 uid，跨环境/重建稳定
+        title: Cron 任务长时间没成功
+        condition: C                      # 哪个 refId 是触发条件
+        for: 1m                           # 持续多久才 firing
+        noDataState: NoData               # NoData / OK / Alerting
+        execErrState: Error               # Error / OK / Alerting
+        labels:                           # 供 policies.yml 路由匹配
+          severity: high
+          team: backend
+          component: cron
+        annotations:
+          summary: "任务 {{ $labels.task }} 已 {{ $values.B.Value | humanizeDuration }} 没成功"
+          description: |
+            webook:cron_last_success_age:seconds 超过 600s。
+            可能原因：业务 panic / 锁一直被占 / Redis 故障。
+          runbook_url: "https://wiki.internal/runbook/cron-task-stale"
+        data:
+          - refId: A                       # ── Query A：从 Prometheus 查 ──
+            relativeTimeRange: { from: 60, to: 0 }
+            datasourceUid: prometheus
+            model:
+              expr: 'webook:cron_last_success_age:seconds{task=~"ranking_.*"}'
+              refId: A
+              instant: true               # 单时间点查询；告警一般用 instant
+          - refId: B                       # ── Reduce B：压成单值（必须）──
+            datasourceUid: __expr__       # 内置表达式引擎
+            model:
+              type: reduce
+              expression: A               # 引用 refId=A
+              reducer: last               # last/mean/min/max/sum/count/median
+              refId: B
+          - refId: C                       # ── Threshold C：判定 ──
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [600] }   # >600 秒
+              refId: C
+
+      # ─────────────────────────────────────────────────────────
+      # 模式 2：Counter 增量阈值（非 0 即报）
+      # 适合：panic / watchdog_lost 这类"出现就告警"的事件
+      # ─────────────────────────────────────────────────────────
+      - uid: webook-cron-panic
+        title: Cron 任务出现 panic
+        condition: C
+        for: 1m
+        noDataState: OK                   # 没数据=没事，OK 比 NoData 合适
+        execErrState: Error
+        labels: { severity: critical, team: backend, component: cron }
+        annotations:
+          summary: "任务 {{ $labels.task }} 5 分钟内出现 panic"
+          description: "查 webook_cron_runs_total{result=panic} + 应用日志的 stack 字段。"
+          runbook_url: "https://wiki.internal/runbook/cron-panic"
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              # rate over 5m，task 维度保留 → 告警标签自动带 task
+              expr: 'sum by (task) (rate(webook_cron_runs_total{result="panic"}[5m]))'
+              refId: A
+              instant: true
+          - refId: B
+            datasourceUid: __expr__
+            model: { type: reduce, expression: A, reducer: last, refId: B }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions: [{ evaluator: { type: gt, params: [0] } }]
+              refId: C
+
+      # ─────────────────────────────────────────────────────────
+      # 模式 3：比率告警（已用 recording rule 预计算）
+      # 适合：错误率 / 命中率 / 饱和度
+      # 注意：对比 rules-example.yml 模式 2，这里因为已有 record 所以单 query 即可
+      # ─────────────────────────────────────────────────────────
+      - uid: webook-lock-acquire-error-rate
+        title: 分布式锁抢锁错误率 > 1%
+        condition: C
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels: { severity: medium, team: backend, component: lock }
+        annotations:
+          summary: "抢锁错误率 {{ $values.B.Value | humanizePercentage }}"
+          description: "对照 redis 健康度 + 应用日志查 root cause。"
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              expr: 'webook:lock_acquire_error_rate:rate5m'
+              refId: A
+              instant: true
+          - refId: B
+            datasourceUid: __expr__
+            model: { type: reduce, expression: A, reducer: last, refId: B }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions: [{ evaluator: { type: gt, params: [0.01] } }]   # > 1%
+              refId: C
+
+# ═══════════════════════════════════════════════════════════════
+# 告警 severity 与项目 policies.yml 的 matcher 对齐：
+#   critical: 立即通知 + 任意时间段
+#   high:     5 分钟分组通知
+#   medium:   30 分钟分组通知
+#   low:      默认每天汇总
+#
+# annotations 模板可用变量：
+#   $labels         alert 完整 labels（{{ $labels.task }}）
+#   $values.B.Value Reduce B 的标量值（{{ $values.B.Value }}）
+#   humanizeDuration / humanizePercentage / humanize  人类可读
+#
+# 校验告警规则：
+#   make -f mk/grafana.mk reload   # 重载并打印 Grafana log 看是否报错
+#   curl -u admin:admin http://localhost:3000/api/v1/provisioning/alert-rules
+#
+# 测试触发：
+#   docker exec webook-prometheus promtool tsdb create-blocks-from rules ...
+#   或手动跑一次 record 名查询，看 Grafana Alert UI 评估状态
+# ═══════════════════════════════════════════════════════════════

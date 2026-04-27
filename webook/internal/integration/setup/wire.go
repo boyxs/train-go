@@ -5,9 +5,13 @@ package setup
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/redis/go-redis/v9"
+	"github.com/robfig/cron/v3"
 	"go.opentelemetry.io/otel/trace"
 	"go.opentelemetry.io/otel/trace/noop"
 
+	"github.com/webook/internal/job"
 	"github.com/webook/internal/repository"
 	"github.com/webook/internal/repository/cache"
 	"github.com/webook/internal/repository/dao"
@@ -15,12 +19,28 @@ import (
 	"github.com/webook/internal/web"
 	"github.com/webook/internal/web/jwt"
 	"github.com/webook/ioc"
+	cronprom "github.com/webook/pkg/cronx/prometheus"
+	"github.com/webook/pkg/redislockx"
+	lockprom "github.com/webook/pkg/redislockx/prometheus"
 	"github.com/webook/pkg/streamer"
 )
 
 // 集成测试不连真实 OTel Collector，注入 Noop TracerProvider 满足依赖
 func provideNoopTracerProvider() trace.TracerProvider {
 	return noop.NewTracerProvider()
+}
+
+// 集成测试每次调用都给独立 prometheus Registry，避免 MustRegister 重复 panic。
+// 生产 ioc.InitLockClient / InitCronMetrics 走 DefaultRegisterer，跨测试调用会撞名。
+func provideTestLockClient(cmd redis.Cmdable) redislockx.Client {
+	return lockprom.NewPrometheusBuilder("test", "lock", "test").
+		Registry(prometheus.NewRegistry()).
+		Build(redislockx.NewClient(cmd))
+}
+
+func provideTestCronMetrics() *cronprom.Metrics {
+	return cronprom.NewPrometheusBuilder("test", "cron", "test").
+		Registry(prometheus.NewRegistry()).Build()
 }
 
 // 这个需要登录权限
@@ -109,6 +129,23 @@ func InitClickEventHandler() web.ClickEventHandler {
 		web.NewAIClickEventHandler,
 	)
 	return &web.AIClickEventHandler{}
+}
+
+// InitRankingCron 集成测试用：拉起完整 cron + lock + wrapper + RankingJob 链路，
+// 返回 cleanup 验证 graceful shutdown。每次独立 prometheus Registry。
+func InitRankingCron() (*cron.Cron, func()) {
+	wire.Build(
+		infraSvcProvider,
+		articleSvcProvider, // 依赖：interaction + article reader
+		articleRankingSvcProvider,
+		provideTestLockClient,
+		provideTestCronMetrics,
+		ioc.InitCronWrapper,
+		clickEventSvcProvider, // ranking service 依赖 ClickEventService
+		job.NewRankingJob,
+		ioc.InitCron,
+	)
+	return nil, nil
 }
 
 func InitChatHandler() web.ChatHandler {

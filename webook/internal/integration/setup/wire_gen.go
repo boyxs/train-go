@@ -9,9 +9,13 @@ package setup
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
+	prometheus2 "github.com/prometheus/client_golang/prometheus"
+	"github.com/redis/go-redis/v9"
+	"github.com/robfig/cron/v3"
 	"go.opentelemetry.io/otel/trace"
 	"go.opentelemetry.io/otel/trace/noop"
 
+	"github.com/webook/internal/job"
 	"github.com/webook/internal/repository"
 	"github.com/webook/internal/repository/cache"
 	"github.com/webook/internal/repository/dao"
@@ -19,6 +23,9 @@ import (
 	"github.com/webook/internal/web"
 	"github.com/webook/internal/web/jwt"
 	"github.com/webook/ioc"
+	prometheus3 "github.com/webook/pkg/cronx/prometheus"
+	"github.com/webook/pkg/redislockx"
+	"github.com/webook/pkg/redislockx/prometheus"
 	"github.com/webook/pkg/streamer"
 )
 
@@ -169,6 +176,36 @@ func InitClickEventHandler() web.ClickEventHandler {
 	return clickEventHandler
 }
 
+// InitRankingCron 集成测试用：拉起完整 cron + lock + wrapper + RankingJob 链路，
+// 返回 cleanup 验证 graceful shutdown。每次独立 prometheus Registry。
+func InitRankingCron() (*cron.Cron, func()) {
+	cmdable := InitRedis()
+	loggerX := InitLogger()
+	rankingCache := cache.NewRedisArticleRankingCache(cmdable, loggerX)
+	db := InitDB()
+	rankingDAO := dao.NewGormArticleRankingDAO(db)
+	rankingRepository := repository.NewCacheArticleRankingRepository(rankingCache, rankingDAO, loggerX)
+	articleReaderDAO := dao.NewGormArticleReaderDAO(db)
+	articleCache := cache.NewRedisArticleCache(cmdable)
+	articleReaderRepository := repository.NewCacheArticleReaderRepository(articleReaderDAO, articleCache, loggerX)
+	interactionDAO := dao.NewGormInteractionDAO(db)
+	interactionCache := cache.NewRedisInteractionCache(cmdable)
+	interactionRepository := repository.NewCacheInteractionRepository(interactionDAO, interactionCache, loggerX)
+	clickEventDAO := dao.NewGormAIClickEventDAO(db)
+	clickEventCache := cache.NewRedisAIClickEventCache(cmdable)
+	clickEventRepository := repository.NewCacheAIClickEventRepository(clickEventDAO, clickEventCache, loggerX)
+	clickEventService := service.NewAIClickEventService(clickEventRepository)
+	rankingService := service.NewArticleRankingService(rankingRepository, articleReaderRepository, interactionRepository, clickEventService, loggerX)
+	client := provideTestLockClient(cmdable)
+	metrics := provideTestCronMetrics()
+	wrapper := ioc.InitCronWrapper(client, metrics, loggerX)
+	rankingJob := job.NewRankingJob(rankingService, wrapper)
+	cronCron, cleanup := ioc.InitCron(rankingJob, loggerX)
+	return cronCron, func() {
+		cleanup()
+	}
+}
+
 func InitChatHandler() web.ChatHandler {
 	db := InitDB()
 	conversationDAO := dao.NewGormConversationDAO(db)
@@ -208,6 +245,19 @@ func InitChatHandler() web.ChatHandler {
 // 集成测试不连真实 OTel Collector，注入 Noop TracerProvider 满足依赖
 func provideNoopTracerProvider() trace.TracerProvider {
 	return noop.NewTracerProvider()
+}
+
+// 集成测试每次调用都给独立 prometheus Registry，避免 MustRegister 重复 panic。
+// 生产 ioc.InitLockClient / InitCronMetrics 走 DefaultRegisterer，跨测试调用会撞名。
+func provideTestLockClient(cmd redis.Cmdable) redislockx.Client {
+	return prometheus.NewPrometheusBuilder("test", "lock", "test").
+		Registry(prometheus2.NewRegistry()).
+		Build(redislockx.NewClient(cmd))
+}
+
+func provideTestCronMetrics() *prometheus3.Metrics {
+	return prometheus3.NewPrometheusBuilder("test", "cron", "test").
+		Registry(prometheus2.NewRegistry()).Build()
 }
 
 var infraSvcProvider = wire.NewSet(

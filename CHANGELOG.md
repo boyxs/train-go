@@ -2,6 +2,48 @@
 
 <!-- 新功能前插在此，日期降序 -->
 
+## [2026-04-26] 定时任务升级：分布式锁框架 + 任务级数据采集 + 通用模板抽离
+
+**变更内容**: 新增 `pkg/redislockx`（bsm/redislock 底座 + 自研 Watchdog 续约 + OnLost 钩子）+ `pkg/cronx`（任务级 Prometheus 指标 + Wrapper 通用模板）；prometheus 子包对齐 `redisx/gormx` 的 builder 链式风格；`internal/job/ranking.go` 缩到薄壳，service 层完全不感知锁；archive 任务首次纳入分布式锁保护；cron 加 graceful Stop hook
+
+**影响范围**:
+- 新增 `webook/pkg/redislockx/`：`Client`/`Lock` 接口；`redisClient` 用 `bsm/redislock` v0.9.4 提供 Obtain/Refresh/Release，错误统一映射到本包 `ErrLockNotHeld`；`redisLock` 在 bsm 之上自研 Watchdog（redisson 招牌特性 bsm 不带）+ `OnLost` / `OnRefresh` 钩子（续约失败 / 续约成功可观测，回调内 panic 由 `safeOnLost` / `safeOnRefresh` 包 recover 防止拖崩进程）；**watchdog 默认 ttl/3 自动开**（对齐 Redisson `lockWatchdogTimeout/3` 行为，调用方无须显式启用）；`Options`：`WithWatchdog`（覆盖默认 interval）/ `WithoutWatchdog`（显式关闭）/ `WithRetryInterval` / `WithOnLost` / `WithOnRefresh`，`applyOptions(opts, ttl)` 助手统一去重
+- 新增 `webook/pkg/redislockx/prometheus/`：builder 风格装饰器，自动给每次 TryLock/Lock 注入默认 OnLost；指标 `webook_lock_acquire_total{result=success/busy/error}` + `held_seconds` + `wait_seconds`（Lock 阻塞实际等待）+ `watchdog_lost_total`（锁中途丢失，幻觉持锁告警）
+- 新增 `webook/pkg/cronx/`：`Wrapper` 把"抢锁→跑业务→Unlock + 4 组指标 + panic recover"模板封死，业务 Job 复用；3 个 Option（`WithNow` / `WithLockKeyPrefix` / `WithLockTTL`）；watchdog 由 redislockx 默认接管，wrapper 不重复暴露；recover 加 `runtime/debug.Stack()` 进 panic 日志
+- 新增 `webook/pkg/cronx/prometheus/`：builder 链式风格，4 组指标 — `webook_cron_runs_total{task,result=success/failed/skipped/panic}`、`duration_seconds{task}`、`in_flight{task}`、`last_success_timestamp{task}`
+- `internal/job/ranking.go`：缩到 ~50 行，只剩 entries 表 + `wrapper.Wrap()` 调用；4 个任务命名加 `ranking_` 前缀（`ranking_hot_recompute` 等）避免未来撞名；archive 任务首次纳入锁保护
+- `internal/service/ranking.go`：`RecomputeHot/Best/New` 删除顶部 TryLock 模板，service 不再 import logger 用于锁日志
+- `internal/repository/ranking.go` + `cache/ranking.go`：删 `TryLock` 接口方法和实现
+- `internal/consts/cache.go`：删 `ArticleRankingLockPattern` + `ArticleRankingLockTTL`
+- `ioc/lock.go`（新增）：`InitLockClient` 包 prometheus 装饰器；`ioc/cron.go`：`InitCron` 改返 `(*cron.Cron, func())`，cleanup 调 `<-c.Stop().Done()` 等 in-flight 跑完，进 wire cleanup chain；新增 `InitCronMetrics` + `InitCronWrapper`
+- `wire.go` + `wire_gen.go`：注入 `InitLockClient` + `InitCronMetrics` + `InitCronWrapper`
+- `mk/mock.mk` + mocks：`pkg/redislockx` 加入 mockgen 矩阵
+- 测试新写：`pkg/cronx` 6（success/lockBusy/lockError/businessError/panic-with-stack/unlockIndependentCtx）+ `pkg/redislockx` 13（含 `DefaultWatchdog` / `WithoutWatchdog` / `OnLost`）+ `pkg/redislockx/prometheus` 4（含 watchdog_lost / wait_seconds）；`internal/job/ranking_test.go` 砍到 1 个入口测试（业务无关行为已被 cronx 单测覆盖）
+
+**技术决策**:
+- 底座选 `bsm/redislock` v0.9.4 而非自实现 SETNX+Lua：bsm 提供 token 校验、RetryStrategy 等成熟件，自研只剩 Watchdog（redisson 招牌特性 bsm 不带）；将来想换 redsync 多节点也只改 `client.go` 一处，`Client`/`Lock` 接口不动
+- prometheus 装饰器靠"prepend WithOnLost"自动注入到每次 TryLock/Lock，**`NewClient` 签名零变更** —— 比加 ClientOption 工厂级默认更轻
+- watchdog 默认开（ttl/3）对齐 Redisson：调用方"任何地方都能直接用"，无须每次记得 `WithWatchdog`；短临界区不想要后台 goroutine 用 `WithoutWatchdog()` 关
+- service 层完全不感知锁：锁是部署形态决定的，不该污染业务接口
+- Wrapper 抽到 `pkg/cronx`：业务无关模板，未来其他 Job 直接复用，无须复制 100 行
+- Watchdog 30s TTL + 10s 续：实例 crash 30s 让贤；archive 任务 2min 也能持续续约
+- task 名加 `ranking_` 前缀 + 锁 key 前缀 `cronx:lock:`：rolling deploy 容忍一次双跑（业务幂等），换来未来 Grafana 标签清晰
+- 跳过 yaml 配置化（cron.lockTTL / watchdog 默认值已合理，无差异化需求时不开口子）
+- 跳过 graceful shutdown 单测（chan 异步难真实，人眼审 wire_gen cleanup 链已够）
+
+**监控模板**（同步随本次提交）：
+- `deploy/prometheus/rules/webook-jobs.rules.yml`：**8 条 Recording Rules**（cron 成功率 + P50/P95/P99 三档耗时 + last_success_age + lock 错误率 / wait P99 / held P99）；模板版 `examples/recording-rules-example.yml`（与 `alerts-example.yml` 对仗的 config-type 命名，业务域无关）带完整注释。**Prometheus 规则目录从 `alerting/` 重命名为 `rules/`**，同步改 `prometheus.yml` 的 `rule_files: rules/*.rules.yml` + `docker-compose.yaml` 的 volume 挂载，与项目"Grafana Alerting + Prometheus Recording rules"架构对齐。**Dashboard 'Cron Duration' panel 改为读三档 record（perf 优化）**：每次 refresh 不再现算 `histogram_quantile`，CPU 开销由 N×panels 降至常量
+- `deploy/grafana/provisioning/alerting/webook-jobs.yml`：6 条告警（CronTaskStale / CronPanicSpike / WatchdogLost / LockAcquireErrorRate / LockWaitP99High / CronInFlightStuck），全 Q→Reduce→Threshold 评估链路；模板版 `examples/alerting/rules-recording-example.yml`
+- `deploy/grafana/provisioning/dashboards/webook-jobs.json`：14 panel 专题面板（cron 4 + lock 4 + 概览 4 + 健康 2），含 `$task` 变量过滤；模板版 `examples/dashboards/webook-jobs-example.json` 每 panel 带 description
+- `webook/tools/check_monitoring.sh`：YAML/JSON 语法 + 元素数量校验脚本（promtool 不可用环境的替代）
+
+**待办**:
+- 部署到 staging 后观察 `webook_cron_*` 与 `webook_lock_*` 指标，配 Grafana 面板和 "X 分钟没成功过" / "watchdog_lost_total > 0" 告警
+- transient Refresh error（非 ErrNotObtained）目前 silently retry 无指标，未来若发现 Redis 抖动场景需告警可加 `refresh_error_total` counter 或扩展 OnLost 在连续 N 次失败时触发
+
+**会话**: 260426-定时任务-分布式锁与数据采集
+**发布**: -
+
 ## [2026-04-23] 榜单移动端适配 + 切 tab 体验 + 后端并发 perf
 
 **变更内容**: 榜单搜索页 5 项移动端响应式 + URL 状态持久化 + 200ms 延迟清空策略 + 后端并发优化 + trend bug fix；三份 CLAUDE.md 补硬规则

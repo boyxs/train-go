@@ -33,8 +33,6 @@ type RankingCache interface {
 	SnapshotRanks(ctx context.Context, date, dim, cat string, ranks map[int64]int) error
 	GetPrevRanks(ctx context.Context, date, dim, cat string, articleIds []int64) (map[int64]int, error)
 
-	TryLock(ctx context.Context, dim, date string) (bool, error)
-
 	DelDay(ctx context.Context, date string) error
 }
 
@@ -62,10 +60,6 @@ func (c *RedisArticleRankingCache) detailKey(date string) string {
 // prevRank Hash，每次 ReplaceTop 互相覆盖，趋势全乱。cat="" 是总榜。
 func (c *RedisArticleRankingCache) prevRankKey(date, dim, cat string) string {
 	return fmt.Sprintf(consts.ArticleRankingPrevRankPattern, date, dim, cat)
-}
-
-func (c *RedisArticleRankingCache) lockKey(dim, date string) string {
-	return fmt.Sprintf(consts.ArticleRankingLockPattern, dim, date)
 }
 
 // ReplaceTop 三步原子操作（Pipeline 合并为一次网络往返）：Del 清旧榜 → ZAdd 塞新榜 → Expire 续命。
@@ -215,14 +209,6 @@ func (c *RedisArticleRankingCache) GetPrevRanks(ctx context.Context, date, dim, 
 		result[articleIds[i]] = r
 	}
 	return result, nil
-}
-
-// TryLock 用 Redis SETNX 做分布式锁。
-// 多实例部署时每个实例都有 cron，同一 tick 会同时触发 Recompute；TryLock 只有一个能成功，
-// 其他实例 SETNX 返 false 直接 return nil（见 service.RecomputeHot）。TTL=55s，
-// 比 cron 间隔 60s 略短，保证下一 tick 前锁一定释放。
-func (c *RedisArticleRankingCache) TryLock(ctx context.Context, dim, date string) (bool, error) {
-	return c.cmd.SetNX(ctx, c.lockKey(dim, date), time.Now().UnixMilli(), consts.ArticleRankingLockTTL).Result()
 }
 
 func (c *RedisArticleRankingCache) DelDay(ctx context.Context, date string) error {

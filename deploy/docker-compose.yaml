@@ -229,7 +229,7 @@ services:
       - "--web.enable-lifecycle"
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./prometheus/alerting:/etc/prometheus/alerting:ro
+      - ./prometheus/rules:/etc/prometheus/rules:ro
       - prometheus-data:/prometheus
     extra_hosts:
       # Linux 上让容器能访问宿主机（Mac/Windows Docker Desktop 已原生支持）

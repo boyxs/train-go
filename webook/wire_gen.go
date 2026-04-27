@@ -106,14 +106,18 @@ func InitWebServer() (App, func(), error) {
 	client := ioc.InitSaramaClient(kafkaConfig, config)
 	consumerConfig := ioc.InitInteractionConsumerConfig(kafkaConfig)
 	consumer := interaction.NewSaramaInteractionEventConsumer(client, interactionRepository, consumerConfig, loggerX)
-	rankingJob := job.NewRankingJob(rankingService, loggerX)
-	cron := ioc.InitCron(rankingJob, loggerX)
+	redislockxClient := ioc.InitLockClient(cmdable)
+	metrics := ioc.InitCronMetrics()
+	wrapper := ioc.InitCronWrapper(redislockxClient, metrics, loggerX)
+	rankingJob := job.NewRankingJob(rankingService, wrapper)
+	cron, cleanup2 := ioc.InitCron(rankingJob, loggerX)
 	app := App{
 		Server:      engine,
 		Consumer:    consumer,
 		RankingCron: cron,
 	}
 	return app, func() {
+		cleanup2()
 		cleanup()
 	}, nil
 }
