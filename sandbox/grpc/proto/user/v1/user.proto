@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package webook.user.v1;
+
+option go_package = "webook/sandbox/grpc/gen/user/v1;userv1";
+
+service UserService {
+  rpc GetUser(GetUserRequest) returns (User);
+}
+
+message GetUserRequest {
+  int64 id = 1;
+}
+
+message User {
+  int64 id = 1;
+  string name = 2;
+  string avatar = 3;
+  map<string, string> attributes = 4;
+  repeated string nicknames = 5;
+  optional int32 age = 6;
+  Address address = 7;
+  oneof contacts {
+    string email = 8;
+    string phone = 9;
+  }
+  Gender gender = 10;
+}
+
+message Address {
+  string province = 1;
+  string city = 2;
+}
+
+enum Gender {
+  GENDER_UNKNOWN = 0;
+  GENDER_MALE = 1;
+  GENDER_FEMALE = 2;
+}
