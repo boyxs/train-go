@@ -67,11 +67,13 @@ jobs:
         run: go vet ./chat/... ./api/... ./pkg/...
 
       - name: 单元测试
+        # 排除 chat/integration（需 MySQL + Redis service container，单元测试这层不起）
         run: |
+          PKGS=$(go list ./chat/... ./api/... ./pkg/... | grep -v /integration)
           if [[ "${{ github.ref }}" == "refs/heads/master" ]] || [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            go test -race ./chat/... ./api/... ./pkg/...
+            go test -race $PKGS
           else
-            go test ./chat/... ./api/... ./pkg/...
+            go test $PKGS
           fi
 
   build-push:
