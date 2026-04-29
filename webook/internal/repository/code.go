@@ -6,11 +6,6 @@ import (
 	"github.com/webook/internal/repository/cache"
 )
 
-var (
-	ErrCodeSendTooMany   = cache.ErrCodeSendTooMany
-	ErrCodeVerifyTooMany = cache.ErrCodeVerifyTooMany
-)
-
 type CodeRepository interface {
 	Store(ctx context.Context, biz string, phone string, code string) error
 	Verify(ctx context.Context, biz string, phone string, code string) (bool, error)

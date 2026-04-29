@@ -1,0 +1,46 @@
+# chat staging 环境配置（同构 internal/config/staging.yaml）
+# 差异点：otel.env=staging / sampleRatio=0.5 / logger info 级
+
+# 远程配置中心：与主仓共用 etcd 实例，path 独立（/webook-chat 不踩 /webook）
+etcd:
+  endpoint: "http://webook-etcd:2379"
+  path: "/webook-chat"
+  type: "yaml"
+
+http:
+  addr: ":8189"
+
+grpc:
+  coreAddr: "webook-core:8090"
+
+mysql:
+  dsn: 'root:13520@tcp(webook-mysql:3306)/webook?parseTime=true&loc=UTC'
+
+redis:
+  addr: 'webook-redis:6379'
+  password: '13520'
+
+# JWT 验签密钥写死在 chat/consts/auth.go，与主仓 internal/consts/auth.go 同源（不读 yaml）
+llm:
+  providers:
+    - name: deepseek
+      apiKey: "sk-405db05b37ac418b91268403d32a55aa"
+      baseUrl: "https://api.deepseek.com"
+      model: "deepseek-chat"
+      maxTokens: 2048
+      timeout: 60
+
+logger:
+  level:
+    l: 0
+  development: false
+  encoding: 'json'
+  outputPaths: [ 'stdout' ]
+  errorOutputPaths: [ 'stderr' ]
+
+otel:
+  endpoint: "otel-collector:4317"
+  serviceName: "webook-chat"
+  serviceVersion: "0.1.0"
+  env: "staging"
+  sampleRatio: 0.5

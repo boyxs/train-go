@@ -6,8 +6,10 @@ interface RefreshConfig extends InternalAxiosRequestConfig {
   __isRefresh?: boolean;
 }
 
+// 单一 baseURL：开发环境走 Next.js dev server rewrites（next.config.ts 配置）
+// 部署环境走 nginx 反代，两套拓扑前端代码完全一致
 const instance = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8089',
+  baseURL: process.env.NEXT_PUBLIC_API_BASE_URL || '/api',
   withCredentials: true,
   timeout: 10_000,
 });

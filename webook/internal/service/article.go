@@ -9,7 +9,7 @@ import (
 	"github.com/webook/pkg/logger"
 )
 
-// ===== 作者端 =====
+// ── 作者端 ─────────────────────────────────────────────────────────────────
 
 type ArticleAuthorService interface {
 	Edit(ctx context.Context, article domain.Article) (int64, error)
@@ -143,10 +143,12 @@ func (s *InternalArticleAuthorService) Delete(ctx context.Context, id int64, uid
 	return nil
 }
 
-// ===== 读者端 =====
+// ── 读者端 ─────────────────────────────────────────────────────────────────
 
 type ArticleReaderService interface {
 	Detail(ctx context.Context, id int64) (domain.Article, error)
+	// BatchDetail 批量取文章详情；不存在的 id 静默跳过，返回保留入参顺序
+	BatchDetail(ctx context.Context, ids []int64) ([]domain.Article, error)
 	Page(ctx context.Context, page int, pageSize int) ([]domain.Article, int64, error)
 }
 
@@ -160,6 +162,10 @@ func NewInternalArticleReaderService(readerRepo repository.ArticleReaderReposito
 
 func (s *InternalArticleReaderService) Detail(ctx context.Context, id int64) (domain.Article, error) {
 	return s.readerRepo.FindById(ctx, id)
+}
+
+func (s *InternalArticleReaderService) BatchDetail(ctx context.Context, ids []int64) ([]domain.Article, error) {
+	return s.readerRepo.FindByIds(ctx, ids)
 }
 
 func (s *InternalArticleReaderService) Page(ctx context.Context, page int, pageSize int) ([]domain.Article, int64, error) {

@@ -18,7 +18,7 @@ import (
 	"github.com/webook/internal/consts"
 	"github.com/webook/internal/integration/setup"
 	"github.com/webook/internal/web"
-	myJwt "github.com/webook/internal/web/jwt"
+	myJwt "github.com/webook/pkg/jwtx"
 )
 
 type ArticlePolishSuite struct {
@@ -62,31 +62,34 @@ func (s *ArticlePolishSuite) postJSON(path string, body string) *httptest.Respon
 func (s *ArticlePolishSuite) TestPolish_EmptyTitle() {
 	t := s.T()
 	recorder := s.postJSON("/article/polish", `{"title":"","content":"有内容"}`)
-	assert.Equal(t, http.StatusOK, recorder.Code)
+	// Code=4 走 ginx CodeToHttpStatus → HTTP 400
+	assert.Equal(t, http.StatusBadRequest, recorder.Code)
 	var res web.Result
 	err := json.NewDecoder(recorder.Body).Decode(&res)
 	assert.NoError(t, err)
-	assert.Equal(t, 4, res.Code)
+	assert.Equal(t, 400, res.Code)
 	assert.Contains(t, res.Msg, "标题")
 }
 
 func (s *ArticlePolishSuite) TestPolish_EmptyContent() {
 	t := s.T()
 	recorder := s.postJSON("/article/polish", `{"title":"标题","content":""}`)
-	assert.Equal(t, http.StatusOK, recorder.Code)
+	// Code=4 走 ginx CodeToHttpStatus → HTTP 400
+	assert.Equal(t, http.StatusBadRequest, recorder.Code)
 	var res web.Result
 	err := json.NewDecoder(recorder.Body).Decode(&res)
 	assert.NoError(t, err)
-	assert.Equal(t, 4, res.Code)
+	assert.Equal(t, 400, res.Code)
 	assert.Contains(t, res.Msg, "内容")
 }
 
 func (s *ArticlePolishSuite) TestPolish_InvalidJSON() {
 	t := s.T()
 	recorder := s.postJSON("/article/polish", "not json")
-	assert.Equal(t, http.StatusOK, recorder.Code)
+	// Code=4 走 ginx CodeToHttpStatus → HTTP 400
+	assert.Equal(t, http.StatusBadRequest, recorder.Code)
 	var res web.Result
 	err := json.NewDecoder(recorder.Body).Decode(&res)
 	assert.NoError(t, err)
-	assert.Equal(t, 4, res.Code)
+	assert.Equal(t, 400, res.Code)
 }

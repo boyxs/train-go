@@ -1,0 +1,97 @@
+etcd:
+  endpoint: http://127.0.0.1:2379
+  path: /webook-core
+  type: yaml
+
+grpc:
+  addr: ":8090"
+
+mysql:
+  dsn: root:13520@tcp(localhost:3306)/webook?parseTime=true&loc=UTC
+
+redis:
+  addr: 127.0.0.1:6379
+  password: "13520"
+
+web:
+  logger:
+    allowReqBody: true
+    allowResBody: true
+    maxReqLen: 2048
+    maxResLen: 2048
+    maxPathLen: 256       # 与 dev/staging/prod 对齐；HTTP 路径 256 已极宽
+
+llm:
+  providers:
+    - name: deepseek
+      apiKey: "sk-405db05b37ac418b91268403d32a55aa"
+      baseUrl: "https://api.deepseek.com"
+      model: "deepseek-chat"
+      maxTokens: 2048
+      timeout: 60
+    - name: kimi
+      apiKey: "sk-KURYxBodidmpQmZsL1SGrEiDoWcETmKDkgr70qsfmEDleS6d"
+      baseUrl: "https://api.moonshot.cn/v1"
+      model: "kimi-k2.5"
+      maxTokens: 2048
+      timeout: 60
+
+kafka:
+  addrs:
+    - "localhost:9094"
+  # 网络超时（秒）
+  dialTimeout: 10
+  readTimeout: 10
+  writeTimeout: 10
+  # Producer
+  producerTimeout: 10  # broker ack 超时（秒）
+  producerRetryMax: 0  # 失败不重试，直接降级同步
+  # Metadata
+  metadataRetryMax: 1
+  metadataRetryBackoff: 250  # 毫秒
+  metadataTimeout: 5
+  # Consumer group
+  consumerGroup: "interaction-consumer"
+  # Consumer 失败退避（秒）
+  consumerBackoffInitial: 5
+  consumerBackoffMax: 60
+
+es:
+  addr: "http://localhost:9200"
+
+ollama:
+  baseUrl: "http://localhost:11434"
+  model: "bge-m3"
+  timeout: 5
+
+embedding:
+  baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+  apiKey: "sk-ef23911b061943b681584ac467c4cd28"
+  model: "text-embedding-v3"
+  dims: 1024
+  timeout: 30
+
+logger:
+  level:
+    l: -1                     # debug 级，本地开发看全量日志
+  development: true           # zap 开发模式：可读 caller / stacktrace
+  encoding: 'console'         # 控制台彩色可读；要 grep / jq 时改 'json'
+  outputPaths: [ 'stdout' ]
+  errorOutputPaths: [ 'stderr' ]
+
+otel:
+  # 本地开发：要 docker compose up -d otel-collector 把 4317 暴露到宿主机
+  endpoint: "localhost:4317"
+  serviceName: "webook-core"
+  serviceVersion: "0.1.0"
+  env: "local"
+  # 采样率公式详见 config/prod.yaml 注释或 docs/opentelemetry/06-best-practices.md。
+  sampleRatio: 1.0          # local 全采样（本机调试全量看）
+
+#etcdctl --endpoints=127.0.0.1:2379 put /webook-core < config/local.yaml
+
+# 应用配置命名标准（详见 webook/CLAUDE.md「环境说明」）：
+#   local.yaml   本地 go run 调试（明文密码连本机 docker）
+#   dev.yaml     团队共享 dev / CI 集成测试（otel.env=dev, sampleRatio=1.0, logger debug）
+#   staging.yaml 预发布（贴近 prod, sampleRatio=0.5）
+#   prod.yaml    生产（sampleRatio=0.1, logger info）

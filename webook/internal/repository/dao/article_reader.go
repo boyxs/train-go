@@ -12,6 +12,8 @@ type ArticleReaderDAO interface {
 	Upsert(ctx context.Context, article PublishedArticle) error
 	Delete(ctx context.Context, id int64, uid int64) error
 	FindById(ctx context.Context, id int64) (PublishedArticle, error)
+	// FindByIds 一次性 IN 查询多条；返回的列表不保证顺序，调用方按 id 自行索引
+	FindByIds(ctx context.Context, ids []int64) ([]PublishedArticle, error)
 	Page(ctx context.Context, offset int, limit int) ([]PublishedArticle, error)
 	Count(ctx context.Context) (int64, error)
 }
@@ -46,6 +48,18 @@ func (d *GormArticleReaderDAO) FindById(ctx context.Context, id int64) (Publishe
 		return PublishedArticle{}, err
 	}
 	return article, nil
+}
+
+func (d *GormArticleReaderDAO) FindByIds(ctx context.Context, ids []int64) ([]PublishedArticle, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	var articleList []PublishedArticle
+	err := d.db.WithContext(ctx).
+		Select("id, title, abstract, author_id, status, category, created_at, updated_at").
+		Where("id IN ?", ids).
+		Find(&articleList).Error
+	return articleList, err
 }
 
 func (d *GormArticleReaderDAO) Page(ctx context.Context, offset int, limit int) ([]PublishedArticle, error) {

@@ -5,11 +5,9 @@ import (
 	"errors"
 
 	"github.com/webook/internal/domain"
+	"github.com/webook/internal/errs"
 	"github.com/webook/internal/repository/dao"
 )
-
-// ErrSearchDocNotFound 搜索文档不存在（幂等删除用）
-var ErrSearchDocNotFound = errors.New("搜索文档不存在")
 
 type ArticleSearchRepository interface {
 	Index(ctx context.Context, article domain.Article, vec []float32) error
@@ -40,8 +38,8 @@ func (r *ESArticleSearchRepository) Index(ctx context.Context, article domain.Ar
 
 func (r *ESArticleSearchRepository) Remove(ctx context.Context, id int64) error {
 	err := r.dao.Delete(ctx, id)
-	if errors.Is(err, dao.ErrESDocNotFound) {
-		return ErrSearchDocNotFound
+	if errors.Is(err, errs.ErrESDocNotFound) {
+		return errs.ErrSearchDocNotFound
 	}
 	return err
 }

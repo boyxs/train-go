@@ -40,11 +40,13 @@ func (h *ArticleReaderHandlerSuite) truncate(tables ...string) {
 		err := h.db.Exec("TRUNCATE TABLE " + table).Error
 		assert.NoError(h.T(), err)
 	}
-	// 清理 Redis 文章缓存
+	// 清理 Redis 文章 + 互动缓存（避免跨 case ReadCnt 残留）
 	ctx := context.Background()
-	keys, _ := h.cmd.Keys(ctx, "article:*").Result()
-	if len(keys) > 0 {
-		h.cmd.Del(ctx, keys...)
+	for _, pattern := range []string{"article:*", "interaction:*"} {
+		keys, _ := h.cmd.Keys(ctx, pattern).Result()
+		if len(keys) > 0 {
+			h.cmd.Del(ctx, keys...)
+		}
 	}
 }
 
@@ -215,21 +217,24 @@ func (h *ArticleReaderHandlerSuite) TestArticleReaderHandler_Detail() {
 			},
 		},
 		{
+			// handler 把 errgroup err 包装为 errs.ErrArticleNotFound (404 + 文章不存在或无权限)
 			name:     "获取不存在的文章",
 			before:   func(t *testing.T) {},
 			req:      `{"id":999}`,
-			wantCode: http.StatusOK,
+			wantCode: http.StatusNotFound,
 			wantResult: Result[ReaderDetailVO]{
-				Msg: "文章不存在",
+				Code: 404,
+				Msg:  "文章不存在或无权限",
 			},
 		},
 		{
 			name:     "id为零",
 			before:   func(t *testing.T) {},
 			req:      `{"id":0}`,
-			wantCode: http.StatusOK,
+			wantCode: http.StatusNotFound,
 			wantResult: Result[ReaderDetailVO]{
-				Msg: "文章不存在",
+				Code: 404,
+				Msg:  "文章不存在或无权限",
 			},
 		},
 	}

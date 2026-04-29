@@ -23,7 +23,7 @@
         "label": "实例",
         "type": "query",
         "datasource": {"type": "prometheus", "uid": "prometheus"},
-        "query": "label_values(up{job=\"webook-app\"}, instance)",
+        "query": "label_values(up{job=\"webook-core\"}, instance)",
         "refresh": 2,
         "includeAll": true,
         "multi": true,
@@ -67,7 +67,7 @@
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [
         {
-          "expr": "sum(rate(webook_http_requests_total[5m]))",
+          "expr": "sum(rate(webook_core_http_requests_total[5m]))",
           "refId": "A",
           "instant": true
         }
@@ -93,7 +93,7 @@
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [
         {
-          "expr": "sum(rate(webook_http_requests_total{status=~\"5..\"}[5m])) / sum(rate(webook_http_requests_total[5m]))",
+          "expr": "sum(rate(webook_core_http_requests_total{status=~\"5..\"}[5m])) / sum(rate(webook_core_http_requests_total[5m]))",
           "refId": "A",
           "instant": true
         }
@@ -122,7 +122,7 @@
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [
         {
-          "expr": "rate(process_cpu_seconds_total{job=\"webook-app\"}[5m])",
+          "expr": "rate(process_cpu_seconds_total{job=\"webook-core\"}[5m])",
           "refId": "A",
           "instant": true
         }
@@ -151,7 +151,7 @@
       "gridPos": {"x": 18, "y": 3, "w": 6, "h": 6},
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [
-        {"expr": "go_goroutines{job=\"webook-app\"}", "refId": "A", "instant": true}
+        {"expr": "go_goroutines{job=\"webook-core\"}", "refId": "A", "instant": true}
       ],
       "fieldConfig": {"defaults": {"unit": "short"}}
     },
@@ -164,7 +164,7 @@
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [
         {
-          "expr": "sum by (pattern) (rate(webook_http_requests_total{instance=~\"$instance\"}[$__rate_interval]))",
+          "expr": "sum by (pattern) (rate(webook_core_http_requests_total{instance=~\"$instance\"}[$__rate_interval]))",
           "refId": "A",
           "legendFormat": "{{pattern}}"
         }
@@ -188,17 +188,17 @@
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, sum by (le) (rate(webook_http_requests_duration_seconds_bucket[$__rate_interval])))",
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(webook_core_http_requests_duration_seconds_bucket[$__rate_interval])))",
           "refId": "A",
           "legendFormat": "p50"
         },
         {
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(webook_http_requests_duration_seconds_bucket[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(webook_core_http_requests_duration_seconds_bucket[$__rate_interval])))",
           "refId": "B",
           "legendFormat": "p95"
         },
         {
-          "expr": "histogram_quantile(0.99, sum by (le) (rate(webook_http_requests_duration_seconds_bucket[$__rate_interval])))",
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(webook_core_http_requests_duration_seconds_bucket[$__rate_interval])))",
           "refId": "C",
           "legendFormat": "p99"
         }
@@ -214,7 +214,7 @@
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [
         {
-          "expr": "up{job=\"webook-app\"}",
+          "expr": "up{job=\"webook-core\"}",
           "refId": "A",
           "instant": true,
           "format": "table"

@@ -15,7 +15,7 @@ import (
 	"github.com/webook/internal/consts"
 	"github.com/webook/internal/domain"
 	svcmocks "github.com/webook/internal/service/mocks"
-	"github.com/webook/internal/web/jwt"
+	jwt "github.com/webook/pkg/jwtx"
 	"github.com/webook/pkg/logger"
 )
 
@@ -56,7 +56,7 @@ func TestAIClickEventHandler_Click(t *testing.T) {
 				return svcmocks.NewMockClickEventService(ctrl)
 			},
 			wantCode: http.StatusBadRequest,
-			wantBody: Result{Code: 4, Msg: "参数无效"},
+			wantBody: Result{Code: 400, Msg: "参数无效"},
 		},
 		{
 			name: "article_id为0",
@@ -65,7 +65,7 @@ func TestAIClickEventHandler_Click(t *testing.T) {
 				return svcmocks.NewMockClickEventService(ctrl)
 			},
 			wantCode: http.StatusBadRequest,
-			wantBody: Result{Code: 4, Msg: "参数无效"},
+			wantBody: Result{Code: 400, Msg: "参数无效"},
 		},
 		{
 			name: "conversation_id为0",
@@ -74,7 +74,7 @@ func TestAIClickEventHandler_Click(t *testing.T) {
 				return svcmocks.NewMockClickEventService(ctrl)
 			},
 			wantCode: http.StatusBadRequest,
-			wantBody: Result{Code: 4, Msg: "参数无效"},
+			wantBody: Result{Code: 400, Msg: "参数无效"},
 		},
 		{
 			name: "JSON绑定失败",
@@ -83,7 +83,7 @@ func TestAIClickEventHandler_Click(t *testing.T) {
 				return svcmocks.NewMockClickEventService(ctrl)
 			},
 			wantCode: http.StatusBadRequest,
-			wantBody: Result{Code: 4, Msg: "参数错误"},
+			wantBody: Result{Code: 400, Msg: "参数错误"},
 		},
 		{
 			name: "service返回错误",
@@ -95,7 +95,7 @@ func TestAIClickEventHandler_Click(t *testing.T) {
 				return svc
 			},
 			wantCode: http.StatusInternalServerError,
-			wantBody: Result{Code: 5, Msg: "系统错误"},
+			wantBody: Result{Code: 500, Msg: "系统错误"},
 		},
 	}
 	for _, tc := range testCases {
@@ -153,7 +153,7 @@ func TestAIClickEventHandler_Dashboard(t *testing.T) {
 				return svc
 			},
 			wantCode: http.StatusInternalServerError,
-			wantBody: Result{Code: 5, Msg: "系统错误"},
+			wantBody: Result{Code: 500, Msg: "系统错误"},
 		},
 	}
 	for _, tc := range testCases {

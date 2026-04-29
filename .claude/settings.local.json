@@ -27,7 +27,8 @@
       "Bash(cp C:/Go/tools/workflow/skills/done/scripts/check-review-passed.sh \"C:/Users/SPACE/.claude/plugins/cache/workflow-marketplace/workflow/1.1.0/skills/done/scripts/check-review-passed.sh\")",
       "Bash(mkdir -p \"C:/Users/SPACE/.claude/plugins/cache/workflow-marketplace/workflow/1.1.0/skills/review/scripts\")",
       "Bash(cp C:/Go/tools/workflow/skills/review/scripts/review-mode.sh \"C:/Users/SPACE/.claude/plugins/cache/workflow-marketplace/workflow/1.1.0/skills/review/scripts/review-mode.sh\")",
-      "Bash(cp C:/Go/tools/workflow/skills/review/SKILL.md \"C:/Users/SPACE/.claude/plugins/cache/workflow-marketplace/workflow/1.1.0/skills/review/SKILL.md\")"
+      "Bash(cp C:/Go/tools/workflow/skills/review/SKILL.md \"C:/Users/SPACE/.claude/plugins/cache/workflow-marketplace/workflow/1.1.0/skills/review/SKILL.md\")",
+      "PowerShell(Get-NetTCPConnection *)"
     ]
   },
   "enableAllProjectMcpServers": true,

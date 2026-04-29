@@ -12,6 +12,7 @@ import (
 
 	"github.com/webook/internal/consts"
 	"github.com/webook/internal/domain"
+	"github.com/webook/internal/errs"
 	"github.com/webook/internal/repository/cache"
 	cachemocks "github.com/webook/internal/repository/cache/mocks"
 	"github.com/webook/internal/repository/dao"
@@ -39,7 +40,7 @@ func TestRedisUserRepository_FindById(t *testing.T) {
 				userDAO := daomocks.NewMockUserDAO(ctrl)
 				userCache := cachemocks.NewMockUserCache(ctrl)
 				userCache.EXPECT().Get(gomock.Any(), userid).
-					Return(domain.User{}, cache.ErrKeyNotExist)
+					Return(domain.User{}, errs.ErrKeyNotExist)
 				userDAO.EXPECT().FindById(gomock.Any(), userid).
 					Return(dao.User{
 						Id: userid,
@@ -113,15 +114,15 @@ func TestRedisUserRepository_FindById(t *testing.T) {
 				userDAO := daomocks.NewMockUserDAO(ctrl)
 				userCache := cachemocks.NewMockUserCache(ctrl)
 				userCache.EXPECT().Get(gomock.Any(), userid).
-					Return(domain.User{}, cache.ErrKeyNotExist)
+					Return(domain.User{}, errs.ErrKeyNotExist)
 				userDAO.EXPECT().FindById(gomock.Any(), userid).
-					Return(dao.User{}, ErrRecordNotFound)
+					Return(dao.User{}, errs.ErrRecordNotFound)
 				return userDAO, userCache
 			},
 			ctx:      context.Background(),
 			userid:   userid,
 			wantUser: domain.User{},
-			wantErr:  ErrRecordNotFound,
+			wantErr:  errs.ErrRecordNotFound,
 		},
 		{
 			name: "回写缓存失败",
@@ -129,7 +130,7 @@ func TestRedisUserRepository_FindById(t *testing.T) {
 				userDAO := daomocks.NewMockUserDAO(ctrl)
 				userCache := cachemocks.NewMockUserCache(ctrl)
 				userCache.EXPECT().Get(gomock.Any(), userid).
-					Return(domain.User{}, cache.ErrKeyNotExist)
+					Return(domain.User{}, errs.ErrKeyNotExist)
 				userDAO.EXPECT().FindById(gomock.Any(), userid).
 					Return(dao.User{
 						Id: userid,

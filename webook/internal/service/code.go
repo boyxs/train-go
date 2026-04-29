@@ -6,13 +6,9 @@ import (
 	"fmt"
 	"math/rand"
 
+	"github.com/webook/internal/errs"
 	"github.com/webook/internal/repository"
 	"github.com/webook/internal/service/sms"
-)
-
-var (
-	ErrCodeSendTooMany   = repository.ErrCodeSendTooMany
-	ErrCodeVerifyTooMany = repository.ErrCodeVerifyTooMany
 )
 
 type CodeService interface {
@@ -44,7 +40,7 @@ func (cs *SmsCodeService) Send(ctx context.Context, biz string, phone string) er
 
 func (cs *SmsCodeService) Verify(ctx context.Context, biz string, phone string, code string) (bool, error) {
 	ok, err := cs.repo.Verify(ctx, biz, phone, code)
-	if errors.Is(err, ErrCodeVerifyTooMany) {
+	if errors.Is(err, errs.ErrCodeVerifyTooMany) {
 		return false, err
 	}
 	return ok, nil

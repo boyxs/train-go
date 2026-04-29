@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/webook/internal/errs"
 	"github.com/webook/internal/service"
 	"github.com/webook/pkg/ginx"
 	"github.com/webook/pkg/logger"
@@ -35,7 +36,7 @@ type searchReq struct {
 
 func (h *InternalArticleSearchHandler) Search(ctx *gin.Context, req searchReq) (ginx.Result, error) {
 	if strings.TrimSpace(req.Query) == "" {
-		return ginx.Result{Code: 4, Msg: "搜索内容不能为空"}, nil
+		return ginx.Result{}, errs.ErrSearchQueryEmpty
 	}
 	if req.Page <= 0 {
 		req.Page = 1
@@ -46,7 +47,7 @@ func (h *InternalArticleSearchHandler) Search(ctx *gin.Context, req searchReq) (
 
 	list, total, err := h.svc.Search(ctx.Request.Context(), req.Query, req.Page, req.Size)
 	if err != nil {
-		return ginx.Result{Code: 5, Msg: "系统错误"}, err
+		return ginx.Result{}, err
 	}
 	return ginx.Result{Data: map[string]any{
 		"list":  list,

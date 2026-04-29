@@ -35,7 +35,7 @@ func TestOAuth2WechatHandler_Callback(t *testing.T) {
 			code:        "any_code",
 			state:       "hacker_state",
 			stateCookie: "legit_state",
-			wantResult:  web.Result{Code: 4, Msg: "非法请求"},
+			wantResult:  web.Result{Code: 400, Msg: "非法请求"},
 		},
 		{
 			name:        "非法请求-State过期",
@@ -43,14 +43,14 @@ func TestOAuth2WechatHandler_Callback(t *testing.T) {
 			state:       "some_state",
 			stateCookie: "some_state",
 			isExpired:   true,
-			wantResult:  web.Result{Code: 4, Msg: "非法请求"},
+			wantResult:  web.Result{Code: 400, Msg: "非法请求"},
 		},
 		{
 			name:        "授权码有误-微信端验证失败",
 			code:        "invalid_code",
 			state:       "correct_state",
 			stateCookie: "correct_state",
-			wantResult:  web.Result{Code: 4, Msg: "授权码有误"},
+			wantResult:  web.Result{Code: 400, Msg: "授权码有误"},
 		},
 		// 以下两个用例需要 Mock 微信 OAuth2 服务才能通过，当前使用真实微信 API，跳过
 		//{

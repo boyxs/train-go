@@ -7,37 +7,43 @@
 package setup
 
 import (
+	"fmt"
+
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
 	prometheus2 "github.com/prometheus/client_golang/prometheus"
 	"github.com/redis/go-redis/v9"
 	"github.com/robfig/cron/v3"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"go.opentelemetry.io/otel/trace"
 	"go.opentelemetry.io/otel/trace/noop"
 
+	"github.com/webook/internal/consts"
+	"github.com/webook/internal/ioc"
 	"github.com/webook/internal/job"
 	"github.com/webook/internal/repository"
 	"github.com/webook/internal/repository/cache"
 	"github.com/webook/internal/repository/dao"
 	"github.com/webook/internal/service"
 	"github.com/webook/internal/web"
-	"github.com/webook/internal/web/jwt"
-	"github.com/webook/ioc"
 	prometheus3 "github.com/webook/pkg/cronx/prometheus"
+	"github.com/webook/pkg/ginx/middleware/metrics"
+	"github.com/webook/pkg/jwtx"
+	"github.com/webook/pkg/logger"
 	"github.com/webook/pkg/redislockx"
 	"github.com/webook/pkg/redislockx/prometheus"
-	"github.com/webook/pkg/streamer"
 )
 
 // Injectors from wire.go:
 
 // 这个需要登录权限
 func InitWebServer() *gin.Engine {
-	cmdable := InitRedis()
-	jwtHandler := jwt.NewRedisJwtHandler(cmdable)
 	loggerX := InitLogger()
+	cmdable := InitRedis()
 	tracerProvider := provideNoopTracerProvider()
-	v := ioc.InitMiddlewares(jwtHandler, loggerX, cmdable, tracerProvider)
+	v := provideTestMiddlewares(loggerX, cmdable, tracerProvider)
+	handler := ioc.InitJwtHandler(cmdable)
 	db := InitDB()
 	userDAO := dao.NewGormUserDAO(db)
 	userCache := cache.NewRedisUserCache(cmdable)
@@ -47,19 +53,19 @@ func InitWebServer() *gin.Engine {
 	codeRepository := repository.NewRedisCodeRepository(codeCache)
 	smsService := ioc.InitSmsService(cmdable, loggerX)
 	codeService := service.NewSmsCodeService(codeRepository, smsService)
-	userHandler := web.NewInternalUserHandler(jwtHandler, userService, codeService, loggerX)
+	userHandler := web.NewInternalUserHandler(handler, userService, codeService, loggerX)
 	articleAuthorDAO := dao.NewGormArticleAuthorDAO(db)
-	articleCache := cache.NewRedisArticleCache(cmdable)
+	articleCache := cache.NewRedisArticleCache(cmdable, loggerX)
 	articleAuthorRepository := repository.NewCacheArticleAuthorRepository(articleAuthorDAO, articleCache)
 	articleReaderDAO := dao.NewGormArticleReaderDAO(db)
 	articleReaderRepository := repository.NewCacheArticleReaderRepository(articleReaderDAO, articleCache, loggerX)
 	typedClient := ioc.InitESClient()
 	articleSearchDAO := dao.NewElasticArticleDAO(typedClient)
 	articleSearchRepository := repository.NewESArticleSearchRepository(articleSearchDAO)
-	ollamaEmbeddingConfig := ioc.InitOllamaEmbeddingConfig()
-	embeddingConfig := ioc.InitEmbeddingConfig()
-	embeddingClient := ioc.InitEmbeddingClient(ollamaEmbeddingConfig, embeddingConfig, cmdable, loggerX)
-	articleSearchService := service.NewArticleSearchService(articleSearchRepository, embeddingClient, loggerX)
+	ollamaConfig := ioc.InitOllamaEmbeddingConfig()
+	config := ioc.InitEmbeddingConfig()
+	client := ioc.InitEmbeddingClient(ollamaConfig, config, cmdable, loggerX)
+	articleSearchService := service.NewArticleSearchService(articleSearchRepository, client, loggerX)
 	articleAuthorService := service.NewInternalArticleAuthorService(articleAuthorRepository, articleReaderRepository, articleSearchService, loggerX)
 	interactionDAO := dao.NewGormInteractionDAO(db)
 	interactionCache := cache.NewRedisInteractionCache(cmdable)
@@ -70,26 +76,15 @@ func InitWebServer() *gin.Engine {
 	articleReaderHandler := web.NewInternalArticleReaderHandler(articleReaderService, interactionService, loggerX)
 	interactionHandler := web.NewInternalInteractionHandler(interactionService, loggerX)
 	oAuth2Service := ioc.InitWechatOAuth2Service()
-	oAuth2Handler := web.NewOAuth2WechatHandler(jwtHandler, oAuth2Service, userService)
-	conversationDAO := dao.NewGormConversationDAO(db)
-	conversationCache := cache.NewRedisConversationCache(cmdable)
-	conversationRepository := repository.NewCacheConversationRepository(conversationDAO, conversationCache, loggerX)
-	messageDAO := dao.NewGormMessageDAO(db)
-	messageCache := cache.NewRedisMessageCache(cmdable)
-	messageRepository := repository.NewCacheMessageRepository(messageDAO, messageCache, loggerX)
-	llmConfig := ioc.InitLLMConfig()
-	llmClient := ioc.InitLLMClient(llmConfig, loggerX)
-	toolExecutor := service.NewAIChatToolExecutor(articleSearchService, articleReaderService, interactionRepository, loggerX)
-	eventStreamer := streamer.NewRedisStreamer(cmdable)
-	chatService := service.NewAIChatService(conversationRepository, messageRepository, llmClient, articleSearchService, toolExecutor, loggerX, eventStreamer)
-	limiter := ioc.InitChatLimiter(cmdable)
-	chatHandler := web.NewInternalChatHandler(chatService, loggerX, limiter)
+	oAuth2Handler := web.NewOAuth2WechatHandler(handler, oAuth2Service, userService)
 	articleSearchHandler := web.NewInternalArticleSearchHandler(articleSearchService, loggerX)
 	clickEventDAO := dao.NewGormAIClickEventDAO(db)
 	clickEventCache := cache.NewRedisAIClickEventCache(cmdable)
 	clickEventRepository := repository.NewCacheAIClickEventRepository(clickEventDAO, clickEventCache, loggerX)
 	clickEventService := service.NewAIClickEventService(clickEventRepository)
 	clickEventHandler := web.NewAIClickEventHandler(clickEventService, loggerX)
+	llmConfig := ioc.InitLLMConfig()
+	llmClient := ioc.InitLLMClient(llmConfig, loggerX)
 	articlePolishService := service.NewAIArticlePolishService(llmClient)
 	articlePolishHandler := web.NewAIArticlePolishHandler(articlePolishService, cmdable, loggerX)
 	rankingCache := cache.NewRedisArticleRankingCache(cmdable, loggerX)
@@ -97,7 +92,7 @@ func InitWebServer() *gin.Engine {
 	rankingRepository := repository.NewCacheArticleRankingRepository(rankingCache, rankingDAO, loggerX)
 	rankingService := service.NewArticleRankingService(rankingRepository, articleReaderRepository, interactionRepository, clickEventService, loggerX)
 	rankingHandler := web.NewArticleRankingHandler(rankingService, loggerX)
-	engine := ioc.InitWebServer(v, userHandler, articleAuthorHandler, articleReaderHandler, interactionHandler, oAuth2Handler, chatHandler, articleSearchHandler, clickEventHandler, articlePolishHandler, rankingHandler)
+	engine := ioc.InitWebServer(v, userHandler, articleAuthorHandler, articleReaderHandler, interactionHandler, oAuth2Handler, articleSearchHandler, clickEventHandler, articlePolishHandler, rankingHandler)
 	return engine
 }
 
@@ -105,18 +100,18 @@ func InitArticleAuthorHandler() web.ArticleAuthorHandler {
 	db := InitDB()
 	articleAuthorDAO := dao.NewGormArticleAuthorDAO(db)
 	cmdable := InitRedis()
-	articleCache := cache.NewRedisArticleCache(cmdable)
+	loggerX := InitLogger()
+	articleCache := cache.NewRedisArticleCache(cmdable, loggerX)
 	articleAuthorRepository := repository.NewCacheArticleAuthorRepository(articleAuthorDAO, articleCache)
 	articleReaderDAO := dao.NewGormArticleReaderDAO(db)
-	loggerX := InitLogger()
 	articleReaderRepository := repository.NewCacheArticleReaderRepository(articleReaderDAO, articleCache, loggerX)
 	typedClient := ioc.InitESClient()
 	articleSearchDAO := dao.NewElasticArticleDAO(typedClient)
 	articleSearchRepository := repository.NewESArticleSearchRepository(articleSearchDAO)
-	ollamaEmbeddingConfig := ioc.InitOllamaEmbeddingConfig()
-	embeddingConfig := ioc.InitEmbeddingConfig()
-	embeddingClient := ioc.InitEmbeddingClient(ollamaEmbeddingConfig, embeddingConfig, cmdable, loggerX)
-	articleSearchService := service.NewArticleSearchService(articleSearchRepository, embeddingClient, loggerX)
+	ollamaConfig := ioc.InitOllamaEmbeddingConfig()
+	config := ioc.InitEmbeddingConfig()
+	client := ioc.InitEmbeddingClient(ollamaConfig, config, cmdable, loggerX)
+	articleSearchService := service.NewArticleSearchService(articleSearchRepository, client, loggerX)
 	articleAuthorService := service.NewInternalArticleAuthorService(articleAuthorRepository, articleReaderRepository, articleSearchService, loggerX)
 	interactionDAO := dao.NewGormInteractionDAO(db)
 	interactionCache := cache.NewRedisInteractionCache(cmdable)
@@ -130,8 +125,8 @@ func InitArticleReaderHandler() web.ArticleReaderHandler {
 	db := InitDB()
 	articleReaderDAO := dao.NewGormArticleReaderDAO(db)
 	cmdable := InitRedis()
-	articleCache := cache.NewRedisArticleCache(cmdable)
 	loggerX := InitLogger()
+	articleCache := cache.NewRedisArticleCache(cmdable, loggerX)
 	articleReaderRepository := repository.NewCacheArticleReaderRepository(articleReaderDAO, articleCache, loggerX)
 	articleReaderService := service.NewInternalArticleReaderService(articleReaderRepository)
 	interactionDAO := dao.NewGormInteractionDAO(db)
@@ -155,10 +150,10 @@ func InitInteractionHandler() web.InteractionHandler {
 }
 
 func InitArticlePolishHandler() web.ArticlePolishHandler {
-	llmConfig := ioc.InitLLMConfig()
+	config := ioc.InitLLMConfig()
 	loggerX := InitLogger()
-	llmClient := ioc.InitLLMClient(llmConfig, loggerX)
-	articlePolishService := service.NewAIArticlePolishService(llmClient)
+	client := ioc.InitLLMClient(config, loggerX)
+	articlePolishService := service.NewAIArticlePolishService(client)
 	cmdable := InitRedis()
 	articlePolishHandler := web.NewAIArticlePolishHandler(articlePolishService, cmdable, loggerX)
 	return articlePolishHandler
@@ -186,7 +181,7 @@ func InitRankingCron() (*cron.Cron, func()) {
 	rankingDAO := dao.NewGormArticleRankingDAO(db)
 	rankingRepository := repository.NewCacheArticleRankingRepository(rankingCache, rankingDAO, loggerX)
 	articleReaderDAO := dao.NewGormArticleReaderDAO(db)
-	articleCache := cache.NewRedisArticleCache(cmdable)
+	articleCache := cache.NewRedisArticleCache(cmdable, loggerX)
 	articleReaderRepository := repository.NewCacheArticleReaderRepository(articleReaderDAO, articleCache, loggerX)
 	interactionDAO := dao.NewGormInteractionDAO(db)
 	interactionCache := cache.NewRedisInteractionCache(cmdable)
@@ -204,40 +199,6 @@ func InitRankingCron() (*cron.Cron, func()) {
 	return cronCron, func() {
 		cleanup()
 	}
-}
-
-func InitChatHandler() web.ChatHandler {
-	db := InitDB()
-	conversationDAO := dao.NewGormConversationDAO(db)
-	cmdable := InitRedis()
-	conversationCache := cache.NewRedisConversationCache(cmdable)
-	loggerX := InitLogger()
-	conversationRepository := repository.NewCacheConversationRepository(conversationDAO, conversationCache, loggerX)
-	messageDAO := dao.NewGormMessageDAO(db)
-	messageCache := cache.NewRedisMessageCache(cmdable)
-	messageRepository := repository.NewCacheMessageRepository(messageDAO, messageCache, loggerX)
-	llmConfig := ioc.InitLLMConfig()
-	llmClient := ioc.InitLLMClient(llmConfig, loggerX)
-	typedClient := ioc.InitESClient()
-	articleSearchDAO := dao.NewElasticArticleDAO(typedClient)
-	articleSearchRepository := repository.NewESArticleSearchRepository(articleSearchDAO)
-	ollamaEmbeddingConfig := ioc.InitOllamaEmbeddingConfig()
-	embeddingConfig := ioc.InitEmbeddingConfig()
-	embeddingClient := ioc.InitEmbeddingClient(ollamaEmbeddingConfig, embeddingConfig, cmdable, loggerX)
-	articleSearchService := service.NewArticleSearchService(articleSearchRepository, embeddingClient, loggerX)
-	articleReaderDAO := dao.NewGormArticleReaderDAO(db)
-	articleCache := cache.NewRedisArticleCache(cmdable)
-	articleReaderRepository := repository.NewCacheArticleReaderRepository(articleReaderDAO, articleCache, loggerX)
-	articleReaderService := service.NewInternalArticleReaderService(articleReaderRepository)
-	interactionDAO := dao.NewGormInteractionDAO(db)
-	interactionCache := cache.NewRedisInteractionCache(cmdable)
-	interactionRepository := repository.NewCacheInteractionRepository(interactionDAO, interactionCache, loggerX)
-	toolExecutor := service.NewAIChatToolExecutor(articleSearchService, articleReaderService, interactionRepository, loggerX)
-	eventStreamer := streamer.NewRedisStreamer(cmdable)
-	chatService := service.NewAIChatService(conversationRepository, messageRepository, llmClient, articleSearchService, toolExecutor, loggerX, eventStreamer)
-	limiter := ioc.InitChatLimiter(cmdable)
-	chatHandler := web.NewInternalChatHandler(chatService, loggerX, limiter)
-	return chatHandler
 }
 
 // wire.go:
@@ -258,6 +219,32 @@ func provideTestLockClient(cmd redis.Cmdable) redislockx.Client {
 func provideTestCronMetrics() *prometheus3.Metrics {
 	return prometheus3.NewPrometheusBuilder("test", "cron", "test").
 		Registry(prometheus2.NewRegistry()).Build()
+}
+
+// provideTestMiddlewares 与 ioc.InitMiddlewares 同结构，但 metrics 走独立 Registry，
+// 避免每个集成测试 SetupSuite 调 InitWebServer 时 DefaultRegisterer.MustRegister 重复 panic。
+// 省略 cors / 限流 / logger（httptest 无 cross-origin、不需限流、避免输出污染）。
+func provideTestMiddlewares(l logger.LoggerX, cmd redis.Cmdable, tp trace.TracerProvider) []gin.HandlerFunc {
+	return []gin.HandlerFunc{metrics.NewPrometheusBuilder("test", "http", "requests", "test").
+		WithCounter().WithHistogram().WithSummary().WithInFlight().
+		Registry(prometheus2.NewRegistry()).
+		Build(), otelgin.Middleware("webook-test", otelgin.WithTracerProvider(tp)), cors.New(cors.Config{AllowOriginFunc: func(string) bool { return true }}), jwtx.NewMiddlewareBuilder(jwtx.MiddlewareConfig{
+		AccessKey: consts.AccessKey,
+		UserKey:   consts.UserKey,
+		Session: func(ctx *gin.Context, ssid string) bool {
+			cnt, err := cmd.Exists(ctx, fmt.Sprintf(consts.UserSsidPattern, ssid)).Result()
+			return err == nil && cnt > 0
+		},
+	}).
+		IgnoredPaths("/user/register", "/user/login", "/user/refresh_token",
+			"/user/login_sms/code/send", "/user/login_sms",
+			"/oauth2/wechat/authurl", "/oauth2/wechat/callback",
+			"/article/reader/detail", "/article/reader/page",
+			"/interaction/view", "/interaction/detail",
+			"/article/ranking/page", "/article/ranking/archive/dates",
+			"/metrics").
+		Build(),
+	}
 }
 
 var infraSvcProvider = wire.NewSet(
@@ -285,4 +272,6 @@ var polishSvcProvider = wire.NewSet(service.NewAIArticlePolishService)
 // 文章榜单：集成测试不拉起 cron
 var articleRankingSvcProvider = wire.NewSet(dao.NewGormArticleRankingDAO, cache.NewRedisArticleRankingCache, repository.NewCacheArticleRankingRepository, service.NewArticleRankingService, web.NewArticleRankingHandler)
 
-var chatSvcProvider = wire.NewSet(ioc.InitLLMConfig, ioc.InitLLMClient, ioc.InitChatLimiter, dao.NewGormConversationDAO, dao.NewGormMessageDAO, cache.NewRedisConversationCache, cache.NewRedisMessageCache, repository.NewCacheConversationRepository, repository.NewCacheMessageRepository, service.NewAIChatService, service.NewAIChatToolExecutor, streamer.NewRedisStreamer)
+// llmSvcProvider 仅 LLM 相关 provider，供 article_polish 用。
+// 原 chatSvcProvider 已随 chat 服务搬到 chat/wire.go。
+var llmSvcProvider = wire.NewSet(ioc.InitLLMConfig, ioc.InitLLMClient)

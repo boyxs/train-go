@@ -2,12 +2,13 @@
 mockgen:
 	#Interface-Based Mocking for Upstream Testing
 	#handler
-	@mockgen -source=./internal/web/jwt/types.go -package=jwtmocks -destination=./internal/web/jwt/mocks/jwt_mock.go
+	@mockgen -source=./pkg/jwtx/types.go -package=jwtmocks -destination=./pkg/jwtx/mocks/jwt_mock.go
 	#service
 	@mockgen -source=./internal/service/user.go -package=svcmocks -destination=./internal/service/mocks/user_mock.go
 	@mockgen -source=./internal/service/article.go -package=svcmocks -destination=./internal/service/mocks/article_mock.go
 	@mockgen -source=./internal/service/code.go -package=svcmocks -destination=./internal/service/mocks/code_mock.go
 	@mockgen -source=./internal/service/article_search.go -package=svcmocks -destination=./internal/service/mocks/article_search_mock.go
+	@mockgen -source=./internal/service/interaction.go -package=svcmocks -destination=./internal/service/mocks/interaction_mock.go
 	#repository
 	@mockgen -source=./internal/repository/user.go -package=repomocks -destination=./internal/repository/mocks/user_mock.go
 	@mockgen -source=./internal/repository/article_author.go -package=repomocks -destination=./internal/repository/mocks/article_author_mock.go
@@ -25,11 +26,8 @@ mockgen:
 	@mockgen -package=redismocks -destination=./internal/repository/cache/redismocks/cmdable_mock.go github.com/redis/go-redis/v9 Cmdable
 	#sms
 	@mockgen -source=./internal/service/sms/types.go -package=smsmocks -destination=./internal/service/sms/mocks/sms_mock.go
-	#chat repository
-	@mockgen -source=./internal/repository/chat_conversation.go -package=repomocks -destination=./internal/repository/mocks/chat_conversation_mock.go
-	@mockgen -source=./internal/repository/chat_message.go -package=repomocks -destination=./internal/repository/mocks/chat_message_mock.go
+	#interaction repository（chat 已拆出独立服务，主仓只剩 interaction repo mock）
 	@mockgen -source=./internal/repository/interaction.go -package=repomocks -destination=./internal/repository/mocks/interaction_mock.go
-	@mockgen -source=./internal/service/chat_tools.go -package=svcmocks -destination=./internal/service/mocks/chat_tools_mock.go
 	#click event
 	@mockgen -source=./internal/repository/dao/click_event.go -package=daomocks -destination=./internal/repository/dao/mocks/click_event_mock.go
 	@mockgen -source=./internal/repository/cache/click_event.go -package=cachemocks -destination=./internal/repository/cache/mocks/click_event_mock.go
@@ -42,10 +40,10 @@ mockgen:
 	@mockgen -source=./internal/repository/cache/ranking.go -package=cachemocks -destination=./internal/repository/cache/mocks/ranking_mock.go
 	@mockgen -source=./internal/repository/ranking.go -package=repomocks -destination=./internal/repository/mocks/ranking_mock.go
 	@mockgen -source=./internal/service/ranking.go -package=svcmocks -destination=./internal/service/mocks/ranking_mock.go
-	#ai
-	@mockgen -source=./internal/service/ai/llm.go -package=aimocks -destination=./internal/service/ai/mocks/llm_mock.go
-	#embedding
-	@mockgen -source=./internal/service/ai/embedding/types.go -package=embmocks -destination=./internal/service/ai/embedding/mocks/embedding_mock.go
+	#llm（pkg 共享，chat 和 article_polish 都消费）
+	@mockgen -source=./pkg/llm/types.go -package=llmmocks -destination=./pkg/llm/mocks/llm_mock.go
+	#embedding（search 业务私有依赖，article_search 消费）
+	@mockgen -source=./internal/service/embedding/types.go -package=embmocks -destination=./internal/service/embedding/mocks/embedding_mock.go
 	#pkg redislockx 分布式锁
 	@mockgen -source=./pkg/redislockx/types.go -package=lockmocks -destination=./pkg/redislockx/mocks/lock_mock.go
 	#update dependencies

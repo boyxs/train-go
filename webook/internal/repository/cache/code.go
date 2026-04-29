@@ -3,16 +3,11 @@ package cache
 import (
 	"context"
 	_ "embed"
-	"errors"
 	"fmt"
 
 	"github.com/redis/go-redis/v9"
-)
 
-var (
-	ErrCodeInvalid       = errors.New("验证码错误或已过期")
-	ErrCodeSendTooMany   = errors.New("验证码发送太频繁")
-	ErrCodeVerifyTooMany = errors.New("验证码校验太频繁")
+	"github.com/webook/internal/errs"
 )
 
 //go:embed lua/store_code.lua
@@ -43,9 +38,9 @@ func (cc *RedisCodeCache) Store(ctx context.Context, biz string, phone string, c
 	}
 	switch result {
 	case -2:
-		return ErrCodeInvalid
+		return errs.ErrCodeInvalid
 	case -1:
-		return ErrCodeSendTooMany
+		return errs.ErrCodeSendTooMany
 	default:
 		return nil
 	}
@@ -60,9 +55,9 @@ func (cc *RedisCodeCache) Verify(ctx context.Context, biz string, phone string, 
 	case -3:
 		return false, nil
 	case -2:
-		return false, ErrCodeVerifyTooMany
+		return false, errs.ErrCodeVerifyTooMany
 	case -1:
-		return false, ErrCodeInvalid
+		return false, errs.ErrCodeInvalid
 	default:
 		return true, nil
 	}

@@ -10,25 +10,53 @@
 # ===================================================
 # 多环境如何隔离：
 #   - project 名按 env 分（webook-dev / webook-prod） → volume 自然独立
-#   - container_name 全 docker 唯一（webook-app / webook-mysql ...） → 同时只跑一套
+#   - container_name 全 docker 唯一（webook-core / webook-chat / webook-mysql ...） → 同时只跑一套
 #   - APP_ENV 从 .env.<env> 注入，webook 加载不同 yaml（local/dev/staging/prod）
 #   - yaml 里直接写明文密码（学习项目）；L2 K8s 再用 Secret + envFrom 做敏感隔离
 # ===================================================
 services:
-  # ── 业务 ─────────────────────────────────────────────────
-  webook:
-    image: ${GHCR_REGISTRY:-ghcr.io}/${GH_USER}/webook:${IMAGE_TAG}
-    container_name: webook-app
+  # ── 业务（核心服务，含 user/article/interaction/ranking/search/click 等模块） ──
+  webook-core:
+    image: ${GHCR_REGISTRY:-ghcr.io}/${GH_USER}/webook-core:${CORE_IMAGE_TAG}
+    container_name: webook-core
     restart: always
+    mem_limit: ${CORE_MEM:-512m}
     environment:
-      APP_ENV: "${APP_ENV}"              # .env.<env> 指定 config/<env>.yaml
+      APP_ENV: "${CORE_APP_ENV}"         # .env.<env> 指定 config/<env>.yaml
       DEPLOY_ENV: "${DEPLOY_ENV}"
       TZ: "Asia/Shanghai"
+      # GOMEMLIMIT 比 mem_limit 留 ~12% buffer（堆外：goroutine 栈/cgo/mmap/网络栈），不够会被 cgroup OOM
+      GOMEMLIMIT: "${CORE_GOMEMLIMIT:-450MiB}"
+      GOGC: "${CORE_GOGC:-80}"           # 比默认 100 激进，省内存换 CPU
     depends_on:
       webook-mysql:   {condition: service_healthy}
       webook-redis:   {condition: service_healthy}
       webook-kafka:   {condition: service_healthy}
       webook-es:      {condition: service_healthy}
+    healthcheck:
+      # 用 /metrics 探活（HTTP 8089 正常监听）；下游 webook-chat 依赖此 healthy 状态再启动
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8089/metrics || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 20s
+
+  # ── chat 微服务（拆分试点：通过 gRPC 调主仓 webook-core） ───
+  webook-chat:
+    image: ${GHCR_REGISTRY:-ghcr.io}/${GH_USER}/webook-chat:${CHAT_IMAGE_TAG}
+    container_name: webook-chat
+    restart: always
+    mem_limit: ${CHAT_MEM:-384m}
+    environment:
+      APP_ENV: "${CHAT_APP_ENV}"         # .env.<env> 指定 config/<env>.yaml
+      DEPLOY_ENV: "${DEPLOY_ENV}"
+      TZ: "Asia/Shanghai"
+      GOMEMLIMIT: "${CHAT_GOMEMLIMIT:-320MiB}"
+      GOGC: "${CHAT_GOGC:-80}"
+    depends_on:
+      webook-core:    {condition: service_healthy}    # 主仓 gRPC :8090 就绪后再起 chat
+      webook-mysql:   {condition: service_healthy}
+      webook-redis:   {condition: service_healthy}
 
   # ── 前端 + 反向代理 ──────────────────────────────────────
   webook-fe:
@@ -296,8 +324,12 @@ services:
     pull_policy: missing
     mem_limit: ${OTEL_MEM:-256m}
     command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    # 默认非 root（uid 10001），写 /var/lib/otelcol 需 chown，最简方式跑 root（学习项目可接受）
+    user: "0:0"
     volumes:
       - ./otel-collector/config.yaml:/etc/otelcol-contrib/config.yaml:ro
+      # file_storage 持久化 sending_queue：collector / zipkin 重启不丢 span
+      - otel-collector-storage:/var/lib/otelcol/storage
     depends_on:
       - zipkin
 
@@ -382,3 +414,4 @@ volumes:
   ollama-data:
   prometheus-data:
   grafana-data:
+  otel-collector-storage:

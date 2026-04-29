@@ -11,6 +11,7 @@ import (
 
 	"github.com/webook/internal/consts"
 	"github.com/webook/internal/domain"
+	"github.com/webook/pkg/logger"
 )
 
 type ArticleCache interface {
@@ -19,6 +20,8 @@ type ArticleCache interface {
 	Del(ctx context.Context, uid int64, id int64) error
 	// GetPub/SetPub/DelPub 读者端公开文章缓存（key 不含 uid）
 	GetPub(ctx context.Context, id int64) (domain.Article, error)
+	// MGetPub 批量取，返回 map[id]Article；缺失的 id 不在 map 里
+	MGetPub(ctx context.Context, ids []int64) (map[int64]domain.Article, error)
 	SetPub(ctx context.Context, article domain.Article) error
 	DelPub(ctx context.Context, id int64) error
 	GetFirstPage(ctx context.Context) ([]domain.Article, int64, error)
@@ -29,12 +32,14 @@ type ArticleCache interface {
 type RedisArticleCache struct {
 	cmd        redis.Cmdable
 	expiration time.Duration
+	l          logger.LoggerX
 }
 
-func NewRedisArticleCache(cmd redis.Cmdable) ArticleCache {
+func NewRedisArticleCache(cmd redis.Cmdable, l logger.LoggerX) ArticleCache {
 	return &RedisArticleCache{
 		cmd:        cmd,
 		expiration: consts.CacheTTL,
+		l:          l,
 	}
 }
 
@@ -105,6 +110,42 @@ func (ac *RedisArticleCache) GetPub(ctx context.Context, id int64) (domain.Artic
 	var article domain.Article
 	err = json.Unmarshal([]byte(data), &article)
 	return article, err
+}
+
+// MGetPub 批量取公开文章；返回 id→Article map，缺失/反序列化失败的 id 不在结果里。
+// 整体 MGET 失败才向上抛 error；个别 key miss 不算错误。
+func (ac *RedisArticleCache) MGetPub(ctx context.Context, ids []int64) (map[int64]domain.Article, error) {
+	if len(ids) == 0 {
+		return map[int64]domain.Article{}, nil
+	}
+	keys := make([]string, len(ids))
+	for i, id := range ids {
+		keys[i] = ac.getPubKey(id)
+	}
+	values, err := ac.cmd.MGet(ctx, keys...).Result()
+	if err != nil {
+		return nil, err
+	}
+	result := make(map[int64]domain.Article, len(ids))
+	for i, v := range values {
+		if v == nil {
+			continue
+		}
+		raw, ok := v.(string)
+		if !ok {
+			ac.l.Warn("MGetPub 返回值类型异常",
+				logger.Int64("id", ids[i]), logger.String("type", fmt.Sprintf("%T", v)))
+			continue
+		}
+		var article domain.Article
+		if uerr := json.Unmarshal([]byte(raw), &article); uerr != nil {
+			ac.l.Warn("MGetPub 反序列化失败（cache 数据损坏，下次回源 DB 修复）",
+				logger.Int64("id", ids[i]), logger.Error(uerr))
+			continue
+		}
+		result[ids[i]] = article
+	}
+	return result, nil
 }
 
 func (ac *RedisArticleCache) SetPub(ctx context.Context, article domain.Article) error {

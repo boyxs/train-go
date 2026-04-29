@@ -22,7 +22,7 @@ groups:
 
       # ─── Alert 规则：表达式为 true 时告警 ──────────────────────
       - alert: WebookDown
-        expr: up{job="webook-app"} == 0       # PromQL
+        expr: up{job="webook-core"} == 0       # PromQL
         for: 1m                               # 持续多久才 firing
         labels:                                # 附加 label（供 Alertmanager 路由）
           severity: critical
@@ -36,9 +36,9 @@ groups:
 
       - alert: Webook5xxHigh
         expr: |
-          sum(rate(webook_http_requests_total{status=~"5.."}[5m]))
+          sum(rate(webook_core_http_requests_total{status=~"5.."}[5m]))
           /
-          sum(rate(webook_http_requests_total[5m]))
+          sum(rate(webook_core_http_requests_total[5m]))
           > 0.01
         for: 5m
         labels:
@@ -51,7 +51,7 @@ groups:
       - alert: WebookP99High
         expr: |
           histogram_quantile(0.99,
-            sum by (le) (rate(webook_http_requests_duration_seconds_bucket[5m]))
+            sum by (le) (rate(webook_core_http_requests_duration_seconds_bucket[5m]))
           ) > 0.5
         for: 10m
         labels:
@@ -80,7 +80,7 @@ groups:
           summary: "Redis 内存使用率 {{ $value | humanizePercentage }}"
 
       - alert: GoroutineLeak
-        expr: go_goroutines{job="webook-app"} > 10000
+        expr: go_goroutines{job="webook-core"} > 10000
         for: 5m
         labels:
           severity: high
@@ -96,20 +96,20 @@ groups:
 
       # ─── Recording 规则：record + expr + labels（无 alert/for/annotations）──
       - record: webook:http_qps:rate5m              # 新指标名（建议用冒号分隔命名空间）
-        expr: sum(rate(webook_http_requests_total[5m]))
+        expr: sum(rate(webook_core_http_requests_total[5m]))
         labels:
           aggregated_by: prometheus
 
       - record: webook:http_error_rate:rate5m
         expr: |
-          sum(rate(webook_http_requests_total{status=~"5.."}[5m]))
+          sum(rate(webook_core_http_requests_total{status=~"5.."}[5m]))
           /
-          sum(rate(webook_http_requests_total[5m]))
+          sum(rate(webook_core_http_requests_total[5m]))
 
       - record: webook:http_p99:rate5m
         expr: |
           histogram_quantile(0.99,
-            sum by (le, pattern) (rate(webook_http_requests_duration_seconds_bucket[5m]))
+            sum by (le, pattern) (rate(webook_core_http_requests_duration_seconds_bucket[5m]))
           )
 
 # ═════════════════════════════════════════════════════════════════

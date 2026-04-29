@@ -23,9 +23,9 @@ datasources:
         # 预置查询：点击直接跳
         queries:
           - name: "请求 QPS"
-            query: 'sum(rate(webook_http_requests_total{$__tags}[5m]))'
+            query: 'sum(rate(webook_core_http_requests_total{$__tags}[5m]))'
           - name: "P99 延迟"
-            query: 'histogram_quantile(0.99, sum by (le) (rate(webook_http_requests_duration_seconds_bucket{$__tags}[5m])))'
+            query: 'histogram_quantile(0.99, sum by (le) (rate(webook_core_http_requests_duration_seconds_bucket{$__tags}[5m])))'
 
       # ── Trace → Logs 联动（接 Loki 才用）────────────────
       # tracesToLogsV2:

@@ -18,6 +18,10 @@ type InteractionService interface {
 	FindUserState(ctx context.Context, uid int64, biz string, bizId int64) (liked, collected bool, err error)
 	// FindByBizIds 批量查聚合计数，返回 map[bizId]Interaction
 	FindByBizIds(ctx context.Context, biz string, bizIds []int64) (map[int64]domain.Interaction, error)
+	// ListHotBizIds 按互动加权分降序，取前 limit 个 bizId（chat 工具 get_hot_articles 用）
+	ListHotBizIds(ctx context.Context, biz string, limit int) ([]int64, error)
+	// ListCollectedBizIds 按用户收藏时间降序，取前 limit 个 bizId（chat 工具 get_my_favorites 用）
+	ListCollectedBizIds(ctx context.Context, uid int64, biz string, limit int) ([]int64, error)
 }
 
 type InternalInteractionService struct {
@@ -66,4 +70,12 @@ func (s *InternalInteractionService) FindByBizIds(ctx context.Context, biz strin
 		result[intr.BizId] = intr
 	}
 	return result, nil
+}
+
+func (s *InternalInteractionService) ListHotBizIds(ctx context.Context, biz string, limit int) ([]int64, error) {
+	return s.repo.ListHotBizIds(ctx, biz, limit)
+}
+
+func (s *InternalInteractionService) ListCollectedBizIds(ctx context.Context, uid int64, biz string, limit int) ([]int64, error) {
+	return s.repo.ListCollectedBizIds(ctx, uid, biz, limit)
 }

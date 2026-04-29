@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 
 	"github.com/elastic/go-elasticsearch/v8"
+
+	"github.com/webook/internal/errs"
 )
 
 const articleIndex = "article_v1"
@@ -52,7 +53,7 @@ func (d *ElasticArticleDAO) Delete(ctx context.Context, id int64) error {
 		return err
 	}
 	if resp.Result.Name == "not_found" {
-		return ErrESDocNotFound
+		return errs.ErrESDocNotFound
 	}
 	return nil
 }
@@ -114,6 +115,3 @@ func (d *ElasticArticleDAO) Search(ctx context.Context, text string, vec []float
 	}
 	return docs, total, nil
 }
-
-// ErrESDocNotFound ES 文档不存在
-var ErrESDocNotFound = errors.New("ES 文档不存在")

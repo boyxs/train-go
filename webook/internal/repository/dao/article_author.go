@@ -6,9 +6,9 @@ import (
 
 	"gorm.io/gorm"
 	"gorm.io/plugin/soft_delete"
-)
 
-var ErrArticleNotFound = errors.New("ID或创作者错误")
+	"github.com/webook/internal/errs"
+)
 
 // ArticleAuthorDAO 制作库 DAO，只操作 article 表
 type ArticleAuthorDAO interface {
@@ -52,7 +52,7 @@ func (d *GormArticleAuthorDAO) Update(ctx context.Context, article Article) erro
 		return row.Error
 	}
 	if row.RowsAffected == 0 {
-		return ErrArticleNotFound
+		return errs.ErrArticleNotFound
 	}
 	return nil
 }
@@ -77,7 +77,7 @@ func (d *GormArticleAuthorDAO) FindByIdAndAuthor(ctx context.Context, id int64, 
 		First(&article).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return Article{}, ErrArticleNotFound
+			return Article{}, errs.ErrArticleNotFound
 		}
 		return Article{}, err
 	}
@@ -123,7 +123,7 @@ func (d *GormArticleAuthorDAO) Delete(ctx context.Context, id int64, uid int64) 
 		return row.Error
 	}
 	if row.RowsAffected == 0 {
-		return ErrArticleNotFound
+		return errs.ErrArticleNotFound
 	}
 	return nil
 }

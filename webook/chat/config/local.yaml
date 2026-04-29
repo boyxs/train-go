@@ -1,0 +1,48 @@
+# chat 服务本地配置（连本机 docker compose 起的中间件）
+# 数据库与主仓共用（不分库），靠表前缀隔离 chat_conversation / chat_message
+
+# 远程配置中心：与主仓共用同一个 etcd 实例，但 path 独立（/webook-chat 不踩 /webook）
+etcd:
+  endpoint: "http://127.0.0.1:2379"
+  path: "/webook-chat"
+  type: "yaml"
+
+http:
+  addr: ":8189"
+
+# 主仓 webook-core gRPC server 地址（chat 工具调用 search/article/interaction 走这里）
+grpc:
+  coreAddr: "127.0.0.1:8090"
+
+mysql:
+  dsn: root:13520@tcp(localhost:3306)/webook?parseTime=true&loc=UTC
+
+redis:
+  addr: 127.0.0.1:6379
+  password: "13520"
+
+# LLM provider（与主仓共享同一份 key 即可）
+# 注：JWT 验签密钥写死在 chat/consts/auth.go，与主仓 internal/consts/auth.go 同源（不读 yaml）
+llm:
+  providers:
+    - name: deepseek
+      apiKey: "sk-405db05b37ac418b91268403d32a55aa"
+      baseUrl: "https://api.deepseek.com"
+      model: "deepseek-chat"
+      maxTokens: 2048
+      timeout: 60
+
+logger:
+  level:
+    l: -1
+  development: true
+  encoding: 'json'
+  outputPaths: [ 'stdout' ]
+  errorOutputPaths: [ 'stderr' ]
+
+otel:
+  endpoint: "localhost:4317"
+  serviceName: "webook-chat"
+  serviceVersion: "0.1.0"
+  env: "local"
+  sampleRatio: 1.0
