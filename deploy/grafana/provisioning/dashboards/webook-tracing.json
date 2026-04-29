@@ -8,7 +8,23 @@
   "editable": false,
   "refresh": "30s",
   "time": {"from": "now-1h", "to": "now"},
-  "templating": {"list": []},
+  "templating": {
+    "list": [
+      {
+        "name": "service",
+        "label": "Service",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "query": { "query": "label_values(up{job=~\"webook-.*\"}, job)", "refId": "PrometheusVariableQueryEditor-VariableQuery" },
+        "refresh": 2,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": "webook-.*",
+        "current": { "text": "All", "value": "$__all", "selected": false }
+      }
+    ]
+  },
   "annotations": {"list": []},
   "panels": [
     {
@@ -27,9 +43,9 @@
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [
         {
-          "expr": "sum(rate(webook_core_http_requests_total[5m]))",
+          "expr": "sum(webook:http_qps:rate5m{job=~\"$service\"})",
           "refId": "A",
-          "legendFormat": "qps"
+          "legendFormat": "{{job}} qps"
         }
       ],
       "fieldConfig": {
@@ -46,9 +62,9 @@
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [
         {
-          "expr": "sum(rate(webook_core_http_requests_total{status=~\"5..\"}[5m])) / sum(rate(webook_core_http_requests_total[5m]))",
+          "expr": "webook:http_5xx_rate:rate5m{job=~\"$service\"}",
           "refId": "A",
-          "legendFormat": "rate"
+          "legendFormat": "{{job}} rate"
         }
       ],
       "fieldConfig": {
@@ -73,9 +89,9 @@
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [
         {
-          "expr": "histogram_quantile(0.99, sum by (le) (rate(webook_core_http_requests_duration_seconds_bucket[5m])))",
+          "expr": "webook:http_duration_p99:rate5m{job=~\"$service\"}",
           "refId": "A",
-          "legendFormat": "p99"
+          "legendFormat": "{{job}} p99"
         }
       ],
       "fieldConfig": {
@@ -100,9 +116,9 @@
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [
         {
-          "expr": "go_goroutines{job=\"webook-core\"}",
+          "expr": "go_goroutines{job=~\"$service\"}",
           "refId": "A",
-          "legendFormat": "goroutines"
+          "legendFormat": "{{job}} goroutines"
         }
       ],
       "fieldConfig": {
@@ -116,7 +132,7 @@
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [
         {
-          "expr": "sum by (pattern) (rate(webook_core_http_requests_total[$__rate_interval]))",
+          "expr": "sum by (pattern) (rate(webook_http_requests_total{job=~\"$service\"}[$__rate_interval]))",
           "refId": "A",
           "legendFormat": "{{pattern}}"
         }
@@ -132,19 +148,19 @@
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, sum by (le) (rate(webook_core_http_requests_duration_seconds_bucket[$__rate_interval])))",
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(webook_http_requests_duration_seconds_bucket{job=~\"$service\"}[$__rate_interval])))",
           "refId": "A",
-          "legendFormat": "p50"
+          "legendFormat": "{{job}} p50"
         },
         {
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(webook_core_http_requests_duration_seconds_bucket[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(webook_http_requests_duration_seconds_bucket{job=~\"$service\"}[$__rate_interval])))",
           "refId": "B",
-          "legendFormat": "p95"
+          "legendFormat": "{{job}} p95"
         },
         {
-          "expr": "histogram_quantile(0.99, sum by (le) (rate(webook_core_http_requests_duration_seconds_bucket[$__rate_interval])))",
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(webook_http_requests_duration_seconds_bucket{job=~\"$service\"}[$__rate_interval])))",
           "refId": "C",
-          "legendFormat": "p99"
+          "legendFormat": "{{job}} p99"
         }
       ],
       "fieldConfig": {

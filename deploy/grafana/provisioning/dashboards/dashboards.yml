@@ -3,7 +3,10 @@ apiVersion: 1
 providers:
   - name: 'default'
     orgId: 1
-    folder: ''
+    # 与 alerting/*.yml 的 folder: Webook 对齐：dashboard + alert 同 folder 一处看全
+    # 改后需重启 grafana（provisioning 只在启动时读）；旧 General 里 provisioned dashboard
+    # 因 disableDeletion=true 可能残留，彻底干净需清 grafana-data volume 重建
+    folder: 'Webook'
     type: file
     # 生产三件套：UI 完全只读，所有改动必须改 JSON + Git
     disableDeletion: true

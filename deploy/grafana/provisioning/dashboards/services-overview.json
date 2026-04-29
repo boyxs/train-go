@@ -9,6 +9,12 @@
   "time": { "from": "now-30m", "to": "now" },
   "templating": { "list": [] },
   "annotations": { "list": [] },
+  "links": [
+    { "title": "Service Catalog（俯瞰）", "url": "/d/webook-service-catalog", "type": "link", "icon": "dashboard", "tooltip": "所有 webook-* 服务卡片墙" },
+    { "title": "Webook Overview（详情）", "url": "/d/webook-overview", "type": "link", "icon": "dashboard", "tooltip": "单服务全景（按 service variable 切）" },
+    { "title": "Webook Ops（深挖）", "url": "/d/webook-ops", "type": "link", "icon": "dashboard", "tooltip": "DB / Redis / 慢路径分析" },
+    { "title": "Webook Tracing（trace）", "url": "/d/webook-tracing", "type": "link", "icon": "external link", "tooltip": "trace 入口 + Zipkin 跳转" }
+  ],
   "panels": [
     {
       "type": "row",
@@ -115,7 +121,7 @@
       "title": "QPS",
       "gridPos": { "h": 5, "w": 4, "x": 0, "y": 23 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "targets": [{ "expr": "sum(rate(webook_core_http_requests_total[5m]))" }],
+      "targets": [{ "expr": "sum(rate(webook_http_requests_total[5m]))" }],
       "fieldConfig": { "defaults": { "unit": "reqps" } }
     },
     {
@@ -123,7 +129,7 @@
       "title": "5xx 错误率",
       "gridPos": { "h": 5, "w": 4, "x": 4, "y": 23 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "targets": [{ "expr": "sum(rate(webook_core_http_requests_total{status=~\"5..\"}[5m])) / sum(rate(webook_core_http_requests_total[5m])) * 100" }],
+      "targets": [{ "expr": "sum(rate(webook_http_requests_total{status=~\"5..\"}[5m])) / sum(rate(webook_http_requests_total[5m])) * 100" }],
       "fieldConfig": { "defaults": { "unit": "percent", "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 1 }, { "color": "red", "value": 5 }] } } }
     },
     {
@@ -131,7 +137,7 @@
       "title": "P99 延迟",
       "gridPos": { "h": 5, "w": 4, "x": 8, "y": 23 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "targets": [{ "expr": "histogram_quantile(0.99, sum(rate(webook_core_http_requests_duration_seconds_bucket[5m])) by (le))" }],
+      "targets": [{ "expr": "histogram_quantile(0.99, sum(rate(webook_http_requests_duration_seconds_bucket[5m])) by (le))" }],
       "fieldConfig": { "defaults": { "unit": "s" } }
     },
     {
@@ -139,14 +145,14 @@
       "title": "Goroutines",
       "gridPos": { "h": 5, "w": 4, "x": 12, "y": 23 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "targets": [{ "expr": "go_goroutines{job=\"webook-core\"}" }]
+      "targets": [{ "expr": "go_goroutines{job=~\"$service\"}" }]
     },
     {
       "type": "stat",
       "title": "堆内存",
       "gridPos": { "h": 5, "w": 4, "x": 16, "y": 23 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "targets": [{ "expr": "go_memstats_alloc_bytes{job=\"webook-core\"}" }],
+      "targets": [{ "expr": "go_memstats_alloc_bytes{job=~\"$service\"}" }],
       "fieldConfig": { "defaults": { "unit": "bytes" } }
     },
     {
@@ -154,7 +160,7 @@
       "title": "进程 CPU",
       "gridPos": { "h": 5, "w": 4, "x": 20, "y": 23 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "targets": [{ "expr": "rate(process_cpu_seconds_total{job=\"webook-core\"}[5m]) * 100" }],
+      "targets": [{ "expr": "rate(process_cpu_seconds_total{job=~\"$service\"}[5m]) * 100" }],
       "fieldConfig": { "defaults": { "unit": "percent" } }
     },
     {
@@ -162,7 +168,7 @@
       "title": "QPS 按 pattern",
       "gridPos": { "h": 7, "w": 12, "x": 0, "y": 28 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "targets": [{ "expr": "sum(rate(webook_core_http_requests_total[5m])) by (pattern)", "legendFormat": "{{pattern}}" }],
+      "targets": [{ "expr": "sum(rate(webook_http_requests_total[5m])) by (pattern)", "legendFormat": "{{pattern}}" }],
       "fieldConfig": { "defaults": { "unit": "reqps" } }
     },
     {
@@ -171,9 +177,9 @@
       "gridPos": { "h": 7, "w": 12, "x": 12, "y": 28 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
-        { "expr": "histogram_quantile(0.50, sum(rate(webook_core_http_requests_duration_seconds_bucket[5m])) by (le))", "legendFormat": "P50" },
-        { "expr": "histogram_quantile(0.95, sum(rate(webook_core_http_requests_duration_seconds_bucket[5m])) by (le))", "legendFormat": "P95" },
-        { "expr": "histogram_quantile(0.99, sum(rate(webook_core_http_requests_duration_seconds_bucket[5m])) by (le))", "legendFormat": "P99" }
+        { "expr": "histogram_quantile(0.50, sum(rate(webook_http_requests_duration_seconds_bucket[5m])) by (le))", "legendFormat": "P50" },
+        { "expr": "histogram_quantile(0.95, sum(rate(webook_http_requests_duration_seconds_bucket[5m])) by (le))", "legendFormat": "P95" },
+        { "expr": "histogram_quantile(0.99, sum(rate(webook_http_requests_duration_seconds_bucket[5m])) by (le))", "legendFormat": "P99" }
       ],
       "fieldConfig": { "defaults": { "unit": "s" } }
     },
@@ -183,8 +189,8 @@
       "gridPos": { "h": 7, "w": 12, "x": 0, "y": 35 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
-        { "expr": "go_gc_duration_seconds{job=\"webook-core\", quantile=\"0.99\"}", "legendFormat": "GC P99 暂停" },
-        { "expr": "rate(go_gc_duration_seconds_count{job=\"webook-core\"}[5m])", "legendFormat": "GC 次数/s" }
+        { "expr": "go_gc_duration_seconds{job=~\"$service\", quantile=\"0.99\"}", "legendFormat": "GC P99 暂停" },
+        { "expr": "rate(go_gc_duration_seconds_count{job=~\"$service\"}[5m])", "legendFormat": "GC 次数/s" }
       ]
     },
     {
@@ -193,8 +199,8 @@
       "gridPos": { "h": 7, "w": 12, "x": 12, "y": 35 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
-        { "expr": "process_open_fds{job=\"webook-core\"}", "legendFormat": "打开" },
-        { "expr": "process_max_fds{job=\"webook-core\"}", "legendFormat": "上限" }
+        { "expr": "process_open_fds{job=~\"$service\"}", "legendFormat": "打开" },
+        { "expr": "process_max_fds{job=~\"$service\"}", "legendFormat": "上限" }
       ]
     },
 

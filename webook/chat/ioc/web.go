@@ -40,7 +40,7 @@ func InitWebServer(middlewares []gin.HandlerFunc, handler web.ChatHandler) *gin.
 func InitMiddlewares(l logger.LoggerX, cmd redis.Cmdable, tp trace.TracerProvider) []gin.HandlerFunc {
 	return []gin.HandlerFunc{
 		// 1. prom HTTP 指标（最外层）
-		metrics.NewPrometheusBuilder("webook_chat", "http", "requests", "HTTP 请求统计").
+		metrics.NewPrometheusBuilder("webook", "http", "requests", "HTTP 请求统计").
 			WithCounter().
 			WithHistogram().
 			WithSummary().

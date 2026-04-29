@@ -80,7 +80,7 @@ groups:
         labels: { severity: critical, team: backend, component: cron }
         annotations:
           summary: "任务 {{ $labels.task }} 5 分钟内出现 panic"
-          description: "查 webook_core_cron_runs_total{result=panic} + 应用日志的 stack 字段。"
+          description: "查 webook_cron_runs_total{result=panic} + 应用日志的 stack 字段。"
           runbook_url: "https://wiki.internal/runbook/cron-panic"
         data:
           - refId: A
@@ -88,7 +88,7 @@ groups:
             datasourceUid: prometheus
             model:
               # rate over 5m，task 维度保留 → 告警标签自动带 task
-              expr: 'sum by (task) (rate(webook_core_cron_runs_total{result="panic"}[5m]))'
+              expr: 'sum by (task) (rate(webook_cron_runs_total{result="panic"}[5m]))'
               refId: A
               instant: true
           - refId: B

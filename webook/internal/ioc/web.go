@@ -61,14 +61,14 @@ func InitMiddlewares(
 ) []gin.HandlerFunc {
 	return []gin.HandlerFunc{
 		// Prometheus 指标采集（最外层，能统计所有请求包括被限流/拒绝的）
-		metrics.NewPrometheusBuilder("webook_core", "http", "requests", "HTTP 请求统计").
+		metrics.NewPrometheusBuilder("webook", "http", "requests", "HTTP 请求统计").
 			WithCounter().
 			WithHistogram().
 			WithSummary().
 			WithInFlight().
 			Build(),
 		// OTel：紧随 Prometheus，创建 root span，让后续所有中间件 / handler 都在 span 上下文里
-		otelgin.Middleware("webook",
+		otelgin.Middleware("webook-core",
 			otelgin.WithTracerProvider(tp),
 		),
 		//cors

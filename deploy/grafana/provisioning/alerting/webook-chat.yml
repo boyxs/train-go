@@ -1,22 +1,17 @@
 apiVersion: 1
 
-# 5 条核心告警规则（基于 Prometheus 已采集的指标）
-# 评估周期 1 分钟，触发条件持续 5 分钟才正式 firing（避免抖动）
-#
-# Grafana Alerting 评估链路规则：
-#   Query (A) → Reduce (B) → Threshold (C) → condition
-#   每个 Threshold 表达式必须接一个 reduced 值，直接接 time series 会报
-#   "looks like time series data, only reduced data can be alerted on"
+# webook-chat 服务级告警（镜像 webook-core.yml，job filter 限定到 webook-chat）
+# metric 命名空间统一为 webook_*，service 区分靠 prometheus 自动注入的 job 标签
 groups:
   - orgId: 1
-    name: webook-core
-    folder: Webook                  # 必须在 Grafana 里有同名 folder（自动创建）
+    name: webook-chat
+    folder: Webook
     interval: 1m
     rules:
 
       # ── ① 服务存活 ────────────────────────────────────────
-      - uid: webook-core-up
-        title: Webook Core 服务不可达
+      - uid: webook-chat-up
+        title: Webook Chat 服务不可达
         condition: C
         for: 1m
         noDataState: NoData
@@ -25,14 +20,14 @@ groups:
           severity: critical
           team: backend
         annotations:
-          summary: "Webook Core 实例 {{ $labels.instance }} 不可达"
-          runbook_url: "https://wiki.internal/runbook/webook-core-down"
+          summary: "Webook Chat 实例 {{ $labels.instance }} 不可达"
+          runbook_url: "https://wiki.internal/runbook/webook-chat-down"
         data:
           - refId: A
             relativeTimeRange: { from: 60, to: 0 }
             datasourceUid: prometheus
             model:
-              expr: 'up{job="webook-core"}'
+              expr: 'up{job="webook-chat"}'
               refId: A
               instant: true
           - refId: B
@@ -52,10 +47,8 @@ groups:
               refId: C
 
       # ── ② HTTP 5xx 错误率 ─────────────────────────────────
-      # 直读 recording rule（webook:http_5xx_rate:rate5m），免每分钟评估两次 sum(rate(...))。
-      # rule 已 by (job) 预聚合 → 这里 {job="webook-core"} 单 series。
-      - uid: webook-5xx-rate
-        title: HTTP 5xx 错误率 > 1%
+      - uid: webook-chat-5xx-rate
+        title: Chat HTTP 5xx 错误率 > 1%
         condition: C
         for: 5m
         noDataState: OK
@@ -64,14 +57,14 @@ groups:
           severity: high
           team: backend
         annotations:
-          summary: "5xx 错误率 {{ $values.B.Value | humanizePercentage }}"
-          runbook_url: "https://wiki.internal/runbook/webook-5xx"
+          summary: "Chat 5xx 错误率 {{ $values.B.Value | humanizePercentage }}"
+          runbook_url: "https://wiki.internal/runbook/webook-chat-5xx"
         data:
           - refId: A
             relativeTimeRange: { from: 600, to: 0 }
             datasourceUid: prometheus
             model:
-              expr: 'webook:http_5xx_rate:rate5m{job="webook-core"}'
+              expr: 'webook:http_5xx_rate:rate5m{job="webook-chat"}'
               refId: A
           - refId: B
             datasourceUid: __expr__
@@ -90,8 +83,9 @@ groups:
               refId: C
 
       # ── ③ HTTP P99 延迟 ─────────────────────────────────
-      - uid: webook-p99
-        title: HTTP P99 延迟 > 500ms
+      # chat 是 LLM 流式服务，SSE 长连接 P99 天然高，阈值放宽到 5s（vs core 500ms）
+      - uid: webook-chat-p99
+        title: Chat HTTP P99 延迟 > 5s
         condition: C
         for: 10m
         noDataState: OK
@@ -100,14 +94,14 @@ groups:
           severity: medium
           team: backend
         annotations:
-          summary: "P99 延迟 {{ $values.B.Value }}s"
-          runbook_url: "https://wiki.internal/runbook/webook-latency"
+          summary: "Chat P99 延迟 {{ $values.B.Value }}s"
+          runbook_url: "https://wiki.internal/runbook/webook-chat-latency"
         data:
           - refId: A
             relativeTimeRange: { from: 600, to: 0 }
             datasourceUid: prometheus
             model:
-              expr: 'webook:http_duration_p99:rate5m{job="webook-core"}'
+              expr: 'webook:http_duration_p99:rate5m{job="webook-chat"}'
               refId: A
           - refId: B
             datasourceUid: __expr__
@@ -122,12 +116,12 @@ groups:
               type: threshold
               expression: B
               conditions:
-                - evaluator: { type: gt, params: [0.5] }
+                - evaluator: { type: gt, params: [5] }
               refId: C
 
       # ── ④ Goroutine 暴涨 ────────────────────────────────
-      - uid: webook-goroutines
-        title: Goroutine 数 > 10000
+      - uid: webook-chat-goroutines
+        title: Chat Goroutine 数 > 10000
         condition: C
         for: 5m
         noDataState: OK
@@ -136,14 +130,14 @@ groups:
           severity: high
           team: backend
         annotations:
-          summary: "Goroutine 数 {{ $values.B.Value }}（疑似泄漏）"
+          summary: "Chat Goroutine 数 {{ $values.B.Value }}（疑似 LLM 流泄漏）"
           runbook_url: "https://wiki.internal/runbook/goroutine-leak"
         data:
           - refId: A
             relativeTimeRange: { from: 300, to: 0 }
             datasourceUid: prometheus
             model:
-              expr: 'go_goroutines{job="webook-core"}'
+              expr: 'go_goroutines{job="webook-chat"}'
               refId: A
               instant: true
           - refId: B
@@ -160,41 +154,4 @@ groups:
               expression: B
               conditions:
                 - evaluator: { type: gt, params: [10000] }
-              refId: C
-
-      # ── ⑤ MySQL 连接接近上限 ──────────────────────────────
-      - uid: mysql-conn-saturation
-        title: MySQL 连接使用率 > 80%
-        condition: C
-        for: 5m
-        noDataState: OK
-        execErrState: Error
-        labels:
-          severity: high
-          team: backend
-        annotations:
-          summary: "MySQL 连接使用率 {{ $values.B.Value | humanizePercentage }}"
-          runbook_url: "https://wiki.internal/runbook/mysql-conn"
-        data:
-          - refId: A
-            relativeTimeRange: { from: 300, to: 0 }
-            datasourceUid: prometheus
-            model:
-              expr: 'mysql_global_status_threads_connected / mysql_global_variables_max_connections'
-              refId: A
-              instant: true
-          - refId: B
-            datasourceUid: __expr__
-            model:
-              type: reduce
-              expression: A
-              reducer: last
-              refId: B
-          - refId: C
-            datasourceUid: __expr__
-            model:
-              type: threshold
-              expression: B
-              conditions:
-                - evaluator: { type: gt, params: [0.8] }
               refId: C
