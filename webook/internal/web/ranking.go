@@ -1,6 +1,7 @@
 package web
 
 import (
+	"os"
 	"regexp"
 
 	"github.com/gin-gonic/gin"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/webook/internal/consts"
 	"github.com/webook/internal/domain"
+	"github.com/webook/internal/errs"
 	"github.com/webook/internal/service"
 	"github.com/webook/pkg/ginx"
 	"github.com/webook/pkg/logger"
@@ -34,7 +36,13 @@ func (h *ArticleRankingHandler) RegisterRoutes(server *gin.Engine) {
 	g := server.Group("/article/ranking")
 	g.POST("/page", ginx.WrapReq[rankingPageReq](h.Page))
 	g.POST("/archive/dates", ginx.Wrap(h.ArchiveDates))
-	g.POST("/archive", ginx.WrapReq[rankingArchiveReq](h.Archive))
+	// archive 是运维 / 测试用接口（手动触发归档，cron 自动归档已覆盖业务），
+	// 生产环境禁用以防越权触发：DEPLOY_ENV=prod 时不注册路由。
+	// 直接读 os.Getenv 不走 viper：viper.AutomaticEnv 对非嵌套 key 会查 "DEPLOYENV"
+	// （SetEnvKeyReplacer 只替换 dot），与 .env 里的 DEPLOY_ENV 对不上，gate 永不触发
+	if os.Getenv("DEPLOY_ENV") != "prod" {
+		g.POST("/archive", ginx.WrapReq[rankingArchiveReq](h.Archive))
+	}
 	g.POST("/click", ginx.WrapReqClaims[rankingClickReq, UserClaims](consts.UserKey, h.Click))
 }
 
@@ -48,14 +56,14 @@ type rankingPageReq struct {
 
 func (h *ArticleRankingHandler) Page(ctx *gin.Context, req rankingPageReq) (Result, error) {
 	if req.Dimension != "" && !domain.Dimension(req.Dimension).Valid() {
-		return Result{Code: 4, Msg: "invalid dimension"}, nil
+		return Result{}, errs.ErrInvalidDimension
 	}
 	if req.Date != "" && !datePattern.MatchString(req.Date) {
-		return Result{Code: 4, Msg: "invalid date"}, nil
+		return Result{}, errs.ErrInvalidDate
 	}
 	list, total, err := h.svc.Page(ctx, req.Date, req.Dimension, req.Category, req.Page, req.PageSize)
 	if err != nil {
-		return Result{Code: 5, Msg: "系统错误"}, err
+		return Result{}, err
 	}
 	return Result{Msg: "ok", Data: ginx.PageResult{List: list, Total: int64(total)}}, nil
 }
@@ -63,7 +71,7 @@ func (h *ArticleRankingHandler) Page(ctx *gin.Context, req rankingPageReq) (Resu
 func (h *ArticleRankingHandler) ArchiveDates(ctx *gin.Context) (Result, error) {
 	dates, err := h.svc.ListArchiveDates(ctx)
 	if err != nil {
-		return Result{Code: 5, Msg: "系统错误"}, err
+		return Result{}, err
 	}
 	return Result{Msg: "ok", Data: dates}, nil
 }
@@ -79,10 +87,10 @@ func (h *ArticleRankingHandler) Archive(ctx *gin.Context, req rankingArchiveReq)
 		date = carbon.Now().ToDateString()
 	}
 	if !datePattern.MatchString(date) {
-		return Result{Code: 4, Msg: "invalid date"}, nil
+		return Result{}, errs.ErrInvalidDate
 	}
 	if err := h.svc.Archive(ctx, date); err != nil {
-		return Result{Code: 5, Msg: "系统错误"}, err
+		return Result{}, err
 	}
 	return Result{Msg: "ok"}, nil
 }
@@ -98,16 +106,16 @@ const rankingClickMaxRank = 100
 
 func (h *ArticleRankingHandler) Click(ctx *gin.Context, req rankingClickReq, uc UserClaims) (Result, error) {
 	if req.ArticleId <= 0 {
-		return Result{Code: 4, Msg: "参数无效"}, nil
+		return Result{}, errs.ErrClickInvalidArgs
 	}
 	if req.Dimension != "" && !domain.Dimension(req.Dimension).Valid() {
-		return Result{Code: 4, Msg: "invalid dimension"}, nil
+		return Result{}, errs.ErrInvalidDimension
 	}
 	if req.Rank < 0 || req.Rank > rankingClickMaxRank {
-		return Result{Code: 4, Msg: "invalid rank"}, nil
+		return Result{}, errs.ErrInvalidRank
 	}
 	if err := h.svc.OnClick(ctx, uc.Userid, req.ArticleId, req.Rank, req.Dimension); err != nil {
-		return Result{Code: 5, Msg: "系统错误"}, err
+		return Result{}, err
 	}
 	return Result{Msg: "ok"}, nil
 }

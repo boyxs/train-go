@@ -130,6 +130,21 @@ func (mr *MockArticleCacheMockRecorder) GetPub(ctx, id any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPub", reflect.TypeOf((*MockArticleCache)(nil).GetPub), ctx, id)
 }
 
+// MGetPub mocks base method.
+func (m *MockArticleCache) MGetPub(ctx context.Context, ids []int64) (map[int64]domain.Article, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "MGetPub", ctx, ids)
+	ret0, _ := ret[0].(map[int64]domain.Article)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// MGetPub indicates an expected call of MGetPub.
+func (mr *MockArticleCacheMockRecorder) MGetPub(ctx, ids any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MGetPub", reflect.TypeOf((*MockArticleCache)(nil).MGetPub), ctx, ids)
+}
+
 // Set mocks base method.
 func (m *MockArticleCache) Set(ctx context.Context, article domain.Article) error {
 	m.ctrl.T.Helper()

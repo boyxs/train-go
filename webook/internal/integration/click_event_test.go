@@ -18,7 +18,7 @@ import (
 	"github.com/webook/internal/integration/setup"
 	"github.com/webook/internal/repository/dao"
 	"github.com/webook/internal/web"
-	myJwt "github.com/webook/internal/web/jwt"
+	myJwt "github.com/webook/pkg/jwtx"
 )
 
 type ClickEventSuite struct {
@@ -111,11 +111,12 @@ func (s *ClickEventSuite) TestClick_InvalidParams() {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			recorder := s.postJSON("/ai/click", tc.body)
-			assert.Equal(t, http.StatusOK, recorder.Code)
+			// Code=4 走 ginx CodeToHttpStatus → HTTP 400
+			assert.Equal(t, http.StatusBadRequest, recorder.Code)
 			var res web.Result
 			err := json.NewDecoder(recorder.Body).Decode(&res)
 			assert.NoError(t, err)
-			assert.Equal(t, 4, res.Code)
+			assert.Equal(t, 400, res.Code)
 		})
 	}
 }

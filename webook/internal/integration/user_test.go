@@ -60,9 +60,9 @@ func TestInternalUserHandler_SendSMSCode(t *testing.T) {
 			name:     "未输入手机号",
 			before:   func(t *testing.T) {},
 			after:    func(t *testing.T) {},
-			wantCode: http.StatusOK,
+			wantCode: http.StatusBadRequest,
 			wantBody: web.Result{
-				Code: 4,
+				Code: 400,
 				Msg:  "请输入手机号码",
 			},
 		},
@@ -89,10 +89,10 @@ func TestInternalUserHandler_SendSMSCode(t *testing.T) {
 				assert.Equal(t, "123456", code)
 
 			},
-			wantCode: http.StatusOK,
+			wantCode: http.StatusTooManyRequests,
 			wantBody: web.Result{
-				Code: 4,
-				Msg:  "短信发送太频繁，请稍后再试",
+				Code: 429,
+				Msg:  "验证码发送太频繁",
 			},
 		},
 		{
@@ -116,10 +116,11 @@ func TestInternalUserHandler_SendSMSCode(t *testing.T) {
 				assert.NoError(t, err)
 				assert.Equal(t, "123456", code)
 			},
-			wantCode: http.StatusOK,
+			// case 名叫"系统错误"但实际逻辑：注入了 code key 但无 TTL → cache.Store 返 ErrCodeInvalid (400)
+			wantCode: http.StatusBadRequest,
 			wantBody: web.Result{
-				Code: 5,
-				Msg:  "系统错误",
+				Code: 400,
+				Msg:  "验证码错误或已过期",
 			},
 		},
 	}

@@ -212,6 +212,7 @@ CREATE TABLE IF NOT EXISTS `conversation` (
   `title` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL DEFAULT '' COMMENT '会话标题（自动从首条 user 消息截取）',
   `created_at` bigint NOT NULL DEFAULT 0 COMMENT '创建时间（Unix 毫秒）',
   `updated_at` bigint NOT NULL DEFAULT 0 COMMENT '最后一条消息时间（Unix 毫秒，排序用）',
+  `deleted_at` bigint NOT NULL DEFAULT 0 COMMENT '软删除时间（Unix 毫秒，0=未删）',
   PRIMARY KEY (`id`) USING BTREE,
   INDEX `idx_conversation_user_updated` (`user_id` ASC, `updated_at` DESC) USING BTREE
 ) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic COMMENT = 'AI 客服会话（对话列表）';
@@ -226,7 +227,10 @@ CREATE TABLE IF NOT EXISTS `message` (
   `content` text CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '消息内容（长文本）',
   `tool_calls` json NULL COMMENT 'LLM 工具调用 JSON（assistant 消息的 function_call/tool_calls）',
   `token_used` int NOT NULL DEFAULT 0 COMMENT '本条消息 token 消耗（计费/监控）',
+  `feedback` tinyint NOT NULL DEFAULT 0 COMMENT '用户反馈：-1=踩 0=未反馈 1=赞',
   `created_at` bigint NOT NULL DEFAULT 0 COMMENT '创建时间（Unix 毫秒，会话内顺序）',
+  `updated_at` bigint NOT NULL DEFAULT 0 COMMENT '更新时间（Unix 毫秒）',
+  `deleted_at` bigint NOT NULL DEFAULT 0 COMMENT '软删除时间（Unix 毫秒，0=未删）',
   PRIMARY KEY (`id`) USING BTREE,
   INDEX `idx_message_conversation_created` (`conversation_id` ASC, `created_at` ASC) USING BTREE
 ) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic COMMENT = 'AI 客服消息（按 conversation_id 聚合）';

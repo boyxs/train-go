@@ -9,6 +9,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/webook/internal/domain"
+	"github.com/webook/internal/errs"
 	"github.com/webook/internal/repository"
 	repomocks "github.com/webook/internal/repository/mocks"
 )
@@ -50,14 +51,14 @@ func TestInternalUserService_Login(t *testing.T) {
 			mock: func(ctrl *gomock.Controller) repository.UserRepository {
 				repo := repomocks.NewMockUserRepository(ctrl)
 				repo.EXPECT().FindByEmail(gomock.Any(), "123456789@qq.com").
-					Return(domain.User{}, ErrRecordNotFound)
+					Return(domain.User{}, errs.ErrRecordNotFound)
 				return repo
 			},
 			ctx:      context.Background(),
 			email:    "123456789@qq.com",
 			password: "@12345678a",
 			wantUser: domain.User{},
-			wantErr:  ErrInvalidUserOrPassword,
+			wantErr:  errs.ErrInvalidUserOrPassword,
 		},
 		{
 			name: "系统异常",
@@ -91,7 +92,7 @@ func TestInternalUserService_Login(t *testing.T) {
 			email:    "123456@qq.com",
 			password: "@123",
 			wantUser: domain.User{},
-			wantErr:  ErrInvalidUserOrPassword,
+			wantErr:  errs.ErrInvalidUserOrPassword,
 		},
 	}
 	for _, tc := range testCases {

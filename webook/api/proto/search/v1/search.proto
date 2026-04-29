@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package webook.search.v1;
+
+option go_package = "github.com/webook/api/gen/search/v1;searchv1";
+
+// SearchService 提供文章搜索能力（被 webook-chat 等下游服务消费）。
+service SearchService {
+  rpc SearchArticles(SearchArticlesRequest) returns (SearchArticlesResponse);
+}
+
+message SearchArticlesRequest {
+  string query = 1;
+  int32 page = 2;   // 1-based
+  int32 size = 3;
+}
+
+message SearchArticlesResponse {
+  repeated ArticleCard articles = 1;
+  int64 total = 2;
+}
+
+message ArticleCard {
+  int64 id = 1;
+  string title = 2;
+  string abstract = 3;
+}

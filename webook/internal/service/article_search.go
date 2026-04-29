@@ -7,8 +7,9 @@ import (
 	"strings"
 
 	"github.com/webook/internal/domain"
+	"github.com/webook/internal/errs"
 	"github.com/webook/internal/repository"
-	"github.com/webook/internal/service/ai/embedding"
+	"github.com/webook/internal/service/embedding"
 	"github.com/webook/pkg/logger"
 )
 
@@ -28,11 +29,11 @@ type ArticleSearchService interface {
 
 type InternalArticleSearchService struct {
 	repo  repository.ArticleSearchRepository
-	embed embedding.EmbeddingClient
+	embed embedding.Client
 	l     logger.LoggerX
 }
 
-func NewArticleSearchService(repo repository.ArticleSearchRepository, embed embedding.EmbeddingClient, l logger.LoggerX) ArticleSearchService {
+func NewArticleSearchService(repo repository.ArticleSearchRepository, embed embedding.Client, l logger.LoggerX) ArticleSearchService {
 	return &InternalArticleSearchService{repo: repo, embed: embed, l: l}
 }
 
@@ -89,7 +90,7 @@ func (s *InternalArticleSearchService) IndexArticle(ctx context.Context, article
 
 func (s *InternalArticleSearchService) RemoveArticle(ctx context.Context, id int64) error {
 	err := s.repo.Remove(ctx, id)
-	if errors.Is(err, repository.ErrSearchDocNotFound) {
+	if errors.Is(err, errs.ErrSearchDocNotFound) {
 		return nil
 	}
 	return err

@@ -6,6 +6,7 @@ import (
 
 	"github.com/webook/internal/consts"
 	"github.com/webook/internal/domain"
+	"github.com/webook/internal/errs"
 	"github.com/webook/internal/service"
 	"github.com/webook/pkg/ginx"
 	"github.com/webook/pkg/logger"
@@ -58,7 +59,7 @@ func (h *InternalArticleAuthorHandler) RegisterRoutes(server *gin.Engine) {
 
 func (h *InternalArticleAuthorHandler) Edit(ctx *gin.Context, req editReq, uc UserClaims) (ginx.Result, error) {
 	if req.Title == "" || req.Content == "" {
-		return ginx.Result{Code: 4, Msg: "标题和内容不能为空"}, nil
+		return ginx.Result{}, errs.ErrArticleEmptyTitleOrContent
 	}
 	id, err := h.svc.Edit(ctx, domain.Article{
 		Id:       req.Id,
@@ -68,14 +69,14 @@ func (h *InternalArticleAuthorHandler) Edit(ctx *gin.Context, req editReq, uc Us
 		Author:   domain.Author{Id: uc.Userid},
 	})
 	if err != nil {
-		return ginx.Result{Msg: "系统错误"}, err
+		return ginx.Result{}, err
 	}
 	return ginx.Result{Data: id}, nil
 }
 
 func (h *InternalArticleAuthorHandler) Publish(ctx *gin.Context, req editReq, uc UserClaims) (ginx.Result, error) {
 	if req.Title == "" || req.Content == "" {
-		return ginx.Result{Code: 4, Msg: "标题和内容不能为空"}, nil
+		return ginx.Result{}, errs.ErrArticleEmptyTitleOrContent
 	}
 	_, err := h.svc.Publish(ctx, domain.Article{
 		Id:       req.Id,
@@ -85,14 +86,14 @@ func (h *InternalArticleAuthorHandler) Publish(ctx *gin.Context, req editReq, uc
 		Author:   domain.Author{Id: uc.Userid},
 	})
 	if err != nil {
-		return ginx.Result{Msg: "系统错误"}, err
+		return ginx.Result{}, err
 	}
 	return ginx.Result{Msg: "OK"}, nil
 }
 
 func (h *InternalArticleAuthorHandler) Withdraw(ctx *gin.Context, req idReq, uc UserClaims) (ginx.Result, error) {
 	if err := h.svc.Withdraw(ctx, req.Id, uc.Userid); err != nil {
-		return ginx.Result{Msg: "系统错误"}, err
+		return ginx.Result{}, err
 	}
 	return ginx.Result{Msg: "OK"}, nil
 }
@@ -116,7 +117,7 @@ func (h *InternalArticleAuthorHandler) Detail(ctx *gin.Context, req idReq, uc Us
 		return nil
 	})
 	if err := eg.Wait(); err != nil {
-		return ginx.Result{Msg: "系统错误"}, err
+		return ginx.Result{}, err
 	}
 	return ginx.Result{Data: AuthorDetailVO{
 		Id:        article.Id,
@@ -167,7 +168,7 @@ type ReaderDetailVO struct {
 func (h *InternalArticleAuthorHandler) Page(ctx *gin.Context, req pageReq, uc UserClaims) (ginx.Result, error) {
 	articles, total, err := h.svc.Page(ctx, uc.Userid, req.Page, req.PageSize)
 	if err != nil {
-		return ginx.Result{Msg: "系统错误"}, err
+		return ginx.Result{}, err
 	}
 	ids := make([]int64, 0, len(articles))
 	for _, a := range articles {
@@ -195,7 +196,7 @@ func (h *InternalArticleAuthorHandler) Page(ctx *gin.Context, req pageReq, uc Us
 func (h *InternalArticleAuthorHandler) List(ctx *gin.Context, uc UserClaims) (ginx.Result, error) {
 	articles, err := h.svc.List(ctx, uc.Userid)
 	if err != nil {
-		return ginx.Result{Msg: "系统错误"}, err
+		return ginx.Result{}, err
 	}
 	list := make([]ArticleVO, 0, len(articles))
 	for _, a := range articles {
@@ -212,12 +213,12 @@ func (h *InternalArticleAuthorHandler) List(ctx *gin.Context, uc UserClaims) (gi
 
 func (h *InternalArticleAuthorHandler) Delete(ctx *gin.Context, req idReq, uc UserClaims) (ginx.Result, error) {
 	if err := h.svc.Delete(ctx, req.Id, uc.Userid); err != nil {
-		return ginx.Result{Msg: "系统错误"}, err
+		return ginx.Result{}, err
 	}
 	return ginx.Result{Msg: "OK"}, nil
 }
 
-// ===== 读者端（公开，无需登录） =====
+// ── 读者端（公开，无需登录） ────────────────────────────────────────────────
 
 type ArticleReaderHandler interface {
 	RegisterRoutes(server *gin.Engine)
@@ -277,7 +278,8 @@ func (h *InternalArticleReaderHandler) Detail(ctx *gin.Context, req idReq) (ginx
 		return nil
 	})
 	if err := eg.Wait(); err != nil {
-		return ginx.Result{Msg: "文章不存在"}, err
+		// errgroup 任一返 err 都视为「文章不存在」（reader 端无权限/无 detail 都按 NotFound 暴露）
+		return ginx.Result{}, errs.ErrArticleNotFound.WithCause(err)
 	}
 	abstract := article.Abstract
 	if abstract == "" {
@@ -298,7 +300,7 @@ func (h *InternalArticleReaderHandler) Detail(ctx *gin.Context, req idReq) (ginx
 func (h *InternalArticleReaderHandler) Page(ctx *gin.Context, req pageReq) (ginx.Result, error) {
 	articles, total, err := h.svc.Page(ctx, req.Page, req.PageSize)
 	if err != nil {
-		return ginx.Result{Msg: "系统错误"}, err
+		return ginx.Result{}, err
 	}
 	ids := make([]int64, 0, len(articles))
 	for _, a := range articles {

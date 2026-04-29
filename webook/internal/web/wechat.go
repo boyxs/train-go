@@ -9,10 +9,11 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/webook/internal/consts"
+	"github.com/webook/internal/errs"
 	"github.com/webook/internal/service"
 	"github.com/webook/internal/service/oauth2"
-	myJwt "github.com/webook/internal/web/jwt"
 	"github.com/webook/pkg/ginx"
+	myJwt "github.com/webook/pkg/jwtx"
 )
 
 type OAuth2Handler interface {
@@ -20,7 +21,7 @@ type OAuth2Handler interface {
 }
 
 type OAuth2WechatHandler struct {
-	myJwt.JwtHandler
+	JwtHandler      myJwt.Handler
 	svc             oauth2.OAuth2Service
 	userSvc         service.UserService
 	key             []byte
@@ -28,7 +29,7 @@ type OAuth2WechatHandler struct {
 }
 
 func NewOAuth2WechatHandler(
-	hdl myJwt.JwtHandler,
+	hdl myJwt.Handler,
 	svc oauth2.OAuth2Service,
 	userSvc service.UserService,
 ) OAuth2Handler {
@@ -51,29 +52,29 @@ func (h *OAuth2WechatHandler) AuthURL(ctx *gin.Context) (ginx.Result, error) {
 	state := uuid.New().String()
 	authURL, err := h.svc.AuthURL(ctx, state)
 	if err != nil {
-		return ginx.Result{Code: 5, Msg: "构造授权登录URL失败"}, err
+		return ginx.Result{}, err
 	}
 	if err := h.setStateCookie(ctx, state); err != nil {
-		return ginx.Result{Code: 5, Msg: "服务器异常"}, err
+		return ginx.Result{}, err
 	}
 	return ginx.Result{Data: authURL}, nil
 }
 
 func (h *OAuth2WechatHandler) Callback(ctx *gin.Context) (ginx.Result, error) {
 	if err := h.verifyState(ctx); err != nil {
-		return ginx.Result{Code: 4, Msg: "非法请求"}, nil
+		return ginx.Result{}, errs.ErrWechatStateInvalid.WithCause(err)
 	}
 	code := ctx.Query("code")
 	wechatAuth, err := h.svc.VerifyCode(ctx, code)
 	if err != nil {
-		return ginx.Result{Code: 4, Msg: "授权码有误"}, nil
+		return ginx.Result{}, errs.ErrWechatCodeInvalid.WithCause(err)
 	}
 	u, err := h.userSvc.FindOrCreateByWechat(ctx, wechatAuth)
 	if err != nil {
-		return ginx.Result{Code: 5, Msg: "系统错误"}, err
+		return ginx.Result{}, err
 	}
-	if err := h.SetLoginToken(ctx, u.Id); err != nil {
-		return ginx.Result{Code: 5, Msg: "系统错误"}, err
+	if err := h.JwtHandler.SetLoginToken(ctx, u.Id); err != nil {
+		return ginx.Result{}, err
 	}
 	return ginx.Result{Msg: "OK"}, nil
 }

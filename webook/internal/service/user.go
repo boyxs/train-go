@@ -8,13 +8,8 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/webook/internal/domain"
+	"github.com/webook/internal/errs"
 	"github.com/webook/internal/repository"
-)
-
-var (
-	ErrDuplicateEmail        = repository.ErrDuplicateEmail
-	ErrRecordNotFound        = repository.ErrRecordNotFound
-	ErrInvalidUserOrPassword = errors.New("用户或密码错误")
 )
 
 type UserService interface {
@@ -48,8 +43,8 @@ func (us *InternalUserService) Register(ctx context.Context, user domain.User) e
 func (us *InternalUserService) Login(ctx context.Context, email string, password string) (domain.User, error) {
 	// 查找用户
 	user, err := us.repo.FindByEmail(ctx, email)
-	if errors.Is(err, ErrRecordNotFound) {
-		return domain.User{}, ErrInvalidUserOrPassword
+	if errors.Is(err, errs.ErrRecordNotFound) {
+		return domain.User{}, errs.ErrInvalidUserOrPassword
 	}
 	if err != nil {
 		return domain.User{}, err
@@ -57,7 +52,7 @@ func (us *InternalUserService) Login(ctx context.Context, email string, password
 	// 解密处理
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password))
 	if err != nil {
-		return domain.User{}, ErrInvalidUserOrPassword
+		return domain.User{}, errs.ErrInvalidUserOrPassword
 	}
 	return user, err
 }
@@ -84,7 +79,7 @@ func (us *InternalUserService) Edit(ctx context.Context, user domain.User) (doma
 
 func (us *InternalUserService) FindOrCreate(ctx context.Context, phone string) (domain.User, error) {
 	u, err := us.repo.FindByPhone(ctx, phone)
-	if !errors.Is(err, repository.ErrRecordNotFound) {
+	if !errors.Is(err, errs.ErrRecordNotFound) {
 		// 有两种情况
 		// err == nil, u 是可用的
 		// err != nil，系统错误，
@@ -93,7 +88,7 @@ func (us *InternalUserService) FindOrCreate(ctx context.Context, phone string) (
 	err = us.repo.Create(ctx, domain.User{Phone: phone})
 	// 有两种可能，一种是 err 恰好是唯一索引冲突（phone）
 	// 一种是 err != nil，系统错误
-	if err != nil && !errors.Is(err, repository.ErrDuplicateUser) {
+	if err != nil && !errors.Is(err, errs.ErrDuplicateUser) {
 		return domain.User{}, err
 	}
 	// 要么 err ==nil，要么ErrDuplicateUser，也代表用户存在
@@ -103,7 +98,7 @@ func (us *InternalUserService) FindOrCreate(ctx context.Context, phone string) (
 
 func (us *InternalUserService) FindOrCreateByWechat(ctx context.Context, wechatAuth domain.WechatAuth) (domain.User, error) {
 	u, err := us.repo.FindByWechat(ctx, wechatAuth.OpenId)
-	if !errors.Is(err, repository.ErrRecordNotFound) {
+	if !errors.Is(err, errs.ErrRecordNotFound) {
 		return u, err
 	}
 	// 创建一个新用户
@@ -113,7 +108,7 @@ func (us *InternalUserService) FindOrCreateByWechat(ctx context.Context, wechatA
 	err = us.repo.Create(ctx, domain.User{
 		WechatAuth: wechatAuth,
 	})
-	if err != nil && !errors.Is(err, repository.ErrDuplicateUser) {
+	if err != nil && !errors.Is(err, errs.ErrDuplicateUser) {
 		return domain.User{}, err
 	}
 	return us.repo.FindByWechat(ctx, wechatAuth.OpenId)

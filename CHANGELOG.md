@@ -2,7 +2,29 @@
 
 <!-- 新功能前插在此，日期降序 -->
 
-## [2026-04-26] 定时任务升级：分布式锁框架 + 任务级数据采集 + 通用模板抽离
+## [2026-04-28] 代码审查修复：鉴权收敛 + 缓存规则归位 + 配置一致性
+
+**变更内容**: 修复连续三轮 ship review 发现的安全/规则问题 — 1 Critical（SSE ResumeStream 越权窃听他人对话流）+ 4 Important（IsGenerating 缺鉴权、ranking.Archive 与 ai.Dashboard 在 prod 暴露、UpdateContent 写后不清缓存）+ 多处 Suggestion（viper key 与 env 名不匹配致 prod 守卫失效、`// =====` 注释分隔线违规、chat local.yaml otel.env 标错、内部 config 注释漏 staging 维度）
+
+**影响范围**:
+- `chat/web/chat.go`：`ResumeStream` 增 UserClaims 提取 + `ListMessages` 归属探测（越权 → 404 阻断 SSE 建立）；`IsGenerating` 路由改 `WrapReqClaims[conversationIdReq, jwtx.UserClaims]`，handler 内同样走 ListMessages 探测
+- `chat/repository/chat_message.go`：`UpdateContent` 写 DB 后自清缓存（Cache-Aside 完整）；删除 `DelMsgCache` 接口方法和实现 — 缓存职责回归 repository
+- `chat/service/chat.go`：删除 `flushToDB` / `finalizeReply` / `savePartialReply` 中 3 处 `DelMsgCache(...)` 兜底调用
+- `internal/web/click_event.go`：`/ai/dashboard` 加 `os.Getenv("DEPLOY_ENV") != "prod"` 路由守卫（与 ranking.Archive 同模式）
+- `internal/web/ranking.go`：`/article/ranking/archive` prod 守卫从 `viper.GetString("deployEnv")` 改 `os.Getenv("DEPLOY_ENV")`（修复 gate 永不触发的 bug）
+- `internal/web/article.go` / `internal/service/article.go` / `pkg/errs/error_test.go` / `pkg/errs/mapping_test.go` / `pkg/ginx/wrapper_errs_test.go` / `pkg/ginx/wrapper_variants_test.go`：7 处 `// =====` 分隔线改 Makefile 风格 `// ── 区域名 ──`（对齐 CLAUDE.md 注释风格）
+- `chat/config/local.yaml`：`otel.env` 由 `"dev"` 改 `"local"`（避免 local trace 与 dev 服务器混存难分）
+- `internal/config/local.yaml` + `test.yaml`：环境说明注释补齐 staging.yaml 一档（原文档过时只列 local/dev/prod 三档）
+
+**技术决策**:
+- ResumeStream 鉴权用 `service.ListMessages(uid, convId, 0, 1)` 当探测器，不新增 service 方法：复用既有「越权/不存在 → ErrConversationNotFound (404)」路径，不增加 API 表面积
+- prod 守卫直读 `os.Getenv("DEPLOY_ENV")` 不走 viper：viper.AutomaticEnv 对非嵌套 key 会 lookup `DEPLOYENV`（uppercase 后无下划线），与 `.env.*` 里的 `DEPLOY_ENV` 对不上 — CLAUDE.md 已记「AutomaticEnv 对嵌套 key 不生效实测验证」，本次确认对扁平 key 同样有此陷阱
+- UpdateContent 自清缓存而非保留 `DelMsgCache` 兜底：service 三处调用容易在新加调用点漏写；接口收敛后责任落到 repository 层，CLAUDE.md「写操作后必须清对应缓存」从字面规则变成结构保障
+- Dashboard / Archive 用 prod 路由守卫而非 admin role middleware：项目当前没有 admin 角色概念，路由守卫是最小可行方案；二者性质一致（运维/调试用，业务无依赖）
+
+**会话**: 260428-review-修复
+
+
 
 **变更内容**: 新增 `pkg/redislockx`（bsm/redislock 底座 + 自研 Watchdog 续约 + OnLost 钩子）+ `pkg/cronx`（任务级 Prometheus 指标 + Wrapper 通用模板）；prometheus 子包对齐 `redisx/gormx` 的 builder 链式风格；`internal/job/ranking.go` 缩到薄壳，service 层完全不感知锁；archive 任务首次纳入分布式锁保护；cron 加 graceful Stop hook
 

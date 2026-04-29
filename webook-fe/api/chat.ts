@@ -74,8 +74,12 @@ export interface SSECallbacks {
   onError: (err: ChatErrorEvent) => void;
 }
 
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8089';
+// SSE fetch 用专属 base：dev 直连 chat 后端绕开 Next.js rewrites（dev rewrites 会 buffer 整个 body 破坏流式 — vercel/next.js#13146）。
+// prod 不设 NEXT_PUBLIC_CHAT_SSE_URL，fallback 到 /api 走 nginx（已配 proxy_buffering off 真流式）。
+const SSE_BASE =
+  process.env.NEXT_PUBLIC_CHAT_SSE_URL ||
+  process.env.NEXT_PUBLIC_API_BASE_URL ||
+  '/api';
 
 // SSE 超时：首字节 30s，流中 60s 无数据断开
 const SSE_CONNECT_TIMEOUT = 30_000;
@@ -97,7 +101,7 @@ export function sendMessageSSE(
     controller.abort();
   }, SSE_CONNECT_TIMEOUT);
 
-  fetch(`${API_BASE}/chat/message/send`, {
+  fetch(`${SSE_BASE}/chat/message/send`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -218,7 +222,7 @@ export function resumeStream(
 ): AbortController {
   const controller = new AbortController();
   const token = tokenUtil.getAccess();
-  const url = `${API_BASE}/chat/message/stream?conversationId=${conversationId}`;
+  const url = `${SSE_BASE}/chat/message/stream?conversationId=${conversationId}`;
 
   fetch(url, {
     method: 'GET',
@@ -236,6 +240,7 @@ export function resumeStream(
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
+      let currentId = '';
 
       while (true) {
         const { done, value } = await reader.read();
@@ -249,7 +254,11 @@ export function resumeStream(
         let currentEvent = '';
         for (const line of lines) {
           if (line.startsWith('id:')) {
-            // 记录 lastEventId 供下次重连
+            currentId = line.slice(3).trim();
+            // 暴露给上层调用者，下次重连用此 id 续传
+            (callbacks as { onEventId?: (id: string) => void }).onEventId?.(
+              currentId,
+            );
           } else if (line.startsWith('event:')) {
             currentEvent = line.slice(6).trim();
           } else if (line.startsWith('data:')) {
@@ -283,7 +292,13 @@ export function resumeStream(
       }
       callbacks.onStreamEnd?.();
     })
-    .catch(() => {
+    .catch((err: Error) => {
+      // AbortError 是用户主动 / 组件 unmount，安静收尾；其他都是真错误，向上抛 onError
+      if (err.name === 'AbortError') {
+        callbacks.onStreamEnd?.();
+        return;
+      }
+      callbacks.onError?.({ code: 0, msg: '断点重连失败' });
       callbacks.onStreamEnd?.();
     });
 

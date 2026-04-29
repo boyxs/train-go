@@ -8,8 +8,6 @@ var (
 	RefreshKey        = []byte("k6CswdUm77WKcbM68UQUuxVsHSpTCwgA")
 	AccessHeader      = "x-access-token"
 	RefreshHeader     = "x-refresh-token"
-	Authorization     = "Authorization"
-	UserAgent         = "User-Agent"
 	UserKey           = "user_claims"
 	Interval          = time.Second * 10
 	ExpireTime        = time.Minute * 30

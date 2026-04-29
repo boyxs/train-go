@@ -17,7 +17,7 @@ import (
 	"github.com/webook/internal/domain"
 	"github.com/webook/internal/integration/setup"
 	"github.com/webook/internal/repository/dao"
-	myJwt "github.com/webook/internal/web/jwt"
+	myJwt "github.com/webook/pkg/jwtx"
 )
 
 type ArticleAuthorHandlerSuite struct {
@@ -175,9 +175,11 @@ func (h *ArticleAuthorHandlerSuite) TestArticleAuthorHandler_Edit() {
 				Title:   "新的标题",
 				Content: "新的内容",
 			},
-			wantCode: http.StatusOK,
+			// 越权写：DAO WHERE author_id 没匹配 → NotFound 透传 → HTTP 500
+			wantCode: http.StatusNotFound,
 			wantResult: Result[int64]{
-				Msg: "系统错误",
+				Code: 404,
+				Msg:  "文章不存在或无权限",
 			},
 		},
 		{
@@ -193,9 +195,10 @@ func (h *ArticleAuthorHandlerSuite) TestArticleAuthorHandler_Edit() {
 				Title:   "不存在的标题",
 				Content: "不存在的内容",
 			},
-			wantCode: http.StatusOK,
+			wantCode: http.StatusNotFound,
 			wantResult: Result[int64]{
-				Msg: "系统错误",
+				Code: 404,
+				Msg:  "文章不存在或无权限",
 			},
 		},
 		{
@@ -206,9 +209,10 @@ func (h *ArticleAuthorHandlerSuite) TestArticleAuthorHandler_Edit() {
 				Title:   "",
 				Content: "有内容",
 			},
-			wantCode: http.StatusOK,
+			// handler 返 Code=4 → ginx CodeToHttpStatus → HTTP 400
+			wantCode: http.StatusBadRequest,
 			wantResult: Result[int64]{
-				Code: 4,
+				Code: 400,
 				Msg:  "标题和内容不能为空",
 			},
 		},
@@ -339,10 +343,12 @@ func (h *ArticleAuthorHandlerSuite) TestArticleAuthorHandler_Publish() {
 				err = h.db.Where("id = ?", 20).First(&pub).Error
 				assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
 			},
-			req:      `{"id":20,"title":"篡改标题","content":"篡改内容"}`,
-			wantCode: http.StatusOK,
+			req: `{"id":20,"title":"篡改标题","content":"篡改内容"}`,
+			// 越权写 → NotFound 透传 → HTTP 500
+			wantCode: http.StatusNotFound,
 			wantResult: Result[any]{
-				Msg: "系统错误",
+				Code: 404,
+				Msg:  "文章不存在或无权限",
 			},
 		},
 		{
@@ -359,19 +365,21 @@ func (h *ArticleAuthorHandlerSuite) TestArticleAuthorHandler_Publish() {
 				assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
 			},
 			req:      `{"id":999,"title":"不存在","content":"不存在内容"}`,
-			wantCode: http.StatusOK,
+			wantCode: http.StatusNotFound,
 			wantResult: Result[any]{
-				Msg: "系统错误",
+				Code: 404,
+				Msg:  "文章不存在或无权限",
 			},
 		},
 		{
-			name:     "发布时标题为空",
-			before:   func(t *testing.T) {},
-			after:    func(t *testing.T) {},
-			req:      `{"title":"","content":"有内容"}`,
-			wantCode: http.StatusOK,
+			name:   "发布时标题为空",
+			before: func(t *testing.T) {},
+			after:  func(t *testing.T) {},
+			req:    `{"title":"","content":"有内容"}`,
+			// handler 返 Code=4 → HTTP 400
+			wantCode: http.StatusBadRequest,
 			wantResult: Result[any]{
-				Code: 4,
+				Code: 400,
 				Msg:  "标题和内容不能为空",
 			},
 		},
@@ -615,12 +623,14 @@ func (h *ArticleAuthorHandlerSuite) TestArticleAuthorHandler_Detail() {
 			},
 		},
 		{
+			// handler errgroup 内 NotFound 透传 → ginx httpStatus → HTTP 500
 			name:     "获取不存在的文章",
 			before:   func(t *testing.T) {},
 			req:      `{"id":999}`,
-			wantCode: http.StatusOK,
+			wantCode: http.StatusNotFound,
 			wantResult: Result[AuthorDetailVO]{
-				Msg: "系统错误",
+				Code: 404,
+				Msg:  "文章不存在或无权限",
 			},
 		},
 		{
@@ -634,18 +644,20 @@ func (h *ArticleAuthorHandlerSuite) TestArticleAuthorHandler_Detail() {
 				assert.NoError(t, err)
 			},
 			req:      `{"id":101}`,
-			wantCode: http.StatusOK,
+			wantCode: http.StatusNotFound,
 			wantResult: Result[AuthorDetailVO]{
-				Msg: "系统错误",
+				Code: 404,
+				Msg:  "文章不存在或无权限",
 			},
 		},
 		{
 			name:     "id为零",
 			before:   func(t *testing.T) {},
 			req:      `{"id":0}`,
-			wantCode: http.StatusOK,
+			wantCode: http.StatusNotFound,
 			wantResult: Result[AuthorDetailVO]{
-				Msg: "系统错误",
+				Code: 404,
+				Msg:  "文章不存在或无权限",
 			},
 		},
 	}
@@ -954,6 +966,7 @@ func (h *ArticleAuthorHandlerSuite) TestArticleAuthorHandler_Delete() {
 			},
 		},
 		{
+			// handler 把 NotFound（含越权）当 err 透传 → ginx httpStatus → HTTP 500
 			name: "删除他人文章",
 			before: func(t *testing.T) {
 				err := h.db.Create(&dao.Article{
@@ -971,9 +984,10 @@ func (h *ArticleAuthorHandlerSuite) TestArticleAuthorHandler_Delete() {
 				assert.Equal(t, "他人文章", article.Title)
 			},
 			req:      `{"id":202}`,
-			wantCode: http.StatusOK,
+			wantCode: http.StatusNotFound,
 			wantResult: Result[any]{
-				Msg: "系统错误",
+				Code: 404,
+				Msg:  "文章不存在或无权限",
 			},
 		},
 		{
@@ -981,9 +995,10 @@ func (h *ArticleAuthorHandlerSuite) TestArticleAuthorHandler_Delete() {
 			before:   func(t *testing.T) {},
 			after:    func(t *testing.T) {},
 			req:      `{"id":999}`,
-			wantCode: http.StatusOK,
+			wantCode: http.StatusNotFound,
 			wantResult: Result[any]{
-				Msg: "系统错误",
+				Code: 404,
+				Msg:  "文章不存在或无权限",
 			},
 		},
 		{
@@ -991,9 +1006,10 @@ func (h *ArticleAuthorHandlerSuite) TestArticleAuthorHandler_Delete() {
 			before:   func(t *testing.T) {},
 			after:    func(t *testing.T) {},
 			req:      `{"id":0}`,
-			wantCode: http.StatusOK,
+			wantCode: http.StatusNotFound,
 			wantResult: Result[any]{
-				Msg: "系统错误",
+				Code: 404,
+				Msg:  "文章不存在或无权限",
 			},
 		},
 	}

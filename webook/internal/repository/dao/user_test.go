@@ -12,6 +12,8 @@ import (
 	"go.uber.org/mock/gomock"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
+
+	"github.com/webook/internal/errs"
 )
 
 func TestGormUserDAO_Insert(t *testing.T) {
@@ -52,7 +54,7 @@ func TestGormUserDAO_Insert(t *testing.T) {
 			u: User{
 				Nickname: "Tommy",
 			},
-			wantErr: ErrDuplicateUser,
+			wantErr: errs.ErrDuplicateUser,
 		},
 		{
 			name: "数据库错误",

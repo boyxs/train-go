@@ -71,6 +71,21 @@ func (mr *MockArticleReaderRepositoryMockRecorder) FindById(ctx, id any) *gomock
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindById", reflect.TypeOf((*MockArticleReaderRepository)(nil).FindById), ctx, id)
 }
 
+// FindByIds mocks base method.
+func (m *MockArticleReaderRepository) FindByIds(ctx context.Context, ids []int64) ([]domain.Article, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FindByIds", ctx, ids)
+	ret0, _ := ret[0].([]domain.Article)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// FindByIds indicates an expected call of FindByIds.
+func (mr *MockArticleReaderRepositoryMockRecorder) FindByIds(ctx, ids any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByIds", reflect.TypeOf((*MockArticleReaderRepository)(nil).FindByIds), ctx, ids)
+}
+
 // Page mocks base method.
 func (m *MockArticleReaderRepository) Page(ctx context.Context, offset, limit int) ([]domain.Article, int64, error) {
 	m.ctrl.T.Helper()

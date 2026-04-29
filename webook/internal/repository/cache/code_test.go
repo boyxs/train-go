@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
+	"github.com/webook/internal/errs"
 	"github.com/webook/internal/repository/cache/redismocks"
 )
 
@@ -72,7 +73,7 @@ func TestRedisCodeCache_Store(t *testing.T) {
 			mock: func(ctrl *gomock.Controller) redis.Cmdable {
 				cmd := redismocks.NewMockCmdable(ctrl)
 				r := redis.NewCmd(context.Background())
-				r.SetErr(ErrCodeInvalid)
+				r.SetErr(errs.ErrCodeInvalid)
 				r.SetVal(int64(-2))
 				cmd.EXPECT().Eval(gomock.Any(), luaStoreCode,
 					[]string{getKeyFunc("test", "18608261234")},
@@ -84,14 +85,14 @@ func TestRedisCodeCache_Store(t *testing.T) {
 			biz:     "test",
 			phone:   "18608261234",
 			code:    "123456",
-			wantErr: ErrCodeInvalid,
+			wantErr: errs.ErrCodeInvalid,
 		},
 		{
 			name: "验证码发送太频繁",
 			mock: func(ctrl *gomock.Controller) redis.Cmdable {
 				cmd := redismocks.NewMockCmdable(ctrl)
 				r := redis.NewCmd(context.Background())
-				r.SetErr(ErrCodeSendTooMany)
+				r.SetErr(errs.ErrCodeSendTooMany)
 				r.SetVal(int64(-1))
 				cmd.EXPECT().Eval(gomock.Any(), luaStoreCode,
 					[]string{getKeyFunc("test", "18608261234")},
@@ -103,7 +104,7 @@ func TestRedisCodeCache_Store(t *testing.T) {
 			biz:     "test",
 			phone:   "18608261234",
 			code:    "123456",
-			wantErr: ErrCodeSendTooMany,
+			wantErr: errs.ErrCodeSendTooMany,
 		},
 	}
 	for _, tc := range testCases {

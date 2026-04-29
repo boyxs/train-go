@@ -27,6 +27,20 @@ exporters:
     endpoint: http://webook-zipkin:9411/api/v2/spans
     tls:
       insecure: true
+    # ── Collector → Zipkin 链路容灾 ─────────────────────────────────
+    # zipkin 短暂不可达 / collector 重启时不丢 span：
+    # 1. sending_queue：缓冲区，溢出才 drop；storage 引用 file_storage 持久化到 volume
+    # 2. retry_on_failure：指数退避重试，最多 5 分钟（之后丢弃，避免无限堆积）
+    sending_queue:
+      enabled: true
+      num_consumers: 4
+      queue_size: 5000
+      storage: file_storage
+    retry_on_failure:
+      enabled: true
+      initial_interval: 5s
+      max_interval: 30s
+      max_elapsed_time: 5m
   # 调试用：把 span 同时打到 collector 自己日志（verbosity=basic 只打计数，detailed 打每条 span 详情）
   debug:
     verbosity: basic
@@ -35,9 +49,17 @@ extensions:
   # /healthz 端点
   health_check:
     endpoint: 0.0.0.0:13133
+  # 持久化 sending_queue 到本地磁盘（docker-compose 挂 named volume 跨重启保留）
+  # zipkin 抖动 / collector 重启都能续传，不丢已收 span
+  file_storage:
+    directory: /var/lib/otelcol/storage
+    timeout: 1s
+    compaction:
+      directory: /var/lib/otelcol/storage
+      on_start: true
 
 service:
-  extensions: [health_check]
+  extensions: [health_check, file_storage]
   pipelines:
     traces:
       receivers: [otlp]

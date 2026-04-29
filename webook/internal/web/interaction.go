@@ -55,7 +55,7 @@ func (h *InternalInteractionHandler) Like(ctx *gin.Context, req likeReq, uc User
 		err = h.svc.CancelLike(ctx, uc.Userid, h.biz, req.ArticleId)
 	}
 	if err != nil {
-		return ginx.Result{Code: 5, Msg: "系统错误"}, err
+		return ginx.Result{}, err
 	}
 	return ginx.Result{Msg: "OK"}, nil
 }
@@ -68,7 +68,7 @@ func (h *InternalInteractionHandler) Collect(ctx *gin.Context, req collectReq, u
 		err = h.svc.CancelCollect(ctx, uc.Userid, h.biz, req.ArticleId)
 	}
 	if err != nil {
-		return ginx.Result{Code: 5, Msg: "系统错误"}, err
+		return ginx.Result{}, err
 	}
 	return ginx.Result{Msg: "OK"}, nil
 }
@@ -77,7 +77,7 @@ func (h *InternalInteractionHandler) Collect(ctx *gin.Context, req collectReq, u
 func (h *InternalInteractionHandler) Detail(ctx *gin.Context, req bizIdReq) (ginx.Result, error) {
 	intr, err := h.svc.FindInteraction(ctx, 0, h.biz, req.ArticleId)
 	if err != nil {
-		return ginx.Result{Code: 5, Msg: "系统错误"}, err
+		return ginx.Result{}, err
 	}
 	return ginx.Result{Data: intr}, nil
 }
@@ -86,7 +86,7 @@ func (h *InternalInteractionHandler) Detail(ctx *gin.Context, req bizIdReq) (gin
 func (h *InternalInteractionHandler) State(ctx *gin.Context, req bizIdReq, uc UserClaims) (ginx.Result, error) {
 	liked, collected, err := h.svc.FindUserState(ctx, uc.Userid, h.biz, req.ArticleId)
 	if err != nil {
-		return ginx.Result{Code: 5, Msg: "系统错误"}, err
+		return ginx.Result{}, err
 	}
 	return ginx.Result{Data: gin.H{
 		"liked":     liked,

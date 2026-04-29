@@ -86,6 +86,21 @@ func (mr *MockArticleReaderDAOMockRecorder) FindById(ctx, id any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindById", reflect.TypeOf((*MockArticleReaderDAO)(nil).FindById), ctx, id)
 }
 
+// FindByIds mocks base method.
+func (m *MockArticleReaderDAO) FindByIds(ctx context.Context, ids []int64) ([]dao.PublishedArticle, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FindByIds", ctx, ids)
+	ret0, _ := ret[0].([]dao.PublishedArticle)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// FindByIds indicates an expected call of FindByIds.
+func (mr *MockArticleReaderDAOMockRecorder) FindByIds(ctx, ids any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByIds", reflect.TypeOf((*MockArticleReaderDAO)(nil).FindByIds), ctx, ids)
+}
+
 // Page mocks base method.
 func (m *MockArticleReaderDAO) Page(ctx context.Context, offset, limit int) ([]dao.PublishedArticle, error) {
 	m.ctrl.T.Helper()

@@ -11,12 +11,6 @@ import (
 	"github.com/webook/internal/repository/dao"
 )
 
-var (
-	ErrDuplicateUser  = dao.ErrDuplicateUser
-	ErrDuplicateEmail = dao.ErrDuplicateEmail
-	ErrRecordNotFound = dao.ErrRecordNotFound
-)
-
 type UserRepository interface {
 	Create(ctx context.Context, user domain.User) error
 	Update(ctx context.Context, user domain.User) (domain.User, error)

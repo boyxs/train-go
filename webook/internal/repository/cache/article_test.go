@@ -11,6 +11,7 @@ import (
 
 	"github.com/webook/internal/domain"
 	"github.com/webook/internal/repository/cache/redismocks"
+	"github.com/webook/pkg/logger"
 )
 
 func TestRedisArticleCache_FirstPage(t *testing.T) {
@@ -69,7 +70,7 @@ func TestRedisArticleCache_FirstPage(t *testing.T) {
 			defer ctrl.Finish()
 
 			cmd := tc.mock(ctrl)
-			c := NewRedisArticleCache(cmd)
+			c := NewRedisArticleCache(cmd, logger.NewNopLogger())
 			ac := c.(*RedisArticleCache)
 
 			ctx := context.Background()
@@ -96,7 +97,7 @@ func TestRedisArticleCache_GetFirstPage_Miss(t *testing.T) {
 	getCmd.SetErr(redis.Nil)
 	cmd.EXPECT().Get(gomock.Any(), "article:reader:first_page").Return(getCmd)
 
-	c := NewRedisArticleCache(cmd)
+	c := NewRedisArticleCache(cmd, logger.NewNopLogger())
 	ac := c.(*RedisArticleCache)
 
 	_, _, err := ac.GetFirstPage(context.Background())
@@ -112,7 +113,7 @@ func TestRedisArticleCache_DelFirstPage(t *testing.T) {
 	delCmd.SetVal(1)
 	cmd.EXPECT().Del(gomock.Any(), "article:reader:first_page").Return(delCmd)
 
-	c := NewRedisArticleCache(cmd)
+	c := NewRedisArticleCache(cmd, logger.NewNopLogger())
 	ac := c.(*RedisArticleCache)
 
 	err := ac.DelFirstPage(context.Background())

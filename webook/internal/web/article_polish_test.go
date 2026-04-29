@@ -14,9 +14,9 @@ import (
 
 	"github.com/webook/internal/consts"
 	"github.com/webook/internal/domain"
-	"github.com/webook/internal/service"
+	"github.com/webook/internal/errs"
 	svcmocks "github.com/webook/internal/service/mocks"
-	"github.com/webook/internal/web/jwt"
+	jwt "github.com/webook/pkg/jwtx"
 	"github.com/webook/pkg/logger"
 	limitmocks "github.com/webook/pkg/ratelimit/mocks"
 )
@@ -64,7 +64,7 @@ func TestAIArticlePolishHandler_Polish(t *testing.T) {
 				return svcmocks.NewMockArticlePolishService(ctrl), limitmocks.NewMockLimiter(ctrl)
 			},
 			wantCode: http.StatusBadRequest,
-			wantBody: Result{Code: 4, Msg: "参数错误"},
+			wantBody: Result{Code: http.StatusBadRequest, Msg: "参数错误"},
 		},
 		{
 			name: "title为空",
@@ -73,11 +73,11 @@ func TestAIArticlePolishHandler_Polish(t *testing.T) {
 				svc := svcmocks.NewMockArticlePolishService(ctrl)
 				lim := limitmocks.NewMockLimiter(ctrl)
 				lim.EXPECT().Limit(gomock.Any(), gomock.Any()).Return(false, nil)
-				svc.EXPECT().Polish(gomock.Any(), "", "有内容").Return(domain.PolishResult{}, service.ErrPolishEmptyTitle)
+				svc.EXPECT().Polish(gomock.Any(), "", "有内容").Return(domain.PolishResult{}, errs.ErrPolishEmptyTitle)
 				return svc, lim
 			},
 			wantCode: http.StatusBadRequest,
-			wantBody: Result{Code: 4, Msg: "标题不能为空"},
+			wantBody: Result{Code: 400, Msg: "标题不能为空"},
 		},
 		{
 			name: "content为空",
@@ -86,11 +86,11 @@ func TestAIArticlePolishHandler_Polish(t *testing.T) {
 				svc := svcmocks.NewMockArticlePolishService(ctrl)
 				lim := limitmocks.NewMockLimiter(ctrl)
 				lim.EXPECT().Limit(gomock.Any(), gomock.Any()).Return(false, nil)
-				svc.EXPECT().Polish(gomock.Any(), "标题", "").Return(domain.PolishResult{}, service.ErrPolishEmptyContent)
+				svc.EXPECT().Polish(gomock.Any(), "标题", "").Return(domain.PolishResult{}, errs.ErrPolishEmptyContent)
 				return svc, lim
 			},
 			wantCode: http.StatusBadRequest,
-			wantBody: Result{Code: 4, Msg: "内容不能为空"},
+			wantBody: Result{Code: 400, Msg: "内容不能为空"},
 		},
 		{
 			name: "content超长",
@@ -99,11 +99,11 @@ func TestAIArticlePolishHandler_Polish(t *testing.T) {
 				svc := svcmocks.NewMockArticlePolishService(ctrl)
 				lim := limitmocks.NewMockLimiter(ctrl)
 				lim.EXPECT().Limit(gomock.Any(), gomock.Any()).Return(false, nil)
-				svc.EXPECT().Polish(gomock.Any(), "标题", "超长内容").Return(domain.PolishResult{}, service.ErrPolishContentTooLong)
+				svc.EXPECT().Polish(gomock.Any(), "标题", "超长内容").Return(domain.PolishResult{}, errs.ErrPolishContentTooLong)
 				return svc, lim
 			},
 			wantCode: http.StatusBadRequest,
-			wantBody: Result{Code: 4, Msg: "内容过长，请缩减至 10000 字符以内"},
+			wantBody: Result{Code: 400, Msg: "内容过长，请缩减至 10000 字符以内"},
 		},
 		{
 			name: "频率限制",
@@ -114,8 +114,8 @@ func TestAIArticlePolishHandler_Polish(t *testing.T) {
 				lim.EXPECT().Limit(gomock.Any(), gomock.Any()).Return(true, nil)
 				return svc, lim
 			},
-			wantCode: http.StatusBadRequest,
-			wantBody: Result{Code: 4, Msg: "润色次数已达上限，请稍后再试"},
+			wantCode: http.StatusTooManyRequests,
+			wantBody: Result{Code: 429, Msg: "润色次数已达上限，请稍后再试"},
 		},
 		{
 			name: "service返回系统错误",
@@ -128,7 +128,7 @@ func TestAIArticlePolishHandler_Polish(t *testing.T) {
 				return svc, lim
 			},
 			wantCode: http.StatusInternalServerError,
-			wantBody: Result{Code: 5, Msg: "润色失败，请重试"},
+			wantBody: Result{Code: 500, Msg: "系统错误"},
 		},
 		{
 			name: "限流检查Redis报错但不阻塞",

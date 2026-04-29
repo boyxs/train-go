@@ -68,15 +68,15 @@
 
 | 查询 | 含义 | 推荐图表类型 |
 |------|------|-------------|
-| `rate(webook_http_requests_total[5m])` | QPS（按路径） | Time series |
-| `sum(rate(webook_http_requests_total[5m]))` | 全局 QPS | Stat |
-| `histogram_quantile(0.99, rate(webook_http_requests_duration_seconds_bucket[5m]))` | P99 响应时间 | Time series |
-| `rate(webook_http_requests_duration_seconds_sum[5m]) / rate(webook_http_requests_duration_seconds_count[5m])` | 平均响应时间 | Time series |
-| `webook_http_requests_in_flight` | 当前活跃请求 | Gauge |
+| `rate(webook_core_http_requests_total[5m])` | QPS（按路径） | Time series |
+| `sum(rate(webook_core_http_requests_total[5m]))` | 全局 QPS | Stat |
+| `histogram_quantile(0.99, rate(webook_core_http_requests_duration_seconds_bucket[5m]))` | P99 响应时间 | Time series |
+| `rate(webook_core_http_requests_duration_seconds_sum[5m]) / rate(webook_core_http_requests_duration_seconds_count[5m])` | 平均响应时间 | Time series |
+| `webook_core_http_requests_in_flight` | 当前活跃请求 | Gauge |
 | `go_goroutines` | goroutine 数 | Time series |
 | `go_memstats_alloc_bytes / 1024 / 1024` | 堆内存 MB | Time series |
 | `rate(process_cpu_seconds_total[5m]) * 100` | CPU 使用率 % | Time series |
-| `sum(rate(webook_http_requests_total{status=~"5.."}[5m])) / sum(rate(webook_http_requests_total[5m])) * 100` | 错误率 % | Stat |
+| `sum(rate(webook_core_http_requests_total{status=~"5.."}[5m])) / sum(rate(webook_core_http_requests_total[5m])) * 100` | 错误率 % | Stat |
 
 4. 右侧面板选图表类型（Time series / Stat / Gauge / Table）
 5. 保存
@@ -85,7 +85,7 @@
 
 - **时间范围**：右上角选 Last 15 minutes / 1 hour / 6 hours
 - **自动刷新**：右上角刷新图标旁设置 10s / 30s / 1m
-- **变量筛选**：导入的面板自带 instance/job 下拉框，选 `webook-app`
+- **变量筛选**：导入的面板自带 instance/job 下拉框，选 `webook-core` 或 `webook-chat`
 - **全屏查看**：面板标题 → 三个点 → View
 - **快速对比**：按住 Ctrl 点选多条曲线高亮对比
 - **标注事件**：在图表上 Ctrl+Click 添加 Annotation（如标记发布时间）

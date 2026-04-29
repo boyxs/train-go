@@ -12,19 +12,19 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/webook/internal/consts"
-	"github.com/webook/internal/service/ai/embedding"
+	"github.com/webook/internal/service/embedding"
 	"github.com/webook/pkg/logger"
 )
 
-// CachedEmbeddingClient 对 embedding.EmbeddingClient 加 Redis 缓存，相同 text 不重复调 API
+// CachedEmbeddingClient 对 embedding.Client 加 Redis 缓存，相同 text 不重复调 API
 type CachedEmbeddingClient struct {
-	delegate embedding.EmbeddingClient
+	delegate embedding.Client
 	cmd      redis.Cmdable
 	l        logger.LoggerX
 	ttl      time.Duration
 }
 
-func NewCachedEmbeddingClient(delegate embedding.EmbeddingClient, cmd redis.Cmdable, l logger.LoggerX) embedding.EmbeddingClient {
+func NewCachedEmbeddingClient(delegate embedding.Client, cmd redis.Cmdable, l logger.LoggerX) embedding.Client {
 	return &CachedEmbeddingClient{
 		delegate: delegate,
 		cmd:      cmd,

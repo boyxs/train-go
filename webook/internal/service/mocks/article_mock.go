@@ -170,6 +170,21 @@ func (m *MockArticleReaderService) EXPECT() *MockArticleReaderServiceMockRecorde
 	return m.recorder
 }
 
+// BatchDetail mocks base method.
+func (m *MockArticleReaderService) BatchDetail(ctx context.Context, ids []int64) ([]domain.Article, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "BatchDetail", ctx, ids)
+	ret0, _ := ret[0].([]domain.Article)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// BatchDetail indicates an expected call of BatchDetail.
+func (mr *MockArticleReaderServiceMockRecorder) BatchDetail(ctx, ids any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchDetail", reflect.TypeOf((*MockArticleReaderService)(nil).BatchDetail), ctx, ids)
+}
+
 // Detail mocks base method.
 func (m *MockArticleReaderService) Detail(ctx context.Context, id int64) (domain.Article, error) {
 	m.ctrl.T.Helper()

@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package webook.article.v1;
+
+option go_package = "github.com/webook/api/gen/article/v1;articlev1";
+
+// ArticleReaderService 提供已发表文章的只读访问。
+// 不暴露 content 字段，调用方按需通过其它接口获取正文。
+service ArticleReaderService {
+  rpc GetArticle(GetArticleRequest) returns (Article);
+  // BatchGetArticles 批量按 id 取文章，避免下游（如 chat get_hot_articles）N+1 RPC。
+  // NotFound 的 id 在结果中静默跳过，长度可能小于入参。
+  rpc BatchGetArticles(BatchGetArticlesRequest) returns (BatchGetArticlesResponse);
+}
+
+message GetArticleRequest {
+  int64 id = 1;
+}
+
+message BatchGetArticlesRequest {
+  repeated int64 ids = 1;
+}
+
+message BatchGetArticlesResponse {
+  repeated Article articles = 1;
+}
+
+message Article {
+  int64 id = 1;
+  string title = 2;
+  string abstract = 3;
+}

@@ -1,0 +1,86 @@
+# staging 环境配置 - 预发布，贴近 prod
+# 同构 prod.yaml，差异点：otel.env="staging" / sampleRatio=0.5（中等采样）
+# 敏感字段由 .env.staging 经 AutomaticEnv 覆盖
+
+etcd:
+  endpoint: "http://webook-etcd:2379"
+  path: '/webook-core'
+  type: 'yaml'
+
+grpc:
+  addr: ":8090"
+
+mysql:
+  dsn: 'root:13520@tcp(webook-mysql:3306)/webook?parseTime=true&loc=UTC'
+
+redis:
+  addr: 'webook-redis:6379'
+  password: '13520'
+
+kafka:
+  addrs:
+    - 'webook-kafka:9092'
+  dialTimeout: 10
+  readTimeout: 10
+  writeTimeout: 10
+  producerTimeout: 10
+  producerRetryMax: 3
+  metadataRetryMax: 3
+  metadataRetryBackoff: 250
+  metadataTimeout: 5
+  consumerGroup: "interaction-consumer"
+  consumerBackoffInitial: 5
+  consumerBackoffMax: 60
+
+llm:
+  providers:
+    - name: deepseek
+      apiKey: "sk-405db05b37ac418b91268403d32a55aa"
+      baseUrl: "https://api.deepseek.com"
+      model: "deepseek-chat"
+      maxTokens: 2048
+      timeout: 60
+    - name: kimi
+      apiKey: "sk-KURYxBodidmpQmZsL1SGrEiDoWcETmKDkgr70qsfmEDleS6d"
+      baseUrl: "https://api.moonshot.cn/v1"
+      model: "kimi-k2.5"
+      maxTokens: 2048
+      timeout: 60
+
+es:
+  addr: 'http://webook-es:9200'
+
+ollama:
+  baseUrl: 'http://webook-ollama:11434'
+  model: "bge-m3"
+  timeout: 5
+
+embedding:
+  baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+  apiKey: "sk-ef23911b061943b681584ac467c4cd28"
+  model: "text-embedding-v3"
+  dims: 1024
+  timeout: 30
+
+logger:
+  level:
+    l: 0                # info 级，对齐 prod
+  development: false
+  encoding: 'json'
+  outputPaths: [ 'stdout' ]
+  errorOutputPaths: [ 'stderr' ]
+
+web:
+  logger:
+    allowReqBody: true   # staging 抓 req 帮排查；res 抓但截断
+    allowResBody: true
+    maxReqLen: 2048
+    maxResLen: 2048
+    maxPathLen: 256
+
+otel:
+  endpoint: "otel-collector:4317"
+  serviceName: "webook-core"
+  serviceVersion: "0.1.0"
+  env: "staging"
+  sampleRatio: 0.5      # staging 中等采样（dev 1.0、prod 0.1 之间）

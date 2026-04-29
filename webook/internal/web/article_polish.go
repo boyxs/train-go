@@ -8,6 +8,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/webook/internal/consts"
+	"github.com/webook/internal/errs"
 	"github.com/webook/internal/service"
 	"github.com/webook/pkg/ginx"
 	"github.com/webook/pkg/logger"
@@ -49,18 +50,12 @@ func (h *AIArticlePolishHandler) Polish(ctx *gin.Context, req polishReq, uc User
 		h.l.Error("润色限流检查失败", logger.Int64("uid", uc.Userid), logger.Error(limitErr))
 	}
 	if limited {
-		return ginx.Result{Code: 4, Msg: "润色次数已达上限，请稍后再试"}, nil
+		return ginx.Result{}, errs.ErrPolishRateLimit
 	}
 
 	result, err := h.svc.Polish(ctx.Request.Context(), req.Title, req.Content)
 	if err != nil {
-		// 区分业务参数错误和系统错误
-		switch err {
-		case service.ErrPolishEmptyTitle, service.ErrPolishEmptyContent, service.ErrPolishContentTooLong:
-			return ginx.Result{Code: 4, Msg: err.Error()}, nil
-		default:
-			return ginx.Result{Code: 5, Msg: "润色失败，请重试"}, err
-		}
+		return ginx.Result{}, err // *errs.Error 自动转对应 HTTP，其他系统错误自动 500
 	}
 	return ginx.Result{Msg: "ok", Data: result}, nil
 }

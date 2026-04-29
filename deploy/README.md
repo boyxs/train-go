@@ -473,13 +473,13 @@ Windows 上 `APP_ENV=config/local.yaml go run main.go`，local.yaml 里地址写
 
 **症状**：POST 或 GET `/api/...` 60 秒后返回 504。
 
-**根因链路**：webook-app 容器在 **restart loop**（不断 panic），nginx 转发到 webook 连接 hang。
+**根因链路**：webook-core 容器在 **restart loop**（不断 panic），nginx 转发到 webook 连接 hang。
 
 **查**：
 ```bash
-docker ps --filter "name=webook-app" --format "{{.Status}}"
+docker ps --filter "name=webook-core" --format "{{.Status}}"
 # 如果显示 "Restarting (2) XX seconds ago" → 确认是 restart loop
-docker logs webook-app --tail 30
+docker logs webook-core --tail 30
 # 找 panic 原因：常见 "failed to connect database"
 ```
 
@@ -570,7 +570,7 @@ make ENV=dev test-email-real # 触发真告警（停 webook 90s）
 ### 问 8：查看具体 env 变量注入到容器了没
 
 ```bash
-docker inspect webook-app --format '{{range .Config.Env}}{{println .}}{{end}}' | grep -E 'MYSQL|REDIS|APP_ENV'
+docker inspect webook-core --format '{{range .Config.Env}}{{println .}}{{end}}' | grep -E 'MYSQL|REDIS|APP_ENV'
 ```
 
 ### 问 9：compose config 展开后到底长啥样

@@ -13,8 +13,6 @@ import (
 	"github.com/webook/internal/domain"
 )
 
-var ErrKeyNotExist = redis.Nil
-
 type UserCache interface {
 	Set(ctx context.Context, user domain.User) error
 	Get(ctx context.Context, userid int64) (domain.User, error)

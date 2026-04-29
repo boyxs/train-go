@@ -43,7 +43,7 @@ scrape_configs:
       - targets: ['localhost:9090']
 
   # ─── Go 应用（最常见）─────────────────────────────────────
-  - job_name: 'webook-app'
+  - job_name: 'webook-core'
     metrics_path: '/metrics'         # 默认就是 /metrics，显式写便于一眼识别
     scrape_interval: 15s             # 覆盖 global
     scrape_timeout: 10s

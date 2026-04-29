@@ -8,7 +8,8 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	viper.SetConfigFile("../../config/test.yaml")
+	// 路径相对 internal/integration 包目录：../config/test.yaml = internal/config/test.yaml
+	viper.SetConfigFile("../config/test.yaml")
 	if err := viper.ReadInConfig(); err != nil {
 		panic(err)
 	}

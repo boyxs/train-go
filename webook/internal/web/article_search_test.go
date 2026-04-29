@@ -15,7 +15,7 @@ import (
 	"github.com/webook/internal/consts"
 	"github.com/webook/internal/domain"
 	svcmocks "github.com/webook/internal/service/mocks"
-	"github.com/webook/internal/web/jwt"
+	jwt "github.com/webook/pkg/jwtx"
 	"github.com/webook/pkg/logger"
 )
 
@@ -50,7 +50,7 @@ func TestSearchHandler_Search(t *testing.T) {
 				return svcmocks.NewMockArticleSearchService(ctrl)
 			},
 			wantCode:   http.StatusBadRequest,
-			wantResult: Result{Code: 4, Msg: "搜索内容不能为空"},
+			wantResult: Result{Code: 400, Msg: "搜索内容不能为空"},
 		},
 		{
 			name:    "page/size 未传使用默认值",
@@ -74,7 +74,7 @@ func TestSearchHandler_Search(t *testing.T) {
 				return svc
 			},
 			wantCode:   http.StatusInternalServerError,
-			wantResult: Result{Code: 5, Msg: "系统错误"},
+			wantResult: Result{Code: 500, Msg: "系统错误"},
 		},
 	}
 

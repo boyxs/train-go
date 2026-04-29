@@ -9,12 +9,8 @@ import (
 	"github.com/go-sql-driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/plugin/soft_delete"
-)
 
-var (
-	ErrDuplicateUser  = errors.New("此用户已被注册")
-	ErrDuplicateEmail = errors.New("邮箱已被注册")
-	ErrRecordNotFound = gorm.ErrRecordNotFound
+	"github.com/webook/internal/errs"
 )
 
 type UserDAO interface {
@@ -42,10 +38,10 @@ func (ud *GormUserDAO) Insert(ctx context.Context, u User) error {
 		const uniqueErrNo uint16 = 1062
 		if mysqlErr.Number == uniqueErrNo {
 			if strings.Contains(mysqlErr.Message, "email") {
-				return ErrDuplicateEmail
+				return errs.ErrDuplicateEmail
 			}
 		}
-		return ErrDuplicateUser
+		return errs.ErrDuplicateUser
 	}
 	return err
 }

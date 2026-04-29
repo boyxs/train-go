@@ -5,21 +5,34 @@
 #     -f docker-compose.yaml -f docker-compose.local.yaml up -d
 # ===================================================
 # 差异点：
-#   - webook / webook-fe：image 换成本地 tag + pull_policy=never，强制 build
+#   - webook-core / webook-chat / webook-fe：image 换成本地 tag + pull_policy=never，强制 build
 #   - 中间件：暴露宿主端口，方便 Windows 上的 go run / DBeaver / RedisInsight 连
 #   - 宿主端口全由 .env.local 的 *_HOST_PORT 变量控制，不硬编码
 # ===================================================
 services:
-  webook:
-    image: webook:local
+  webook-core:
+    image: webook-core:local
     pull_policy: never              # 不尝试从 registry 拉，只用本地 build 出来的
     build:
+      # context 必须是 webook/ 仓根：多阶段 build 阶段要 go build 整 module
       context: ../webook
-      dockerfile: Dockerfile
+      dockerfile: internal/Dockerfile
       args:
         VERSION: local
     ports:
-      - "${WEBOOK_HOST_PORT:-8089}:8089"
+      - "${CORE_HOST_PORT:-8089}:8089"
+
+  webook-chat:
+    image: webook-chat:local
+    pull_policy: never
+    build:
+      # context 必须是 webook/ 仓根：chat 多阶段 build 阶段要 go build 整 module
+      context: ../webook
+      dockerfile: chat/Dockerfile
+      args:
+        VERSION: local
+    ports:
+      - "${CHAT_HOST_PORT:-8189}:8189"
 
   webook-fe:
     image: webook-fe:local

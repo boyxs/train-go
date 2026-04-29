@@ -59,14 +59,14 @@ groups:
           component: cron
         annotations:
           summary: "任务 {{ $labels.task }} 5 分钟内出现 panic"
-          description: "查 webook_cron_runs_total{task,result=panic}，并对照应用日志的 stack 字段。"
+          description: "查 webook_core_cron_runs_total{task,result=panic}，并对照应用日志的 stack 字段。"
           runbook_url: "https://wiki.internal/runbook/cron-panic"
         data:
           - refId: A
             relativeTimeRange: { from: 300, to: 0 }
             datasourceUid: prometheus
             model:
-              expr: 'sum by (task) (rate(webook_cron_runs_total{result="panic"}[5m]))'
+              expr: 'sum by (task) (rate(webook_core_cron_runs_total{result="panic"}[5m]))'
               refId: A
               instant: true
           - refId: B
@@ -102,7 +102,7 @@ groups:
             relativeTimeRange: { from: 300, to: 0 }
             datasourceUid: prometheus
             model:
-              expr: 'rate(webook_lock_watchdog_lost_total[5m])'
+              expr: 'rate(webook_core_lock_watchdog_lost_total[5m])'
               refId: A
               instant: true
           - refId: B
@@ -207,7 +207,7 @@ groups:
             relativeTimeRange: { from: 60, to: 0 }
             datasourceUid: prometheus
             model:
-              expr: 'max by (task) (webook_cron_in_flight)'
+              expr: 'max by (task) (webook_core_cron_in_flight)'
               refId: A
               instant: true
           - refId: B

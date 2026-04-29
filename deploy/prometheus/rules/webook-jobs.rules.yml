@@ -15,33 +15,33 @@ groups:
       # 任务成功率（按 task 分组，5m 滑动）
       - record: webook:cron_success_rate:rate5m
         expr: |
-          sum by (task) (rate(webook_cron_runs_total{result="success"}[5m]))
+          sum by (task) (rate(webook_core_cron_runs_total{result="success"}[5m]))
           /
-          sum by (task) (rate(webook_cron_runs_total[5m]))
+          sum by (task) (rate(webook_core_cron_runs_total[5m]))
 
       # 任务耗时分位数（按 task 分组）— 三档同时 record，Dashboard 直接读，避免每次 refresh
       # 都重算 histogram_quantile（Prometheus CPU 大头）
       - record: webook:cron_duration_p50:rate5m
         expr: |
           histogram_quantile(0.50,
-            sum by (task, le) (rate(webook_cron_duration_seconds_bucket[5m]))
+            sum by (task, le) (rate(webook_core_cron_duration_seconds_bucket[5m]))
           )
 
       - record: webook:cron_duration_p95:rate5m
         expr: |
           histogram_quantile(0.95,
-            sum by (task, le) (rate(webook_cron_duration_seconds_bucket[5m]))
+            sum by (task, le) (rate(webook_core_cron_duration_seconds_bucket[5m]))
           )
 
       - record: webook:cron_duration_p99:rate5m
         expr: |
           histogram_quantile(0.99,
-            sum by (task, le) (rate(webook_cron_duration_seconds_bucket[5m]))
+            sum by (task, le) (rate(webook_core_cron_duration_seconds_bucket[5m]))
           )
 
       # 任务"距上次成功的滞后秒数"，告警直接用此 metric
       - record: webook:cron_last_success_age:seconds
-        expr: time() - webook_cron_last_success_timestamp
+        expr: time() - webook_core_cron_last_success_timestamp
 
   - name: webook-jobs-lock-recording
     interval: 30s
@@ -50,20 +50,20 @@ groups:
       # 抢锁错误率（Redis 抖动 / 连接异常）
       - record: webook:lock_acquire_error_rate:rate5m
         expr: |
-          sum(rate(webook_lock_acquire_total{result="error"}[5m]))
+          sum(rate(webook_core_lock_acquire_total{result="error"}[5m]))
           /
-          sum(rate(webook_lock_acquire_total[5m]))
+          sum(rate(webook_core_lock_acquire_total[5m]))
 
       # 阻塞 Lock() 实际等待 P99（业务 Lock 越快越好）
       - record: webook:lock_wait_p99:rate5m
         expr: |
           histogram_quantile(0.99,
-            sum by (le) (rate(webook_lock_wait_seconds_bucket[5m]))
+            sum by (le) (rate(webook_core_lock_wait_seconds_bucket[5m]))
           )
 
       # 锁持有时长 P99（任务跑多久）
       - record: webook:lock_held_p99:rate5m
         expr: |
           histogram_quantile(0.99,
-            sum by (le) (rate(webook_lock_held_seconds_bucket[5m]))
+            sum by (le) (rate(webook_core_lock_held_seconds_bucket[5m]))
           )

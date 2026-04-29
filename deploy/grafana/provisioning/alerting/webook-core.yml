@@ -15,8 +15,8 @@ groups:
     rules:
 
       # ── ① 服务存活 ────────────────────────────────────────
-      - uid: webook-up
-        title: Webook 服务不可达
+      - uid: webook-core-up
+        title: Webook Core 服务不可达
         condition: C
         for: 1m
         noDataState: NoData
@@ -25,14 +25,14 @@ groups:
           severity: critical
           team: backend
         annotations:
-          summary: "Webook 实例 {{ $labels.instance }} 不可达"
-          runbook_url: "https://wiki.internal/runbook/webook-down"
+          summary: "Webook Core 实例 {{ $labels.instance }} 不可达"
+          runbook_url: "https://wiki.internal/runbook/webook-core-down"
         data:
           - refId: A
             relativeTimeRange: { from: 60, to: 0 }
             datasourceUid: prometheus
             model:
-              expr: 'up{job="webook-app"}'
+              expr: 'up{job="webook-core"}'
               refId: A
               instant: true
           - refId: B
@@ -69,13 +69,13 @@ groups:
             relativeTimeRange: { from: 600, to: 0 }
             datasourceUid: prometheus
             model:
-              expr: 'sum(rate(webook_http_requests_total{status=~"5.."}[5m]))'
+              expr: 'sum(rate(webook_core_http_requests_total{status=~"5.."}[5m]))'
               refId: A
           - refId: B                                           # 分母：总 rate (time series)
             relativeTimeRange: { from: 600, to: 0 }
             datasourceUid: prometheus
             model:
-              expr: 'sum(rate(webook_http_requests_total[5m]))'
+              expr: 'sum(rate(webook_core_http_requests_total[5m]))'
               refId: B
           - refId: C                                           # reduce A → 单值
             datasourceUid: __expr__
@@ -124,7 +124,7 @@ groups:
             relativeTimeRange: { from: 600, to: 0 }
             datasourceUid: prometheus
             model:
-              expr: 'histogram_quantile(0.99, sum by (le) (rate(webook_http_requests_duration_seconds_bucket[5m])))'
+              expr: 'histogram_quantile(0.99, sum by (le) (rate(webook_core_http_requests_duration_seconds_bucket[5m])))'
               refId: A
           - refId: B
             datasourceUid: __expr__
@@ -160,7 +160,7 @@ groups:
             relativeTimeRange: { from: 300, to: 0 }
             datasourceUid: prometheus
             model:
-              expr: 'go_goroutines{job="webook-app"}'
+              expr: 'go_goroutines{job="webook-core"}'
               refId: A
               instant: true
           - refId: B
