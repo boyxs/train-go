@@ -29,7 +29,7 @@ help:
 	@echo "  reload-all         一次 reload 所有"
 	@echo "  test-email         ≡ test-email-ui（推荐）"
 	@echo "  test-email-ui      打印 UI Test 按钮路径，最快验证 contact point"
-	@echo "  test-email-real    停 webook 90s 触发真告警，端到端验证（有服务中断）"
+	@echo "  test-email-real    停 webook-core 90s 触发真告警，端到端验证（有服务中断）"
 	@echo "  restart            重启 Grafana 容器（改 contactpoints 后必用）"
 	@echo ""
 	@echo "环境变量覆盖："
@@ -82,14 +82,14 @@ test-email-ui:
 	@echo "  点后立即收到一封模板渲染邮件（含示例 alert 数据）"
 
 test-email-real:
-	@echo "🚨 即将停 webook 触发真告警（webook-up 规则，for=1m）"
-	@echo "   期间 webook 服务中断约 90 秒。生产环境慎用！"
+	@echo "🚨 即将停 webook-core 触发真告警（webook-core-up 规则，for=1m）"
+	@echo "   期间 webook-core 服务中断约 90 秒。生产环境慎用！"
 	@read -p "确认继续? [y/N] " ans; [ "$$ans" = "y" ] || [ "$$ans" = "Y" ] || { echo "已取消"; exit 0; }
-	@$(COMPOSE) stop webook
+	@$(COMPOSE) stop webook-core
 	@echo "⏳ 等 90s 让告警 firing + policy group_wait + SMTP 发送..."
 	@sleep 90
-	@$(COMPOSE) up -d webook
-	@echo "✅ webook 已恢复。邮箱应收到告警 + 稍后的 resolved 通知"
+	@$(COMPOSE) up -d webook-core
+	@echo "✅ webook-core 已恢复。邮箱应收到告警 + 稍后的 resolved 通知"
 	@echo "   Alerting 状态：http://$(GRAFANA_HOST)/alerting/list"
 
 # 兜底：API reload 失败 / 想重建容器时用
