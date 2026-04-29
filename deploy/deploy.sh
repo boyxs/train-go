@@ -5,7 +5,7 @@
 #   ./deploy.sh <local|dev|staging|prod>     # 起（会自动 stop 别的 env）
 #   ./deploy.sh <env> down                    # 停（volume 保留）
 #   ./deploy.sh <env> nuke                    # 停 + 清 volume（prod 需确认）
-#   ./deploy.sh <env> logs [service]          # 日志（默认 webook）
+#   ./deploy.sh <env> logs [service]          # 日志（默认 webook-core）
 #   ./deploy.sh <env> status                  # docker compose ps
 #   ./deploy.sh <env> pull                    # 只拉镜像（local 模式是 build）
 #   ./deploy.sh <env> restart <service>       # 重启某服务
@@ -125,7 +125,7 @@ case "$ACTION" in
     [ "$ans" = "yes" ] && $COMPOSE down -v && echo "✅ $ENV 全部清理"
     ;;
   logs)
-    $COMPOSE logs -f --tail=100 "${3:-webook}"
+    $COMPOSE logs -f --tail=100 "${3:-webook-core}"
     ;;
   status|ps)
     $COMPOSE ps

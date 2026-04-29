@@ -57,6 +57,13 @@ services:
       webook-core:    {condition: service_healthy}    # 主仓 gRPC :8090 就绪后再起 chat
       webook-mysql:   {condition: service_healthy}
       webook-redis:   {condition: service_healthy}
+    healthcheck:
+      # /health 探活（chat/ioc/web.go 注册）；让 nginx depends_on 能等到 chat 真正起来
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8189/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 20s
 
   # ── 前端 + 反向代理 ──────────────────────────────────────
   webook-fe:
@@ -351,8 +358,9 @@ services:
     # 不挂 /var/log/nginx：保留官方镜像的 access.log → /dev/stdout / error.log → /dev/stderr 软链
     # 让 docker 接管日志（docker logs / 配置 logrotate driver），避免文件无限增长
     depends_on:
-      - webook
-      - webook-fe
+      webook-core: {condition: service_healthy}
+      webook-chat: {condition: service_healthy}
+      webook-fe:   {condition: service_started}    # fe 没 healthcheck，启动即视为就绪
     healthcheck:
       # 用 127.0.0.1 而非 localhost：避免 BusyBox wget 优先解析 IPv6 ::1（nginx 默认只监听 IPv4）失败
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/healthz || exit 1"]
