@@ -28,7 +28,7 @@ func InitDB(_ TimezoneReady, l loggerx.LoggerX) *gorm.DB {
 		panic("[chat] failed to connect mysql: " + err.Error())
 	}
 	// Prometheus 指标 callback
-	if err := gormprom.NewPrometheusBuilder("webook_chat", "db", "query", "DB 查询统计").
+	if err := gormprom.NewPrometheusBuilder("webook", "db", "query", "DB 查询统计").
 		WithCounter().
 		WithHistogram().
 		WithSummary().

@@ -22,7 +22,7 @@ func InitRedis() redis.Cmdable {
 		Password: cfg.Password,
 	})
 	// Prometheus Hook
-	client.AddHook(redisprom.NewPrometheusBuilder("webook_chat", "redis", "cmd", "Redis 命令统计").
+	client.AddHook(redisprom.NewPrometheusBuilder("webook", "redis", "cmd", "Redis 命令统计").
 		WithCounter().
 		WithHistogram().
 		WithSummary().

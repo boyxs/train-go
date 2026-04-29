@@ -93,14 +93,14 @@ groups:
             relativeTimeRange: { from: 600, to: 0 }
             datasourceUid: prometheus
             model:
-              expr: 'sum(rate(webook_core_http_requests_total{status=~"5.."}[5m]))'
+              expr: 'sum(rate(webook_http_requests_total{status=~"5.."}[5m]))'
               refId: A
           # 分母：总 rate（时间序列）
           - refId: B
             relativeTimeRange: { from: 600, to: 0 }
             datasourceUid: prometheus
             model:
-              expr: 'sum(rate(webook_core_http_requests_total[5m]))'
+              expr: 'sum(rate(webook_http_requests_total[5m]))'
               refId: B
           # 分子 Reduce
           - refId: C
@@ -149,7 +149,7 @@ groups:
             relativeTimeRange: { from: 600, to: 0 }
             datasourceUid: prometheus
             model:
-              expr: 'histogram_quantile(0.99, sum by (le) (rate(webook_core_http_requests_duration_seconds_bucket[5m])))'
+              expr: 'histogram_quantile(0.99, sum by (le) (rate(webook_http_requests_duration_seconds_bucket[5m])))'
               refId: A
           - refId: B
             datasourceUid: __expr__

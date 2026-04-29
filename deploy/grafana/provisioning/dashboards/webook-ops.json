@@ -8,7 +8,7 @@
       "type": "stat",
       "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "targets": [{ "expr": "time() - process_start_time_seconds{job=\"webook-core\"}", "legendFormat": "uptime" }],
+      "targets": [{ "expr": "time() - process_start_time_seconds{job=~\"$service\"}", "legendFormat": "{{job}} uptime" }],
       "fieldConfig": { "defaults": { "unit": "s", "thresholds": { "steps": [{ "color": "green", "value": null }] } }, "overrides": [] }
     },
     {
@@ -16,7 +16,7 @@
       "type": "stat",
       "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "targets": [{ "expr": "resets(process_cpu_seconds_total{job=\"webook-core\"}[1h])", "legendFormat": "restarts" }],
+      "targets": [{ "expr": "resets(process_cpu_seconds_total{job=~\"$service\"}[1h])", "legendFormat": "{{job}} restarts" }],
       "fieldConfig": { "defaults": { "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] } }, "overrides": [] }
     },
     {
@@ -24,7 +24,7 @@
       "type": "gauge",
       "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "targets": [{ "expr": "rate(redis_keyspace_hits_total[5m]) / (rate(redis_keyspace_hits_total[5m]) + rate(redis_keyspace_misses_total[5m])) * 100", "legendFormat": "hit %" }],
+      "targets": [{ "expr": "rate(redis_keyspace_hits_total[5m]) / (rate(redis_keyspace_hits_total[5m]) + rate(redis_keyspace_misses_total[5m])) * 100", "legendFormat": "{{job}} hit %" }],
       "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100, "thresholds": { "steps": [{ "color": "red", "value": null }, { "color": "yellow", "value": 80 }, { "color": "green", "value": 95 }] } }, "overrides": [] }
     },
     {
@@ -32,7 +32,7 @@
       "type": "stat",
       "gridPos": { "h": 4, "w": 4, "x": 12, "y": 0 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "targets": [{ "expr": "mysql_global_status_threads_connected", "legendFormat": "connections" }],
+      "targets": [{ "expr": "mysql_global_status_threads_connected", "legendFormat": "{{job}} connections" }],
       "fieldConfig": { "defaults": { "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 100 }, { "color": "red", "value": 150 }] } }, "overrides": [] }
     },
     {
@@ -40,7 +40,7 @@
       "type": "stat",
       "gridPos": { "h": 4, "w": 4, "x": 16, "y": 0 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "targets": [{ "expr": "sum(kafka_consumergroup_lag)", "legendFormat": "total lag" }],
+      "targets": [{ "expr": "sum(kafka_consumergroup_lag)", "legendFormat": "{{job}} total lag" }],
       "fieldConfig": { "defaults": { "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 100 }, { "color": "red", "value": 1000 }] } }, "overrides": [] }
     },
     {
@@ -48,7 +48,7 @@
       "type": "stat",
       "gridPos": { "h": 4, "w": 4, "x": 20, "y": 0 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "targets": [{ "expr": "rate(go_memstats_alloc_bytes_total{job=\"webook-core\"}[5m])", "legendFormat": "alloc/s" }],
+      "targets": [{ "expr": "rate(go_memstats_alloc_bytes_total{job=~\"$service\"}[5m])", "legendFormat": "{{job}} alloc/s" }],
       "fieldConfig": { "defaults": { "unit": "Bps", "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 52428800 }, { "color": "red", "value": 104857600 }] } }, "overrides": [] }
     },
     {
@@ -56,7 +56,7 @@
       "type": "table",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "targets": [{ "expr": "topk(10, histogram_quantile(0.99, sum(rate(webook_core_http_requests_duration_seconds_bucket[5m])) by (le, pattern)))", "legendFormat": "{{pattern}}", "instant": true, "format": "table" }],
+      "targets": [{ "expr": "topk(10, histogram_quantile(0.99, sum(rate(webook_http_requests_duration_seconds_bucket{job=~\"$service\"}[5m])) by (le, pattern)))", "legendFormat": "{{pattern}}", "instant": true, "format": "table" }],
       "transformations": [
         { "id": "organize", "options": { "excludeByName": { "Time": true, "le": true }, "renameByName": { "pattern": "路径", "Value": "P99 (秒)" } } },
         { "id": "sortBy", "options": { "fields": {}, "sort": [{ "field": "P99 (秒)", "desc": true }] } }
@@ -68,7 +68,7 @@
       "type": "table",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "targets": [{ "expr": "topk(10, sum(rate(webook_core_http_requests_total[5m])) by (pattern))", "legendFormat": "{{pattern}}", "instant": true, "format": "table" }],
+      "targets": [{ "expr": "topk(10, sum(webook:http_qps:rate5m{job=~\"$service\"}) by (pattern))", "legendFormat": "{{pattern}}", "instant": true, "format": "table" }],
       "transformations": [
         { "id": "organize", "options": { "excludeByName": { "Time": true }, "renameByName": { "pattern": "路径", "Value": "QPS" } } },
         { "id": "sortBy", "options": { "fields": {}, "sort": [{ "field": "QPS", "desc": true }] } }
@@ -80,7 +80,7 @@
       "type": "table",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "targets": [{ "expr": "sum(rate(webook_core_http_requests_total{status=~\"5..\"}[5m])) by (pattern, status) > 0", "legendFormat": "{{pattern}}", "instant": true, "format": "table" }],
+      "targets": [{ "expr": "sum(rate(webook_http_requests_total{job=~\"$service\",status=~\"5..\"}[5m])) by (pattern, status) > 0", "legendFormat": "{{pattern}}", "instant": true, "format": "table" }],
       "transformations": [
         { "id": "organize", "options": { "excludeByName": { "Time": true }, "renameByName": { "pattern": "路径", "status": "状态码", "Value": "错误率/s" } } },
         { "id": "sortBy", "options": { "fields": {}, "sort": [{ "field": "错误率/s", "desc": true }] } }
@@ -92,7 +92,7 @@
       "type": "table",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "targets": [{ "expr": "sum(rate(webook_core_http_requests_total{status=~\"4..\"}[5m])) by (pattern, status) > 0", "legendFormat": "{{pattern}}", "instant": true, "format": "table" }],
+      "targets": [{ "expr": "sum(rate(webook_http_requests_total{job=~\"$service\",status=~\"4..\"}[5m])) by (pattern, status) > 0", "legendFormat": "{{pattern}}", "instant": true, "format": "table" }],
       "transformations": [
         { "id": "organize", "options": { "excludeByName": { "Time": true }, "renameByName": { "pattern": "路径", "status": "状态码", "Value": "请求率/s" } } },
         { "id": "sortBy", "options": { "fields": {}, "sort": [{ "field": "请求率/s", "desc": true }] } }
@@ -104,7 +104,7 @@
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 20 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "targets": [{ "expr": "rate(redis_keyspace_hits_total[5m]) / (rate(redis_keyspace_hits_total[5m]) + rate(redis_keyspace_misses_total[5m])) * 100", "legendFormat": "hit %" }],
+      "targets": [{ "expr": "rate(redis_keyspace_hits_total[5m]) / (rate(redis_keyspace_hits_total[5m]) + rate(redis_keyspace_misses_total[5m])) * 100", "legendFormat": "{{job}} hit %" }],
       "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100, "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] }
     },
     {
@@ -113,8 +113,8 @@
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 20 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "targets": [
-        { "expr": "rate(mysql_global_status_queries[5m])", "legendFormat": "queries/s" },
-        { "expr": "rate(mysql_global_status_slow_queries[5m])", "legendFormat": "slow queries/s" }
+        { "expr": "rate(mysql_global_status_queries[5m])", "legendFormat": "{{job}} queries/s" },
+        { "expr": "rate(mysql_global_status_slow_queries[5m])", "legendFormat": "{{job}} slow queries/s" }
       ],
       "fieldConfig": { "defaults": { "unit": "ops", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] }
     },
@@ -132,9 +132,9 @@
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "targets": [
-        { "expr": "go_memstats_alloc_bytes{job=\"webook-core\"} / 1024 / 1024", "legendFormat": "当前堆 MB" },
-        { "expr": "go_memstats_sys_bytes{job=\"webook-core\"} / 1024 / 1024", "legendFormat": "OS 分配 MB" },
-        { "expr": "predict_linear(go_memstats_alloc_bytes{job=\"webook-core\"}[1h], 3600) / 1024 / 1024", "legendFormat": "1h 后预测 MB" }
+        { "expr": "go_memstats_alloc_bytes{job=~\"$service\"} / 1024 / 1024", "legendFormat": "{{job}} 当前堆 MB" },
+        { "expr": "go_memstats_sys_bytes{job=~\"$service\"} / 1024 / 1024", "legendFormat": "{{job}} OS 分配 MB" },
+        { "expr": "predict_linear(go_memstats_alloc_bytes{job=~\"$service\"}[1h], 3600) / 1024 / 1024", "legendFormat": "{{job}} 1h 后预测 MB" }
       ],
       "fieldConfig": { "defaults": { "unit": "decmbytes", "custom": { "drawStyle": "line", "fillOpacity": 5 } }, "overrides": [{ "matcher": { "id": "byName", "options": "1h 后预测 MB" }, "properties": [{ "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }] }] }
     },
@@ -154,7 +154,7 @@
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 36 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "targets": [{ "expr": "sum(rate(webook_core_db_query_total[5m])) by (type)", "legendFormat": "{{type}}" }],
+      "targets": [{ "expr": "sum(rate(webook_db_query_total{job=~\"$service\"}[5m])) by (type)", "legendFormat": "{{type}}" }],
       "fieldConfig": { "defaults": { "unit": "ops", "custom": { "drawStyle": "line", "fillOpacity": 20, "stacking": { "mode": "normal" } } }, "overrides": [] }
     },
     {
@@ -162,7 +162,7 @@
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 36 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "targets": [{ "expr": "histogram_quantile(0.99, sum(rate(webook_core_db_query_duration_seconds_bucket[5m])) by (le, table))", "legendFormat": "{{table}}" }],
+      "targets": [{ "expr": "histogram_quantile(0.99, sum(rate(webook_db_query_duration_seconds_bucket{job=~\"$service\"}[5m])) by (le, table))", "legendFormat": "{{table}}" }],
       "fieldConfig": { "defaults": { "unit": "s", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] }
     },
     {
@@ -170,7 +170,7 @@
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 8, "x": 16, "y": 36 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "targets": [{ "expr": "sum(rate(webook_core_db_query_duration_seconds_sum[5m])) by (type) / sum(rate(webook_core_db_query_duration_seconds_count[5m])) by (type)", "legendFormat": "{{type}}" }],
+      "targets": [{ "expr": "sum(rate(webook_db_query_duration_seconds_sum{job=~\"$service\"}[5m])) by (type) / sum(rate(webook_db_query_duration_seconds_count{job=~\"$service\"}[5m])) by (type)", "legendFormat": "{{type}}" }],
       "fieldConfig": { "defaults": { "unit": "s", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] }
     },
     {
@@ -178,7 +178,7 @@
       "type": "table",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 44 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "targets": [{ "expr": "topk(5, histogram_quantile(0.99, sum(rate(webook_core_db_query_duration_seconds_bucket[5m])) by (le, table)))", "legendFormat": "{{table}}", "instant": true, "format": "table" }],
+      "targets": [{ "expr": "topk(5, histogram_quantile(0.99, sum(rate(webook_db_query_duration_seconds_bucket{job=~\"$service\"}[5m])) by (le, table)))", "legendFormat": "{{table}}", "instant": true, "format": "table" }],
       "transformations": [
         { "id": "organize", "options": { "excludeByName": { "Time": true, "le": true }, "renameByName": { "table": "表", "Value": "P99 (秒)" } } },
         { "id": "sortBy", "options": { "fields": {}, "sort": [{ "field": "P99 (秒)", "desc": true }] } }
@@ -190,7 +190,7 @@
       "type": "table",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 44 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "targets": [{ "expr": "topk(5, sum(rate(webook_core_db_query_total[5m])) by (table))", "legendFormat": "{{table}}", "instant": true, "format": "table" }],
+      "targets": [{ "expr": "topk(5, sum(rate(webook_db_query_total{job=~\"$service\"}[5m])) by (table))", "legendFormat": "{{table}}", "instant": true, "format": "table" }],
       "transformations": [
         { "id": "organize", "options": { "excludeByName": { "Time": true }, "renameByName": { "table": "表", "Value": "QPS" } } },
         { "id": "sortBy", "options": { "fields": {}, "sort": [{ "field": "QPS", "desc": true }] } }
@@ -202,7 +202,7 @@
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 52 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "targets": [{ "expr": "sum(rate(webook_core_redis_cmd_total{hit=\"true\"}[5m])) by (biz) / sum(rate(webook_core_redis_cmd_total{hit=~\"true|false\"}[5m])) by (biz) * 100", "legendFormat": "{{biz}}" }],
+      "targets": [{ "expr": "sum(rate(webook_redis_cmd_total{job=~\"$service\",hit=\"true\"}[5m])) by (biz) / sum(rate(webook_redis_cmd_total{job=~\"$service\",hit=~\"true|false\"}[5m])) by (biz) * 100", "legendFormat": "{{biz}}" }],
       "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100, "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] }
     },
     {
@@ -210,7 +210,7 @@
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 8, "x": 8, "y": 52 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "targets": [{ "expr": "sum(rate(webook_core_redis_cmd_total[5m])) by (biz)", "legendFormat": "{{biz}}" }],
+      "targets": [{ "expr": "sum(rate(webook_redis_cmd_total{job=~\"$service\"}[5m])) by (biz)", "legendFormat": "{{biz}}" }],
       "fieldConfig": { "defaults": { "unit": "ops", "custom": { "drawStyle": "line", "fillOpacity": 20, "stacking": { "mode": "normal" } } }, "overrides": [] }
     },
     {
@@ -218,7 +218,7 @@
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 8, "x": 16, "y": 52 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "targets": [{ "expr": "histogram_quantile(0.99, sum(rate(webook_core_redis_cmd_duration_seconds_bucket[5m])) by (le, cmd))", "legendFormat": "{{cmd}}" }],
+      "targets": [{ "expr": "histogram_quantile(0.99, sum(rate(webook_redis_cmd_duration_seconds_bucket{job=~\"$service\"}[5m])) by (le, cmd))", "legendFormat": "{{cmd}}" }],
       "fieldConfig": { "defaults": { "unit": "s", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] }
     },
     {
@@ -227,8 +227,8 @@
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 60 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "targets": [
-        { "expr": "sum(rate(webook_core_redis_cmd_total{hit=\"true\"}[5m])) by (biz)", "legendFormat": "", "instant": true, "format": "table", "refId": "hit" },
-        { "expr": "sum(rate(webook_core_redis_cmd_total{hit=\"false\"}[5m])) by (biz)", "legendFormat": "", "instant": true, "format": "table", "refId": "miss" }
+        { "expr": "sum(rate(webook_redis_cmd_total{job=~\"$service\",hit=\"true\"}[5m])) by (biz)", "legendFormat": "", "instant": true, "format": "table", "refId": "hit" },
+        { "expr": "sum(rate(webook_redis_cmd_total{job=~\"$service\",hit=\"false\"}[5m])) by (biz)", "legendFormat": "", "instant": true, "format": "table", "refId": "miss" }
       ],
       "transformations": [
         { "id": "seriesToColumns", "options": { "byField": "biz" } },
@@ -241,7 +241,7 @@
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 60 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-      "targets": [{ "expr": "topk(10, sum(rate(webook_core_redis_cmd_total[5m])) by (cmd))", "legendFormat": "{{cmd}}" }],
+      "targets": [{ "expr": "topk(10, sum(rate(webook_redis_cmd_total{job=~\"$service\"}[5m])) by (cmd))", "legendFormat": "{{cmd}}" }],
       "fieldConfig": { "defaults": { "unit": "ops", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] }
     }
   ],
@@ -254,6 +254,19 @@
         "type": "datasource",
         "query": "prometheus",
         "current": { "text": "Prometheus", "value": "Prometheus" }
+      },
+      {
+        "name": "service",
+        "label": "Service",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "query": { "query": "label_values(up{job=~\"webook-.*\"}, job)", "refId": "PrometheusVariableQueryEditor-VariableQuery" },
+        "refresh": 2,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": "webook-.*",
+        "current": { "text": "All", "value": "$__all", "selected": false }
       }
     ]
   },

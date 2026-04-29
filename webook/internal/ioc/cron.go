@@ -29,7 +29,7 @@ func InitCron(rankingJob *job.RankingJob, l logger.LoggerX) (*cron.Cron, func())
 
 // InitCronMetrics 任务级指标统一在这一处注册。所有 Job 共享 *Metrics 句柄，task 标签区分。
 func InitCronMetrics() *cronprom.Metrics {
-	return cronprom.NewPrometheusBuilder("webook_core", "cron", "定时任务").Build()
+	return cronprom.NewPrometheusBuilder("webook", "cron", "定时任务").Build()
 }
 
 // InitCronWrapper 把锁/指标/日志组装成 *cronx.Wrapper，所有 Job 复用。

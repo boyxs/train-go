@@ -23,7 +23,7 @@ func InitRedis() redis.Cmdable {
 		Password: cfg.Password,
 	})
 	// 注册 Prometheus 指标 Hook（Counter + Histogram + Summary）
-	client.AddHook(redisprom.NewPrometheusBuilder("webook_core", "redis", "cmd", "Redis 命令统计").
+	client.AddHook(redisprom.NewPrometheusBuilder("webook", "redis", "cmd", "Redis 命令统计").
 		WithCounter().
 		WithHistogram().
 		WithSummary().

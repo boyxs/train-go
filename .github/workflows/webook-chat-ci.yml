@@ -1,4 +1,4 @@
-name: Chat Service CI
+name: Webook Chat Service CI
 
 on:
   push:

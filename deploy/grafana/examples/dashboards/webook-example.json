@@ -67,7 +67,7 @@
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [
         {
-          "expr": "sum(rate(webook_core_http_requests_total[5m]))",
+          "expr": "sum(rate(webook_http_requests_total[5m]))",
           "refId": "A",
           "instant": true
         }
@@ -93,7 +93,7 @@
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [
         {
-          "expr": "sum(rate(webook_core_http_requests_total{status=~\"5..\"}[5m])) / sum(rate(webook_core_http_requests_total[5m]))",
+          "expr": "sum(rate(webook_http_requests_total{status=~\"5..\"}[5m])) / sum(rate(webook_http_requests_total[5m]))",
           "refId": "A",
           "instant": true
         }
@@ -164,7 +164,7 @@
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [
         {
-          "expr": "sum by (pattern) (rate(webook_core_http_requests_total{instance=~\"$instance\"}[$__rate_interval]))",
+          "expr": "sum by (pattern) (rate(webook_http_requests_total{instance=~\"$instance\"}[$__rate_interval]))",
           "refId": "A",
           "legendFormat": "{{pattern}}"
         }
@@ -188,17 +188,17 @@
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, sum by (le) (rate(webook_core_http_requests_duration_seconds_bucket[$__rate_interval])))",
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(webook_http_requests_duration_seconds_bucket[$__rate_interval])))",
           "refId": "A",
           "legendFormat": "p50"
         },
         {
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(webook_core_http_requests_duration_seconds_bucket[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(webook_http_requests_duration_seconds_bucket[$__rate_interval])))",
           "refId": "B",
           "legendFormat": "p95"
         },
         {
-          "expr": "histogram_quantile(0.99, sum by (le) (rate(webook_core_http_requests_duration_seconds_bucket[$__rate_interval])))",
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(webook_http_requests_duration_seconds_bucket[$__rate_interval])))",
           "refId": "C",
           "legendFormat": "p99"
         }

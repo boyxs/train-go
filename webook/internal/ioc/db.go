@@ -31,7 +31,7 @@ func InitDB(_ TimezoneReady, l loggerx.LoggerX) *gorm.DB {
 		panic("failed to connect database")
 	}
 	// 注册 Prometheus 指标 callback（Counter + Histogram + Summary）
-	if err := gormprom.NewPrometheusBuilder("webook_core", "db", "query", "DB 查询统计").
+	if err := gormprom.NewPrometheusBuilder("webook", "db", "query", "DB 查询统计").
 		WithCounter().
 		WithHistogram().
 		WithSummary().

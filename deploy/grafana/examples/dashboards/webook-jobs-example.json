@@ -39,7 +39,7 @@
           "uid": "${DS_PROMETHEUS}"
         },
         "query": {
-          "query": "label_values(webook_core_cron_runs_total, task)",
+          "query": "label_values(webook_cron_runs_total, task)",
           "refId": "Variable"
         },
         "includeAll": true,
@@ -67,7 +67,7 @@
       },
       "targets": [
         {
-          "expr": "count(count by (task) (webook_core_cron_runs_total))",
+          "expr": "count(count by (task) (webook_cron_runs_total))",
           "legendFormat": "tasks"
         }
       ],
@@ -144,7 +144,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(webook_core_lock_acquire_total[5m]))",
+          "expr": "sum(rate(webook_lock_acquire_total[5m]))",
           "legendFormat": "qps"
         }
       ],
@@ -179,7 +179,7 @@
       },
       "targets": [
         {
-          "expr": "sum(increase(webook_core_lock_watchdog_lost_total[1h]))",
+          "expr": "sum(increase(webook_lock_watchdog_lost_total[1h]))",
           "legendFormat": "lost"
         }
       ],
@@ -217,7 +217,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (task, result) (rate(webook_core_cron_runs_total{task=~\"$task\"}[5m]))",
+          "expr": "sum by (task, result) (rate(webook_cron_runs_total{task=~\"$task\"}[5m]))",
           "legendFormat": "{{task}} / {{result}}"
         }
       ],
@@ -250,7 +250,7 @@
       },
       "targets": [
         {
-          "expr": "webook_core_cron_in_flight{task=~\"$task\"}",
+          "expr": "webook_cron_in_flight{task=~\"$task\"}",
           "legendFormat": "{{task}}"
         }
       ],
@@ -373,7 +373,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (result) (rate(webook_core_lock_acquire_total[5m]))",
+          "expr": "sum by (result) (rate(webook_lock_acquire_total[5m]))",
           "legendFormat": "{{result}}"
         }
       ],
@@ -455,7 +455,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (le) (rate(webook_core_lock_wait_seconds_bucket[5m]))",
+          "expr": "sum by (le) (rate(webook_lock_wait_seconds_bucket[5m]))",
           "format": "heatmap",
           "legendFormat": "{{le}}"
         }
@@ -483,7 +483,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (le) (rate(webook_core_lock_held_seconds_bucket[5m]))",
+          "expr": "sum by (le) (rate(webook_lock_held_seconds_bucket[5m]))",
           "format": "heatmap",
           "legendFormat": "{{le}}"
         }
@@ -511,7 +511,7 @@
       },
       "targets": [
         {
-          "expr": "webook_core_lock_watchdog_lost_total",
+          "expr": "webook_lock_watchdog_lost_total",
           "legendFormat": "lost"
         }
       ],
@@ -549,7 +549,7 @@
       },
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, sum by (le) (rate(webook_core_lock_wait_seconds_bucket[5m])))",
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(webook_lock_wait_seconds_bucket[5m])))",
           "legendFormat": "P50"
         },
         {

@@ -105,6 +105,29 @@ type(scope): description
 
 实际 `.env.prod`（gitignored）由部署者按 example 手工同步。
 
+## 服务拆分 / 新增服务
+
+新增或拆分服务（例如 webook-chat 从 webook-core 抽离）后，**下表全部配置必须同步**，缺一项视为半成品：
+
+| 维度 | 文件 | 改什么 |
+|------|------|--------|
+| 应用配置 | `<service>/config/{local,dev,staging,prod,test}.yaml` | 5 份同构 + 服务差异点（otel.serviceName / sampleRatio / http.addr） |
+| Wire DI | `<service>/wire.go` + `wire ./...` 重生成 | Provider Set + InitWebServer |
+| Prometheus 抓取 | `deploy/prometheus/prometheus.yml` | 加 `job_name: <service>` + targets |
+| Prometheus 录制规则 | `deploy/prometheus/rules/*.rules.yml` | 新服务若有 cron / lock 等模式同步 |
+| Grafana 告警 | `deploy/grafana/provisioning/alerting/<service>.yml` | up / 5xx / P99 / goroutines（镜像现有模板，`{job="<service>"}` 限定本服务） |
+| Grafana 看板 | `deploy/grafana/provisioning/dashboards/*.json` | services-overview 加多服务对比 + 各 dashboard 用 service variable |
+| Docker compose | `deploy/docker-compose.yaml` | 服务定义 + healthcheck + nginx depends_on / upstream / 路由 |
+| Nginx 反代 | `deploy/nginx/conf.d/default.conf` | upstream + location 路由规则 |
+| 部署脚本 | `deploy/deploy.sh` | logs / restart 默认 service 名等假设 |
+| 部署变量 | `deploy/.env.<env>` + `.env.<env>.example` | `IMAGE_TAG` / `APP_ENV` 拆分按服务前缀（`CORE_` / `CHAT_`） |
+| CI workflow | `.github/workflows/<service>-ci.yml` | 镜像现有 workflow，`paths` / `paths-ignore` 与其他服务互斥 |
+| Dockerfile | `<service>/Dockerfile` | 多阶段构建（context = `webook/` 仓根） |
+| **Metric 命名** | 应用层 builder | 统一 `webook_<subsystem>_*`（如 `webook_http_*`、`webook_db_*`），**禁止** `webook_<service>_*`；service 区分靠 prometheus 自动注入的 `job` label |
+| 文档 | `CHANGELOG.md` + `<service>/CLAUDE.md` | 拆分原因 / 技术决策 / 接入方式 |
+
+review 收尾前用 `grep -rn '<旧服务名>'` 全仓扫一遍，确认上面 14 类全部同步。漏一项 → 监控盲区 / 启动失败 / 告警不及时 / CI 不触发 / 部署不一致。
+
 ## 注释风格
 
 禁止用 `// ===` 或 `// ---` 做分隔线。区域分隔用 Makefile 风格：
