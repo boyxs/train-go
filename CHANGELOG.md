@@ -190,7 +190,7 @@
 - L2 K8s Service name 一一对应，提前练 K8s 思维
 
 **CI 流水线**:
-- `.github/workflows/webook-ci.yml` + `webook-fe-ci.yml`：master/feature push 触发，build → push ghcr，tag 含 `master-latest` 滚动 + 版本 tag
+- `.github/workflows/webook-ci.yml` + `webook-fe-ci.yml`：main/feature push 触发，build → push ghcr，tag 含 `main-latest` 滚动 + 版本 tag
 - `webook/Dockerfile` `ARG VERSION` + `LABEL org.opencontainers.image.version`，CI 注入版本元数据
 - `paths-ignore '**.md'` 文档改不触发 CI
 
@@ -209,7 +209,7 @@
 - 监控栈每环境重建：prometheus 数据单 env 独立不混淆，符合 L1「每 project 独立全套」哲学
 - 服务引用用 service name 不用固定 IP：对齐 L2 K8s 心智模型（K8s 没人手写 IP）
 - yaml 分环境 + env 注 secrets 的混合方案：PR review "改 dev 配置" 直接看 dev.yaml diff；微服务 N×M 不用维护 N×M env 变量
-- prod tag 强校验语义化版本（`x.y.z`）：倒逼走 `git tag webook-v*` 流程，不允许 `master-<sha>` 上 prod
+- prod tag 强校验语义化版本（`x.y.z`）：倒逼走 `git tag webook-v*` 流程，不允许 `main-<sha>` 上 prod
 - example 用 `CHANGE_ME` 占位：强制部署者主动填密码，比示例写明文更安全
 
 **待办**:
@@ -388,7 +388,7 @@
 
 **变更内容**: 补齐前端 CI；前后端 CI 均扩展 `build-push` job 推镜像到 GHCR；docker-compose 新增 webook-fe + nginx 同源反代，实现浏览器只见一个域名、零 CORS
 **影响范围**:
-- 前端 CI 新建：`.github/workflows/webook-fe-ci.yml`（eslint + tsc + next build；master/feature/webook-fe-v 三种 tag 推 `ghcr.io/<user>/webook-fe`）
+- 前端 CI 新建：`.github/workflows/webook-fe-ci.yml`（eslint + tsc + next build；main/feature/webook-fe-v 三种 tag 推 `ghcr.io/<user>/webook-fe`）
 - 后端 CI 扩展：`.github/workflows/webook-ci.yml` 加 `build-push` job，先 `go build -tags=k8s` 再 docker build（保留简单 Dockerfile 策略）；tag `webook-v*.*.*` 也触发
 - 前端 Dockerfile：`webook-fe/Dockerfile` npm registry 改 `ARG NPM_REGISTRY` 可传参（默认官方源，CI 用默认，本地按需切 npmmirror）
 - 部署栈：`docker-compose.yaml` 加 `webook-fe`（3000 仅 expose）+ `nginx`（80 对外，同源反代：`/` → 前端，`/api/*` → 后端）
@@ -470,7 +470,7 @@
 - 模块路径采用 `github.com/webook` 而非 `github.com/boyxs/train-go/webook`：短路径更简洁，私有项目不需要外部 `go get`
 - CI 不依赖 make，直接调 goimports 二进制：降低 runner 环境耦合
 - 当前只有 lint-test job，build-push 留到 L1 完整流程时加（需配合 Dockerfile 多阶段）
-**待办**: Dockerfile 改多阶段 + CI 加 build-push → GHCR；打开 GitHub 仓库分支保护（master 强制 PR + CI 绿）
+**待办**: Dockerfile 改多阶段 + CI 加 build-push → GHCR；打开 GitHub 仓库分支保护（main 强制 PR + CI 绿）
 **会话**: 260417-infra-GitHub迁移
 
 ## [2026-04-14] Prometheus 监控链路

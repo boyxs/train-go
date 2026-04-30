@@ -942,7 +942,7 @@ my-new-cmd:
    ↓
 git commit + PR
    ↓
-merge master
+merge main
    ↓
 scp / rsync 到服务器
    ↓

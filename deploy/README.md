@@ -21,7 +21,7 @@
 | 命令 | 镜像来源 | 业务中间件端口 | 监控端口 | 适合场景 |
 |------|---------|--------------|--------|---------|
 | `./deploy.sh local` | 本地 build | **全暴露**（3306/6379/9092/9200 等） | 80/3001/9090/9411 | Windows 开发，`go run` / DBeaver 连中间件 |
-| `./deploy.sh dev` | ghcr (`master-latest`) | 不暴露 | 80/3001/9090/9411 | 团队 dev 服务器 |
+| `./deploy.sh dev` | ghcr (`main-latest`) | 不暴露 | 80/3001/9090/9411 | 团队 dev 服务器 |
 | `./deploy.sh staging` | 同上 | 不暴露 | **81/3011/9190/9412** | 预发布 |
 | `./deploy.sh prod` | ghcr (`1.2.0`，语义化版本) | 不暴露 | **82/3021/9290/9413** | 生产 |
 
@@ -162,7 +162,7 @@ CI 配置三份独立 workflow，互斥 `paths-ignore`：
 | 事件 | 触发的 workflow | 镜像 tag |
 |------|---------------|---------|
 | `git push feature/<anything>` | 改了哪个服务就触发哪个 | `feature-<sha>` |
-| `git push master` | 改了哪个服务就触发哪个 | `master-latest` + `master-<sha>` |
+| `git push main` | 改了哪个服务就触发哪个 | `main-latest` + `main-<sha>` |
 | `git tag webook-core-v1.2.0 && git push --tags` | core CI | `webook-core:1.2.0` |
 | `git tag webook-chat-v1.2.0 && git push --tags` | chat CI | `webook-chat:1.2.0` |
 | `git tag webook-fe-v1.2.0 && git push --tags` | fe CI | `webook-fe:1.2.0` |
@@ -197,36 +197,36 @@ git checkout -b feature/xxx
 # 改代码...
 git push origin feature/xxx
 # CI 按改动路径自动推 ghcr.io/<user>/webook-{core,chat,fe}:feature-<sha>（只触发受影响的服务）
-# 想合就开 PR → merge 到 master
-# master push 触发 CI → 推 master-latest + master-<sha>
+# 想合就开 PR → merge 到 main
+# main push 触发 CI → 推 main-latest + main-<sha>
 
 # === 服务器侧（dev 机）===
 ssh dev-server
 cd ~/webook-deploy
 ./deploy.sh dev
-# 从 ghcr 拉 master-latest，起 webook-dev project
+# 从 ghcr 拉 main-latest，起 webook-dev project
 # 访问：http://<dev-server>/
 ```
 
-- `.env.dev` 的 `CORE_IMAGE_TAG` / `CHAT_IMAGE_TAG` / `FE_IMAGE_TAG` 默认 `master-latest` → 每次 `./deploy.sh dev` 都拉最新 master
+- `.env.dev` 的 `CORE_IMAGE_TAG` / `CHAT_IMAGE_TAG` / `FE_IMAGE_TAG` 默认 `main-latest` → 每次 `./deploy.sh dev` 都拉最新 main
 - 想回退到某个特定 sha：改 `.env.dev` 的对应 `*_IMAGE_TAG`：
   ```bash
-  sed -i "s|^CORE_IMAGE_TAG=.*|CORE_IMAGE_TAG=master-a1b2c3d|" .env.dev
+  sed -i "s|^CORE_IMAGE_TAG=.*|CORE_IMAGE_TAG=main-a1b2c3d|" .env.dev
   ./deploy.sh dev pull && ./deploy.sh dev
   ```
-- CI 在 master 走 `-race` 测试，质量闸门保留
+- CI 在 main 走 `-race` 测试，质量闸门保留
 
 #### 📒 Staging（预发布）
 
 ```bash
-# 和 dev 拉同一个 master-latest，只是资源规格贴近 prod + 端口错开
+# 和 dev 拉同一个 main-latest，只是资源规格贴近 prod + 端口错开
 ssh staging-server
 cd ~/webook-deploy
 ./deploy.sh staging
 # 访问：http://<staging-server>:81/
 ```
 
-- `.env.staging` 的 `CORE_IMAGE_TAG` / `CHAT_IMAGE_TAG` / `FE_IMAGE_TAG` 都是 `master-latest`（和 dev 同源）
+- `.env.staging` 的 `CORE_IMAGE_TAG` / `CHAT_IMAGE_TAG` / `FE_IMAGE_TAG` 都是 `main-latest`（和 dev 同源）
 - 用途：上 prod 前在 staging 跑一轮 smoke test / E2E
 - 如果用独立 staging 机，和 dev 完全隔离；如果和 dev 同机会互相 stop（container_name 冲突）
 
@@ -234,7 +234,7 @@ cd ~/webook-deploy
 
 ```bash
 # === 发版人侧 ===
-# master 充分测试后按需打 tag（每个服务独立打，不必三件套都打）
+# main 充分测试后按需打 tag（每个服务独立打，不必三件套都打）
 git tag webook-core-v1.2.0
 git tag webook-chat-v1.2.0
 git tag webook-fe-v1.2.0
@@ -255,14 +255,14 @@ sed -i "s|^FE_IMAGE_TAG=.*|FE_IMAGE_TAG=1.2.0|" .env.prod
 # 访问：http://<prod-server>:82/
 ```
 
-- **prod 建议只填语义化版本**（`x.y.z`）到 `.env.prod` 的三个 `*_IMAGE_TAG`，不要填 `master-latest`（防止手滑把未验证版本发到生产）
+- **prod 建议只填语义化版本**（`x.y.z`）到 `.env.prod` 的三个 `*_IMAGE_TAG`，不要填 `main-latest`（防止手滑把未验证版本发到生产）
 - **回滚**：改 `.env.prod` 的 `CORE_IMAGE_TAG` / `CHAT_IMAGE_TAG` / `FE_IMAGE_TAG` 回旧版本（例 `1.1.0`）然后 `./deploy.sh prod pull && ./deploy.sh prod`
 - GHCR 上的 tag 只要没手动删就永久保留，回滚无时效限制
 
 ### 发版 checklist（prod 上线）
 
 ```bash
-# 1. 代码合到 master 且 CI 绿灯
+# 1. 代码合到 main 且 CI 绿灯
 # 2. 在 dev / staging 跑过 smoke test
 # 3. 打 tag（按需，每服务独立）
 git tag webook-core-v1.2.0
@@ -300,7 +300,7 @@ sed -i "s|^FE_IMAGE_TAG=.*|FE_IMAGE_TAG=1.1.0|" .env.prod
 
 CI 通过 `paths-ignore` 严格分离三个服务：core / chat / fe 改动只触发自家 workflow。所以：
 
-- 只改 core 业务：`git push master` → 只触发 core CI → 只更新 `webook-core:master-latest`
+- 只改 core 业务：`git push main` → 只触发 core CI → 只更新 `webook-core:main-latest`
 - 只改 chat 业务：同上触发 chat
 - 只改前端：同上触发 fe
 - 紧急修某一服务：独立打 tag（如 `webook-chat-v1.2.1`）独立发版
@@ -512,14 +512,14 @@ docker logs webook-core --tail 30
 # 打开 https://github.com/YOUR_USER?tab=packages 看
 
 # 2. 本地 docker 能直接 pull 吗？
-docker pull ghcr.io/YOUR_USER/webook-core:master-latest
-docker pull ghcr.io/YOUR_USER/webook-chat:master-latest
-docker pull ghcr.io/YOUR_USER/webook-fe:master-latest
+docker pull ghcr.io/YOUR_USER/webook-core:main-latest
+docker pull ghcr.io/YOUR_USER/webook-chat:main-latest
+docker pull ghcr.io/YOUR_USER/webook-fe:main-latest
 ```
 
 **常见原因**：
 - `.env.<env>` 里 `*_IMAGE_TAG` 被 deploy.sh 意外写坏（比如 `down` 当 tag）→ 看 `grep IMAGE_TAG .env.dev`
-- GHCR package 被删了或没推过 → 重新 push master 触发 CI 重建
+- GHCR package 被删了或没推过 → 重新 push main 触发 CI 重建
 
 ### 问 3：容器频繁 Restarting + OOM
 

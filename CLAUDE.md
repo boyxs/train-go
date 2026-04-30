@@ -101,7 +101,7 @@ type(scope): description
 | `CHAT_IMAGE_TAG` | `webook-chat-v*.*.*` | `CHAT_IMAGE_TAG=1.1.0` |
 | `FE_IMAGE_TAG`   | `webook-fe-v*.*.*`   | `FE_IMAGE_TAG=1.1.0`   |
 
-每个服务独立打 tag、独立发版（按需推哪个 tag 就只动哪个 IMAGE_TAG）。不更新 → `./deploy.sh prod` 仍拉旧镜像，等于没发版。dev/staging 用 `master-latest` 滚动 tag 不动；只有 prod 走语义化版本固定。
+每个服务独立打 tag、独立发版（按需推哪个 tag 就只动哪个 IMAGE_TAG）。不更新 → `./deploy.sh prod` 仍拉旧镜像，等于没发版。dev/staging 用 `main-latest` 滚动 tag 不动；只有 prod 走语义化版本固定。
 
 实际 `.env.prod`（gitignored）由部署者按 example 手工同步。
 
