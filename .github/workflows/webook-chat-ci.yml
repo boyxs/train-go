@@ -2,7 +2,7 @@ name: Webook Chat Service CI
 
 on:
   push:
-    branches: [master, 'feature/**']
+    branches: [main, 'feature/**']
     tags: ['webook-chat-v*.*.*']
     paths-ignore:
       - 'webook-fe/**'
@@ -12,7 +12,7 @@ on:
       - 'prd/**'
       - '**.md'
   pull_request:
-    branches: [master]
+    branches: [main]
     paths:
       - 'webook/chat/**'
       - 'webook/api/**'
@@ -70,7 +70,7 @@ jobs:
         # 排除 chat/integration（需 MySQL + Redis service container，单元测试这层不起）
         run: |
           PKGS=$(go list ./chat/... ./api/... ./pkg/... | grep -v /integration)
-          if [[ "${{ github.ref }}" == "refs/heads/master" ]] || [[ "${{ github.ref }}" == refs/tags/* ]]; then
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]] || [[ "${{ github.ref }}" == refs/tags/* ]]; then
             go test -race $PKGS
           else
             go test $PKGS
@@ -94,8 +94,8 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=raw,value=master-latest,enable=${{ github.ref == 'refs/heads/master' }}
-            type=raw,value=master-${{ github.sha }},enable=${{ github.ref == 'refs/heads/master' }}
+            type=raw,value=main-latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=main-${{ github.sha }},enable=${{ github.ref == 'refs/heads/main' }}
             type=raw,value=feature-${{ github.sha }},enable=${{ startsWith(github.ref, 'refs/heads/feature/') }}
             # tag webook-chat-v1.2.3 → 1.2.3
             type=match,pattern=webook-chat-v(.*),group=1

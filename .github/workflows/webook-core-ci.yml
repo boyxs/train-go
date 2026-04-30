@@ -4,7 +4,7 @@ on:
   push:
     # 不用 paths 过滤：否则 tag push 指向 diff 不含 webook/** 的 commit 时会静默不触发
     # 由 pull_request 的 paths 过滤保底，减少无关 PR 跑 CI 即可
-    branches: [master, 'feature/**']
+    branches: [main, 'feature/**']
     tags: ['webook-core-v*.*.*']
     paths-ignore:
       - 'webook-fe/**'
@@ -15,7 +15,7 @@ on:
       - 'prd/**'
       - '**.md'
   pull_request:
-    branches: [master]
+    branches: [main]
     paths:
       - 'webook/internal/**'
       - 'webook/api/**'
@@ -75,9 +75,9 @@ jobs:
         run: go vet ./...
 
       - name: 单元测试
-        # master 和 tag 发布路径跑 -race（慢 2-5x 但抓并发 bug）；feature 开发快速反馈
+        # main 和 tag 发布路径跑 -race（慢 2-5x 但抓并发 bug）；feature 开发快速反馈
         run: |
-          if [[ "${{ github.ref }}" == "refs/heads/master" ]] || [[ "${{ github.ref }}" == refs/tags/* ]]; then
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]] || [[ "${{ github.ref }}" == refs/tags/* ]]; then
             go test -race $(go list ./... | grep -v /integration)
           else
             go test $(go list ./... | grep -v /integration)
@@ -101,9 +101,9 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            # master 分支：master-latest（滚动）+ master-<sha>（可回溯）
-            type=raw,value=master-latest,enable=${{ github.ref == 'refs/heads/master' }}
-            type=raw,value=master-${{ github.sha }},enable=${{ github.ref == 'refs/heads/master' }}
+            # main 分支：main-latest（滚动）+ main-<sha>（可回溯）
+            type=raw,value=main-latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=main-${{ github.sha }},enable=${{ github.ref == 'refs/heads/main' }}
             # feature/** 分支：feature-<sha>
             type=raw,value=feature-${{ github.sha }},enable=${{ startsWith(github.ref, 'refs/heads/feature/') }}
             # tag webook-core-v1.2.3 → 1.2.3
