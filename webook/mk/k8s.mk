@@ -1,6 +1,6 @@
 # K3s 部署全流程
-# 用法：make -f mk/k8s.mk deploy
-# 或加到根 Makefile：include mk/k8s.mk
+# 用法：cd webook && make -f mk/k8s.mk deploy
+# 必须在 webook/ 下执行，YAML 路径 ../kubernetes/ 依赖此工作目录
 
 IMAGE := train/webook:1.0.0
 
@@ -23,11 +23,11 @@ deploy:
 	@rm webook.tar
 
 	@echo "--- [4/5] Apply K8s manifests + rollout restart ---"
-	@kubectl apply -f k8s/k8s-webook-deployment.yaml
+	@kubectl apply -f ../kubernetes/webook-deployment.yaml
 	@kubectl rollout restart deployment webook-record
 
 	@echo "--- [5/5] Apply Service (NodePort) ---"
-	@kubectl apply -f k8s/k8s-webook-service.yaml
+	@kubectl apply -f ../kubernetes/webook-service.yaml
 
 	@echo "--- [OK] Deployment complete ---"
 	@kubectl get pods -l app=webook-record
@@ -36,7 +36,7 @@ deploy:
 
 # 清理 K8s 资源
 clean:
-	@kubectl delete -f k8s/k8s-webook-deployment.yaml,k8s/k8s-webook-service.yaml --ignore-not-found
+	@kubectl delete -f ../kubernetes/webook-deployment.yaml,../kubernetes/webook-service.yaml --ignore-not-found
 
 help:
 	@echo "make -f mk/k8s.mk deploy  - 一键部署到 K3s"

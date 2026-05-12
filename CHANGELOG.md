@@ -2,6 +2,25 @@
 
 <!-- 新功能前插在此，日期降序 -->
 
+## [2026-05-12] k8s 部署目录上移到仓库根 + 去冗余前缀
+
+**变更内容**: `webook/k8s/`（10 个 YAML）整体上移到仓库根 `kubernetes/`，与 `deploy/` 并列；文件名去掉冗余的 `k8s-` 前缀
+**影响范围**:
+- `webook/k8s/k8s-*.yaml`（10 个）→ `kubernetes/*.yaml`（git rename，历史保留）
+- `webook/mk/k8s.mk`：4 处路径改为 `../kubernetes/<name>.yaml`；顶部用法注释明确"必须在 webook/ 下执行"
+- `webook/mk/infra.mk`：10 处路径改为 `../kubernetes/<name>.yaml`
+- `webook/CLAUDE.md` L1 部署层章节：`k8s/`（将来式）改为 `kubernetes/`（已建）
+
+**技术决策**:
+- 位置上移：webook/CLAUDE.md 早有规划「K8s 与 `deploy/` 并列于仓库根，不挤压 deploy/」，本次落地
+- 目录用 `kubernetes/` 全称：与 `deploy/` 一致采用通用全称，避免与 mk 文件名 `k8s.mk` 重复
+- 文件去 `k8s-` 前缀：目录名已表意，`kubernetes/mysql-deployment.yaml` 比 `kubernetes/k8s-mysql-deployment.yaml` 干净
+- Makefile 走 `../kubernetes/` 相对路径：调用方式 `make -f mk/k8s.mk` 隐含 working directory = `webook/`，顶部注释明确化避免误用
+
+**会话**: 260512-k8s-目录上移
+
+
+
 ## [2026-04-28] 代码审查修复：鉴权收敛 + 缓存规则归位 + 配置一致性
 
 **变更内容**: 修复连续三轮 ship review 发现的安全/规则问题 — 1 Critical（SSE ResumeStream 越权窃听他人对话流）+ 4 Important（IsGenerating 缺鉴权、ranking.Archive 与 ai.Dashboard 在 prod 暴露、UpdateContent 写后不清缓存）+ 多处 Suggestion（viper key 与 env 名不匹配致 prod 守卫失效、`// =====` 注释分隔线违规、chat local.yaml otel.env 标错、内部 config 注释漏 staging 维度）

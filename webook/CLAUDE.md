@@ -47,7 +47,7 @@ APP_ENV=config/local.yaml go run main.go
 - `./deploy.sh local`：本地开发（build 代码 + 暴露宿主端口给 go run / DBeaver）
 - `./deploy.sh <dev|staging|prod>`：服务器部署（pull ghcr 镜像）
 - 同时只跑一套（container_name 唯一），volume 按 project 隔离（`webook-<env>_*`）不串
-- K8s 将来新开 `k8s/` 或 `helm/` 目录与 `deploy/` 并列，不挤压这里
+- K8s 走仓库根 `kubernetes/` 目录（已建），后续如引入 helm 再新开 `helm/`，均与 `deploy/` 并列，不挤压这里
 
 完整 CI/CD 演进路线见 `C:\Go\notes\cicd-webook-roadmap.md`。
 

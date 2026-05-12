@@ -25,12 +25,12 @@ all:
 # --- MySQL Target ---
 mysql:
 	@echo "$(STEP) [1/5] Applying Storage (PV & PVC)..."
-	@$(KUBECTL) apply -f k8s/k8s-mysql-pv.yaml -n $(NAMESPACE)
-	@$(KUBECTL) apply -f k8s/k8s-mysql-pvc.yaml -n $(NAMESPACE)
+	@$(KUBECTL) apply -f ../kubernetes/mysql-pv.yaml -n $(NAMESPACE)
+	@$(KUBECTL) apply -f ../kubernetes/mysql-pvc.yaml -n $(NAMESPACE)
 
 	@echo "$(STEP) [2/5] Applying Manifests (Deployment & Service)..."
-	@$(KUBECTL) apply -f k8s/k8s-mysql-deployment.yaml -n $(NAMESPACE)
-	@$(KUBECTL) apply -f k8s/k8s-mysql-service.yaml -n $(NAMESPACE)
+	@$(KUBECTL) apply -f ../kubernetes/mysql-deployment.yaml -n $(NAMESPACE)
+	@$(KUBECTL) apply -f ../kubernetes/mysql-service.yaml -n $(NAMESPACE)
 
 	@echo "$(STEP) [3/5] Triggering Restart to pick up changes..."
 	@$(KUBECTL) rollout restart deployment webook-mysql -n $(NAMESPACE)
@@ -46,8 +46,8 @@ mysql:
 # --- Redis Target ---
 redis:
 	@echo "$(STEP) Step 1/3: Applying Redis manifests..."
-	@$(KUBECTL) apply -f k8s/k8s-redis-deployment.yaml -n $(NAMESPACE)
-	@$(KUBECTL) apply -f k8s/k8s-redis-service.yaml -n $(NAMESPACE)
+	@$(KUBECTL) apply -f ../kubernetes/redis-deployment.yaml -n $(NAMESPACE)
+	@$(KUBECTL) apply -f ../kubernetes/redis-service.yaml -n $(NAMESPACE)
 	@echo "$(STEP) Step 2/3: Restarting webook-redis..."
 	@$(KUBECTL) rollout restart deployment webook-redis -n $(NAMESPACE)
 	@echo "$(STEP) Step 3/3: Waiting for stability..."
@@ -57,8 +57,8 @@ redis:
 # --- Etcd Target ---
 etcd:
 	@echo "$(STEP) Step 1/3: Applying Etcd manifests..."
-	@$(KUBECTL) apply -f k8s/k8s-etcd-deployment.yaml -n $(NAMESPACE)
-	@$(KUBECTL) apply -f k8s/k8s-etcd-service.yaml -n $(NAMESPACE)
+	@$(KUBECTL) apply -f ../kubernetes/etcd-deployment.yaml -n $(NAMESPACE)
+	@$(KUBECTL) apply -f ../kubernetes/etcd-service.yaml -n $(NAMESPACE)
 	@echo "$(STEP) Step 2/3: Restarting webook-etcd..."
 	@$(KUBECTL) rollout restart deployment webook-etcd -n $(NAMESPACE)
 	@echo "$(STEP) Step 3/3: Waiting for stability..."
@@ -73,7 +73,7 @@ status:
 # --- Cleanup ---
 clean:
 	@echo "$(STEP) Cleaning up infrastructure..."
-	@$(KUBECTL) delete -f k8s/k8s-mysql-deployment.yaml,k8s/k8s-mysql-service.yaml,k8s/k8s-redis-deployment.yaml,k8s/k8s-redis-service.yaml,k8s/k8s-etcd-deployment.yaml,k8s/k8s-etcd-service.yaml -n $(NAMESPACE) --ignore-not-found
+	@$(KUBECTL) delete -f ../kubernetes/mysql-deployment.yaml,../kubernetes/mysql-service.yaml,../kubernetes/redis-deployment.yaml,../kubernetes/redis-service.yaml,../kubernetes/etcd-deployment.yaml,../kubernetes/etcd-service.yaml -n $(NAMESPACE) --ignore-not-found
 	@echo "$(INFO) Cleanup complete."
 
 # make -f mk/infra.mk xxx
