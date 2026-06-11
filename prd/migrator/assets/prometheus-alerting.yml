@@ -1,0 +1,108 @@
+# webook-migrator v1 告警 spec。
+# v1 可观测性基于基础设施 metric（up / webook_http_* / webook_db_* / go_*）+ webook_core 业务 SLO。
+# 业务级 migrator metric 告警（lag / apply_qps / mismatch / dead_letter）v1 未埋点；
+# v1 可观测靠 oncall 巡检控制台 API（/lag、/mismatch、/tasks/:id）+ runbook 覆盖。
+# 关联：04-cutover-playbook.md §12.3 / runbooks/
+
+groups:
+  # ── P0：服务级（基础设施）─────────────────────────────────
+  - name: webook-migrator-service
+    rules:
+      - alert: MigratorServiceDown
+        expr: up{job="webook-migrator"} == 0
+        for: 1m
+        labels:
+          severity: P0
+          team: oncall
+          component: webook-migrator
+        annotations:
+          summary: "webook-migrator 服务不可用 (instance {{ $labels.instance }})"
+          description: |
+            webook-migrator 实例 {{ $labels.instance }} 健康检查失败 ≥ 1 min。
+            业务侧 SDK 走 safe 默认（SideOld），主流程不影响；但所有迁移 task 暂停。
+          runbook_url: "https://github.com/webook/prd/migrator/runbooks/migrator-service-down.md"
+
+  # ── P1：HTTP 基础设施 ─────────────────────────────────────
+  - name: webook-migrator-http
+    rules:
+      - alert: Migrator5xxHigh
+        expr: rate(webook_http_requests_total{job="webook-migrator",code=~"5.."}[5m]) > 0.05
+        for: 3m
+        labels:
+          severity: P1
+          team: oncall
+          component: webook-migrator
+        annotations:
+          summary: "webook-migrator 5xx 错误率 > 5%"
+
+      - alert: MigratorP99High
+        expr: histogram_quantile(0.99, rate(webook_http_request_duration_seconds_bucket{job="webook-migrator"}[5m])) > 1
+        for: 5m
+        labels:
+          severity: P1
+          team: oncall
+          component: webook-migrator
+        annotations:
+          summary: "webook-migrator HTTP P99 > 1s"
+
+      - alert: MigratorGoroutinesHigh
+        expr: go_goroutines{job="webook-migrator"} > 10000
+        for: 5m
+        labels:
+          severity: P2
+          team: oncall
+          component: webook-migrator
+        annotations:
+          summary: "webook-migrator goroutines > 10000（疑似泄漏）"
+
+  # ── P2：源库压力（基础设施 mysql_exporter）────────────────
+  - name: webook-migrator-resource
+    rules:
+      - alert: MigratorSourceLoadHigh
+        expr: mysql_global_status_threads_running{instance=~".*source.*"} > 100
+        for: 3m
+        labels:
+          severity: P2
+          team: oncall
+          component: webook-migrator
+        annotations:
+          summary: "源库压力告警：threads_running={{ $value }}"
+          description: |
+            源库 {{ $labels.instance }} threads_running 超 100 持续 3 min。
+            如果迁移正在跑全量，立即降速（POST /tasks/$ID/throttle）。
+          runbook_url: "https://github.com/webook/prd/migrator/runbooks/source-pressure-high.md"
+
+  # ── P0：用户级（业务侧 SLO，webook_core metric）────────────
+  - name: webook-migrator-business-slo
+    rules:
+      - alert: MigratorBusinessRTRegression
+        expr: |
+          histogram_quantile(0.99, rate(webook_core_http_request_duration_seconds_bucket[5m]))
+          > histogram_quantile(0.99, rate(webook_core_http_request_duration_seconds_bucket[5m] offset 1d)) + 0.05
+        for: 5m
+        labels:
+          severity: P1
+          team: oncall
+          component: webook-core
+        annotations:
+          summary: "业务 P99 RT 比昨天同时刻 + 50ms（可能迁移导致）"
+          description: |
+            business P99 RT {{ $value }}s，超昨日同时刻 + 50ms。
+            如灰度迁移正在进行，立即评估是否 gray=0 回滚。
+          runbook_url: "https://github.com/webook/prd/migrator/runbooks/cutover-rollback.md"
+
+      - alert: MigratorBusinessErrorRateHigh
+        expr: |
+          rate(webook_core_http_requests_total{status=~"5.."}[5m])
+          / rate(webook_core_http_requests_total[5m]) > 0.0005
+        for: 2m
+        labels:
+          severity: P0
+          team: oncall
+          component: webook-core
+        annotations:
+          summary: "业务 5xx 错误率 > 0.05%（可能迁移导致）"
+          description: |
+            business 5xx 错误率 {{ $value | humanizePercentage }}，持续 2 min。
+            如灰度迁移正在进行（双写期），立即 gray=0 回滚；如已切 DST_ONLY 单写，OLD 不可回滚，立即前向修复 NEW。
+          runbook_url: "https://github.com/webook/prd/migrator/runbooks/cutover-rollback.md"

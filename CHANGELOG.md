@@ -2,6 +2,260 @@
 
 <!-- 新功能前插在此，日期降序 -->
 
+## [2026-06-11] webook-migrator 分层合规重构 + 命名全链统一 + 业务监控 + 文档对齐
+
+**变更内容**：在干净 v1 基础上做架构质量收口——①**跨层引用清除**：service/web 层不再直引 `repository/dao`·`repository/cache`·`redis.Cmdable`，新增 7 个 repository（checkpoint/validate_log/dead_letter/audit_log/throttle/switch_state + 原 task）+ `service/replay`（ReplayDL 业务从 handler 下沉）+ cache 层 `SwitchStateCache`；②**命名全链统一**：DAO 实体去 `Migration` 前缀（`MigrationTask`→`Task`…，含表名 `migration_*`→`*` 与索引名）、`Id` 风格贯通（`TaskID`/`taskID`→`TaskId`/`taskId`，字段/变量/方法一体）、转换 helper 升维泛型 `pkg/slicex.Map`（删手写复数方法）、删死哨兵 `ErrStateConflict` + validate_log 索引自愈兼容逻辑 + GTID 占位澄清；③**业务监控补齐**：`webook_migration_lag_ms{task_id,side}` + `webook_migration_dead_letter_unreplayed{task_id}`（scrape 实采 Collector）+ grafana 面板恢复真实查询（删此前永远 No-data 的幽灵面板）；④**transform 文件结构对齐** source/sink（接口/registry/identity/mongo 分文件）；⑤三服务 `ioc/config.go` 同构统一。
+
+**影响范围**：`webook/migrator/**`（16 包）+ 新增 `webook/pkg/slicex`；`webook/internal/ioc/config.go`（core 抽出）+ `chat/ioc/config.go` + `internal/migratorsdk/sdk.go` 注释；部署 `deploy/grafana/.../webook-migrator.json`；prd/migrator 全量同步（02-architecture·03-walkthrough·README·postman 等）；`webook/CLAUDE.md` 新增 4 条规则（层间模型转换 / 标识符 Id 风格 / 包内多实现文件组织 / 多服务布局）。全模块 `go build/vet/test ./...` 全绿、goimports 干净；`Migration*`/`migration_*`/`TaskID`/`toDomainList` 全仓 grep 零残留。
+
+**技术决策**：分层修复严守「service 只依赖 repository 接口、横切中间件（audit）可直达仓储」；`Id` 风格选「向仓内既有约定收敛」而非 Go-initialisms（存量几百处 vs 2 离群点）；`slicex.Map` 自写 6 行泛型而非引 samber/lo（标准库无 Map、避免新依赖）；表名前缀剥除因控制库是专用库 `webook_migrator`（前缀无命名空间价值）+ v1 未发版零迁移成本；监控用 scrape-time Collector（无后台 goroutine，2s 超时兜底 DB 聚合查询）。
+
+**待办**：CountUnreplayedByTask 补 sqlmock 单测；full 同步进度指标（v2）；lag/dead_letter 告警规则（alerting yml，可选）；部署侧 dev/staging 旧 `webook_migrator` 库需 DROP 重建（表已改名，AutoMigrate 不迁移）。
+
+**会话**：260606-migrator-删反向同步（延续）
+
+## [2026-06-08] webook-migrator 清扫为干净 v1（删 CLAUDE.md/02b + 清除 idempotency/RBAC/反向同步残留 + 文档同步）
+
+**变更内容**：把 migrator 代码注释与设计文档统一收敛为「干净 v1」——①删 `webook/migrator/CLAUDE.md`（v1/v2/扩展点前瞻框架最集中、且与 prd 文档重复）+ `prd/migrator/02b-task-module-design.md`（交付前 vertical-slice 蓝图，已被实际代码取代）；②清除文档里**已从代码删除的功能**残留：idempotency 中间件 / `Idempotency-Key` header / `migrator:idempotency` 键 / IdempotencyCache、RBAC 中间件假声明（`rbac.go` / `InitRBACBuilder` / 401·403·429 e2e / 挂 14 endpoint）——区分保留 `幂等`（Sink upsert 性质）；③代码注释去兼容性/前瞻措辞（反向同步残留 4 处、向后兼容、GTID/throttle v2 前瞻、Step 路标、失效声明 sink 乐观锁/canal 后续集成）；④文档前瞻指针（"以 CLAUDE.md 设计范围/v2 范围为单一真相源"）全部清掉，v1 能力以 `02-architecture.md`「📌 v1 实现摘要」为权威。
+
+**影响范围**：删 2 文件；代码 12 文件改注释（build + vet + `go test ./migrator/...` 全绿）；prd 文档 `02-architecture.md`·`03-walkthrough.md`·`01-product.md`·`04-cutover-playbook.md`·`04b-cutover-checklist.md`·`adr/0002`·`assets/prometheus-alerting.yml` + `webook/migrator/README.md`·`scripts/postman.json` 同步；全仓 grep 验证 0 残留（idempotency 中间件 / Idempotency-Key / migrator:idempotency / IdempotencyMiddleware / RBAC middleware / requireRBAC / InitRBACBuilder / 反向同步 / webook/migrator/CLAUDE.md）。
+
+**技术决策**：CLAUDE.md 与 prd/migrator 文档职责重叠 + 是 v1/v2 框架残留集中地，删除后 `02-architecture.md`（本就是「权威定义」）单一承载 v1 能力摘要；idempotency/RBAC 中间件早在 v1 收尾已从代码删除（见 `[2026-05-27]` 条），但文档当时未同步干净，本次彻底对齐；`幂等`（Sink ON DUPLICATE KEY + Version 乐观锁）是真实 v1 行为，与「idempotency 中间件」区分保留；反向 repair `dst_overwrite_src`（≠反向同步引擎）保留。
+
+**待办**：无（v1 文档/代码已自洽；`webook/migrator/CLAUDE.md` 已删，先前条目对其「v2 设计范围」的引用随文件移除而失效，v1 文档不再前瞻 v2）。
+
+**会话**：260606-migrator-删反向同步（续接）
+
+**发布**：（未发布）
+
+## [2026-06-06] webook-migrator prd 文档全面对齐 v1（反向同步归 v2 + 业务 metric 归基础设施）
+
+**变更内容**：prd/migrator 设计文档与 v1 代码对齐——①移除反向同步（cutover Plan B），回滚模型改为「DST_ONLY 不可逆，回滚仅双写期 SRC_FIRST/DST_FIRST，切前充分对账兜底」；②42 处 `webook_migrator_*` 业务 metric 改为 v1 实际可观测（基础设施 metric `webook_http_/db_/go_` + 控制台 API `/lag`·`/tasks/:id`·`/mismatch` + mysql 查控制库 + 服务日志），prometheus-alerting 重写为 v1 4 条核心告警 + 业务 SLO；③health `{status:ok,service}`、throttle「next_start 生效」、Redis stage/gray key 用 taskName —— 全部对齐代码。
+**影响范围**：`prd/migrator/`（01~04b + 10 runbook + adr/retros/assets）+ `webook/migrator/CLAUDE.md`（v2 设计范围补反向同步）；代码侧反向同步增删抵消（`pipeline/source/factory.go` 等回原样，build/vet/44 单元包全绿）。
+**技术决策**：反向同步（NEW→OLD 自动回写）涉及引擎方向化 + 防死循环 + 状态编排，复杂度高，v1 不做、归 v2，靠「切单写不可逆 + cutover 前强制对账（mismatch<0.001%）」兜底；业务 metric 埋点归 v2（落地须合规命名 `webook_<subsystem>_*`），v1 用基础设施 metric + API 可观测。
+**待办**：v2 若做反向同步 / 业务 metric，按 `webook/migrator/CLAUDE.md`「v2 设计范围」推进。
+**会话**：260606-migrator-删反向同步
+**发布**：（未发布）
+
+## [2026-05-28] webook-migrator v1 收尾（异构 verify Mongo dst + 共享 mongo client + README A/B/C + 全量文档同步）
+
+**变更内容**：在 v1 任意源框架（2026-05-27）基础上补齐两件事：①**异构 verify 真支持 Mongo 作目标**（`SourceFactory.BuildDst` mongo 分支复用 `MongoSource` 读 dst collection + `VerifyEngine.diffAndLog` 比对前 `normalizeRows` 对两侧应用表的 transform 归一 + 去 `_id` PK 回显）；②**README 重排为 A/B/C 三组**（A 核心生命周期 / B 异构方向 / C 参考），修 Step 4 空号 + 6b 编号、ES Appendix B 上移成 B3、顶部加目录、内部交叉引用全部对齐。
+
+**影响范围**：
+- 代码（前一会话已实现，本日补 e2e + 文档）：`pipeline/source/factory.go`（BuildDst mongo 分支）、`service/verify/verify.go`（`normalizeRows` + transform Registry 注入）、`ioc/engines.go::InitVerifyEngine`、`service/verify/verify_test.go`（异构-transform 用例）。
+- 新增 e2e：`integration/verify_mongo_e2e_test.go::TestMySQL_E2E_VerifyMongoDst` —— 真 infra 跑 MySQL→Mongo 全量后构造 VerifyEngine（mysql+mongo 双 builder + transform Registry）跑 Full，断言①干净迁移零假阳性 ②改 dst 一行检出恰好 1 diff。**本机 Mongo 副本集 + MySQL 起着时实跑 PASS**。
+- 文档：`webook/migrator/README.md` 整篇重排（1290→1319 行，命令/期望输出零流失；fence count 140=140 校验）；`webook/migrator/CLAUDE.md`「已知功能边界」加「异构 verify Mongo dst ✅」行；`verify.go` 包注释边界更新。
+- 顺手修 bug：README L1155 `mongosh` 命令漏 `&authSource=admin` → 用户运行报 `Authentication failed`。补齐后与其他 5 处 mongosh 命令一致。
+
+**技术决策**：
+- 异构 verify normalize 选「两侧都过 transform + 去 `_id`」而非「只对源端 transform」—— transform 对已正确迁移的 dst 是幂等的（拍平后再拍平不变），保证同构（Identity + 无 `_id`）路径行为零漂移，单测验证 2 路径（异构 + 同构）。
+- README 重排走 Python line-range 切片 + 标题行重写脚本（命令体 byte-for-byte 切片，不是 LLM 重写命令），避免命令文本回写漂移；脚本输出与原文做 `Counter` 比对验证零内容流失。
+- 编号方案选 A/B/C 三组但不动 markdown heading 层级（组首和子节都是 `##`），避免大规模层级 demotion 风险；目录用手写嵌套列表，导航靠 Ctrl-F + 目录文字定位（不依赖 anchor 链接，避免中文/标点 anchor 生成歧义）。
+
+**配套收尾**：①`ioc.InitMongoClient` 进程级共享 `*mongo.Client` 注入 wire（sink/source 各 builder 复用同一连接池，driver 内置 pool 管理），关闭原 `buildMongo*` 多 client 模式；②全部迁移相关文档（`migrator/CLAUDE.md` / `migrator/README.md` / `prd/migrator/01-product.md` / `02-architecture.md` / `02b-task-module-design.md` / `03-walkthrough.md` / `04b-cutover-checklist.md`）同步对齐 v1，删除"首版差异 / 待办 / TODO"语气，统一指向 `migrator/CLAUDE.md`「设计范围与扩展点」作为单一真相源。
+
+**会话**：260527-migrator-任意源框架（续接 2，从 2026-05-27 晚 prompt-too-long 中断 → 2026-05-28 收尾）
+**发布**：待发布
+
+---
+
+## [2026-05-27] webook-migrator v1（第一版）
+
+**总述**：webook-migrator 第一版 —— 异构数据迁移服务（任意源 MySQL/Mongo ↔ 任意目标 MySQL/ES/…），全量 + 增量（CDC binlog / Mongo Change Stream）+ 对账 + 4 阶段切流。本条目合并三段建设：①完整 review（17 bug + 异构对账闭环 + canal cdc 落地 + 架构简化 + 文档同步，§一~五）；②incr binlogpos→checkpoint 持久化修复（§六）；③任意源框架（MySQL 单源 → 任意源可插拔，Mongo 全量+增量，§七）。**Mongo 全量 + 增量 e2e 已对真副本集 Mongo（2 节点 rs0）验证 PASS**。
+
+**背景**：以 README Step 8 对账数据对不上为入口，一路 review 出来一连串关联 bug + 设计缺陷。最终覆盖：P0 阻塞修复、P1 实现缺失补齐、异构对账闭环、canal cdc 运行环境落地、架构 YAGNI 简化、prd 文档同步。完整 17 个 bug 表见 `webook/migrator/CLAUDE.md`「已知功能边界」段。
+
+### 一、P0 + 关键 bug 修复
+
+| Bug | 修法 |
+|------|------|
+| SourceFactory cdc 任务全量阶段误用 CanalSource | 接口拆 `BuildFullSrc / BuildIncrSrc / BuildDst` 三方法（按读取语义,不再按 task.Mode）;ADR-0002 记录决策 |
+| validate_log 唯一索引 `uk_dedup` 含 repaired 列 → mark 时 1062 Duplicate entry | 索引列减为 `(task_id, table_name, biz_id)`;`BatchInsert` upsert 显式重置 `repaired=0`（绕开 GORM `default:0` 零值过滤） |
+| `task.status` 死字段 8 状态全停 0 | `TaskService/Repository.UpdateStatus`;FullEngine/IncrEngine.Run 入口/出口 defer 推进;SwitchService DST_ONLY 同步 Switched |
+| DSN 字段被忽略（所有迁移在控制库内自闭环） | 新建 `pipeline/dsn/Resolver` 接口 + `StaticResolver` 占位;SourceFactory/SinkFactory 加 `WithDBResolver`;生产前补 Vault PerTaskResolver |
+| audit_log.error_msg 永远空 | middleware 解响应 body `{code,msg}` 截 512 字节填入 |
+| Preflight 占位返 ready=true | 通过 `dsn.Resolver` 拿源端 db,真查 `@@global.binlog_format / gtid_mode` + `information_schema.STATISTICS` 表 PK |
+| `/lag` 只看 src 侧 | 加 `IncrEngine.LagDst` + `dstLastEventTs sync.Map` CAS 更新;handler 返 `{lagMs, srcLagMs, dstLagMs}` |
+| GORM AutoMigrate 不改同名索引 | `dao/init_table.go` 加 `ensureValidateLogDedupIndex`:启动时查 information_schema 比对,不符合就去重 + DROP + ADD 自愈 |
+| GORM 零值字段过滤让 upsert repaired=0 失效 | DoUpdates 用 `clause.Assignments(map{"repaired": 0})` 字面值绕开 |
+| `/start` 重复请求双开 race | `paused.LoadOrStore(taskID, nil)` 原子占位 + handler `IsRunning` 早判 409 双层防护 |
+| `/verify sampleRate=0` 不被拦 | SampleRate 改 `*float64` 区分"未传"vs"显式 0";handler 校验 (0,1] |
+| `/gray percent=200` 业务消息被吞 | 去掉 binding `min/max` tag,让 service 层 `ErrInvalidGrayPercent` 透传到 HTTP |
+| switch `Stage required` 让 rollback `stage:""` 撞 binding 400 | switchReq.Stage 去 required,handler 内仅 rollback 模式跳过 stage.Valid() |
+| 状态机错误 sentinel.Message 吞动态 from/to | `WithMetadata` 携带 `from/to/allowed`,前端 `Result.Metadata` 取 |
+| README Step 8.1 INSERT id=99 重复跑撞 PK | 改 `REPLACE INTO`,Step 8.1 全部幂等 |
+| Step 9 `mark_only` 后再 verify 同差异从列表消失 | DoUpdates 覆盖 repaired=0 让差异重新进列表（符合"当下承认,再发现仍提醒"语义） |
+| Windows Git Bash `paste -sd,` \r\n 导致 ids JSON 无效 | README 改用 `tr -d '\r' \| tr '\n' ',' \| sed 's/,$//'` |
+
+### 二、异构对账闭环（MySQL ↔ ES 双向真异构）
+
+- 新建 `pipeline/source/es.go`（~190 行）：ESSource 用 search_after 分页（ES 8 scroll 已 deprecated）+ aggs PKRange + IncrSubscribe 返 err（ES 无 binlog 概念）
+- `SourceFactory.BuildDst` 按 `task.SinkType` 分发 MySQL/ES;`WithESSourceBuilder` ioc option
+- 与 `buildESSink` 共享 yaml `migrator.es.addrs`（读/写同集群）
+- `es_test.go` 用 httptest.Server 作 mock（esapi.SearchRequest.ctx 是 unexported,不抽 ESClient interface,直接传 `*elasticsearch.Client`）;6 case 全 PASS
+- README 附录 B 完整 demo：B.1 创建 → B.2 全量同步 → B.3 真对账 → B.4 src_overwrite_dst 真覆盖 ES → B.5 切流
+
+### 三、canal cdc 运行环境落地
+
+**协议层（之前已实现）**：`GoMySQLCanalClient`（go-mysql canal SDK）+ `CanalSource` + `BinlogClient` 接口。
+
+**本轮补齐**：
+- `config/local.yaml` + `test.yaml` 加 `migrator.canal.{addr,user,password,serverIdBase,flavor}`
+- `deploy/docker-compose.yaml` MySQL `command:` 加 `--log-bin --binlog-format=ROW --binlog-row-image=FULL --server-id=1 --default-authentication-plugin=mysql_native_password`
+- 新建 `deploy/mysql/init/01-canal-user.sql`：首次启动建 canal 用户 + REPLICATION SLAVE/CLIENT/SELECT 权限
+- 新建 `integration/canal_e2e_test.go`（~150 行）：连真 MySQL,INSERT/UPDATE/DELETE 触发 BinlogEvent 到达;基础设施不可用 t.Skip
+- README Step 6b cdc 完整 demo + 故障排查表
+
+**canal 自动重连**（architect review P0 修复）：
+- `Subscribe` 包重连循环,指数退避 1s→30s 封顶;`canalEventHandler` 跨重连周期共享 + `OnRotate/OnPosSynced` 实时跟踪最新位点
+- `canalSrv` 改 `atomic.Pointer[canal.Canal]`,重连换新实例时 Stop 安全
+
+### 四、架构简化（YAGNI / 删过度抽象）
+
+- 删 `web/middleware/{rbac,idempotency}.go` + `repository/cache/idempotency.go` + `integration/authz_e2e_test.go`：RBAC 是占位 NoOp,Idempotency 调试期反而干扰;不可逆操作（switch/repair）由 MySQL 唯一索引 + 状态机 + IsRunning 兜底
+- `ChangeEvent` 改成 `type ChangeEvent = BinlogEvent` 别名（字段完全一致,无业务转换）
+- `BinlogClient.Subscribe(ctx, fromPos, fromGTID)` → `Subscribe(ctx, fromPos)`（fromGTID 一直 `_` 忽略,接口诚实优于占位）;CursorKindGTID 改返显式 error
+- 删 es_test.go / canal_e2e_test.go 末尾的 `var _ = errors.New` 占位
+
+### 五、prd/migrator 文档同步
+
+- `02-architecture.md` 头部加"📌 与首版实现的差异"段（12 行表格映射目标态 vs 首版实际）
+- `02b-task-module-design.md` / `03-walkthrough.md` 顶部加 caveat 指向差异段;`03 §8.2` SourceFactory 代码示例改新三方法接口
+- `01-product.md` / `04b-cutover-checklist.md` 加 RBAC/Idempotency 实施差异注释
+- `04-cutover-playbook.md` + 7 个 runbooks：批量 sed 删 `-H "Idempotency-Key: $(uuidgen)"` curl header 行;删 `IDEM()` shell helper + 13 处 `-H "$(IDEM)"` 调用
+- 新增 `prd/migrator/adr/0002-source-factory-three-methods.md`：详细记录 SourceFactory 三方法决策的备选/理由/后果
+
+### 六、incr binlogpos → checkpoint 持久化修复（合并 2026-05-26）
+
+Canal 端 `buildBinlogEvent` 漏填 `BinlogPos` + `OnRow` 没透传 file/logPos → `BinlogEvent.BinlogPos==""` → `runPartition.flush()` 守卫 `if lastPos!="" && compareBinlogPos>0` 永不命中 → `migration_checkpoint` `phase=incr` 行从未入库 → 重启后从 master 当前位点起订，丢重启窗口事件。修复：`OnRow` 透传位点 + `buildBinlogEvent` 加 binlogPos 参数（`canal_client.go` + `canal_client_test.go` 3 子测试防回归）；首事件 file 空时留空串不写残废格式（守卫逻辑本身正确，从源头修）。
+
+### 七、任意源框架：MySQL 单源 → 任意源可插拔（Mongo 全量+增量，合并 2026-05-27）
+
+4 阶段：①PK 行标识全链路 int64→string（`Row`/`ChangeEvent`/`Mutation.PK` + `validate_log`/`dead_letter.biz_id`→`varchar(64)`），数值源分片键/全量游标保数值语义（**拆两层规避 `"10"<"9"`**）；②可插拔骨架：`domain.SourceType`(mysql/mongo) + `SourceFactory` 按源分发 `BuildFullSrc`/`BuildIncrSrc` + 新 `pipeline/transform`（`Transformer` 接口 + `Registry` 按 `TableMapping.Transform` 名选，空→Identity）；③`MongoSource` 全量（find 单 shard 流式 + ObjectID→hex）+ `MongoToRelational`（嵌套子文档/数组→JSON 列）+ full 引擎接入；④`MongoSource` 增量（Change Stream `Watch` + resume token 经 `BinlogPos` 复用引擎游标）+ incr 引擎接入。关键决策：**全量游标 int64→string「最后发出的 PK」**（源升序 last==max，零 MySQL 漂移 + 通吃非数值 PK）；transform 注册表建在 ioc `InitFullEngine/InitIncrEngine` 内（引擎 provider 签名不变，免 wire 重生成）。`go vet ./migrator/...` 全净（顺手清掉 `runPartition` pre-existing unreachable code）。新增 `pipeline/source/mongo.go` · `pipeline/transform/` · `consts.CursorKindResumeToken` · `deploy` 加 `webook-mongo` 单节点副本集 · `config` mongo 段 · `integration/mongo_{,incr_}e2e_test.go`。**两 e2e 对真副本集 Mongo 验证 PASS**。
+
+### 八、扩展点 / v2 路线图（按生产场景演进）
+
+v1 已交付全集功能；下列项为接口扩展点（v1 已抽象，按生产场景注入实现）或显式 v2 范围（需架构决策）。完整对照见 [`webook/migrator/CLAUDE.md`](webook/migrator/CLAUDE.md)「设计范围与扩展点」。
+
+1. **DSN 真 Vault/K8s Secret 解析**：实现 `pipeline/dsn.PerTaskResolver` 替换 `StaticResolver`，按 `task.SourceDsnRef`/`SinkDsnRef` 解明文 DSN + LRU `*gorm.DB` 连接池；同模式扩展异构 sink（按 `task.SinkDsnRef` 支持多 ES/Kafka/CK/Mongo 集群）。
+2. **多 cdc task 共享 binlog stream**（架构演进，per-task → per-process）：单进程一个 canal client + `IncludeTableRegex` 全订；`IncrEngine` 按 `task.tables` 过滤事件。影响 `BinlogClient` 接口，独立立项。
+3. **Canal GTID 续订模式**：`BinlogClient.Subscribe` 加 `fromGTID` 参数 + `GoMySQLCanalClient` GTID 实现 + MySQL `--gtid-mode=ON --enforce-gtid-consistency=ON`。
+4. **CK / Kafka verify-dst Source**：在 `SourceFactory.BuildDst` 加 switch case 复用对应 Source 实现（参考 mysql / es / mongo 分支模板，~200 行各）。
+5. **RBAC scope 中间件回接**：webook-core 起 SSO 签发链路后，挂回 `web/middleware/rbac.go` 走 `migrator:{read,write,switch,repair}` scope 校验。
+6. **Throttle 运行时实时调速**：`engine` 暴露 `SetConfig` + atomic 字段实时反映 yaml/Redis 改动。
+7. **Canal Prometheus 指标增强**：`connection_status` / `events_total` / lag 平稳态（无事件时返 0 而非 stale）。
+8. **dev/staging/prod yaml 按部署目标补完**：local.yaml 已配 `migrator.{canal,mongo,es}.*` 全集；其他环境按部署目标库参数复制即可。
+9. **Mongo `_id` 全量游标 mid-shard resume**：`Source.FullScan` 签名扩展（影响所有 source）；v1 走 `MongoSink.ReplaceOne` upsert 幂等重扫兜底，已知设计选择。
+10. **2026-05-26 之前的 webook_migrator 库一次性升级**：旧实例如已跑过 cdc，`migration_checkpoint.phase='incr'` 行可能为空（§六 修复前的现象），重启前手工 INSERT 一行兜底位点；见下「部署侧手动迁移 SQL」段。
+
+### 部署侧手动迁移 SQL（已有 webook_migrator 库升级前必跑）
+
+```sql
+-- 1. validate_log 去重 + 换索引（去 repaired 字段）
+DELETE v1 FROM migration_validate_log v1
+  INNER JOIN migration_validate_log v2
+  ON v1.task_id=v2.task_id AND v1.table_name=v2.table_name
+     AND v1.biz_id=v2.biz_id AND v1.id < v2.id;
+ALTER TABLE migration_validate_log
+  DROP INDEX uk_migration_validate_log_dedup,
+  ADD UNIQUE INDEX uk_migration_validate_log_dedup (task_id, table_name, biz_id);
+
+-- 2. webook-mysql 容器升级让 docker-compose 新参数生效。**推荐方式（保数据）**:
+-- 手动跑一次 canal 用户 SQL,然后 restart 容器,不删 volume:
+-- mysql -h 127.0.0.1 -uroot -p13520 < deploy/mysql/init/01-canal-user.sql
+-- docker compose -p webook-local restart webook-mysql
+--
+-- ⚠️ 暴力方式(会清 webook / chat / migrator 所有库,**先 dump 备份**):
+-- docker exec webook-mysql mysqldump -uroot -p13520 --all-databases > /tmp/backup.sql
+-- docker compose -p webook-local stop webook-mysql
+-- docker volume rm webook-local_mysql-data
+-- ./deploy.sh local
+
+-- 3. 清残留 Idempotency Redis key（可选）
+-- redis-cli -a <pass> KEYS 'webook:idem:*' | xargs redis-cli -a <pass> DEL
+
+-- 4. 任意源框架 schema 升级（已有 webook_migrator 库,来自 05-27）：
+ALTER TABLE migration_task ADD COLUMN source_type varchar(32) NOT NULL DEFAULT 'mysql' AFTER kind;
+ALTER TABLE migration_validate_log MODIFY COLUMN biz_id varchar(64) NOT NULL;
+ALTER TABLE dead_letter MODIFY COLUMN biz_id varchar(64) NOT NULL;
+```
+
+**会话**: 260525-migrator-Step8-对账调试 + 260526-migrator-binlogpos修复 + 260527-migrator-任意源框架（v1 合并）
+**发布**: 待发布
+
+---
+
+## [2026-05-19] webook-migrator 部署 / CI / 监控同步（补齐 CLAUDE.md 服务拆分 14 项）
+
+**变更内容**: 补齐 2026-05-16 migrator 服务初版遗留的 9 项部署/CI/监控同步，使其与 webook-core / webook-chat 处于同一就绪等级，可走 `./deploy.sh <env>` 起服务、被 Prometheus 抓取、Grafana 看板/告警生效、GitHub Actions 自动构建镜像
+
+**影响范围**:
+- 新增 `webook/migrator/Dockerfile`（多阶段构建，抄 chat/Dockerfile 改 build target = `./migrator`）
+- 新增 `.github/workflows/webook-migrator-ci.yml`（lint-test + build-push，tag 模式 `webook-migrator-v*.*.*`）
+- 新增 `deploy/grafana/provisioning/alerting/webook-migrator.yml`（up / 5xx / P99 / goroutines 4 类告警，`{job="webook-migrator"}` 限定）
+- 新增 `deploy/grafana/provisioning/dashboards/webook-migrator.json`（8 panel：up + QPS + P50/95/99 + Go runtime 3 + 业务 lag/dead-letter 2）
+- 改 `deploy/docker-compose.yaml`：加 `webook-migrator` service 段（depends_on mysql/redis、healthcheck :8083/health、mem_limit MIGRATOR_MEM 默认 384m）
+- 改 `deploy/nginx/conf.d/default.conf`：加 `upstream webook_migrator` + `/api/migrator/` location（白名单 IP，剥 /api 前缀转 :8083）
+- 改 `deploy/prometheus/prometheus.yml`：加 `job_name: webook-migrator` target `webook-migrator:8083/metrics`
+- 改 `deploy/.env.{local,dev,staging,prod}` + 4 份 `.example`：加 `MIGRATOR_IMAGE_TAG` / `MIGRATOR_APP_ENV`（实际部署用最小集 2 个；example 完整含 `MIGRATOR_MEM/GOMEMLIMIT/GOGC` 5 个）
+- 收尾延续：改 `deploy/docker-compose.local.yaml` 补 `webook-migrator` local override（chat/core/fe 都有，独缺 migrator → `./deploy.sh local` 会去拉 ghcr 失败）；`.env.local{,.example}` 加 `MIGRATOR_HOST_PORT=8083` 让 local override 暴露宿主端口
+- 收尾延续：`webook/migrator/README.md` 加 0.7 docker compose 容器模式段（验证容器 + nginx + prometheus + grafana + CI 入口）+ 附录 A 业务侧 SDK 接入自测 8 步（搬自 `prd/migrator/code-reading-guide.md §16.5`）；§16.5 改成指针段引用 README 附录 A
+
+**技术决策**:
+- 不新建 `deploy/prometheus/rules/webook-migrator.rules.yml` — 现有 `webook-services.rules.yml` 已按 `sum by (job)` 自动覆盖任意新 job，migrator 加 prom job 即被记录
+- dashboard 业务 metric 命名 `webook_migration_*`（subsystem 前缀），**不用** `webook_migrator_*`（service 前缀）— 遵 CLAUDE.md「禁止 `webook_<service>_*`」
+- nginx `/api/migrator/` 默认仅放 docker bridge / 内网 IP（公网默认 deny），符合 architecture.md「迁移服务全闭网」要求
+- 4 份 `.env.<env>`（实际部署）只加 IMAGE_TAG + APP_ENV，跟现有 CORE/CHAT 精简风格一致；4 份 `.env.<env>.example` 完整含 MEM/GOMEMLIMIT/GOGC，给部署者参考
+
+**待办**:
+- prod 上线前在 `.env.prod` 把 `MIGRATOR_IMAGE_TAG` 同步到推出的 `webook-migrator-v*.*.*` 真实 tag 号（同 CORE_/CHAT_ 规则）
+- migrator 服务实装 `webook_migration_lag_seconds` / `webook_migration_dead_letter_total` 指标后 dashboard 业务 panel 自动生效
+
+**会话**: 260519-migrator-部署同步
+
+## [2026-05-16] webook-migrator 服务初版（多表 + Canal + 异构 Sink + 完整鉴权）
+
+**变更内容**: 新增独立服务 `webook-migrator`（与 webook-core / webook-chat 并列），完整数据迁移框架 — 全量 / 增量 / 对账 / 切流 / 死信重放 14 endpoint + 业务侧 SDK 接入 + 三件套 PRD/架构/playbook 文档
+
+**影响范围**:
+- 新建 `webook/migrator/`（独立服务，与 chat 平级）：
+  - `service/{full,incr,verify,switching}` 五大引擎；IncrEngine 含 partition 并行（FNV hash + errgroup + min-ckpt resume + ckpt 防回退）
+  - `pipeline/source/`：`MySQLSource`（全量分页 SELECT）+ `CanalSource`（实现 `GoMySQLCanalClient` 基于 `go-mysql-org/go-mysql/canal` 真订阅 binlog）；`SourceFactory` 按 task.Mode 分发
+  - `pipeline/sink/`：`MySQLSink`（INSERT ... ON DUP KEY UPDATE + Version 乐观锁）+ `ESSink` + `ClickHouseSink` + `MongoSink` + `KafkaSink`；`SinkFactory` 按 task.SinkType 分发
+  - `domain.Task`：`Tables()` / `PickTable(idx)` 支持任务内多张表；`EncodeShardNo(tableIdx, shardNo)` 解决 checkpoint 表冲突
+  - `web/`：14 endpoint（CRUD + Lifecycle 11 + Query）+ middleware（idempotency / audit / RBAC 4 scope）；handler 持 factory 运行时按 task.id 动态构造 Source/Sink
+  - `repository/dao/`：5 张控制库表（task / checkpoint / validate_log / audit_log / dead_letter）
+  - `config/`：5 份 yaml（local/test/dev/staging/prod），含 partitionCount + Canal / ES / CK / Mongo / Kafka 配置段
+  - `ioc/`：8 Provider + InitRBACBuilder + Rate-Limit middleware
+  - `integration/`：e2e（CRUD + idempotency + audit + 401/403/429 鉴权 5 子测）
+- 新建 `webook/internal/migratorsdk/`：业务侧接入接口
+  - `SwitchReader.ChooseSide` 按 stage + gray 决策 OLD/NEW 路由
+  - `DualWriter.Write` 按 stage 分阶段双写策略
+  - `NoOp` / `Redis` 两套实现 + `FailureRecorder` 双写失败兜底
+- 主仓 `webook/internal/wire.go` + `migrator_sdk.go`：yaml flag `migrator.sdk.enabled` 决定注入 NoOp / Redis 实现
+- 新建 `prd/migrator/` 文档套件：PRD / architecture / zero-downtime-playbook / task-module-design / code-reading-guide / cutover-checklist / 10 runbooks / drill-records / postmortems
+- `webook/go.mod` 加 5 个异构 SDK 依赖：`go-mysql v1.15.0` / `elastic v8.19.6` / `clickhouse-go v2` / `mongo-driver v1.17.9` / `sarama`
+
+**技术决策**:
+- IncrEngine partition 并行：单一订阅 → dispatcher FNV-hash → N partition channel → 各 worker 攒批 / Sink.Apply / checkpoint。subscriber / dispatcher / workers 全进 errgroup，任一失败 gctx cancel 全部退出（无 goroutine leak）
+- 多 partition resume 正确性：load 全部 partition ckpt → `min(各 partition CursorValue)` 作 IncrSubscribe 起点 + worker 保留 startPos 防 ckpt 回退（fast partition 重放安全靠 Sink 幂等 + Version 乐观锁兜底）
+- BinlogPos 比较：先比 file 字典序（zero-padded `mysql-bin.000001` 保证字典序 = 数字序）再比 pos 数字（不能字典序 — `"100" < "99"` 字典序但 100 > 99 数值序）
+- 任务内多表分发：checkpoint shard_no 编码 `tableIdx * ShardStride + realShardNo`（ShardStride=10000，每张表最多 1 万 shard，最多 21474 张表）
+- factory 模式：引擎 / handler 持 factory，运行时按 task.id Get → BuildSrc/BuildDst 构造对应 Source/Sink；wire 不再注入静态 Source/Sink 实例
+- Sink 异构分发：MySQLSinkFactory 默认 MySQL；task.SinkType=es/clickhouse/mongo/kafka → 调 heteroBuilder（ioc 注入，按 yaml 配 ES client / CK conn / Mongo Connect / Kafka SyncProducer）
+- ESSink 乐观锁：external version_type + Mutation.Version → ES 自动拒老 version 写入（409 conflict，业务层视为正常跳过）
+- ClickHouseSink：insert 走 ReplacingMergeTree(version)，delete 走 `ALTER TABLE ... DELETE`（CK 异步删除）
+- KafkaSink：key=PK → HashPartitioner 同 PK 落同 partition 保单行顺序
+- RBAC：4 scope（read/write/switch/repair）+ ScopeExtractor 函数式注入（生产 Redis lookup，本地 NoOp 全 scope）；挂到 14 endpoint
+- Rate-Limit：复用 `pkg/ginx/middleware/ratelimit` 滑动窗口（默认 1 秒 100 req / IP，yaml 可覆盖）
+
+**待办**:
+- 部署到 dev 后跑端到端验证（部署同步已于 2026-05-19 补齐：Dockerfile / docker-compose / nginx / prometheus job + dashboard / grafana alerting + dashboard / .env MIGRATOR_* / GitHub Actions CI 全到位）
+
+**会话**: 260516-migrator-完整版
+
+
+
 ## [2026-05-12] k8s 部署目录上移到仓库根 + 去冗余前缀
 
 **变更内容**: `webook/k8s/`（10 个 YAML）整体上移到仓库根 `kubernetes/`，与 `deploy/` 并列；文件名去掉冗余的 `k8s-` 前缀

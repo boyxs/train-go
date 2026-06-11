@@ -65,6 +65,29 @@ services:
       retries: 6
       start_period: 20s
 
+  # ── migrator 控制台服务（独立控制库 webook_migrator，需 mysql binlog 已开启） ──
+  webook-migrator:
+    image: ${GHCR_REGISTRY:-ghcr.io}/${GH_USER}/webook-migrator:${MIGRATOR_IMAGE_TAG}
+    container_name: webook-migrator
+    restart: always
+    mem_limit: ${MIGRATOR_MEM:-384m}
+    environment:
+      APP_ENV: "${MIGRATOR_APP_ENV}"     # .env.<env> 指定 config/<env>.yaml
+      DEPLOY_ENV: "${DEPLOY_ENV}"
+      TZ: "Asia/Shanghai"
+      GOMEMLIMIT: "${MIGRATOR_GOMEMLIMIT:-320MiB}"
+      GOGC: "${MIGRATOR_GOGC:-80}"
+    depends_on:
+      webook-mysql:   {condition: service_healthy}    # canal 订阅 binlog + 控制库读写
+      webook-redis:   {condition: service_healthy}    # stage/gray/throttle/propose 控制位
+    healthcheck:
+      # /health 探活（migrator/ioc/web.go:41 注册）；让 nginx depends_on 能等到 migrator 真正起来
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8083/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 20s
+
   # ── 前端 + 反向代理 ──────────────────────────────────────
   webook-fe:
     image: ${GHCR_REGISTRY:-ghcr.io}/${GH_USER}/webook-fe:${FE_IMAGE_TAG}
@@ -83,12 +106,23 @@ services:
     restart: always
     pull_policy: missing
     mem_limit: ${MYSQL_MEM:-768m}       # 实机验证：<400m 首次 InnoDB init 会 cgroup OOM
+    # ── canal 增量同步硬前提 ──────────────────────────────────
+    # binlog + ROW + FULL row image:canal 拉 binlog 解 RowsEvent 必需
+    # server-id=1:必须 < canal 实例 serverIdBase(1001),避免主从 ID 冲突
+    # mysql_native_password:go-mysql canal SDK 兼容(默认 caching_sha2 部分版本握手失败)
+    command:
+      - --server-id=1
+      - --log-bin=mysql-bin
+      - --binlog-format=ROW
+      - --binlog-row-image=FULL
+      - --default-authentication-plugin=mysql_native_password
     environment:
       MYSQL_ROOT_PASSWORD: "${MYSQL_PASS}"
       MYSQL_DATABASE: webook
       TZ: "Asia/Shanghai"
     volumes:
       - mysql-data:/var/lib/mysql
+      - ./mysql/init:/docker-entrypoint-initdb.d  # 首次启动跑 init/*.sql 建 canal 用户
     healthcheck:
       # CMD-SHELL 稳：shell 解析参数；-h 127.0.0.1 比 localhost 稳（mysql 8 socket 处理有坑）
       # 不传 -p：ping 不需要认证，密码不同步时不误判
@@ -194,6 +228,25 @@ services:
     profiles: ["llm"]                    # COMPOSE_PROFILES=llm ./deploy.sh <env> 启用
     volumes:
       - ollama-data:/root/.ollama
+
+  # Mongo：migrator 异构「源」（Mongo→MySQL 全量 + 增量 Change Stream）+「目标」（MySQL→Mongo sink）用。
+  # Change Stream 需副本集：起单节点 rs0；首次起容器后执行一次
+  #   docker exec webook-mongo mongosh --quiet --eval "rs.initiate()"
+  # 客户端用 ?directConnection=true 连（见各 config/*.yaml 的 migrator.mongo.uri）。
+  webook-mongo:
+    image: mongo:7.0
+    container_name: webook-mongo
+    restart: always
+    pull_policy: missing
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    mem_limit: ${MONGO_MEM:-512m}
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
 
   # ── Exporters ────────────────────────────────────────────
   webook-mysqld-exporter:
@@ -420,6 +473,7 @@ volumes:
   kafka-data:
   es-data:
   ollama-data:
+  mongo-data:
   prometheus-data:
   grafana-data:
   otel-collector-storage:

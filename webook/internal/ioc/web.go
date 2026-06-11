@@ -102,9 +102,6 @@ func InitMiddlewares(
 	}
 }
 
-// ConfigChangeCallbacks 远程配置变更时调用
-var ConfigChangeCallbacks []func()
-
 func loggerMiddleware(l logger.LoggerX) gin.HandlerFunc {
 	builder := accesslog.NewLoggerMiddlewareBuilder(func(ctx context.Context, val accesslog.RequestLog) {
 		// 正式环境 默认 INFO，不输出 DEBUG

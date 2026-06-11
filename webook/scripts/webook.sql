@@ -98,6 +98,28 @@ CREATE TABLE `published_article`  (
 ) ENGINE = InnoDB AUTO_INCREMENT = 36 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic COMMENT = '文章线上库（读者可见，发布后从 article 同步而来）';
 
 -- ----------------------------
+-- Table structure for published_article_v1（迁移 NEW 侧）
+-- 与 published_article schema 同构，供 migratorsdk 双写 / 切读演练；
+-- 启用 migrator.sdk.enabled=true 时 NEW 侧 DAO 操作此表。
+-- ----------------------------
+DROP TABLE IF EXISTS `published_article_v1`;
+CREATE TABLE `published_article_v1`  (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `title` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '标题（快照）',
+  `content` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '正文（快照，BLOB）',
+  `abstract` varchar(256) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '摘要（快照）',
+  `author_id` bigint NULL DEFAULT NULL COMMENT '作者 id',
+  `status` tinyint UNSIGNED NULL DEFAULT NULL COMMENT '状态：2=公开可读 3=仅自己可见',
+  `category` varchar(32) NOT NULL DEFAULT '' COMMENT '分类：tech/career/life/ai/other',
+  `created_at` bigint NULL DEFAULT NULL COMMENT '发布时间（Unix 毫秒）',
+  `updated_at` bigint NULL DEFAULT NULL COMMENT '更新时间（Unix 毫秒）',
+  `deleted_at` bigint NOT NULL DEFAULT 0 COMMENT '软删除时间（0=未删）',
+  PRIMARY KEY (`id`) USING BTREE,
+  INDEX `idx_published_article_v1_author_id`(`author_id` ASC) USING BTREE,
+  INDEX `idx_published_article_v1_category`(`category` ASC) USING BTREE
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic COMMENT = '文章线上库 NEW 侧（migratorsdk 双写演练目标）';
+
+-- ----------------------------
 -- Records of published_article
 -- ----------------------------
 INSERT INTO `published_article` VALUES (1, 'Go 并发编程入门', 'goroutine 是 Go 语言最核心的并发原语。不同于操作系统线程，goroutine 由 Go runtime 调度，初始栈仅 2KB，创建成本极低。配合 channel 可以实现优雅的 CSP 并发模型...', 'goroutine 是 Go 语言最核心的并发原语。不同于操作系统线程，goroutine 由 Go runtime 调度，初始栈仅 2KB，创建成本极低。配合 channel 可以实现优雅的 CSP 并发模型...', 1, 2, 'tech', 1772330400000, 1772330400000, 0);

@@ -1,0 +1,122 @@
+{
+  "uid": "webook-migrator",
+  "title": "Webook Migrator（服务详情）",
+  "tags": ["webook", "migrator", "service"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "templating": { "list": [] },
+  "annotations": { "list": [] },
+  "links": [
+    { "title": "服务总览", "url": "/d/services-overview", "type": "link", "icon": "dashboard" },
+    { "title": "Webook Overview", "url": "/d/webook-overview", "type": "link", "icon": "dashboard" },
+    { "title": "Webook Ops（深挖）", "url": "/d/webook-ops", "type": "link", "icon": "dashboard" }
+  ],
+  "panels": [
+    {
+      "type": "row",
+      "title": "服务存活 + HTTP",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "collapsed": false
+    },
+    {
+      "type": "stat",
+      "title": "实例存活（up）",
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "up{job=\"webook-migrator\"}", "legendFormat": "{{instance}}" }],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "background",
+        "orientation": "horizontal",
+        "textMode": "value_and_name"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "DOWN", "color": "red" } } },
+            { "type": "value", "options": { "1": { "text": "UP", "color": "green" } } }
+          ],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] }
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "QPS（按 status 拆）",
+      "gridPos": { "h": 5, "w": 9, "x": 6, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "sum by (status) (rate(webook_http_requests_total{job=\"webook-migrator\"}[5m]))", "legendFormat": "{{status}}" }],
+      "fieldConfig": { "defaults": { "unit": "reqps" } }
+    },
+    {
+      "type": "timeseries",
+      "title": "P50 / P95 / P99 延迟",
+      "gridPos": { "h": 5, "w": 9, "x": 15, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "webook:http_duration_p50:rate5m{job=\"webook-migrator\"}", "legendFormat": "p50" },
+        { "expr": "webook:http_duration_p95:rate5m{job=\"webook-migrator\"}", "legendFormat": "p95" },
+        { "expr": "webook:http_duration_p99:rate5m{job=\"webook-migrator\"}", "legendFormat": "p99" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+
+    {
+      "type": "row",
+      "title": "Go runtime",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 6 },
+      "collapsed": false
+    },
+    {
+      "type": "timeseries",
+      "title": "Goroutine 数",
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 7 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "go_goroutines{job=\"webook-migrator\"}", "legendFormat": "{{instance}}" }],
+      "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "yellow", "value": 1000 }, { "color": "red", "value": 5000 }] } } }
+    },
+    {
+      "type": "timeseries",
+      "title": "堆内存（heap_inuse）",
+      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 7 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "go_memstats_heap_inuse_bytes{job=\"webook-migrator\"}", "legendFormat": "{{instance}}" }],
+      "fieldConfig": { "defaults": { "unit": "bytes" } }
+    },
+    {
+      "type": "timeseries",
+      "title": "GC 暂停（pause_ns avg）",
+      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 7 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "rate(go_gc_pause_seconds_sum{job=\"webook-migrator\"}[5m])", "legendFormat": "{{instance}}" }],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+
+    {
+      "type": "row",
+      "title": "迁移业务（lag / dead-letter）",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 13 },
+      "collapsed": false
+    },
+    {
+      "type": "timeseries",
+      "title": "增量同步 lag（ms，src=消费进度 / dst=写入进度）",
+      "description": "仅运行中任务有样本。持续 src>60s 看 runbooks/lag-spike.md",
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 14 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "webook_migration_lag_ms{job=\"webook-migrator\"}", "legendFormat": "task={{task_id}} {{side}}" }],
+      "fieldConfig": { "defaults": { "unit": "ms", "thresholds": { "mode": "absolute", "steps": [{ "color": "green" }, { "color": "yellow", "value": 30000 }, { "color": "red", "value": 60000 }] } } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Dead Letter 未重放数",
+      "description": "持续上涨看 runbooks/dead-letter-growing.md；replay-dl 后应回落",
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 14 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "webook_migration_dead_letter_unreplayed{job=\"webook-migrator\"}", "legendFormat": "task={{task_id}}" }]
+    }
+  ]
+}

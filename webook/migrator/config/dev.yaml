@@ -1,0 +1,66 @@
+# migrator dev 环境配置（团队共享 dev / CI 集成测试）
+# 差异点：otel.env=dev / sampleRatio=1.0（全采样便于调试）/ logger debug
+# 控制库独立：webook_migrator（与 webook / webook_chat 不分库共用 MySQL 实例，逻辑库隔离）
+
+# 远程配置中心：与主仓共用 etcd 实例，path 独立（/webook-migrator 不踩其他服务）
+etcd:
+  endpoint: "http://webook-etcd:2379"
+  path: "/webook-migrator"
+  type: "yaml"
+
+http:
+  addr: ":8083"
+
+# dev 起着 webook-core 签发 token；JWT 校验生效
+web:
+  jwt:
+    disabled: false
+
+mysql:
+  dsn: 'root:13520@tcp(webook-mysql:3306)/webook_migrator?parseTime=true&loc=UTC'
+
+redis:
+  addr: 'webook-redis:6379'
+  password: '13520'
+
+logger:
+  level:
+    l: -1
+  development: true
+  encoding: 'json'
+  outputPaths: [ 'stdout' ]
+  errorOutputPaths: [ 'stderr' ]
+
+otel:
+  endpoint: "otel-collector:4317"
+  serviceName: "webook-migrator"
+  serviceVersion: "0.1.0"
+  env: "dev"
+  sampleRatio: 1.0
+
+# 表名 / PK 列从 task.TablesJSON 读取（创建 task 时配）
+migrator:
+  full:
+    batchSize: 1000
+    channelBuf: 4096
+  incr:
+    batchSize: 100
+    channelBuf: 4096
+    # partition 并行：按 PK FNV-hash 分发到 N 个 worker；同 PK 始终落同 partition 保单行顺序。
+    # dev 单 partition 跑（数据量小）；staging / prod 按业务峰值调
+    partitionCount: 1
+  verify:
+    batchSize: 1000
+    channelBuf: 4096
+  # cdc 增量订阅;dev 用 1001 段错开 staging(2001)/prod(3001) 避免 binlog 槽位冲突
+  canal:
+    addr: "webook-mysql:3306"
+    user: "canal"
+    password: "canal"
+    serverIdBase: 1001
+    flavor: "mysql"
+  es:
+    addrs:
+      - "http://webook-es:9200"
+    # username: ""
+    # password: ""

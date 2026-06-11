@@ -1,0 +1,1690 @@
+{
+  "info": {
+    "_postman_id": "webook-migrator-e2e",
+    "name": "Go",
+    "description": "webook-migrator v1 — 手动测试集（14 endpoint + 切流状态机 + 异构对账 + 任意源框架）\n\n## 用法\n\n1. Import 后按 A1 → A12 顺序执行 A 段（同构 MySQL→MySQL 完整生命周期，覆盖全部 14 endpoint）。\n2. B1/B2/B3 演示异构方向（任意源框架）：B1 Mongo→MySQL、B2 MySQL→Mongo、B3 MySQL→ES。\n3. 请求体里的 `{{baseUrl}}` / `{{taskId}}` 等是 Postman 变量，在 Collection Variables 里改。\n\n## Collection Variables\n\n| key | 默认 | 说明 |\n|-----|------|------|\n| baseUrl | http://localhost:8083 | migrator 服务地址 |\n| taskId | 1 | A 段 task id（A2 创建后回填） |\n| taskName | art_schema_v1 | A 段 task name；Redis stage/gray key 用它 |\n| taskIdB1/B2/B3 | (空) | B 段各任务 id |\n| taskNameB1/B2/B3 | user_mongo_to_mysql / article_to_mongo / art_to_es_v1 | B 段各 task name |\n\n## 与 README 对齐\n\n本 collection 编号 A1-A12 / B1-B3 与 `webook/migrator/README.md` 章节号一一对应。请求里的期望响应字段名（如 mismatchVO 的 camelCase）与 v1 实际 API 形态一致。",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "A1 健康检查",
+      "item": [
+        {
+          "name": "A1 GET /health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ],
+              "description": ""
+            },
+            "description": "期望：{\"service\":\"migrator\",\"status\":\"ok\"}"
+          },
+          "description": ""
+        },
+        {
+          "name": "A1 GET /metrics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/metrics",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "metrics"
+              ],
+              "description": ""
+            },
+            "description": "期望：Prometheus exposition 格式 (# HELP / # TYPE / 指标数值)"
+          },
+          "description": ""
+        }
+      ],
+      "description": ""
+    },
+    {
+      "name": "A2-A3 任务 CRUD（创建 / 列表 / 详情）",
+      "item": [
+        {
+          "name": "A2 POST /migrator/tasks 创建任务",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": ""
+              },
+              {
+                "key": "x-access-token",
+                "value": "{{accessToken}}",
+                "type": "text",
+                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"art_schema_v1\",\n  \"mode\": \"cdc\",\n  \"kind\": \"schema\",\n  \"sourceDsnRef\": \"vault:src\",\n  \"sinkType\": \"mysql\",\n  \"sinkDsnRef\": \"vault:dst\",\n  \"tables\": [{\"src\": \"article\", \"dst\": \"article_v1\", \"partitionKey\": \"id\"}]\n}",
+              "options": {
+                "raw": {
+                  "language": "json",
+                  "description": ""
+                },
+                "description": ""
+              },
+              "description": ""
+            },
+            "url": {
+              "raw": "{{baseUrl}}/migrator/tasks",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "migrator",
+                "tasks"
+              ],
+              "description": ""
+            },
+            "description": "期望：{\"code\":0,\"data\":{\"taskId\":1}}\n\n验证：\n- task 表有 1 行\n- audit_log 表有 1 行，payload 中 sourceDsnRef/sinkDsnRef 被 mask 成 ***"
+          },
+          "description": ""
+        },
+        {
+          "name": "A3 GET /migrator/tasks 列表",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-access-token",
+                "value": "{{accessToken}}",
+                "type": "text",
+                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/migrator/tasks?offset=0&limit=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "migrator",
+                "tasks"
+              ],
+              "query": [
+                {
+                  "key": "offset",
+                  "value": "0",
+                  "description": ""
+                },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": ""
+                }
+              ],
+              "description": ""
+            },
+            "description": "期望：{\"code\":0,\"data\":{\"list\":[TaskVO],\"total\":1}}"
+          },
+          "description": ""
+        },
+        {
+          "name": "A3 GET /migrator/tasks/:id 详情",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-access-token",
+                "value": "{{accessToken}}",
+                "type": "text",
+                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/migrator/tasks/{{taskId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "migrator",
+                "tasks",
+                "{{taskId}}"
+              ],
+              "description": ""
+            },
+            "description": "期望：TaskVO（屏蔽了 sourceDsnRef/sinkDsnRef/tables_json 敏感字段）"
+          },
+          "description": ""
+        }
+      ],
+      "description": ""
+    },
+    {
+      "name": "A4 Preflight 飞行前检查",
+      "item": [
+        {
+          "name": "A4 POST /migrator/preflight",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": ""
+              },
+              {
+                "key": "x-access-token",
+                "value": "{{accessToken}}",
+                "type": "text",
+                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"sourceDsnRef\":\"vault:src\",\"tables\":[\"article\"]}",
+              "options": {
+                "raw": {
+                  "language": "json",
+                  "description": ""
+                },
+                "description": ""
+              },
+              "description": ""
+            },
+            "url": {
+              "raw": "{{baseUrl}}/migrator/preflight",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "migrator",
+                "preflight"
+              ],
+              "description": ""
+            },
+            "description": "期望：{\"code\":0,\"data\":{\"binlog_format\":\"ROW\",\"gtid_mode\":\"OFF\",\"read_replica_lag\":0,\"ready\":true,\"tables_missing_pk\":[],\"tables_with_pk\":[\"article\"]}}\n\nv1 已实现真查源库：handler 通过 dsn.Resolver 解源 db → SHOW VARIABLES 查 binlog_format/gtid_mode + information_schema 查表 PK。binlog_format=ROW + 每张表有 PK → ready=true（gtid_mode 是信息性字段不进 ready 判断，v1 binlog file/pos 续订不依赖 GTID）"
+          },
+          "description": ""
+        }
+      ],
+      "description": ""
+    },
+    {
+      "name": "A5-A6 启动全量同步 / 增量同步",
+      "item": [
+        {
+          "name": "A5  POST /tasks/:id/start phase=full",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": ""
+              },
+              {
+                "key": "x-access-token",
+                "value": "{{accessToken}}",
+                "type": "text",
+                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phase\": \"full\",\n  \"shards\": [{\"no\": 0, \"pkMin\": 1, \"pkMax\": 100, \"batchSz\": 1000}]\n}",
+              "options": {
+                "raw": {
+                  "language": "json",
+                  "description": ""
+                },
+                "description": ""
+              },
+              "description": ""
+            },
+            "url": {
+              "raw": "{{baseUrl}}/migrator/tasks/{{taskId}}/start",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "migrator",
+                "tasks",
+                "{{taskId}}",
+                "start"
+              ],
+              "description": ""
+            },
+            "description": "期望（立即返回，异步跑）：{\"code\":0,\"data\":{\"started\":\"full\"}}\n\n等 2 秒后验证：\n- SELECT id, title FROM article_v1 ORDER BY id → 3 行从 article 同步过来\n- SELECT * FROM checkpoint → 1 | full | 0 | id_range | 3（lastPK=3）\n\n前提：article + article_v1 表已建，article 表有数据（见 collection description 的 SQL）"
+          },
+          "description": ""
+        },
+        {
+          "name": "A6.1 POST /tasks/:id/start phase=incr（v1 实装：源端 mysql 走 canal binlog / 源端 mongo 走 Change Stream）",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": ""
+              },
+              {
+                "key": "x-access-token",
+                "value": "{{accessToken}}",
+                "type": "text",
+                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"phase\":\"incr\"}",
+              "options": {
+                "raw": {
+                  "language": "json",
+                  "description": ""
+                },
+                "description": ""
+              },
+              "description": ""
+            },
+            "url": {
+              "raw": "{{baseUrl}}/migrator/tasks/{{taskId}}/start",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "migrator",
+                "tasks",
+                "{{taskId}}",
+                "start"
+              ],
+              "description": ""
+            },
+            "description": "期望：{\"code\":0,\"data\":{\"started\":\"incr\"}}\n\n但 IncrEngine 注入的是 MySQLSource，IncrSubscribe 返 ErrIncrNotSupported。\n看服务日志会有 'IncrEngine.Run failed: ... source ... does not support IncrSubscribe'。\n真实增量需要接 GoMySQLCanalClient。"
+          },
+          "description": ""
+        },
+        {
+          "name": "A6.4 GET /tasks/:id/lag （v1 已实现双侧延迟）",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-access-token",
+                "value": "{{accessToken}}",
+                "type": "text",
+                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/migrator/tasks/{{taskId}}/lag",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "migrator",
+                "tasks",
+                "{{taskId}}",
+                "lag"
+              ],
+              "description": ""
+            },
+            "description": "v1 返回 {srcLagMs, dstLagMs, lagMs}。\n- srcLagMs：CanalSource 跟最新 binlog 事件 ts 差\n- dstLagMs：IncrEngine 维护 dstLastEventTs sync.Map，每次 Sink.Apply 成功后 CAS 更新\n- lagMs：兼容字段（等同 srcLagMs）\n\n期望（任务 cdc 在跑）：{\"code\":0,\"data\":{\"srcLagMs\":<int>,\"dstLagMs\":<int>,\"lagMs\":<int>}}\n如未跑 cdc 或未注入 IncrEngine → 503 lag unavailable。"
+          },
+          "description": ""
+        }
+      ],
+      "description": ""
+    },
+    {
+      "name": "A7 暂停（POST /pause）",
+      "item": [
+        {
+          "name": "A7 POST /tasks/:id/pause",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-access-token",
+                "value": "{{accessToken}}",
+                "type": "text",
+                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/migrator/tasks/{{taskId}}/pause",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "migrator",
+                "tasks",
+                "{{taskId}}",
+                "pause"
+              ],
+              "description": ""
+            },
+            "description": "期望：\n- 任务在跑：{\"code\":0,\"data\":{\"paused\":true}}\n- 任务已跑完：{\"code\":409,\"msg\":\"task not running (no full / incr engine paused)\"}\n\n本地 3 行数据全量秒级完成，所以一般返 409。大数据量场景才能真停。"
+          },
+          "description": ""
+        }
+      ],
+      "description": ""
+    },
+    {
+      "name": "A8 对账（POST /verify）",
+      "item": [
+        {
+          "name": "A8.2 全量对账（mode=full）",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": ""
+              },
+              {
+                "key": "x-access-token",
+                "value": "{{accessToken}}",
+                "type": "text",
+                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"mode\":\"full\"}",
+              "options": {
+                "raw": {
+                  "language": "json",
+                  "description": ""
+                },
+                "description": ""
+              },
+              "description": ""
+            },
+            "url": {
+              "raw": "{{baseUrl}}/migrator/tasks/{{taskId}}/verify",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "migrator",
+                "tasks",
+                "{{taskId}}",
+                "verify"
+              ],
+              "description": ""
+            },
+            "description": "对账前先制造差异：\n\n```sql\nDELETE FROM article_v1 WHERE id=2;          -- missing\nUPDATE article_v1 SET title='被篡改' WHERE id=3;  -- diff\nINSERT INTO article_v1 (id, title) VALUES (99, '幽灵');  -- extra\n```\n\n期望：{\"code\":0,\"data\":{\"mismatchCount\":3}}"
+          },
+          "description": ""
+        },
+        {
+          "name": "A8.4 采样对账（mode=sample, rate=0.5）",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": ""
+              },
+              {
+                "key": "x-access-token",
+                "value": "{{accessToken}}",
+                "type": "text",
+                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"mode\":\"sample\",\"sampleRate\":0.5}",
+              "options": {
+                "raw": {
+                  "language": "json",
+                  "description": ""
+                },
+                "description": ""
+              },
+              "description": ""
+            },
+            "url": {
+              "raw": "{{baseUrl}}/migrator/tasks/{{taskId}}/verify",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "migrator",
+                "tasks",
+                "{{taskId}}",
+                "verify"
+              ],
+              "description": ""
+            },
+            "description": "期望：mismatchCount 是 PK hash 落入 50% 采样池的差异数（约 1-2 个，PK hash 决定）"
+          },
+          "description": ""
+        },
+        {
+          "name": "A8.4 采样率越界 → 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": ""
+              },
+              {
+                "key": "x-access-token",
+                "value": "{{accessToken}}",
+                "type": "text",
+                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"mode\":\"sample\",\"sampleRate\":0}",
+              "options": {
+                "raw": {
+                  "language": "json",
+                  "description": ""
+                },
+                "description": ""
+              },
+              "description": ""
+            },
+            "url": {
+              "raw": "{{baseUrl}}/migrator/tasks/{{taskId}}/verify",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "migrator",
+                "tasks",
+                "{{taskId}}",
+                "verify"
+              ],
+              "description": ""
+            },
+            "description": "期望：{\"code\":400,\"msg\":\"采样率必须在 (0, 1] 之间\"}"
+          },
+          "description": ""
+        }
+      ],
+      "description": ""
+    },
+    {
+      "name": "A8.3 查差异列表（GET /mismatch）",
+      "item": [
+        {
+          "name": "A8.3 GET /tasks/:id/mismatch（差异明细分页）",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-access-token",
+                "value": "{{accessToken}}",
+                "type": "text",
+                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/migrator/tasks/{{taskId}}/mismatch?offset=0&limit=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "migrator",
+                "tasks",
+                "{{taskId}}",
+                "mismatch"
+              ],
+              "query": [
+                {
+                  "key": "offset",
+                  "value": "0",
+                  "description": ""
+                },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": ""
+                }
+              ],
+              "description": ""
+            },
+            "description": "期望：list 3 行（07 步制造的差异），字段为 camelCase（与 mismatchVO 一致）\n- bizId=\"2\"  mismatchKind=\"missing\"\n- bizId=\"3\"  mismatchKind=\"diff\"   diffDetail 含 \"diff_fields\":[\"title\"]\n- bizId=\"99\" mismatchKind=\"extra\"\n\n响应每行完整字段：id / taskId / direction / bizTable / bizId / mismatchKind / diffDetail / repaired / createdAt / repairedAt"
+          },
+          "description": ""
+        }
+      ],
+      "description": ""
+    },
+    {
+      "name": "A9 修复差异（POST /repair）",
+      "item": [
+        {
+          "name": "A9 mark_only（仅标记不动数据）",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": ""
+              },
+              {
+                "key": "x-access-token",
+                "value": "{{accessToken}}",
+                "type": "text",
+                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"strategy\":\"mark_only\",\"ids\":[1,2,3]}",
+              "options": {
+                "raw": {
+                  "language": "json",
+                  "description": ""
+                },
+                "description": ""
+              },
+              "description": ""
+            },
+            "url": {
+              "raw": "{{baseUrl}}/migrator/tasks/{{taskId}}/repair",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "migrator",
+                "tasks",
+                "{{taskId}}",
+                "repair"
+              ],
+              "description": ""
+            },
+            "description": "前置：先跑 08 步 GET mismatch 拿到 validate_log id（替换 ids 数组）\n\n期望：{\"code\":0,\"data\":{\"repaired\":3}}\n\n验证：SELECT id, repaired, repaired_at FROM validate_log WHERE task_id={{taskId}}\n→ 所有 repaired=1，repaired_at 有值"
+          },
+          "description": ""
+        },
+        {
+          "name": "A9 src_overwrite_dst（用 src 真覆盖 dst）",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": ""
+              },
+              {
+                "key": "x-access-token",
+                "value": "{{accessToken}}",
+                "type": "text",
+                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"strategy\":\"src_overwrite_dst\",\"ids\":[1]}",
+              "options": {
+                "raw": {
+                  "language": "json",
+                  "description": ""
+                },
+                "description": ""
+              },
+              "description": ""
+            },
+            "url": {
+              "raw": "{{baseUrl}}/migrator/tasks/{{taskId}}/repair",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "migrator",
+                "tasks",
+                "{{taskId}}",
+                "repair"
+              ],
+              "description": ""
+            },
+            "description": "期望：{\"code\":0,\"data\":{\"repaired\":N}} — 真用 src 数据覆盖 dst\n\n需要 'Source 点查 + Sink Apply' 组合接口"
+          },
+          "description": ""
+        }
+      ],
+      "description": ""
+    },
+    {
+      "name": "A10 灰度比例（POST /gray）",
+      "item": [
+        {
+          "name": "A10 设 percent=50",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": ""
+              },
+              {
+                "key": "x-access-token",
+                "value": "{{accessToken}}",
+                "type": "text",
+                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"percent\":50}",
+              "options": {
+                "raw": {
+                  "language": "json",
+                  "description": ""
+                },
+                "description": ""
+              },
+              "description": ""
+            },
+            "url": {
+              "raw": "{{baseUrl}}/migrator/tasks/{{taskId}}/gray",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "migrator",
+                "tasks",
+                "{{taskId}}",
+                "gray"
+              ],
+              "description": ""
+            },
+            "description": "期望：{\"code\":0,\"data\":{\"gray\":50}}\n\n验证：\n- redis-cli GET 'migrator:gray:<task name>' → 50（路由决策源）\n- SELECT gray_percent FROM task WHERE id={{taskId}} → 50（冗余持久化）"
+          },
+          "description": ""
+        },
+        {
+          "name": "A10 percent 越界 → 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": ""
+              },
+              {
+                "key": "x-access-token",
+                "value": "{{accessToken}}",
+                "type": "text",
+                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"percent\":200}",
+              "options": {
+                "raw": {
+                  "language": "json",
+                  "description": ""
+                },
+                "description": ""
+              },
+              "description": ""
+            },
+            "url": {
+              "raw": "{{baseUrl}}/migrator/tasks/{{taskId}}/gray",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "migrator",
+                "tasks",
+                "{{taskId}}",
+                "gray"
+              ],
+              "description": ""
+            },
+            "description": "期望：{\"code\":400,\"msg\":\"灰度比例必须在 0-100 之间\"}"
+          },
+          "description": ""
+        }
+      ],
+      "description": ""
+    },
+    {
+      "name": "A11 切流状态机（双人复核 / 同 actor 拦截 / Rollback / 跳级拦截）",
+      "item": [
+        {
+          "name": "A11.1.1 SRC_ONLY → SRC_FIRST",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": ""
+              },
+              {
+                "key": "x-access-token",
+                "value": "{{accessToken}}",
+                "type": "text",
+                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"stage\":\"SRC_FIRST\"}",
+              "options": {
+                "raw": {
+                  "language": "json",
+                  "description": ""
+                },
+                "description": ""
+              },
+              "description": ""
+            },
+            "url": {
+              "raw": "{{baseUrl}}/migrator/tasks/{{taskId}}/switch",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "migrator",
+                "tasks",
+                "{{taskId}}",
+                "switch"
+              ],
+              "description": ""
+            },
+            "description": "默认 stage=SRC_ONLY（Redis 没存就是 SRC_ONLY）。推进到 SRC_FIRST。\n\n期望：{\"code\":0,\"data\":{\"stage\":\"SRC_FIRST\"}}\n\n验证：redis-cli GET 'migrator:stage:<task name>' → SRC_FIRST"
+          },
+          "description": ""
+        },
+        {
+          "name": "A11.1.2 SRC_FIRST → DST_FIRST",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": ""
+              },
+              {
+                "key": "x-access-token",
+                "value": "{{accessToken}}",
+                "type": "text",
+                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"stage\":\"DST_FIRST\"}",
+              "options": {
+                "raw": {
+                  "language": "json",
+                  "description": ""
+                },
+                "description": ""
+              },
+              "description": ""
+            },
+            "url": {
+              "raw": "{{baseUrl}}/migrator/tasks/{{taskId}}/switch",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "migrator",
+                "tasks",
+                "{{taskId}}",
+                "switch"
+              ],
+              "description": ""
+            },
+            "description": "期望：{\"code\":0,\"data\":{\"stage\":\"DST_FIRST\"}}"
+          },
+          "description": ""
+        },
+        {
+          "name": "A11.1.3 DST_FIRST → DST_ONLY propose（第一步）",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": ""
+              },
+              {
+                "key": "x-access-token",
+                "value": "{{accessToken}}",
+                "type": "text",
+                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"stage\":\"DST_ONLY\",\"propose\":\"alice\"}",
+              "options": {
+                "raw": {
+                  "language": "json",
+                  "description": ""
+                },
+                "description": ""
+              },
+              "description": ""
+            },
+            "url": {
+              "raw": "{{baseUrl}}/migrator/tasks/{{taskId}}/switch",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "migrator",
+                "tasks",
+                "{{taskId}}",
+                "switch"
+              ],
+              "description": ""
+            },
+            "description": "期望：{\"code\":412,\"msg\":\"未提议或提议已过期，请先 propose\"}\n（propose 已记录到 Redis，等 approve）\n\n验证：redis-cli GET 'migrator:cutover_propose:<task name>' → alice"
+          },
+          "description": ""
+        },
+        {
+          "name": "A11.1.4 DST_FIRST → DST_ONLY approve（第二步，完成切流）",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": ""
+              },
+              {
+                "key": "x-access-token",
+                "value": "{{accessToken}}",
+                "type": "text",
+                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"stage\":\"DST_ONLY\",\"approve\":\"bob\"}",
+              "options": {
+                "raw": {
+                  "language": "json",
+                  "description": ""
+                },
+                "description": ""
+              },
+              "description": ""
+            },
+            "url": {
+              "raw": "{{baseUrl}}/migrator/tasks/{{taskId}}/switch",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "migrator",
+                "tasks",
+                "{{taskId}}",
+                "switch"
+              ],
+              "description": ""
+            },
+            "description": "approve 必须用不同于 propose 的 actor\n\n期望：{\"code\":0,\"data\":{\"stage\":\"DST_ONLY\"}}\n\n验证：\n- redis-cli GET 'migrator:stage:<task name>' → DST_ONLY\n- redis-cli GET 'migrator:cutover_propose:<task name>' → nil（已消费）"
+          },
+          "description": ""
+        },
+        {
+          "name": "A11.2 双人同 actor 拦截 → 409",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": ""
+              },
+              {
+                "key": "x-access-token",
+                "value": "{{accessToken}}",
+                "type": "text",
+                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"stage\":\"DST_ONLY\",\"propose\":\"alice\",\"approve\":\"alice\"}",
+              "options": {
+                "raw": {
+                  "language": "json",
+                  "description": ""
+                },
+                "description": ""
+              },
+              "description": ""
+            },
+            "url": {
+              "raw": "{{baseUrl}}/migrator/tasks/{{taskId}}/switch",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "migrator",
+                "tasks",
+                "{{taskId}}",
+                "switch"
+              ],
+              "description": ""
+            },
+            "description": "前置：先把 task 1 rollback 到 SRC_FIRST 再 sw-2 推到 DST_FIRST（不然现在已 DST_ONLY 路径不会走双人复核）\n\n期望：{\"code\":409,\"msg\":\"propose 和 approve 必须是不同用户\"}"
+          },
+          "description": ""
+        },
+        {
+          "name": "A11.4 Rollback 幂等 → SRC_FIRST",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": ""
+              },
+              {
+                "key": "x-access-token",
+                "value": "{{accessToken}}",
+                "type": "text",
+                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"stage\":\"ignored\",\"action\":\"rollback\"}",
+              "options": {
+                "raw": {
+                  "language": "json",
+                  "description": ""
+                },
+                "description": ""
+              },
+              "description": ""
+            },
+            "url": {
+              "raw": "{{baseUrl}}/migrator/tasks/{{taskId}}/switch",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "migrator",
+                "tasks",
+                "{{taskId}}",
+                "switch"
+              ],
+              "description": ""
+            },
+            "description": "期望：{\"code\":0,\"data\":{\"stage\":\"SRC_FIRST\"}}\n\n验证：redis-cli GET 'migrator:stage:<task name>' → SRC_FIRST\n\n再发一次同样的 rollback → 幂等返回 SRC_FIRST，不报错"
+          },
+          "description": ""
+        },
+        {
+          "name": "A11.3 跳级拦截 → 409 状态机非法转移",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": ""
+              },
+              {
+                "key": "x-access-token",
+                "value": "{{accessToken}}",
+                "type": "text",
+                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"stage\":\"DST_ONLY\",\"propose\":\"alice\",\"approve\":\"bob\"}",
+              "options": {
+                "raw": {
+                  "language": "json",
+                  "description": ""
+                },
+                "description": ""
+              },
+              "description": ""
+            },
+            "url": {
+              "raw": "{{baseUrl}}/migrator/tasks/{{taskId}}/switch",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "migrator",
+                "tasks",
+                "{{taskId}}",
+                "switch"
+              ],
+              "description": ""
+            },
+            "description": "前置：先 rollback（11.5）确保 stage=SRC_FIRST\n\n期望：{\"code\":409,\"msg\":\"任务状态冲突: SRC_FIRST → DST_ONLY 非法（必须按 SRC_ONLY→SRC_FIRST→DST_FIRST→DST_ONLY 顺序）\"}"
+          },
+          "description": ""
+        }
+      ],
+      "description": ""
+    },
+    {
+      "name": "A12 死信重放（POST /replay-dl）",
+      "item": [
+        {
+          "name": "A12 POST /tasks/:id/replay-dl（注意带 body {} 或 {limit:1000}）",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": ""
+              },
+              {
+                "key": "x-access-token",
+                "value": "{{accessToken}}",
+                "type": "text",
+                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"limit\":1000}",
+              "options": {
+                "raw": {
+                  "language": "json",
+                  "description": ""
+                },
+                "description": ""
+              },
+              "description": ""
+            },
+            "url": {
+              "raw": "{{baseUrl}}/migrator/tasks/{{taskId}}/replay-dl",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "migrator",
+                "tasks",
+                "{{taskId}}",
+                "replay-dl"
+              ],
+              "description": ""
+            },
+            "description": "前置：手插死信（含一条坏 JSON 测失败计数）：\n\n```sql\nINSERT INTO dead_letter (task_id, op, table_name, biz_id, payload) VALUES\n  ({{taskId}}, 'insert', 'article', '100', '{\\\"id\\\":100,\\\"title\\\":\\\"replay-1\\\"}'),\n  ({{taskId}}, 'insert', 'article', '101', '{\\\"id\\\":101,\\\"title\\\":\\\"replay-2\\\"}'),\n  ({{taskId}}, 'insert', 'article', '102', 'this-is-not-json');\n```\n\n期望：{\"code\":0,\"data\":{\"replayed\":2,\"failed\":1}}\n\n验证：\n- SELECT * FROM article_v1 WHERE id IN (100,101) → 2 行\n- SELECT id, replayed, retry_count, last_error FROM dead_letter\n  - id=100, 101: replayed=1, replayed_at 有值\n  - id=102: replayed=0, retry_count=1, last_error 含 'payload unmarshal'（坏 JSON 进 retry）\n\n注意：POST /replay-dl 必须带 body，至少 {} 或 {\"limit\":1000}（handler 用 WrapReq[replayReq]，无 body 返 400）"
+          },
+          "description": ""
+        }
+      ],
+      "description": ""
+    },
+    {
+      "name": "A 段杂项（Throttle 调速 + /lag 双侧延迟，v1 已实现）",
+      "item": [
+        {
+          "name": "POST /tasks/:id/throttle 调速（v1 已实现，下次 Start 生效）",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "description": ""
+              },
+              {
+                "key": "x-access-token",
+                "value": "{{accessToken}}",
+                "type": "text",
+                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"qps\":10000,\"shard_workers\":16}",
+              "options": {
+                "raw": {
+                  "language": "json",
+                  "description": ""
+                },
+                "description": ""
+              },
+              "description": ""
+            },
+            "url": {
+              "raw": "{{baseUrl}}/migrator/tasks/{{taskId}}/throttle",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "migrator",
+                "tasks",
+                "{{taskId}}",
+                "throttle"
+              ],
+              "description": ""
+            },
+            "description": "v1 已实现：TaskService.SetThrottle 经 ThrottleRepository 写 Redis（key=migrator:throttle:<taskId>），Start 时 handler 经 svc.GetThrottle 回读覆盖 ShardSpec.QPSLimit。\n\n期望：{\"code\":0,\"data\":{\"qpsLimit\":<int>}}。\n注意：运行时实时改 qps 不生效——'下次启动生效'语义；运行时实时调速属 v2 范围。"
+          },
+          "description": ""
+        }
+      ],
+      "description": ""
+    },
+    {
+      "name": "B1 Mongo 源 → MySQL（任意源框架：全量 find + 增量 Change Stream）",
+      "description": "前置：本机 Mongo 副本集起着（docker-compose webook-mongo rs0：127.0.0.1:27017,27018）。详见 README §B1。\n\n变量：{{taskIdB1}}=B1.3 返回的 taskId，{{taskNameB1}}=user_mongo_to_mysql。",
+      "item": [
+        {
+          "name": "B1.3 POST /migrator/tasks 建 Mongo→MySQL 任务（sourceType=mongo + transform）",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-access-token",
+                "value": "{{accessToken}}",
+                "type": "text",
+                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"user_mongo_to_mysql\",\n  \"mode\": \"cdc\",\n  \"kind\": \"heterogeneous\",\n  \"sourceType\": \"mongo\",\n  \"sourceDsnRef\": \"vault:mongo-src\",\n  \"sinkType\": \"mysql\",\n  \"sinkDsnRef\": \"vault:dst\",\n  \"tables\": [{\"src\": \"user_demo\", \"dst\": \"user_demo\", \"partitionKey\": \"_id\", \"transform\": \"mongo_to_relational\"}]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/migrator/tasks",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "migrator",
+                "tasks"
+              ]
+            },
+            "description": "建 Mongo→MySQL 异构任务：sourceType=mongo + 表上 transform=mongo_to_relational 让 MongoToRelational 把嵌套子文档/数组拍平成 JSON 列。\n\n期望：{\"code\":0,\"data\":{\"taskId\":<N>}}。把返回值存 Collection Variable taskIdB1。"
+          }
+        },
+        {
+          "name": "B1.4 POST /tasks/:id/start full（find 流式 → 拍平 → 落 MySQL）",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-access-token",
+                "value": "{{accessToken}}",
+                "type": "text",
+                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"phase\":\"full\"}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/migrator/tasks/{{taskIdB1}}/start",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "migrator",
+                "tasks",
+                "{{taskIdB1}}",
+                "start"
+              ]
+            },
+            "description": "MongoSource(find cursor 流式) → MongoToRelational(顶层标量保留 / 嵌套+数组→JSON 列) → MySQLSink。\n\n期望：{\"code\":0,\"data\":{\"started\":\"full\"}}。\n\n验证 SQL：SELECT _id, name, profile, tags FROM user_demo → 行已落，profile/tags 是 JSON 字符串列。"
+          }
+        },
+        {
+          "name": "B1.5 POST /tasks/:id/start incr（Mongo Change Stream + resume token）",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-access-token",
+                "value": "{{accessToken}}",
+                "type": "text",
+                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"phase\":\"incr\"}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/migrator/tasks/{{taskIdB1}}/start",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "migrator",
+                "tasks",
+                "{{taskIdB1}}",
+                "start"
+              ]
+            },
+            "description": "Change Stream Watch + resume token 经 BinlogPos 复用引擎游标；checkpoint 写 checkpoint phase=incr cursor_kind=binlog_pos 同 MySQL canal 通道。需 Mongo 副本集。\n\n触发 mongo insert/update/delete → 验证 MySQL user_demo 表跟随。"
+          }
+        }
+      ]
+    },
+    {
+      "name": "B2 MySQL 源 → Mongo 目标（反向：异构 sink + /verify 异构对账）",
+      "description": "前置：Mongo 副本集起着（详见 README §B2）。变量 {{taskIdB2}}=B2.1 返回 taskId, {{taskNameB2}}=article_to_mongo。",
+      "item": [
+        {
+          "name": "B2.1 POST /migrator/tasks 建 MySQL→Mongo 任务（sinkType=mongo，无 transform）",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-access-token",
+                "value": "{{accessToken}}",
+                "type": "text",
+                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"article_to_mongo\",\n  \"mode\": \"cdc\",\n  \"kind\": \"heterogeneous\",\n  \"sourceType\": \"mysql\",\n  \"sourceDsnRef\": \"vault:src\",\n  \"sinkType\": \"mongo\",\n  \"sinkDsnRef\": \"vault:mongo-dst\",\n  \"tables\": [{\"src\": \"article\", \"dst\": \"article\", \"partitionKey\": \"id\"}]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/migrator/tasks",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "migrator",
+                "tasks"
+              ]
+            },
+            "description": "MySQL→Mongo 不需 transform：关系行 cols → 文档字段；行 PK → 文档 _id（MongoSink ReplaceOne upsert）。\n\n期望：{\"code\":0,\"data\":{\"taskId\":<N>}}。"
+          }
+        },
+        {
+          "name": "B2.2 POST /tasks/:id/start full（MySQLSource → MongoSink）",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-access-token",
+                "value": "{{accessToken}}",
+                "type": "text",
+                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"phase\":\"full\"}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/migrator/tasks/{{taskIdB2}}/start",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "migrator",
+                "tasks",
+                "{{taskIdB2}}",
+                "start"
+              ]
+            },
+            "description": "期望：{\"code\":0,\"data\":{\"started\":\"full\"}}。\n\n验证：mongosh 看 article collection → 每个 doc 含 _id=<PK 字符串>、id/title/content 等字段。v1 canal 读 TEXT 列已归一为 string（非 base64）。"
+          }
+        },
+        {
+          "name": "B2.3 POST /tasks/:id/start incr（canal binlog，不是 Change Stream）",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-access-token",
+                "value": "{{accessToken}}",
+                "type": "text",
+                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"phase\":\"incr\"}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/migrator/tasks/{{taskIdB2}}/start",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "migrator",
+                "tasks",
+                "{{taskIdB2}}",
+                "start"
+              ]
+            },
+            "description": "MySQL 源的增量都走 canal binlog（Change Stream 是 Mongo 源专属）。\n\n注意 v1 多 cdc task 同表抢 binlog stream（per-task canal client）→ 跑 B2 cdc 前先 pause 其他同源 cdc task。"
+          }
+        },
+        {
+          "name": "B2.4 POST /tasks/:id/verify 异构对账（mongo 作目标 — v1 已支持）",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-access-token",
+                "value": "{{accessToken}}",
+                "type": "text",
+                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"mode\":\"full\"}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/migrator/tasks/{{taskIdB2}}/verify",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "migrator",
+                "tasks",
+                "{{taskIdB2}}",
+                "verify"
+              ]
+            },
+            "description": "v1 实现：SourceFactory.BuildDst 在 sinkType=mongo 时复用 MongoSource 读 dst collection；VerifyEngine.diffAndLog 比对前 normalizeRows 对两侧应用表的 transform 归一 + 剥 sink 注入元数据 _id/version（PK 回显 / 乐观锁元数据，不进比对）。\n\n期望（干净迁移）：{\"code\":0,\"data\":{\"mismatchCount\":0}}\n注入差异（mongo dst 改一行）后期望：mismatchCount=1，bizId=被改行的 PK，mismatchKind=\"diff\"。"
+          }
+        }
+      ]
+    },
+    {
+      "name": "B3 MySQL 源 → Elasticsearch 目标（异构 sink + 真异构对账）",
+      "description": "前置：ES 起着（curl http://localhost:9200/_cluster/health → green/yellow）+ 建 article_v1 索引 + yaml 配 migrator.es.addrs。详见 README §B3。变量 {{taskIdB3}}=B3.1 返回 taskId。",
+      "item": [
+        {
+          "name": "B3.1 POST /migrator/tasks 建 MySQL→ES 任务（kind=heterogeneous + sinkType=es）",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-access-token",
+                "value": "{{accessToken}}",
+                "type": "text",
+                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"art_to_es_v1\",\n  \"mode\": \"cdc\",\n  \"kind\": \"heterogeneous\",\n  \"sourceDsnRef\": \"vault:src\",\n  \"sinkType\": \"es\",\n  \"sinkDsnRef\": \"vault:es-dst\",\n  \"tables\": [{\"src\": \"article\", \"dst\": \"article_v1\", \"partitionKey\": \"id\"}]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/migrator/tasks",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "migrator",
+                "tasks"
+              ]
+            },
+            "description": "期望：{\"code\":0,\"data\":{\"taskId\":<N>}}。"
+          }
+        },
+        {
+          "name": "B3.2 POST /tasks/:id/start full（MySQLSource → ESSink bulk）",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-access-token",
+                "value": "{{accessToken}}",
+                "type": "text",
+                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"phase\":\"full\"}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/migrator/tasks/{{taskIdB3}}/start",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "migrator",
+                "tasks",
+                "{{taskIdB3}}",
+                "start"
+              ]
+            },
+            "description": "ESSink 用 bulk indexer 批量写 ES。\n期望：{\"code\":0,\"data\":{\"started\":\"full\"}}。\n验证：curl http://localhost:9200/article_v1/_count → count 等于源表行数。"
+          }
+        },
+        {
+          "name": "B3.3 POST /tasks/:id/verify 异构对账（MySQL src vs ES dst — 真异构闭环）",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-access-token",
+                "value": "{{accessToken}}",
+                "type": "text",
+                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"mode\":\"full\"}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/migrator/tasks/{{taskIdB3}}/verify",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "migrator",
+                "tasks",
+                "{{taskIdB3}}",
+                "verify"
+              ]
+            },
+            "description": "SourceFactory.BuildDst 在 sinkType=es 时返 ESSource（search_after 分页 + aggs PKRange 扫 ES）。\n\n期望：干净迁移 mismatchCount=0；注入差异（curl PUT/DELETE ES 改 dst）后期望返该差异数。\n响应字段 camelCase（与 mismatchVO 一致）。"
+          }
+        },
+        {
+          "name": "B3.4 POST /tasks/:id/repair src_overwrite_dst（用 src 真覆盖 ES dst）",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-access-token",
+                "value": "{{accessToken}}",
+                "type": "text",
+                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"strategy\":\"src_overwrite_dst\",\"ids\":[/* 替换为 B3.3 拿到的 validate_log ids */]}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/migrator/tasks/{{taskIdB3}}/repair",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "migrator",
+                "tasks",
+                "{{taskIdB3}}",
+                "repair"
+              ]
+            },
+            "description": "verify 找到差异 → repair 拿 src snapshot 走 ESSink 真写回 ES → 再 verify mismatchCount=0。\n\n前置：从 B3.3 拿到 validate_log ids，替换 body 里的占位。"
+          }
+        },
+        {
+          "name": "B3.5 POST /tasks/:id/switch SRC_FIRST（与同构 A11 一致）",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-access-token",
+                "value": "{{accessToken}}",
+                "type": "text",
+                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"stage\":\"SRC_FIRST\"}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/migrator/tasks/{{taskIdB3}}/switch",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "migrator",
+                "tasks",
+                "{{taskIdB3}}",
+                "switch"
+              ]
+            },
+            "description": "SwitchService 写 migrator:stage:art_to_es_v1 = SRC_FIRST。\n验证：redis-cli GET 'migrator:stage:art_to_es_v1' → SRC_FIRST。"
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8083",
+      "type": "string",
+      "description": ""
+    },
+    {
+      "key": "taskId",
+      "value": "1",
+      "type": "string",
+      "description": ""
+    },
+    {
+      "key": "taskName",
+      "value": "art_schema_v1",
+      "type": "string"
+    },
+    {
+      "key": "taskIdB1",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "taskNameB1",
+      "value": "user_mongo_to_mysql",
+      "type": "string"
+    },
+    {
+      "key": "taskIdB2",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "taskNameB2",
+      "value": "article_to_mongo",
+      "type": "string"
+    },
+    {
+      "key": "taskIdB3",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "taskNameB3",
+      "value": "art_to_es_v1",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string",
+      "description": "x-access-token header 值（webook-core JWT）。web.jwt.disabled=true 时可空；接 SSO 后填实际 token。"
+    }
+  ],
+  "description": ""
+}

@@ -1,5 +1,3 @@
 {
-  "enabledPlugins": {
-    "workflow@workflow-marketplace": true
-  }
+  "enabledPlugins": {}
 }

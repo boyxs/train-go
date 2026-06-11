@@ -73,6 +73,13 @@ Handler (web/) → Service (service/) → Repository (repository/) → DAO (dao/
 | `config/` | 环境配置 | YAML 配置项 |
 | `wire.go` | 主入口 DI | 依赖注入全景 |
 
+### 多服务布局约定
+
+- **core**（最早）：整个服务在 `internal/` 下（含 `main.go` / `wire.go` / `ioc/`），历史遗留布局
+- **拆分服务**（`chat/`、`migrator/`）：包平铺在 `<svc>/` 下，**不套 `internal/`**——单 module 仓库里 `<svc>/internal/` 只能挡仓内兄弟服务导包，当前无跨服务导包需求，边界靠 review 维持
+- **新增服务跟随平铺布局**，不效仿 core
+- 三服务 `ioc/config.go` 同构持有 `ConfigChangeCallbacks`（etcd 配置热更挂点，`web.go` 追加回调、`main.go` 统一触发），新服务接热更时镜像此文件
+
 ## 分层规则
 
 - 依赖方向严格单向：Handler → Service → Repository → DAO/Cache，**禁止跨层调用**
@@ -84,6 +91,11 @@ Handler (web/) → Service (service/) → Repository (repository/) → DAO (dao/
 - **子包按能力拆分**：同一目录下两种独立能力（如 LLM 聊天 vs 文本向量化）必须拆子包，不平铺
 - **接口命名避免歧义**：子包内接口用完整名（`EmbeddingClient` 而非 `Client`），调用方读 `embedding.EmbeddingClient` 一眼能分清
 - **Handler / Service / Repository / DAO 构造函数必须返回接口**，不返回具体指针；实现用 `Internal` 或技术前缀（`InternalChatHandler` / `AIClickEventHandler` / `GormArticleAuthorDAO`）。入参也依赖接口，方便 Wire 注入和单测 mock。
+- **包内多实现的文件组织（接口 + N 实现的包）**：契约与实现分文件，杜绝"实现散落、一半挤在接口文件"——
+  - `<pkg>.go`（与包同名）：**只放接口 + 共享值类型**，禁止任何具体实现（哪怕最简单的 Identity/NoOp 默认实现）
+  - dispatch（factory / registry）：独立文件 `factory.go` / `registry.go`
+  - 每个具体实现各占一个**按行为/技术命名**的文件（`mysql.go` / `mongo.go` / `identity.go`）
+  - 范本：`pipeline/source`（source.go + factory.go + mysql/canal/es/mongo.go）、`pipeline/sink`、`pipeline/transform`
 
 ## 命名规范
 
@@ -94,12 +106,29 @@ Handler (web/) → Service (service/) → Repository (repository/) → DAO (dao/
 | 表名 | **单数**，下划线分词 | `article` / `published_article` / `user_interaction`（❌ `articles`） |
 | 文件 | 按业务角色，不按技术 | `article_author.go`（非 `article_dao.go`） |
 | receiver | 类型首字母小写 | `func (s *chatService) Send()` |
+| 标识符缩写 | **统一 `Id` 风格**（不用 Go initialisms 的 `ID`），字段/方法/局部变量一体适用，跨层字段名必须一字不差 | `Id` / `TaskId` / `BizId` / `FindById` / `taskId`（❌ `TaskID` / `taskID`） |
 | 查询方法 | `Find`(单条) `Page`(分页) `List`(列表) | `FindByXx` / `PageXxs` / `ListXxs` |
 | 写入方法 | 按业务动作 | `Publish` / `Withdraw`（非 `Process`） |
 | DB 查询结果 | `xxxList` | `articleList, err := dao.ListByAuthor()` |
 | 自定义切片 | `xxxs` | `ids := make([]int64, 0, len(articleList))` |
 | 索引/映射 | `xxxMap` | `authorMap := make(map[int64]Author)` |
 | 单条查询 | 原名或无后缀 | `article, err := dao.FindById()` |
+
+## 层间模型转换（repository 的 domain ↔ dao）
+
+转换是**纯函数**，不是数据库操作——**禁止用查询动词（List / Find / Page）给转换方法命名**。
+
+两条铁律（why：单条是字段映射的**唯一真相源**，加字段只改一处；批量循环是无差别样板，不值得每个 repository 写一份）：
+
+1. 每个 repository 只写**单条**转换：`toDomain`（dao → domain）/ `toEntity`（domain → dao）——方向编进名字（两侧类型常同名，按类型命名分不清方向）
+2. **批量一律 `slicex.Map(rows, r.toDomain)`**（`pkg/slicex`），禁止手写 `toDomains`/`toXxxList`/`toXxxSlice` 等复数转换方法
+
+```go
+func (r *X) toDomain(m dao.Y) domain.Y { return domain.Y{...} }   // 唯一映射点
+
+list, total, err := r.dao.List(...)
+return slicex.Map(list, r.toDomain), total, nil                    // 批量=泛型 Map+单条
+```
 
 ## 数据表规范
 
@@ -135,6 +164,40 @@ CREATE TABLE `xxx` (
 ) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic COMMENT = '一句话讲这张表';
 ```
 
+## 数据迁移 SDK（业务侧接入）
+
+`internal/migratorsdk/` 提供两个接口，业务 DAO 接入后可经迁移服务（webook-migrator）做双写 / 切流：
+
+| 接口 | 用途 |
+|------|------|
+| `SwitchReader.ChooseSide(ctx, taskName, hashKey)` | 读路由：按 Redis `migrator:stage:{name}` + `migrator:gray:{name}` 决定走 OLD / NEW |
+| `DualWriter.Write(ctx, taskName, fn(side))` | 写策略：按 stage 分阶段（SRC_FIRST 双写、DST_FIRST 严格双写、DST_ONLY 单写 NEW） |
+
+**默认 NoOp 零开销**：`migrator.sdk.enabled` yaml flag 未设或 `false` 时 wire 注入 NoOp 实现，路径上无 Redis 调用、与原始 DAO 调用等价；启用迁移时改 yaml 切到 RedisSwitchReader/RedisDualWriter。
+
+**migrator 服务挂掉不影响主服务**：SDK 不调 migrator gRPC；Redis 不可达自动降级 SideOld（保业务可用）。
+
+业务侧用法（已落 `internal/repository/article_reader.go` `CacheArticleReaderRepository`）：
+
+```go
+type CacheArticleReaderRepository struct {
+    oldDAO       dao.ArticleReaderDAO
+    newDAO       dao.ArticleReaderDAO // 启用迁移时操作 NEW 侧表（如 published_article_v1）
+    switchReader migratorsdk.SwitchReader
+    dualWriter   migratorsdk.DualWriter
+    taskName     string
+    // ...
+}
+
+func (r *CacheArticleReaderRepository) Upsert(ctx context.Context, a domain.Article) error {
+    return r.dualWriter.Write(ctx, r.taskName, func(side migratorsdk.Side) error {
+        return r.daoBySide(side).Upsert(ctx, toEntity(a))
+    })
+}
+```
+
+未启用时 `dualWriter=NoOpDualWriter` 等价于 `r.oldDAO.Upsert(ctx, ...)` 直接调一次。读路径同理用 `switchReader.ChooseSide` 决定 OLD/NEW。
+
 ## 复用已有工具包（禁止重复造轮子）
 
 新模块开发前必须检查以下已有封装，**直接复用，不要手写替代实现**：
@@ -153,6 +216,114 @@ CREATE TABLE `xxx` (
 2. Repository 层有 Cache 接口就必须用 — 不能绕过缓存直连 DAO
 3. 新增 Redis 键在 `internal/consts/` 定义 Pattern，不散写 `fmt.Sprintf`
 4. 通用工具函数提取到 `pkg/` 或 `internal/domain/`
+
+## Web 层规范
+
+> 适用：本仓库**所有** Web 层（任意 module / service / 未来新增也适用）
+> 原则：横切关注点（响应格式 / 错误流转 / 日志 / 分页）由 `pkg/` 统一提供，业务代码**只写业务**
+> 违反任意一条 review 直接打回
+
+### 7 条规则（每条都有 why）
+
+| # | 规则 | Why（原理）| How（怎么做）|
+|---|------|------|------|
+| 1 | **响应类型用 type alias，不自造 struct** | 多个 Result struct 让前端 / 网关无法统一处理；单一定义源是 API 契约的基础 | `type Result = ginx.Result`（来源 `pkg/ginx`）|
+| 2 | **路由装饰器用框架，不手写 c.JSON** | 手写 `c.JSON(400, ...)` 让错误映射分散到每个 handler；新增一种错误要改 N 处 | `ginx.Wrap` / `ginx.WrapReq[Req]` / `ginx.WrapClaims[C]` / `ginx.WrapReqClaims[Req,C]` 装饰，handler 只 `return Result{}, err` |
+| 3 | **分页响应用 PageResult，不自造 ListResp** | 同 #1，前端依赖统一 `{list, total}` 形态 | `ginx.PageResult{List, Total}` |
+| 4 | **Handler 签名固定 `(ctx) (Result, error)`** | 配合 #2，让框架自动：成功 200+Result、`*errs.Error` 转对应 HTTP、其他 err 转 500 | 见 Handler 模板段 |
+| 5 | **业务错误用 sentinel `*errs.Error`，自带 HTTP code** | `errors.New("xxx")` 是 string 比较；handler 内多分支 `errors.Is` switch 不可维护 | `pkg/errs.New(httpCode, msg)` 定义包级 sentinel；`WithCause` 附原因；`WithMetadata` 附字段定位 |
+| 6 | **日志用 `LoggerX` 接口，不自造 Logger** | 框架统一接日志 / 追踪 / 采样；自造接口无法接入 OTel / Field 化结构日志 | `logger.LoggerX`（`pkg/logger`）+ Field helper（`logger.Int64 / String / Error`）+ `logger.NewNopLogger()` 测试用 |
+| 7 | **错误码不引入 HTTP 之外的字符串维度** | HTTP code 已经够用（前端按 HTTP status 触发 catch）；引入 `ErrCodeXxx string` 等于双重契约，写两遍维护两遍 | `*errs.Error.Code` ≡ `Result.Code` ≡ HTTP status，三者同源 |
+
+### 速查 ❌ / ✅
+
+| 禁止 | 必须 |
+|------|------|
+| 自定义 `Result struct {...}` | `type Result = ginx.Result` |
+| 自造 `Result400 / 422 / 500 / OK` 等 helper | `ginx.Wrap / WrapReq / WrapClaims / WrapReqClaims` |
+| 自造 `XxxListResp / PageResp` 分页结构 | `ginx.PageResult{List, Total}` |
+| `func(c *gin.Context)` + `c.JSON` + switch 错误映射 | `func(ctx) (Result, error)`，框架 `WriteError` 自动转 |
+| `errors.New("xxx")` 当业务错误 | `pkg/errs.New(httpCode, msg)` 定义 `*errs.Error` |
+| 自造 `Logger interface` / `NoOpLogger` | `logger.LoggerX` + `logger.NewNopLogger()` |
+| `ErrCodeXxx string` 字符串错误码常量 | HTTP code = Result.Code = errs.Error.Code |
+
+### Handler 标准模板
+
+```go
+// 接口 + Internal 实现 + 构造函数返回接口
+type XxxHandler interface {
+    RegisterRoutes(r *gin.Engine)
+}
+type InternalXxxHandler struct {
+    svc service.XxxService
+    l   logger.LoggerX
+}
+func NewXxxHandler(s service.XxxService, l logger.LoggerX) XxxHandler {
+    return &InternalXxxHandler{svc: s, l: l}
+}
+
+// 业务方法签名固定 (ctx) (Result, error)
+func (h *InternalXxxHandler) Create(ctx *gin.Context, req createReq) (Result, error) {
+    id, err := h.svc.Create(ctx.Request.Context(), ...)
+    if err != nil {
+        return Result{}, err          // *errs.Error 自动转 HTTP；其他 err → 500
+    }
+    return Result{Data: gin.H{"id": id}}, nil
+}
+
+// 路由装饰
+func (h *InternalXxxHandler) RegisterRoutes(r *gin.Engine) {
+    g := r.Group("/api/xxx")
+    g.POST("", ginx.WrapReq[createReq](h.Create))
+    g.GET("/:id", ginx.Wrap(h.Get))
+    g.GET("", ginx.Wrap(h.List))  // List 返回 Result{Data: ginx.PageResult{...}}
+}
+```
+
+### 业务错误定义模板
+
+```go
+package errs
+
+import "github.com/webook/pkg/errs"
+
+// 包级 sentinel；Message 必须全局唯一（errors.Is 按 Code+Message 比对）
+var (
+    ErrResourceNotFound  = errs.New(404, "资源不存在")
+    ErrDuplicateResource = errs.New(409, "资源已存在")
+    ErrInvalidArg        = errs.New(400, "参数不合法")
+    ErrForbidden         = errs.New(403, "无权访问")
+    ErrUnauthenticated   = errs.New(401, "未登录")
+)
+```
+
+### 业务错误用法
+
+```go
+// 抛出（handler 直接返回，框架自动转 HTTP）
+return Result{}, errs.ErrResourceNotFound
+
+// 带原因（cause 进日志 + e.Error() 输出，不影响 errors.Is 命中）
+return Result{}, errs.ErrInvalidArg.WithCause(fmt.Errorf("name 不能为空"))
+
+// 带元数据（前端可用 Result.Metadata 做字段级精确提示）
+return Result{}, errs.ErrInvalidArg.WithMetadata("field", "name")
+
+// 调用方匹配（按 Code+Message 比对，跨副本仍命中）
+if errors.Is(err, errs.ErrResourceNotFound) { ... }
+```
+
+### Web 层 PR 自查清单
+
+- [ ] 响应类型用 `type Result = ginx.Result`，没有自造 Result struct
+- [ ] 路由用 `ginx.Wrap / WrapReq / WrapClaims / WrapReqClaims` 装饰，没有 `Result400 / 422 / 500 / OK` 等响应 helper
+- [ ] 分页用 `ginx.PageResult`，没有自造 `XxxListResp / PageResp`
+- [ ] Handler 签名是 `func(ctx) (Result, error)`，不是 `func(c *gin.Context)`
+- [ ] Handler 内**无** `errors.Is` 多分支 switch 映射 HTTP code（让 `*errs.Error` 自带 Code）
+- [ ] 业务错误用 `pkg/errs.New(httpCode, msg)` 定义 sentinel，不用 `errors.New`
+- [ ] 日志用 `pkg/logger.LoggerX` + Field helper，没有自造 Logger interface / NoOpLogger
+- [ ] 没有 `ErrCodeXxx string` 业务错误码常量（HTTP code 是唯一错误码维度）
+- [ ] 三层（Handler / Service / Repository）的构造函数都**返回接口**，实现命名带 `[技术 / Internal 前缀][实体名][层后缀]`（如 `InternalResourceService`、`GormResourceDAO`）
 
 ## 编码约束
 

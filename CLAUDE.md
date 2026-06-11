@@ -73,6 +73,7 @@ type(scope): description
 - type: `feat` / `fix` / `refactor` / `docs` / `chore` / `perf` / `test`
 - scope 后端: `web` / `service` / `repository` / `dao` / `cache` / `ioc`
 - scope 前端: `page` / `component` / `api` / `hook` / `style` / `config`
+- **禁止 AI 合作者签名**：commit message / PR body / merge message 一律不得包含 `Co-Authored-By: Claude`、`Co-Authored-By: GPT`、`Co-Authored-By: <AI 名> <noreply@anthropic.com>`、`🤖 Generated with Claude Code` 等任何把 AI 伪装成真实开发者协作的标识。git 历史只记录真实人类作者，AI 协作信息只在 PR 描述正文里说明（如有必要），不进 commit trailer。已发现含此类签名的提交需在合并前 amend 移除
 
 ## CHANGELOG.md
 
@@ -137,7 +138,19 @@ review 收尾前用 `grep -rn '<旧服务名>'` 全仓扫一遍，确认上面 1
 ```
 
 
+## 会话中断/续接
+
+上下文满了重开能接着干。进度落盘到 `.claude/handover/<slug>.md`（gitignored），slug 用 `/rename` 约定 `YYMMDD-模块-功能中文`。结构参考 `.claude/handover/template.md`。
+
+**每次会话开始**：先 `ls .claude/handover/*.md`（除 `template.md`）。有未完成任务 → 主动告知用户："检测到 N 个进行中任务：<slug 清单>，要接续哪个？" 用户选定后 Read 对应文件继续。
+
+**做事时**：完成一个 Edit/Write+自验证、跑通一个测试、做出一个关键决策，就追加到当前 slug 文件对应段；遇到卡点更新"正在做" + "阻塞点"。**不要等用户喊**，自觉维护。会话内只跟一个 slug；切换任务需用户明确说出新 slug。
+
+**任务收尾**：用户确认完成后，把文件 mv 到 `.claude/handover/archive/<slug>.md`。
+
+`template.md` 入仓共享，活跃任务文件 gitignore。不要把任务进度存到 `memory/`（那是长期偏好，每会话自动注入会污染上下文）；不要在 CHANGELOG.md 写未完成的中间状态。
+
 ## 记录
 
 - 完成功能后追加 `CHANGELOG.md`
-- 发现更好做法记录到 `memory/`（feedback 类型）
+- 任务中途要中断 → handover 文件已实时维护，重开会话自动接续

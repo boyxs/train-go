@@ -210,20 +210,28 @@ var searchSvcProvider = wire.NewSet(
 var articleSvcProvider = wire.NewSet(
 	dao.NewGormArticleAuthorDAO,
 	dao.NewGormArticleReaderDAO,
+	dao.NewGormArticleReaderNewDAO,
 	cache.NewRedisArticleCache,
 	repository.NewCacheArticleAuthorRepository,
 	repository.NewCacheArticleReaderRepository,
 	service.NewInternalArticleAuthorService,
 	service.NewInternalArticleReaderService,
+	ioc.InitMigratorSDKSwitchReader,
+	ioc.InitMigratorSDKDualWriter,
+	ioc.InitMigratorSDKTaskName,
 	interactionSvcProvider,
 	searchSvcProvider,
 )
 
 var articleReaderSvcProvider = wire.NewSet(
 	dao.NewGormArticleReaderDAO,
+	dao.NewGormArticleReaderNewDAO,
 	cache.NewRedisArticleCache,
 	repository.NewCacheArticleReaderRepository,
 	service.NewInternalArticleReaderService,
+	ioc.InitMigratorSDKSwitchReader,
+	ioc.InitMigratorSDKDualWriter,
+	ioc.InitMigratorSDKTaskName,
 	interactionSvcProvider,
 )
 

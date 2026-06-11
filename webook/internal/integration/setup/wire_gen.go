@@ -58,7 +58,11 @@ func InitWebServer() *gin.Engine {
 	articleCache := cache.NewRedisArticleCache(cmdable, loggerX)
 	articleAuthorRepository := repository.NewCacheArticleAuthorRepository(articleAuthorDAO, articleCache)
 	articleReaderDAO := dao.NewGormArticleReaderDAO(db)
-	articleReaderRepository := repository.NewCacheArticleReaderRepository(articleReaderDAO, articleCache, loggerX)
+	articleReaderNewDAO := dao.NewGormArticleReaderNewDAO(db)
+	switchReader := ioc.InitMigratorSDKSwitchReader(cmdable, loggerX)
+	dualWriter := ioc.InitMigratorSDKDualWriter(cmdable, loggerX)
+	taskName := ioc.InitMigratorSDKTaskName()
+	articleReaderRepository := repository.NewCacheArticleReaderRepository(articleReaderDAO, articleReaderNewDAO, articleCache, switchReader, dualWriter, taskName, loggerX)
 	typedClient := ioc.InitESClient()
 	articleSearchDAO := dao.NewElasticArticleDAO(typedClient)
 	articleSearchRepository := repository.NewESArticleSearchRepository(articleSearchDAO)
@@ -104,7 +108,11 @@ func InitArticleAuthorHandler() web.ArticleAuthorHandler {
 	articleCache := cache.NewRedisArticleCache(cmdable, loggerX)
 	articleAuthorRepository := repository.NewCacheArticleAuthorRepository(articleAuthorDAO, articleCache)
 	articleReaderDAO := dao.NewGormArticleReaderDAO(db)
-	articleReaderRepository := repository.NewCacheArticleReaderRepository(articleReaderDAO, articleCache, loggerX)
+	articleReaderNewDAO := dao.NewGormArticleReaderNewDAO(db)
+	switchReader := ioc.InitMigratorSDKSwitchReader(cmdable, loggerX)
+	dualWriter := ioc.InitMigratorSDKDualWriter(cmdable, loggerX)
+	taskName := ioc.InitMigratorSDKTaskName()
+	articleReaderRepository := repository.NewCacheArticleReaderRepository(articleReaderDAO, articleReaderNewDAO, articleCache, switchReader, dualWriter, taskName, loggerX)
 	typedClient := ioc.InitESClient()
 	articleSearchDAO := dao.NewElasticArticleDAO(typedClient)
 	articleSearchRepository := repository.NewESArticleSearchRepository(articleSearchDAO)
@@ -124,10 +132,14 @@ func InitArticleAuthorHandler() web.ArticleAuthorHandler {
 func InitArticleReaderHandler() web.ArticleReaderHandler {
 	db := InitDB()
 	articleReaderDAO := dao.NewGormArticleReaderDAO(db)
+	articleReaderNewDAO := dao.NewGormArticleReaderNewDAO(db)
 	cmdable := InitRedis()
 	loggerX := InitLogger()
 	articleCache := cache.NewRedisArticleCache(cmdable, loggerX)
-	articleReaderRepository := repository.NewCacheArticleReaderRepository(articleReaderDAO, articleCache, loggerX)
+	switchReader := ioc.InitMigratorSDKSwitchReader(cmdable, loggerX)
+	dualWriter := ioc.InitMigratorSDKDualWriter(cmdable, loggerX)
+	taskName := ioc.InitMigratorSDKTaskName()
+	articleReaderRepository := repository.NewCacheArticleReaderRepository(articleReaderDAO, articleReaderNewDAO, articleCache, switchReader, dualWriter, taskName, loggerX)
 	articleReaderService := service.NewInternalArticleReaderService(articleReaderRepository)
 	interactionDAO := dao.NewGormInteractionDAO(db)
 	interactionCache := cache.NewRedisInteractionCache(cmdable)
@@ -181,8 +193,12 @@ func InitRankingCron() (*cron.Cron, func()) {
 	rankingDAO := dao.NewGormArticleRankingDAO(db)
 	rankingRepository := repository.NewCacheArticleRankingRepository(rankingCache, rankingDAO, loggerX)
 	articleReaderDAO := dao.NewGormArticleReaderDAO(db)
+	articleReaderNewDAO := dao.NewGormArticleReaderNewDAO(db)
 	articleCache := cache.NewRedisArticleCache(cmdable, loggerX)
-	articleReaderRepository := repository.NewCacheArticleReaderRepository(articleReaderDAO, articleCache, loggerX)
+	switchReader := ioc.InitMigratorSDKSwitchReader(cmdable, loggerX)
+	dualWriter := ioc.InitMigratorSDKDualWriter(cmdable, loggerX)
+	taskName := ioc.InitMigratorSDKTaskName()
+	articleReaderRepository := repository.NewCacheArticleReaderRepository(articleReaderDAO, articleReaderNewDAO, articleCache, switchReader, dualWriter, taskName, loggerX)
 	interactionDAO := dao.NewGormInteractionDAO(db)
 	interactionCache := cache.NewRedisInteractionCache(cmdable)
 	interactionRepository := repository.NewCacheInteractionRepository(interactionDAO, interactionCache, loggerX)
@@ -257,11 +273,11 @@ var userSvcProvider = wire.NewSet(dao.NewGormUserDAO, cache.NewRedisUserCache, r
 
 var searchSvcProvider = wire.NewSet(ioc.InitESClient, ioc.InitOllamaEmbeddingConfig, ioc.InitEmbeddingConfig, ioc.InitEmbeddingClient, dao.NewElasticArticleDAO, repository.NewESArticleSearchRepository, service.NewArticleSearchService)
 
-var articleSvcProvider = wire.NewSet(dao.NewGormArticleAuthorDAO, dao.NewGormArticleReaderDAO, cache.NewRedisArticleCache, repository.NewCacheArticleAuthorRepository, repository.NewCacheArticleReaderRepository, service.NewInternalArticleAuthorService, service.NewInternalArticleReaderService, interactionSvcProvider,
+var articleSvcProvider = wire.NewSet(dao.NewGormArticleAuthorDAO, dao.NewGormArticleReaderDAO, dao.NewGormArticleReaderNewDAO, cache.NewRedisArticleCache, repository.NewCacheArticleAuthorRepository, repository.NewCacheArticleReaderRepository, service.NewInternalArticleAuthorService, service.NewInternalArticleReaderService, ioc.InitMigratorSDKSwitchReader, ioc.InitMigratorSDKDualWriter, ioc.InitMigratorSDKTaskName, interactionSvcProvider,
 	searchSvcProvider,
 )
 
-var articleReaderSvcProvider = wire.NewSet(dao.NewGormArticleReaderDAO, cache.NewRedisArticleCache, repository.NewCacheArticleReaderRepository, service.NewInternalArticleReaderService, interactionSvcProvider)
+var articleReaderSvcProvider = wire.NewSet(dao.NewGormArticleReaderDAO, dao.NewGormArticleReaderNewDAO, cache.NewRedisArticleCache, repository.NewCacheArticleReaderRepository, service.NewInternalArticleReaderService, ioc.InitMigratorSDKSwitchReader, ioc.InitMigratorSDKDualWriter, ioc.InitMigratorSDKTaskName, interactionSvcProvider)
 
 var interactionSvcProvider = wire.NewSet(dao.NewGormInteractionDAO, cache.NewRedisInteractionCache, repository.NewCacheInteractionRepository, service.NewInternalInteractionService)
 

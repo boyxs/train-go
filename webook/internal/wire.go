@@ -57,6 +57,14 @@ var articleRankingProviderSet = wire.NewSet(
 	web.NewArticleRankingHandler,
 )
 
+// migratorSDKProviderSet 业务侧迁移 SDK（默认 NoOp 零开销，yaml migrator.sdk.enabled=true 切 Redis 实现）
+var migratorSDKProviderSet = wire.NewSet(
+	ioc.InitMigratorSDKSwitchReader,
+	ioc.InitMigratorSDKDualWriter,
+	ioc.InitMigratorSDKTaskName,
+	dao.NewGormArticleReaderNewDAO,
+)
+
 // kafkaProviderSet Kafka 基础设施 + 互动事件
 var kafkaProviderSet = wire.NewSet(
 	ioc.InitKafkaConfig,
@@ -117,6 +125,7 @@ func InitWebServer() (App, func(), error) {
 		ioc.InitJwtHandler,
 		// 搜索模块
 		searchProviderSet,
+		migratorSDKProviderSet,
 		// 点击埋点
 		clickEventProviderSet,
 		// 文章润色
