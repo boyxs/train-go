@@ -84,3 +84,9 @@ otel:
   serviceVersion: "0.1.0"
   env: "staging"
   sampleRatio: 0.5      # staging 中等采样（dev 1.0、prod 0.1 之间）
+
+# 数据迁移 SDK（默认关 → NoOp 零开销；切 true 启用 RedisSwitchReader + RedisDualWriter，详见 local.yaml 注释）
+migrator:
+  sdk:
+    enabled: false
+    taskName: "published_article_v1"

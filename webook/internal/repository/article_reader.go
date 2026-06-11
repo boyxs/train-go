@@ -6,6 +6,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/webook/internal/domain"
+	"github.com/webook/internal/migratorsdk"
 	"github.com/webook/internal/repository/cache"
 	"github.com/webook/internal/repository/dao"
 	"github.com/webook/pkg/logger"
@@ -21,24 +22,70 @@ type ArticleReaderRepository interface {
 	Page(ctx context.Context, offset int, limit int) ([]domain.Article, int64, error)
 }
 
+// CacheArticleReaderRepository 线上库 Repository（含 migratorsdk 双写 / 切读）。
+//
+// SDK 行为：
+//   - 默认 NoOp（migrator.sdk.enabled: false）→ 业务等价旧行为，零 Redis 调用
+//   - Redis 实现（启用迁移时）→ Upsert/Delete 按 stage 双写 OLD/NEW；FindById/FindByIds 按 stage+gray 切读
+//   - Page 不切（跨侧分页语义不一致），切流期始终走 oldDAO
 type CacheArticleReaderRepository struct {
-	dao   dao.ArticleReaderDAO
-	cache cache.ArticleCache
-	l     logger.LoggerX
+	oldDAO       dao.ArticleReaderDAO
+	newDAO       dao.ArticleReaderDAO
+	cache        cache.ArticleCache
+	switchReader migratorsdk.SwitchReader
+	dualWriter   migratorsdk.DualWriter
+	taskName     string
+	l            logger.LoggerX
 }
 
-func NewCacheArticleReaderRepository(dao dao.ArticleReaderDAO, c cache.ArticleCache, l logger.LoggerX) ArticleReaderRepository {
-	return &CacheArticleReaderRepository{dao: dao, cache: c, l: l}
+func NewCacheArticleReaderRepository(
+	oldDAO dao.ArticleReaderDAO,
+	newDAO dao.ArticleReaderNewDAO,
+	c cache.ArticleCache,
+	sw migratorsdk.SwitchReader,
+	dw migratorsdk.DualWriter,
+	taskName migratorsdk.TaskName,
+	l logger.LoggerX,
+) ArticleReaderRepository {
+	return &CacheArticleReaderRepository{
+		oldDAO: oldDAO, newDAO: dao.ArticleReaderDAO(newDAO), cache: c,
+		switchReader: sw, dualWriter: dw, taskName: string(taskName), l: l,
+	}
+}
+
+// daoBySide 按 SDK 决策返对应 DAO。
+func (r *CacheArticleReaderRepository) daoBySide(side migratorsdk.Side) dao.ArticleReaderDAO {
+	if side == migratorsdk.SideNew {
+		return r.newDAO
+	}
+	return r.oldDAO
+}
+
+// chooseSide 包装 SwitchReader.ChooseSide，显式处理错误（不直接 `_, _:=` 吞错）。
+// 失败时降级 SideOld：业务可用优先；SDK 实现层已对 Redis 故障内部降级，这层错误处理是为接口契约预留的扩展兜底。
+func (r *CacheArticleReaderRepository) chooseSide(ctx context.Context, hashKey int64) migratorsdk.Side {
+	side, err := r.switchReader.ChooseSide(ctx, r.taskName, hashKey)
+	if err != nil {
+		r.l.Warn("ChooseSide 失败，降级 SideOld",
+			logger.String("task", r.taskName),
+			logger.Int64("hash_key", hashKey),
+			logger.Error(err))
+		return migratorsdk.SideOld
+	}
+	return side
 }
 
 func (r *CacheArticleReaderRepository) Upsert(ctx context.Context, article domain.Article) error {
-	err := r.dao.Upsert(ctx, dao.PublishedArticle{
+	entity := dao.PublishedArticle{
 		Id:       article.Id,
 		Title:    article.Title,
 		Content:  article.Content,
 		Abstract: article.Abstract,
 		AuthorId: article.Author.Id,
 		Status:   article.Status.ToUint8(),
+	}
+	err := r.dualWriter.Write(ctx, r.taskName, func(side migratorsdk.Side) error {
+		return r.daoBySide(side).Upsert(ctx, entity)
 	})
 	if err != nil {
 		return err
@@ -51,7 +98,9 @@ func (r *CacheArticleReaderRepository) Upsert(ctx context.Context, article domai
 }
 
 func (r *CacheArticleReaderRepository) Delete(ctx context.Context, id int64, uid int64) error {
-	err := r.dao.Delete(ctx, id, uid)
+	err := r.dualWriter.Write(ctx, r.taskName, func(side migratorsdk.Side) error {
+		return r.daoBySide(side).Delete(ctx, id, uid)
+	})
 	if err != nil {
 		return err
 	}
@@ -73,7 +122,8 @@ func (r *CacheArticleReaderRepository) FindById(ctx context.Context, id int64) (
 	if err == nil {
 		return art, nil
 	}
-	pub, err := r.dao.FindById(ctx, id)
+	side := r.chooseSide(ctx, id)
+	pub, err := r.daoBySide(side).FindById(ctx, id)
 	if err != nil {
 		return domain.Article{}, err
 	}
@@ -103,10 +153,9 @@ func (r *CacheArticleReaderRepository) FindByIds(ctx context.Context, ids []int6
 	}
 
 	if len(missIds) > 0 {
-		// dao.FindByIds 为节省带宽 Select 排除了 Content；这里只填到本次结果，
-		// 不回写 article:pub:{id} 缓存——避免污染单条 FindById 的全字段缓存
-		// 导致 /article/:id 详情页显示空正文。批量场景靠单条 FindById 自然预热。
-		entityList, dErr := r.dao.FindByIds(ctx, missIds)
+		// 路由按 missIds[0]：dao.FindByIds 不返 Content，结果不回写单条 :pub:{id} 全字段缓存。
+		side := r.chooseSide(ctx, missIds[0])
+		entityList, dErr := r.daoBySide(side).FindByIds(ctx, missIds)
 		if dErr != nil {
 			return nil, dErr
 		}
@@ -134,18 +183,18 @@ func (r *CacheArticleReaderRepository) Page(ctx context.Context, offset int, lim
 		}
 	}
 
-	// 缓存 miss 或非首页，并发查 DB
+	// Page 不走 SDK：跨侧分页语义不一致（同 offset/limit 看到不同列表），cutover 期保留 OLD。
 	var articles []dao.PublishedArticle
 	var count int64
 	var eg errgroup.Group
 	eg.Go(func() error {
 		var e error
-		articles, e = r.dao.Page(ctx, offset, limit)
+		articles, e = r.oldDAO.Page(ctx, offset, limit)
 		return e
 	})
 	eg.Go(func() error {
 		var e error
-		count, e = r.dao.Count(ctx)
+		count, e = r.oldDAO.Count(ctx)
 		return e
 	})
 	if err := eg.Wait(); err != nil {

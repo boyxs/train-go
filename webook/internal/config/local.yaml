@@ -88,6 +88,12 @@ otel:
   # 采样率公式详见 config/prod.yaml 注释或 docs/opentelemetry/06-best-practices.md。
   sampleRatio: 1.0          # local 全采样（本机调试全量看）
 
+# 数据迁移 SDK（默认关 → NoOp 零开销；切 true 启用 RedisSwitchReader + RedisDualWriter）
+migrator:
+  sdk:
+    enabled: true
+    taskName: "published_article_v1"
+
 #etcdctl --endpoints=127.0.0.1:2379 put /webook-core < config/local.yaml
 
 # 应用配置命名标准（详见 webook/CLAUDE.md「环境说明」）：

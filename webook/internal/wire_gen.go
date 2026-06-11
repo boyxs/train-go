@@ -52,7 +52,11 @@ func InitWebServer() (App, func(), error) {
 	articleCache := cache.NewRedisArticleCache(cmdable, loggerX)
 	articleAuthorRepository := repository.NewCacheArticleAuthorRepository(articleAuthorDAO, articleCache)
 	articleReaderDAO := dao.NewGormArticleReaderDAO(db)
-	articleReaderRepository := repository.NewCacheArticleReaderRepository(articleReaderDAO, articleCache, loggerX)
+	articleReaderNewDAO := dao.NewGormArticleReaderNewDAO(db)
+	switchReader := ioc.InitMigratorSDKSwitchReader(cmdable, loggerX)
+	dualWriter := ioc.InitMigratorSDKDualWriter(cmdable, loggerX)
+	taskName := ioc.InitMigratorSDKTaskName()
+	articleReaderRepository := repository.NewCacheArticleReaderRepository(articleReaderDAO, articleReaderNewDAO, articleCache, switchReader, dualWriter, taskName, loggerX)
 	typedClient := ioc.InitESClient()
 	articleSearchDAO := dao.NewElasticArticleDAO(typedClient)
 	articleSearchRepository := repository.NewESArticleSearchRepository(articleSearchDAO)
@@ -131,6 +135,9 @@ var polishProviderSet = wire.NewSet(ioc.InitLLMConfig, ioc.InitLLMClient, servic
 
 // articleRankingProviderSet 文章榜单模块
 var articleRankingProviderSet = wire.NewSet(dao.NewGormArticleRankingDAO, cache.NewRedisArticleRankingCache, repository.NewCacheArticleRankingRepository, service.NewArticleRankingService, job.NewRankingJob, web.NewArticleRankingHandler)
+
+// migratorSDKProviderSet 业务侧迁移 SDK（默认 NoOp 零开销，yaml migrator.sdk.enabled=true 切 Redis 实现）
+var migratorSDKProviderSet = wire.NewSet(ioc.InitMigratorSDKSwitchReader, ioc.InitMigratorSDKDualWriter, ioc.InitMigratorSDKTaskName, dao.NewGormArticleReaderNewDAO)
 
 // kafkaProviderSet Kafka 基础设施 + 互动事件
 var kafkaProviderSet = wire.NewSet(ioc.InitKafkaConfig, ioc.InitSaramaConfig, ioc.InitSaramaSyncProducer, ioc.InitSaramaClient, ioc.InitEventProducer, ioc.InitInteractionConsumerConfig, interaction.NewSaramaInteractionEventProducer, interaction.NewSaramaInteractionEventConsumer)

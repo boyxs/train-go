@@ -590,6 +590,69 @@ type Result[T any] struct {
 	Data T      `json:"data"`
 }
 
+// TestArticleAuthorHandler_RepublishAfterWithdraw_ResetsDeletedAt
+// 回归：published_article(_v1) 撤回（GORM softDelete:milli 设 deleted_at=now）后重新发布，
+// Upsert 必须把 deleted_at 重置回 0，否则 FindById 因 GORM 自动注入 `WHERE deleted_at=0`
+// 过滤而读不到行，业务侧表现为"重新发布完看不到文章"。
+func (h *ArticleAuthorHandlerSuite) TestArticleAuthorHandler_RepublishAfterWithdraw_ResetsDeletedAt() {
+	t := h.T()
+	mockNow := time.Now().UnixMilli()
+
+	// 1) 先建一条已发布文章
+	require := assert.New(t)
+	require.NoError(h.db.Create(&dao.Article{
+		Id: 99030, Title: "v1", Content: "c1",
+		AuthorId: 1, Status: uint8(domain.ArticleStatusPublished),
+		CreatedAt: mockNow,
+	}).Error)
+	require.NoError(h.db.Create(&dao.PublishedArticle{
+		Id: 99030, Title: "v1", Content: "c1",
+		AuthorId: 1, Status: uint8(domain.ArticleStatusPublished),
+		CreatedAt: mockNow,
+	}).Error)
+
+	// 2) 撤回 → published_article.deleted_at 应被 softDelete 设非 0
+	wReq, err := http.NewRequest(http.MethodPost, "/article/withdraw",
+		bytes.NewReader([]byte(`{"id":99030}`)))
+	require.NoError(err)
+	wReq.Header.Set("Content-Type", "application/json")
+	wRec := httptest.NewRecorder()
+	h.server.ServeHTTP(wRec, wReq)
+	assert.Equal(t, http.StatusOK, wRec.Code)
+
+	// 直接绕 GORM 软删过滤，读 deleted_at 原始值
+	var deletedAtAfterWithdraw int64
+	require.NoError(h.db.Raw(
+		"SELECT deleted_at FROM published_article WHERE id = ?", 99030,
+	).Scan(&deletedAtAfterWithdraw).Error)
+	assert.Greater(t, deletedAtAfterWithdraw, int64(0),
+		"撤回后 deleted_at 必须 > 0（GORM softDelete:milli 设当前时间戳）")
+
+	// 3) 重新发布同 id → Upsert 走 ON DUPLICATE KEY UPDATE，
+	//    本回归 case 期望 deleted_at 被列入 DoUpdates → 重置为 0
+	pReq, err := http.NewRequest(http.MethodPost, "/article/publish",
+		bytes.NewReader([]byte(`{"id":99030,"title":"v2","content":"c2"}`)))
+	require.NoError(err)
+	pReq.Header.Set("Content-Type", "application/json")
+	pRec := httptest.NewRecorder()
+	h.server.ServeHTTP(pRec, pReq)
+	assert.Equal(t, http.StatusOK, pRec.Code)
+
+	// 4) 验证 deleted_at 重置为 0 + title/content 已更新
+	var deletedAtAfterRepublish int64
+	require.NoError(h.db.Raw(
+		"SELECT deleted_at FROM published_article WHERE id = ?", 99030,
+	).Scan(&deletedAtAfterRepublish).Error)
+	assert.Equal(t, int64(0), deletedAtAfterRepublish,
+		"重新发布后 deleted_at 必须重置为 0，否则 FindById 因软删过滤读不到（bug 现场）")
+
+	var pub dao.PublishedArticle
+	// GORM First 自动注入 deleted_at=0，能 First 出来说明业务侧读路径无 ErrRecordNotFound
+	require.NoError(h.db.Where("id = ?", 99030).First(&pub).Error)
+	assert.Equal(t, "v2", pub.Title)
+	assert.Equal(t, "c2", pub.Content)
+}
+
 func (h *ArticleAuthorHandlerSuite) TestArticleAuthorHandler_Detail() {
 	t := h.T()
 	mockNow := time.Now().UnixMilli()

@@ -19,15 +19,17 @@ import (
 )
 
 // 默认 Zipkin collector 地址，本地起：
-//   docker run -d -p 9411:9411 openzipkin/zipkin
+//
+//	docker run -d -p 9411:9411 openzipkin/zipkin
+//
 // 浏览器访问 http://localhost:9411 查看 trace
 const zipkinEndpoint = "http://localhost:9411/api/v2/spans"
 
 // 初始化 Zipkin TracerProvider：BatchSpanProcessor + service.name
 // 跟 stdout 版的区别：
-//   1) exporter 改成 zipkin.New(endpoint)
-//   2) 用 BatchSpanProcessor（生产标配，攒批发送，降低 IO）
-//   3) 测试结束 Shutdown 会 flush 剩余 span
+//  1. exporter 改成 zipkin.New(endpoint)
+//  2. 用 BatchSpanProcessor（生产标配，攒批发送，降低 IO）
+//  3. 测试结束 Shutdown 会 flush 剩余 span
 func initZipkinTracer(t *testing.T) (trace.Tracer, func()) {
 	exporter, err := zipkin.New(zipkinEndpoint)
 	require.NoError(t, err)

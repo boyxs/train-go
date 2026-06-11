@@ -11,6 +11,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/webook/internal/domain"
+	"github.com/webook/internal/migratorsdk"
 	cachemocks "github.com/webook/internal/repository/cache/mocks"
 	"github.com/webook/internal/repository/dao"
 	daomocks "github.com/webook/internal/repository/dao/mocks"
@@ -134,7 +135,14 @@ func TestCacheArticleReaderRepository_Page(t *testing.T) {
 			defer ctrl.Finish()
 
 			d, c := tc.mock(ctrl)
-			repo := NewCacheArticleReaderRepository(d, c, logger.NewNopLogger())
+			// 原 Page 测试不涉及 SDK 路由（Page 不走 SDK），newDAO/sw/dw 用 NoOp 占位
+			repo := NewCacheArticleReaderRepository(
+				d, dao.ArticleReaderNewDAO(d), c,
+				migratorsdk.NewNoOpSwitchReader(),
+				migratorsdk.NewNoOpDualWriter(),
+				"published_article_v1",
+				logger.NewNopLogger(),
+			)
 
 			arts, cnt, err := repo.Page(context.Background(), tc.offset, tc.limit)
 			if tc.wantErr != nil {

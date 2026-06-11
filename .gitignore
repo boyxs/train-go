@@ -19,3 +19,10 @@ go.work
 # !.env.local
 # !.env.example
 # !.env.*.example
+
+# Claude Code 会话中断/续接进度（个人本地状态，不入仓）
+.claude/handover/*.md
+.claude/handover/archive/*
+!.claude/handover/template.md
+!.claude/handover/archive/.gitkeep
+
