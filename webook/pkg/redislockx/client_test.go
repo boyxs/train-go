@@ -54,22 +54,15 @@ func TestTryLock_OnRefresh(t *testing.T) {
 	require.True(t, ok)
 	t.Cleanup(func() { _ = lock.Unlock(context.Background()) })
 
-	//实际时序
-	//
-	//ticker.NewTicker(333ms) 标称时间：
-	//tick 1: t=333.33ms
-	//tick 2: t=666.67ms
-	//tick 3: t=1000.00ms
-	//tick 4: t=1333.33ms
-	//tick 5: t=1666.67ms     ← hit=5，余量 333ms
-	//tick 6: t=2000.00ms     ← hit=6 与 Eventually 截止同时发生 ⚠️
-	//
-	//Eventually waitFor=2s 截止：t=2000ms
-	//tick=200ms 决定 poll 时刻：200, 400, ..., 1800, 2000
+	// 验"按 ttl/3 间隔反复续约"：默认 interval=ttl/3≈333ms，watchdog 会持续 PEXPIRE 保活。
+	// 断言 3s 内 ≥5 次 —— 既证明是短间隔反复续约（非一次性；也非 ttl 级间隔：1s 间隔在 3s 内只够 ~3 次），
+	// 又留足余量：333ms 间隔标称 3s 内 ~9 次，≥5 有 ~1.3s 富余。
+	// 不要把窗口收到刚好卡住第 5 次（如 1801ms）—— 每次 tick 含一次 Redis 往返 + ticker 漂移 +
+	// 协程调度抖动，慢 CI runner 上必 flaky（已实测：本地快机过、CI 慢机挂）。
 	require.Eventually(t, func() bool {
 		return atomic.LoadInt32(&hit) >= 5
-	}, 1801*time.Millisecond, 200*time.Millisecond,
-		"默认 watchdog 应自动启动并触发 OnRefresh（默认 interval=ttl/3=333ms）")
+	}, 3*time.Second, 100*time.Millisecond,
+		"默认 watchdog 应按 ttl/3 间隔反复触发 OnRefresh（3s 内应 ≥5 次）")
 }
 
 // 显式关闭 watchdog：偷 token 后 OnLost 永远不该被调（因为 watchdog 根本没跑）。
