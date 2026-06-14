@@ -1,0 +1,46 @@
+apiVersion: 1
+
+# 冒烟测试告警：验证 规则→通知(policies)→contactpoint→SMTP 邮件 整条链路。vector(1)>0 恒真 = always firing。
+# 默认 isPaused: true；测邮件时改 false + 重载 grafana（重启容器或 alerting reload API），~30s 收信，测完改回 true。
+groups:
+  - orgId: 1
+    name: webook-smoke-test
+    folder: Webook
+    interval: 1m
+    rules:
+      - uid: webook-smoke-test
+        title: 【冒烟测试】邮件链路验证（平时应 paused）
+        condition: C
+        for: 0s
+        isPaused: true
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: info
+          team: backend
+        annotations:
+          summary: "冒烟测试：收到此邮件 = 规则→通知→SMTP 链路通。测完请把 isPaused 改回 true。"
+          runbook_url: "https://wiki.internal/runbook/smoke-test"
+        data:
+          - refId: A
+            relativeTimeRange: { from: 60, to: 0 }
+            datasourceUid: prometheus
+            model:
+              expr: 'vector(1)'
+              refId: A
+              instant: true
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+              refId: C

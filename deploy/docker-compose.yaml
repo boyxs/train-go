@@ -334,6 +334,8 @@ services:
     environment:
       GF_SECURITY_ADMIN_USER: "${GRAFANA_USER:-admin}"
       GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_PASS:-admin}"
+      # 告警邮件链接 = root_url；GRAFANA_ROOT_URL 给完整 URL（含协议+端口），按 env 注入
+      GF_SERVER_ROOT_URL: "${GRAFANA_ROOT_URL:-http://localhost:3001/}"
       # ── SMTP（告警邮件）凭证从 .env.<env> 注入 ──
       GF_SMTP_ENABLED: "${GRAFANA_SMTP_ENABLED:-false}"
       GF_SMTP_HOST: "${GRAFANA_SMTP_HOST:-smtp.qq.com:587}"

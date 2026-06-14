@@ -45,7 +45,8 @@ contactPoints:
             {{ end -}}
             严重级：{{ .Labels.severity }}
             团队：{{ .Labels.team }}
-            Summary：{{ .Annotations.summary }}
+            {{ if eq .Status "firing" }}Summary：{{ .Annotations.summary }}
+            {{ end -}}
             Runbook：{{ .Annotations.runbook_url }}
             Silence：{{ .SilenceURL }}
             ─────────────────────────────────────────────
