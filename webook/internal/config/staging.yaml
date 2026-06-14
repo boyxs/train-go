@@ -88,5 +88,5 @@ otel:
 # 数据迁移 SDK（默认关 → NoOp 零开销；切 true 启用 RedisSwitchReader + RedisDualWriter，详见 local.yaml 注释）
 migrator:
   sdk:
-    enabled: false
+    enabled: true
     taskName: "published_article_v1"
