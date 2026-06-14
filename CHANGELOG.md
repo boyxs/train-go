@@ -2,6 +2,32 @@
 
 <!-- 新功能前插在此，日期降序 -->
 
+## [2026-06-14] 监控告警修复与完善（NaN 误报 + 邮件链路）
+
+**变更内容**：①prometheus 录制规则加 NaN 守卫（`分母 >0` / `and 观测计数 >0`），消除无流量时 5xx/分位/比率 `0/0=NaN` 抖出的 fire+instant-resolve 误告警；②grafana 邮件链路：root_url 改 `GRAFANA_ROOT_URL` 按 env 注入（修链接端口/协议）、contactpoints 模板 resolved 不显示 Summary、新增默认 `isPaused` 的冒烟测试规则验证「规则→通知→SMTP」整链。
+**影响范围**：`deploy/prometheus/rules/*.rules.yml`（11 条加守卫）、`deploy/grafana/provisioning/alerting/*`（contactpoints + 新增 webook-smoke-test.yml）、`docker-compose.yaml`、8 份 `.env.*`（加 GRAFANA_ROOT_URL）。纯配置，prometheus `/-/reload` + 重建 grafana 生效，不动服务镜像。
+**技术决策**：NaN 是「有数据」绕过 `noDataState`，守卫让无流量时序列消失 → 交 noDataState:OK；root_url 用完整 URL 变量以支持 https / 自定义端口。
+**待办**：dev/staging/prod 真实 `.env` 的 `GRAFANA_ROOT_URL` 经域名/IP 访问时改真实 host；QQ SMTP 授权码在私有仓 .env 明文，建议择机重置 + 重新 gitignore。
+**会话**：260614-postman鉴权与监控告警
+**发布**：（配置，reload 生效）
+
+## [2026-06-14] webook-core 启用 migrator SDK 双写/切流（webook-core-v1.3.0）
+
+**变更内容**：`migrator.sdk.enabled` 四环境 `false→true`，core 文章读写挂 RedisSwitchReader/DualWriter。默认 stage（无 Redis stage key）行为等价旧逻辑（仍读写 `published_article`），仅热路径 +1 Redis 查询、Redis 故障降级 SideOld。
+**影响范围**：`internal/config/{dev,staging,prod,test}.yaml`、`deploy/.env.prod.example`（CORE_IMAGE_TAG→1.3.0）。tag `webook-core-v1.3.0` → CI 出 `ghcr.../webook-core:1.3.0`。
+**技术决策**：启用 ≠ 迁移，只挂插件；实际切流需另设 `migrator:stage:published_article_v1` 键 + prod 建并回填 `published_article_v1` 表。CI 跳过 integration，SDK 路径靠 prod runtime + 本地集成测试验证。
+**待办**：部署同步真实 `.env.prod` `CORE_IMAGE_TAG=1.3.0` + `./deploy.sh prod`。
+**会话**：260614-postman鉴权与监控告警
+**发布**：（webook-core-v1.3.0，待部署）
+
+## [2026-06-14] webook-migrator postman/README 鉴权对齐 Bearer（webook-migrator-v1.2.1）
+
+**变更内容**：postman 集合改 `Authorization: Bearer`（移除无效的 x-access-token 请求头）+ 新增 A0 授权登录文件夹（登录脚本自动回填 token）+ 变量统一命名；README A.5 curl 修 Bearer 头 / 端口 :8089 / `$token` 变量，B3 ES 注入 `--data-raw`→`-d`（兼容旧 curl）。
+**影响范围**：`webook/migrator/scripts/postman.json`、`webook/migrator/README.md`。tag `webook-migrator-v1.2.1`（dev 资产 + 文档，镜像功能无变化）。
+**技术决策**：migrator 与 core 共用 `jwtx.ExtractBearer`，只认 `Authorization` 头；x-access-token 仅是登录响应头，旧集合靠 `jwt.disabled` 蒙混、从未真鉴权。
+**会话**：260614-postman鉴权与监控告警
+**发布**：（webook-migrator-v1.2.1）
+
 ## [2026-06-11] webook-migrator 分层合规重构 + 命名全链统一 + 业务监控 + 文档对齐
 
 **变更内容**：在干净 v1 基础上做架构质量收口——①**跨层引用清除**：service/web 层不再直引 `repository/dao`·`repository/cache`·`redis.Cmdable`，新增 7 个 repository（checkpoint/validate_log/dead_letter/audit_log/throttle/switch_state + 原 task）+ `service/replay`（ReplayDL 业务从 handler 下沉）+ cache 层 `SwitchStateCache`；②**命名全链统一**：DAO 实体去 `Migration` 前缀（`MigrationTask`→`Task`…，含表名 `migration_*`→`*` 与索引名）、`Id` 风格贯通（`TaskID`/`taskID`→`TaskId`/`taskId`，字段/变量/方法一体）、转换 helper 升维泛型 `pkg/slicex.Map`（删手写复数方法）、删死哨兵 `ErrStateConflict` + validate_log 索引自愈兼容逻辑 + GTID 占位澄清；③**业务监控补齐**：`webook_migration_lag_ms{task_id,side}` + `webook_migration_dead_letter_unreplayed{task_id}`（scrape 实采 Collector）+ grafana 面板恢复真实查询（删此前永远 No-data 的幽灵面板）；④**transform 文件结构对齐** source/sink（接口/registry/identity/mongo 分文件）；⑤三服务 `ioc/config.go` 同构统一。
