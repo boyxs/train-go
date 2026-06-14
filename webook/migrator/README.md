@@ -1024,12 +1024,12 @@ curl -sS -X DELETE 'http://localhost:9200/article_v1/_doc/2?refresh=true'
 # 改 ES 一个 doc 的 title(造 diff)
 curl -sS -X POST 'http://localhost:9200/article_v1/_update/3?refresh=true' \
   -H 'Content-Type: application/json' \
-  --data-raw '{"doc":{"title":"ES_TAMPERED"}}'
+  -d '{"doc":{"title":"ES_TAMPERED"}}'
 
 # 加 ES 一个 src 没有的 doc(造 extra)
 curl -sS -X PUT 'http://localhost:9200/article_v1/_doc/99?refresh=true' \
   -H 'Content-Type: application/json' \
-  --data-raw '{"id":99,"title":"ES_GHOST","content":"phantom"}'
+  -d '{"id":99,"title":"ES_GHOST","content":"phantom"}'
 
 # 再 verify
 curl -sS -X POST http://localhost:8083/migrator/tasks/$TID3/verify \
@@ -1268,7 +1268,7 @@ redis-cli -a 13520 -h 127.0.0.1 -p 6379 SET migrator:gray:published_article_v1 1
 
 ### A.5 调 webook-core API 触发 SDK 路径
 
-> v1 实际路由（来源 `webook/internal/web/article.go::RegisterRoutes`）。所有端点是 **POST**，认证靠 `x-access-token` header（除 `/article/reader/*`，读者侧不要 token）。
+> v1 实际路由（来源 `webook/internal/web/article.go::RegisterRoutes`）。所有端点是 **POST**，认证靠 `Authorization: Bearer <token>` header（除 `/article/reader/*`，读者侧不要 token）。
 
 | 用户行为 | 端点 | 触发的 SDK 方法 | 内部链路 |
 |---|---|---|---|
@@ -1279,29 +1279,32 @@ redis-cli -a 13520 -h 127.0.0.1 -p 6379 SET migrator:gray:published_article_v1 1
 | 读分页 | `POST /article/reader/page` | **不走 SDK** | Page 跨侧语义不一致，切流期始终走 oldDAO（见 `repository/article_reader.go` 注释）|
 
 ```powershell
+# 先设一次 token，整段复用（值 = 登录后响应头 x-access-token；跑 scripts/postman.json 的 A0.2 密码登录可自动拿）
+$token = "<webook-core JWT>"
+
 # 发表（Upsert → DualWriter.Write 双写 / 单写按 stage 决策）
-curl.exe -X POST http://localhost:8080/article/publish `
-  -H "Content-Type: application/json" -H "x-access-token: <token>" `
+curl.exe -X POST http://localhost:8089/article/publish `
+  -H "Content-Type: application/json" -H "Authorization: Bearer $token" `
   -d '{\"id\":0,\"title\":\"sdk-e2e\",\"content\":\"hello\",\"abstract\":\"abs\"}'
 # 返：{"code":0,"data":<新生成的 article id>}
 
 # 详情（FindById → SwitchReader.ChooseSide 按 stage+gray 决定走 OLD/NEW）
-curl.exe -X POST http://localhost:8080/article/reader/detail `
+curl.exe -X POST http://localhost:8089/article/reader/detail `
   -H "Content-Type: application/json" `
   -d '{\"id\":<上面返的 id>}'
 
 # 撤回（Delete → DualWriter.Write，作者侧 token 必带）
-curl.exe -X POST http://localhost:8080/article/withdraw `
-  -H "Content-Type: application/json" -H "x-access-token: <token>" `
+curl.exe -X POST http://localhost:8089/article/withdraw `
+  -H "Content-Type: application/json" -H "Authorization: Bearer $token" `
   -d '{\"id\":<id>}'
 
 # 删除（同 Delete 链路，区别于 withdraw 是物理删 vs 状态置 unpublished）
-curl.exe -X POST http://localhost:8080/article/delete `
-  -H "Content-Type: application/json" -H "x-access-token: <token>" `
+curl.exe -X POST http://localhost:8089/article/delete `
+  -H "Content-Type: application/json" -H "Authorization: Bearer $token" `
   -d '{\"id\":<id>}'
 ```
 
-> Bash / Linux 用户把 `curl.exe` 改 `curl`、反引号 `` ` `` 改 `\` 续行。`<token>` 是 webook-core JWT（登录态拿）。
+> Bash / Linux 用户把 `curl.exe` 改 `curl`、反引号 `` ` `` 改 `\` 续行，`$token` 赋值改成 `token="..."`（无 `$`、等号两侧不留空格）。`$token` 是 webook-core JWT，登录态拿——跑 `scripts/postman.json` 的 A0.2 密码登录后从 x-access-token 响应头复制即可。
 >
 > 如何看到 SDK 真触发：把 `migrator.sdk.enabled` 切 `true` 后，A.4 已 `SET migrator:stage:published_article_v1 SRC_FIRST` → 发表后 A.6 SQL 验证 `published_article_v1` 表（NEW 侧）真出现新行。stage=SRC_ONLY 时 NEW 侧不动（NoOp 等价旧行为）。
 
