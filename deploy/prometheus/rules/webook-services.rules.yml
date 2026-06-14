@@ -1,49 +1,45 @@
-# Prometheus Recording Rules：webook-* 服务级 HTTP 指标按 job 维度预聚合
-#
-# 加载路径：prometheus.yml rule_files: /etc/prometheus/rules/*.rules.yml
-# 校验：promtool check rules webook-services.rules.yml
-#
-# 与 webook-jobs.rules.yml 区别：
-#   webook-jobs       → cron / lock 系统级，只 webook-core 上报，不分 service 维度
-#   webook-services   → HTTP 业务级，所有 webook-* 服务都上报，by (job) 拆分对比
-#
-# Dashboard / Alerting 直接读这些 record（避免每次刷新重算 histogram_quantile，省 Prometheus CPU）。
+# Prometheus Recording Rules：webook-* HTTP 指标按 job 预聚合（dashboard / alerting 直接读）。校验 promtool check rules。
+# NaN 守卫：无流量时 0/0 比率与空 histogram_quantile 会产 NaN 误告警，
+# 统一 `分母 >0` / `and (观测计数 >0)` 让无数据时不出序列（交告警 noDataState: OK 处理）。
 groups:
 
   - name: webook-services-http-recording
     interval: 30s
     rules:
 
-      # 服务级 QPS（按 job 拆分；加新服务自动跟进）
+      # QPS
       - record: webook:http_qps:rate5m
         expr: sum by (job) (rate(webook_http_requests_total[5m]))
 
-      # 服务级 5xx 错误率
+      # 5xx 错误率（分母 >0 守卫）
       - record: webook:http_5xx_rate:rate5m
         expr: |
           sum by (job) (rate(webook_http_requests_total{status=~"5.."}[5m]))
           /
-          sum by (job) (rate(webook_http_requests_total[5m]))
+          (sum by (job) (rate(webook_http_requests_total[5m])) > 0)
 
-      # 服务级 P50/P95/P99 延迟（dashboard 三档同时读）
+      # P50/P95/P99 延迟（尾部 and 守卫空数据 NaN）
       - record: webook:http_duration_p50:rate5m
         expr: |
           histogram_quantile(0.50,
             sum by (job, le) (rate(webook_http_requests_duration_seconds_bucket[5m]))
           )
+          and on (job) (sum by (job) (rate(webook_http_requests_duration_seconds_count[5m])) > 0)
 
       - record: webook:http_duration_p95:rate5m
         expr: |
           histogram_quantile(0.95,
             sum by (job, le) (rate(webook_http_requests_duration_seconds_bucket[5m]))
           )
+          and on (job) (sum by (job) (rate(webook_http_requests_duration_seconds_count[5m])) > 0)
 
       - record: webook:http_duration_p99:rate5m
         expr: |
           histogram_quantile(0.99,
             sum by (job, le) (rate(webook_http_requests_duration_seconds_bucket[5m]))
           )
+          and on (job) (sum by (job) (rate(webook_http_requests_duration_seconds_count[5m])) > 0)
 
-      # 服务级活跃请求 in-flight（instant gauge，by job 即可，无需 rate）
+      # in-flight
       - record: webook:http_in_flight
         expr: sum by (job) (webook_http_requests_in_flight)
