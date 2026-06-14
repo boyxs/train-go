@@ -80,10 +80,10 @@ otel:
   # 采样率公式详见 config/prod.yaml 注释或 docs/opentelemetry/06-best-practices.md。
   sampleRatio: 1.0          # local 全采样（本机调试全量看）
 
-# 数据迁移 SDK（默认关 → NoOp 零开销；集成测试不走 SDK 切流路径，详见 local.yaml 注释）
+# 数据迁移 SDK（enabled:true → 集成测试走 RedisSwitchReader + RedisDualWriter 真实切流路径；无 stage key 时降级 SideOld=只写旧表，详见 local.yaml 注释）
 migrator:
   sdk:
-    enabled: false
+    enabled: true
     taskName: "published_article_v1"
 
 #etcdctl --endpoints=127.0.0.1:2379 put /webook-core < config/local.yaml
