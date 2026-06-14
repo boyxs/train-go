@@ -2,10 +2,279 @@
   "info": {
     "_postman_id": "webook-migrator-e2e",
     "name": "Go",
-    "description": "webook-migrator v1 — 手动测试集（14 endpoint + 切流状态机 + 异构对账 + 任意源框架）\n\n## 用法\n\n1. Import 后按 A1 → A12 顺序执行 A 段（同构 MySQL→MySQL 完整生命周期，覆盖全部 14 endpoint）。\n2. B1/B2/B3 演示异构方向（任意源框架）：B1 Mongo→MySQL、B2 MySQL→Mongo、B3 MySQL→ES。\n3. 请求体里的 `{{baseUrl}}` / `{{taskId}}` 等是 Postman 变量，在 Collection Variables 里改。\n\n## Collection Variables\n\n| key | 默认 | 说明 |\n|-----|------|------|\n| baseUrl | http://localhost:8083 | migrator 服务地址 |\n| taskId | 1 | A 段 task id（A2 创建后回填） |\n| taskName | art_schema_v1 | A 段 task name；Redis stage/gray key 用它 |\n| taskIdB1/B2/B3 | (空) | B 段各任务 id |\n| taskNameB1/B2/B3 | user_mongo_to_mysql / article_to_mongo / art_to_es_v1 | B 段各 task name |\n\n## 与 README 对齐\n\n本 collection 编号 A1-A12 / B1-B3 与 `webook/migrator/README.md` 章节号一一对应。请求里的期望响应字段名（如 mismatchVO 的 camelCase）与 v1 实际 API 形态一致。",
+    "description": "webook-migrator v1 — 手动测试集（A0 授权登录 + 14 endpoint + 切流状态机 + 异构对账 + 任意源框架）\n\n## 鉴权（重要）\n\nmigrator 从 `Authorization: Bearer <token>` 头取 JWT（不是 x-access-token——后者只是登录响应头）。本 collection 在 Collection 级配了 Bearer Token = {{accessToken}}，所有请求自动带上，无需逐个加头。\n\ntoken 由 webook-core 颁发：先跑 A0.2 密码登录（或 A0.4 短信登录），测试脚本自动把 x-access-token / x-refresh-token 响应头写进 accessToken / refreshToken 变量。本地 migrator web.jwt.disabled=true 时不验签，可跳过 A0 直接打。\n\n## 用法\n\n1. （需鉴权时）先执行 A0.2 密码登录，自动回填 accessToken。\n2. 按 A1 → A12 顺序执行 A 段（同构 MySQL→MySQL 完整生命周期，覆盖全部 14 endpoint）。\n3. B1/B2/B3 演示异构方向（任意源框架）：B1 Mongo→MySQL、B2 MySQL→Mongo、B3 MySQL→ES。\n4. 请求里的 `{{migratorBaseUrl}}` / `{{coreBaseUrl}}` / `{{taskIdA}}` 等是 Postman 变量，在 Collection Variables 里改。\n\n## Collection Variables\n\n| key | 默认 | 说明 |\n|-----|------|------|\n| migratorBaseUrl | http://localhost:8083 | migrator 服务地址（直连） |\n| coreBaseUrl | http://localhost:8089 | webook-core 地址，A0 登录 / 注册接口在此 |\n| taskIdA | 1 | A 段 task id（A2 创建后回填） |\n| taskNameA | art_schema_v1 | A 段 task name；Redis stage/gray key 用它 |\n| taskIdB1/B2/B3 | (空) | B 段各任务 id |\n| taskNameB1/B2/B3 | user_mongo_to_mysql / article_to_mongo / art_to_es_v1 | B 段各 task name |\n| email / password | (空) | A0 密码登录凭据 |\n| accessToken / refreshToken | (空) | 登录后自动回填，无需手填 |\n\n## 与 README 对齐\n\n本 collection 编号 A1-A12 / B1-B3 与 `webook/migrator/README.md` 章节号一一对应。请求里的期望响应字段名（如 mismatchVO 的 camelCase）与 v1 实际 API 形态一致。",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
   "item": [
+    {
+      "name": "A0 授权登录（token 由 webook-core 颁发）",
+      "description": "webook-migrator 从 `Authorization: Bearer` 头取 JWT，token 由 webook-core（{{coreBaseUrl}}）颁发。先跑 A0.2 密码登录或 A0.4 短信登录，测试脚本自动回填 accessToken / refreshToken，后续 migrator 请求即自动带 Bearer。\n\n注意：本地 migrator web.jwt.disabled=true 时不验签，可跳过本段。用前先在 Collection Variables 填 email / password。",
+      "item": [
+        {
+          "name": "A0.1 POST /user/register 注册",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\",\n  \"confirmPassword\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{coreBaseUrl}}/user/register",
+              "host": [
+                "{{coreBaseUrl}}"
+              ],
+              "path": [
+                "user",
+                "register"
+              ]
+            },
+            "description": "注册新用户。密码需 8+ 位且含字母 + 数字 + 特殊字符（$@$!%*#?&）。\n\n期望：{\"code\":0,\"msg\":\"注册成功\"}；邮箱已存在 → 409。"
+          }
+        },
+        {
+          "name": "A0.2 POST /user/login 密码登录（自动回填 token）",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// 登录成功后把 token 写进 collection 变量，后续 migrator 请求自动鉴权",
+                  "const at = pm.response.headers.get('x-access-token');",
+                  "if (at) {",
+                  "    pm.collectionVariables.set('accessToken', at);",
+                  "    console.log('accessToken 已回填');",
+                  "}",
+                  "const rt = pm.response.headers.get('x-refresh-token');",
+                  "if (rt) {",
+                  "    pm.collectionVariables.set('refreshToken', rt);",
+                  "    console.log('refreshToken 已回填');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{coreBaseUrl}}/user/login",
+              "host": [
+                "{{coreBaseUrl}}"
+              ],
+              "path": [
+                "user",
+                "login"
+              ]
+            },
+            "description": "密码登录。成功后 webook-core 在 x-access-token / x-refresh-token 响应头返回 token，测试脚本自动写入 accessToken / refreshToken 变量。\n\n期望：{\"code\":0,\"msg\":\"登录成功\"}；账号或密码错 → 401。"
+          }
+        },
+        {
+          "name": "A0.3 POST /user/login_sms/code/send 发送短信验证码",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"13800138000\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{coreBaseUrl}}/user/login_sms/code/send",
+              "host": [
+                "{{coreBaseUrl}}"
+              ],
+              "path": [
+                "user",
+                "login_sms",
+                "code",
+                "send"
+              ]
+            },
+            "description": "发送登录短信验证码（biz=login）。本地未接真实短信网关时验证码走日志 / 控制台。\n\n期望：{\"code\":0,\"msg\":\"发送成功\"}；1 分钟内重复发 → 429。"
+          }
+        },
+        {
+          "name": "A0.4 POST /user/login_sms 短信验证码登录（自动回填 token）",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const at = pm.response.headers.get('x-access-token');",
+                  "if (at) { pm.collectionVariables.set('accessToken', at); console.log('accessToken 已回填'); }",
+                  "const rt = pm.response.headers.get('x-refresh-token');",
+                  "if (rt) { pm.collectionVariables.set('refreshToken', rt); console.log('refreshToken 已回填'); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"13800138000\",\n  \"code\": \"123456\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{coreBaseUrl}}/user/login_sms",
+              "host": [
+                "{{coreBaseUrl}}"
+              ],
+              "path": [
+                "user",
+                "login_sms"
+              ]
+            },
+            "description": "短信验证码登录（手机号不存在则自动注册）。code 填 A0.3 收到的验证码。成功后同 A0.2 自动回填 token。\n\n期望：{\"code\":0,\"msg\":\"登录成功\"}；验证码错 → 业务错误。"
+          }
+        },
+        {
+          "name": "A0.5 GET /user/refresh_token 刷新 access token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const at = pm.response.headers.get('x-access-token');",
+                  "if (at) { pm.collectionVariables.set('accessToken', at); console.log('accessToken 已刷新'); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{refreshToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{coreBaseUrl}}/user/refresh_token",
+              "host": [
+                "{{coreBaseUrl}}"
+              ],
+              "path": [
+                "user",
+                "refresh_token"
+              ]
+            },
+            "description": "用 refresh token 换新的 access token（access 过期时调）。本请求覆盖为 Bearer {{refreshToken}}（webook-core 的 refresh_token 接口也从 Authorization 头取 token）；成功后测试脚本刷新 accessToken。\n\n期望：200 {\"msg\":\"OK\"}；refresh 失效 → 401。"
+          }
+        },
+        {
+          "name": "A0.6 GET /user/profile 查看个人资料",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{coreBaseUrl}}/user/profile",
+              "host": [
+                "{{coreBaseUrl}}"
+              ],
+              "path": [
+                "user",
+                "profile"
+              ]
+            },
+            "description": "查看当前登录用户资料。继承 Collection 级 Bearer {{accessToken}} 鉴权。\n\n期望：200 直接返回 Profile 对象（此接口不走 Result 包装）；未登录 → 401。"
+          }
+        },
+        {
+          "name": "A0.7 POST /user/logout 退出登录",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{coreBaseUrl}}/user/logout",
+              "host": [
+                "{{coreBaseUrl}}"
+              ],
+              "path": [
+                "user",
+                "logout"
+              ]
+            },
+            "description": "登出：清空 token 响应头 + 把当前 ssid 加入登出黑名单（access token 立即失效）。继承 Collection 级 Bearer 鉴权。\n\n期望：{\"code\":0,\"msg\":\"退出成功\"}。"
+          }
+        }
+      ]
+    },
     {
       "name": "A1 健康检查",
       "item": [
@@ -15,9 +284,9 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/health",
+              "raw": "{{migratorBaseUrl}}/health",
               "host": [
-                "{{baseUrl}}"
+                "{{migratorBaseUrl}}"
               ],
               "path": [
                 "health"
@@ -34,9 +303,9 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/metrics",
+              "raw": "{{migratorBaseUrl}}/metrics",
               "host": [
-                "{{baseUrl}}"
+                "{{migratorBaseUrl}}"
               ],
               "path": [
                 "metrics"
@@ -62,14 +331,7 @@
                 "key": "Content-Type",
                 "value": "application/json",
                 "description": ""
-              },
-              {
-                "key": "x-access-token",
-                "value": "{{accessToken}}",
-                "type": "text",
-                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
-              }
-            ],
+              }            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"art_schema_v1\",\n  \"mode\": \"cdc\",\n  \"kind\": \"schema\",\n  \"sourceDsnRef\": \"vault:src\",\n  \"sinkType\": \"mysql\",\n  \"sinkDsnRef\": \"vault:dst\",\n  \"tables\": [{\"src\": \"article\", \"dst\": \"article_v1\", \"partitionKey\": \"id\"}]\n}",
@@ -83,9 +345,9 @@
               "description": ""
             },
             "url": {
-              "raw": "{{baseUrl}}/migrator/tasks",
+              "raw": "{{migratorBaseUrl}}/migrator/tasks",
               "host": [
-                "{{baseUrl}}"
+                "{{migratorBaseUrl}}"
               ],
               "path": [
                 "migrator",
@@ -101,18 +363,11 @@
           "name": "A3 GET /migrator/tasks 列表",
           "request": {
             "method": "GET",
-            "header": [
-              {
-                "key": "x-access-token",
-                "value": "{{accessToken}}",
-                "type": "text",
-                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
-              }
-            ],
+            "header": [],
             "url": {
-              "raw": "{{baseUrl}}/migrator/tasks?offset=0&limit=10",
+              "raw": "{{migratorBaseUrl}}/migrator/tasks?offset=0&limit=10",
               "host": [
-                "{{baseUrl}}"
+                "{{migratorBaseUrl}}"
               ],
               "path": [
                 "migrator",
@@ -140,23 +395,16 @@
           "name": "A3 GET /migrator/tasks/:id 详情",
           "request": {
             "method": "GET",
-            "header": [
-              {
-                "key": "x-access-token",
-                "value": "{{accessToken}}",
-                "type": "text",
-                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
-              }
-            ],
+            "header": [],
             "url": {
-              "raw": "{{baseUrl}}/migrator/tasks/{{taskId}}",
+              "raw": "{{migratorBaseUrl}}/migrator/tasks/{{taskIdA}}",
               "host": [
-                "{{baseUrl}}"
+                "{{migratorBaseUrl}}"
               ],
               "path": [
                 "migrator",
                 "tasks",
-                "{{taskId}}"
+                "{{taskIdA}}"
               ],
               "description": ""
             },
@@ -179,14 +427,7 @@
                 "key": "Content-Type",
                 "value": "application/json",
                 "description": ""
-              },
-              {
-                "key": "x-access-token",
-                "value": "{{accessToken}}",
-                "type": "text",
-                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
-              }
-            ],
+              }            ],
             "body": {
               "mode": "raw",
               "raw": "{\"sourceDsnRef\":\"vault:src\",\"tables\":[\"article\"]}",
@@ -200,9 +441,9 @@
               "description": ""
             },
             "url": {
-              "raw": "{{baseUrl}}/migrator/preflight",
+              "raw": "{{migratorBaseUrl}}/migrator/preflight",
               "host": [
-                "{{baseUrl}}"
+                "{{migratorBaseUrl}}"
               ],
               "path": [
                 "migrator",
@@ -229,14 +470,7 @@
                 "key": "Content-Type",
                 "value": "application/json",
                 "description": ""
-              },
-              {
-                "key": "x-access-token",
-                "value": "{{accessToken}}",
-                "type": "text",
-                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
-              }
-            ],
+              }            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"phase\": \"full\",\n  \"shards\": [{\"no\": 0, \"pkMin\": 1, \"pkMax\": 100, \"batchSz\": 1000}]\n}",
@@ -250,14 +484,14 @@
               "description": ""
             },
             "url": {
-              "raw": "{{baseUrl}}/migrator/tasks/{{taskId}}/start",
+              "raw": "{{migratorBaseUrl}}/migrator/tasks/{{taskIdA}}/start",
               "host": [
-                "{{baseUrl}}"
+                "{{migratorBaseUrl}}"
               ],
               "path": [
                 "migrator",
                 "tasks",
-                "{{taskId}}",
+                "{{taskIdA}}",
                 "start"
               ],
               "description": ""
@@ -275,14 +509,7 @@
                 "key": "Content-Type",
                 "value": "application/json",
                 "description": ""
-              },
-              {
-                "key": "x-access-token",
-                "value": "{{accessToken}}",
-                "type": "text",
-                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
-              }
-            ],
+              }            ],
             "body": {
               "mode": "raw",
               "raw": "{\"phase\":\"incr\"}",
@@ -296,14 +523,14 @@
               "description": ""
             },
             "url": {
-              "raw": "{{baseUrl}}/migrator/tasks/{{taskId}}/start",
+              "raw": "{{migratorBaseUrl}}/migrator/tasks/{{taskIdA}}/start",
               "host": [
-                "{{baseUrl}}"
+                "{{migratorBaseUrl}}"
               ],
               "path": [
                 "migrator",
                 "tasks",
-                "{{taskId}}",
+                "{{taskIdA}}",
                 "start"
               ],
               "description": ""
@@ -316,23 +543,16 @@
           "name": "A6.4 GET /tasks/:id/lag （v1 已实现双侧延迟）",
           "request": {
             "method": "GET",
-            "header": [
-              {
-                "key": "x-access-token",
-                "value": "{{accessToken}}",
-                "type": "text",
-                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
-              }
-            ],
+            "header": [],
             "url": {
-              "raw": "{{baseUrl}}/migrator/tasks/{{taskId}}/lag",
+              "raw": "{{migratorBaseUrl}}/migrator/tasks/{{taskIdA}}/lag",
               "host": [
-                "{{baseUrl}}"
+                "{{migratorBaseUrl}}"
               ],
               "path": [
                 "migrator",
                 "tasks",
-                "{{taskId}}",
+                "{{taskIdA}}",
                 "lag"
               ],
               "description": ""
@@ -351,23 +571,16 @@
           "name": "A7 POST /tasks/:id/pause",
           "request": {
             "method": "POST",
-            "header": [
-              {
-                "key": "x-access-token",
-                "value": "{{accessToken}}",
-                "type": "text",
-                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
-              }
-            ],
+            "header": [],
             "url": {
-              "raw": "{{baseUrl}}/migrator/tasks/{{taskId}}/pause",
+              "raw": "{{migratorBaseUrl}}/migrator/tasks/{{taskIdA}}/pause",
               "host": [
-                "{{baseUrl}}"
+                "{{migratorBaseUrl}}"
               ],
               "path": [
                 "migrator",
                 "tasks",
-                "{{taskId}}",
+                "{{taskIdA}}",
                 "pause"
               ],
               "description": ""
@@ -391,14 +604,7 @@
                 "key": "Content-Type",
                 "value": "application/json",
                 "description": ""
-              },
-              {
-                "key": "x-access-token",
-                "value": "{{accessToken}}",
-                "type": "text",
-                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
-              }
-            ],
+              }            ],
             "body": {
               "mode": "raw",
               "raw": "{\"mode\":\"full\"}",
@@ -412,14 +618,14 @@
               "description": ""
             },
             "url": {
-              "raw": "{{baseUrl}}/migrator/tasks/{{taskId}}/verify",
+              "raw": "{{migratorBaseUrl}}/migrator/tasks/{{taskIdA}}/verify",
               "host": [
-                "{{baseUrl}}"
+                "{{migratorBaseUrl}}"
               ],
               "path": [
                 "migrator",
                 "tasks",
-                "{{taskId}}",
+                "{{taskIdA}}",
                 "verify"
               ],
               "description": ""
@@ -437,14 +643,7 @@
                 "key": "Content-Type",
                 "value": "application/json",
                 "description": ""
-              },
-              {
-                "key": "x-access-token",
-                "value": "{{accessToken}}",
-                "type": "text",
-                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
-              }
-            ],
+              }            ],
             "body": {
               "mode": "raw",
               "raw": "{\"mode\":\"sample\",\"sampleRate\":0.5}",
@@ -458,14 +657,14 @@
               "description": ""
             },
             "url": {
-              "raw": "{{baseUrl}}/migrator/tasks/{{taskId}}/verify",
+              "raw": "{{migratorBaseUrl}}/migrator/tasks/{{taskIdA}}/verify",
               "host": [
-                "{{baseUrl}}"
+                "{{migratorBaseUrl}}"
               ],
               "path": [
                 "migrator",
                 "tasks",
-                "{{taskId}}",
+                "{{taskIdA}}",
                 "verify"
               ],
               "description": ""
@@ -483,14 +682,7 @@
                 "key": "Content-Type",
                 "value": "application/json",
                 "description": ""
-              },
-              {
-                "key": "x-access-token",
-                "value": "{{accessToken}}",
-                "type": "text",
-                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
-              }
-            ],
+              }            ],
             "body": {
               "mode": "raw",
               "raw": "{\"mode\":\"sample\",\"sampleRate\":0}",
@@ -504,14 +696,14 @@
               "description": ""
             },
             "url": {
-              "raw": "{{baseUrl}}/migrator/tasks/{{taskId}}/verify",
+              "raw": "{{migratorBaseUrl}}/migrator/tasks/{{taskIdA}}/verify",
               "host": [
-                "{{baseUrl}}"
+                "{{migratorBaseUrl}}"
               ],
               "path": [
                 "migrator",
                 "tasks",
-                "{{taskId}}",
+                "{{taskIdA}}",
                 "verify"
               ],
               "description": ""
@@ -530,23 +722,16 @@
           "name": "A8.3 GET /tasks/:id/mismatch（差异明细分页）",
           "request": {
             "method": "GET",
-            "header": [
-              {
-                "key": "x-access-token",
-                "value": "{{accessToken}}",
-                "type": "text",
-                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
-              }
-            ],
+            "header": [],
             "url": {
-              "raw": "{{baseUrl}}/migrator/tasks/{{taskId}}/mismatch?offset=0&limit=10",
+              "raw": "{{migratorBaseUrl}}/migrator/tasks/{{taskIdA}}/mismatch?offset=0&limit=10",
               "host": [
-                "{{baseUrl}}"
+                "{{migratorBaseUrl}}"
               ],
               "path": [
                 "migrator",
                 "tasks",
-                "{{taskId}}",
+                "{{taskIdA}}",
                 "mismatch"
               ],
               "query": [
@@ -582,14 +767,7 @@
                 "key": "Content-Type",
                 "value": "application/json",
                 "description": ""
-              },
-              {
-                "key": "x-access-token",
-                "value": "{{accessToken}}",
-                "type": "text",
-                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
-              }
-            ],
+              }            ],
             "body": {
               "mode": "raw",
               "raw": "{\"strategy\":\"mark_only\",\"ids\":[1,2,3]}",
@@ -603,19 +781,19 @@
               "description": ""
             },
             "url": {
-              "raw": "{{baseUrl}}/migrator/tasks/{{taskId}}/repair",
+              "raw": "{{migratorBaseUrl}}/migrator/tasks/{{taskIdA}}/repair",
               "host": [
-                "{{baseUrl}}"
+                "{{migratorBaseUrl}}"
               ],
               "path": [
                 "migrator",
                 "tasks",
-                "{{taskId}}",
+                "{{taskIdA}}",
                 "repair"
               ],
               "description": ""
             },
-            "description": "前置：先跑 08 步 GET mismatch 拿到 validate_log id（替换 ids 数组）\n\n期望：{\"code\":0,\"data\":{\"repaired\":3}}\n\n验证：SELECT id, repaired, repaired_at FROM validate_log WHERE task_id={{taskId}}\n→ 所有 repaired=1，repaired_at 有值"
+            "description": "前置：先跑 08 步 GET mismatch 拿到 validate_log id（替换 ids 数组）\n\n期望：{\"code\":0,\"data\":{\"repaired\":3}}\n\n验证：SELECT id, repaired, repaired_at FROM validate_log WHERE task_id={{taskIdA}}\n→ 所有 repaired=1，repaired_at 有值"
           },
           "description": ""
         },
@@ -628,17 +806,10 @@
                 "key": "Content-Type",
                 "value": "application/json",
                 "description": ""
-              },
-              {
-                "key": "x-access-token",
-                "value": "{{accessToken}}",
-                "type": "text",
-                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
-              }
-            ],
+              }            ],
             "body": {
               "mode": "raw",
-              "raw": "{\"strategy\":\"src_overwrite_dst\",\"ids\":[1]}",
+              "raw": "{\"strategy\":\"src_overwrite_dst\",\"ids\":[1,2,3]}",
               "options": {
                 "raw": {
                   "language": "json",
@@ -649,14 +820,14 @@
               "description": ""
             },
             "url": {
-              "raw": "{{baseUrl}}/migrator/tasks/{{taskId}}/repair",
+              "raw": "{{migratorBaseUrl}}/migrator/tasks/{{taskIdA}}/repair",
               "host": [
-                "{{baseUrl}}"
+                "{{migratorBaseUrl}}"
               ],
               "path": [
                 "migrator",
                 "tasks",
-                "{{taskId}}",
+                "{{taskIdA}}",
                 "repair"
               ],
               "description": ""
@@ -680,14 +851,7 @@
                 "key": "Content-Type",
                 "value": "application/json",
                 "description": ""
-              },
-              {
-                "key": "x-access-token",
-                "value": "{{accessToken}}",
-                "type": "text",
-                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
-              }
-            ],
+              }            ],
             "body": {
               "mode": "raw",
               "raw": "{\"percent\":50}",
@@ -701,19 +865,19 @@
               "description": ""
             },
             "url": {
-              "raw": "{{baseUrl}}/migrator/tasks/{{taskId}}/gray",
+              "raw": "{{migratorBaseUrl}}/migrator/tasks/{{taskIdA}}/gray",
               "host": [
-                "{{baseUrl}}"
+                "{{migratorBaseUrl}}"
               ],
               "path": [
                 "migrator",
                 "tasks",
-                "{{taskId}}",
+                "{{taskIdA}}",
                 "gray"
               ],
               "description": ""
             },
-            "description": "期望：{\"code\":0,\"data\":{\"gray\":50}}\n\n验证：\n- redis-cli GET 'migrator:gray:<task name>' → 50（路由决策源）\n- SELECT gray_percent FROM task WHERE id={{taskId}} → 50（冗余持久化）"
+            "description": "期望：{\"code\":0,\"data\":{\"gray\":50}}\n\n验证：\n- redis-cli GET 'migrator:gray:<task name>' → 50（路由决策源）\n- SELECT gray_percent FROM task WHERE id={{taskIdA}} → 50（冗余持久化）"
           },
           "description": ""
         },
@@ -726,14 +890,7 @@
                 "key": "Content-Type",
                 "value": "application/json",
                 "description": ""
-              },
-              {
-                "key": "x-access-token",
-                "value": "{{accessToken}}",
-                "type": "text",
-                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
-              }
-            ],
+              }            ],
             "body": {
               "mode": "raw",
               "raw": "{\"percent\":200}",
@@ -747,14 +904,14 @@
               "description": ""
             },
             "url": {
-              "raw": "{{baseUrl}}/migrator/tasks/{{taskId}}/gray",
+              "raw": "{{migratorBaseUrl}}/migrator/tasks/{{taskIdA}}/gray",
               "host": [
-                "{{baseUrl}}"
+                "{{migratorBaseUrl}}"
               ],
               "path": [
                 "migrator",
                 "tasks",
-                "{{taskId}}",
+                "{{taskIdA}}",
                 "gray"
               ],
               "description": ""
@@ -778,14 +935,7 @@
                 "key": "Content-Type",
                 "value": "application/json",
                 "description": ""
-              },
-              {
-                "key": "x-access-token",
-                "value": "{{accessToken}}",
-                "type": "text",
-                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
-              }
-            ],
+              }            ],
             "body": {
               "mode": "raw",
               "raw": "{\"stage\":\"SRC_FIRST\"}",
@@ -799,14 +949,14 @@
               "description": ""
             },
             "url": {
-              "raw": "{{baseUrl}}/migrator/tasks/{{taskId}}/switch",
+              "raw": "{{migratorBaseUrl}}/migrator/tasks/{{taskIdA}}/switch",
               "host": [
-                "{{baseUrl}}"
+                "{{migratorBaseUrl}}"
               ],
               "path": [
                 "migrator",
                 "tasks",
-                "{{taskId}}",
+                "{{taskIdA}}",
                 "switch"
               ],
               "description": ""
@@ -824,14 +974,7 @@
                 "key": "Content-Type",
                 "value": "application/json",
                 "description": ""
-              },
-              {
-                "key": "x-access-token",
-                "value": "{{accessToken}}",
-                "type": "text",
-                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
-              }
-            ],
+              }            ],
             "body": {
               "mode": "raw",
               "raw": "{\"stage\":\"DST_FIRST\"}",
@@ -845,14 +988,14 @@
               "description": ""
             },
             "url": {
-              "raw": "{{baseUrl}}/migrator/tasks/{{taskId}}/switch",
+              "raw": "{{migratorBaseUrl}}/migrator/tasks/{{taskIdA}}/switch",
               "host": [
-                "{{baseUrl}}"
+                "{{migratorBaseUrl}}"
               ],
               "path": [
                 "migrator",
                 "tasks",
-                "{{taskId}}",
+                "{{taskIdA}}",
                 "switch"
               ],
               "description": ""
@@ -870,14 +1013,7 @@
                 "key": "Content-Type",
                 "value": "application/json",
                 "description": ""
-              },
-              {
-                "key": "x-access-token",
-                "value": "{{accessToken}}",
-                "type": "text",
-                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
-              }
-            ],
+              }            ],
             "body": {
               "mode": "raw",
               "raw": "{\"stage\":\"DST_ONLY\",\"propose\":\"alice\"}",
@@ -891,14 +1027,14 @@
               "description": ""
             },
             "url": {
-              "raw": "{{baseUrl}}/migrator/tasks/{{taskId}}/switch",
+              "raw": "{{migratorBaseUrl}}/migrator/tasks/{{taskIdA}}/switch",
               "host": [
-                "{{baseUrl}}"
+                "{{migratorBaseUrl}}"
               ],
               "path": [
                 "migrator",
                 "tasks",
-                "{{taskId}}",
+                "{{taskIdA}}",
                 "switch"
               ],
               "description": ""
@@ -916,14 +1052,7 @@
                 "key": "Content-Type",
                 "value": "application/json",
                 "description": ""
-              },
-              {
-                "key": "x-access-token",
-                "value": "{{accessToken}}",
-                "type": "text",
-                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
-              }
-            ],
+              }            ],
             "body": {
               "mode": "raw",
               "raw": "{\"stage\":\"DST_ONLY\",\"approve\":\"bob\"}",
@@ -937,14 +1066,14 @@
               "description": ""
             },
             "url": {
-              "raw": "{{baseUrl}}/migrator/tasks/{{taskId}}/switch",
+              "raw": "{{migratorBaseUrl}}/migrator/tasks/{{taskIdA}}/switch",
               "host": [
-                "{{baseUrl}}"
+                "{{migratorBaseUrl}}"
               ],
               "path": [
                 "migrator",
                 "tasks",
-                "{{taskId}}",
+                "{{taskIdA}}",
                 "switch"
               ],
               "description": ""
@@ -962,14 +1091,7 @@
                 "key": "Content-Type",
                 "value": "application/json",
                 "description": ""
-              },
-              {
-                "key": "x-access-token",
-                "value": "{{accessToken}}",
-                "type": "text",
-                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
-              }
-            ],
+              }            ],
             "body": {
               "mode": "raw",
               "raw": "{\"stage\":\"DST_ONLY\",\"propose\":\"alice\",\"approve\":\"alice\"}",
@@ -983,14 +1105,14 @@
               "description": ""
             },
             "url": {
-              "raw": "{{baseUrl}}/migrator/tasks/{{taskId}}/switch",
+              "raw": "{{migratorBaseUrl}}/migrator/tasks/{{taskIdA}}/switch",
               "host": [
-                "{{baseUrl}}"
+                "{{migratorBaseUrl}}"
               ],
               "path": [
                 "migrator",
                 "tasks",
-                "{{taskId}}",
+                "{{taskIdA}}",
                 "switch"
               ],
               "description": ""
@@ -1008,14 +1130,7 @@
                 "key": "Content-Type",
                 "value": "application/json",
                 "description": ""
-              },
-              {
-                "key": "x-access-token",
-                "value": "{{accessToken}}",
-                "type": "text",
-                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
-              }
-            ],
+              }            ],
             "body": {
               "mode": "raw",
               "raw": "{\"stage\":\"ignored\",\"action\":\"rollback\"}",
@@ -1029,14 +1144,14 @@
               "description": ""
             },
             "url": {
-              "raw": "{{baseUrl}}/migrator/tasks/{{taskId}}/switch",
+              "raw": "{{migratorBaseUrl}}/migrator/tasks/{{taskIdA}}/switch",
               "host": [
-                "{{baseUrl}}"
+                "{{migratorBaseUrl}}"
               ],
               "path": [
                 "migrator",
                 "tasks",
-                "{{taskId}}",
+                "{{taskIdA}}",
                 "switch"
               ],
               "description": ""
@@ -1054,14 +1169,7 @@
                 "key": "Content-Type",
                 "value": "application/json",
                 "description": ""
-              },
-              {
-                "key": "x-access-token",
-                "value": "{{accessToken}}",
-                "type": "text",
-                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
-              }
-            ],
+              }            ],
             "body": {
               "mode": "raw",
               "raw": "{\"stage\":\"DST_ONLY\",\"propose\":\"alice\",\"approve\":\"bob\"}",
@@ -1075,14 +1183,14 @@
               "description": ""
             },
             "url": {
-              "raw": "{{baseUrl}}/migrator/tasks/{{taskId}}/switch",
+              "raw": "{{migratorBaseUrl}}/migrator/tasks/{{taskIdA}}/switch",
               "host": [
-                "{{baseUrl}}"
+                "{{migratorBaseUrl}}"
               ],
               "path": [
                 "migrator",
                 "tasks",
-                "{{taskId}}",
+                "{{taskIdA}}",
                 "switch"
               ],
               "description": ""
@@ -1106,14 +1214,7 @@
                 "key": "Content-Type",
                 "value": "application/json",
                 "description": ""
-              },
-              {
-                "key": "x-access-token",
-                "value": "{{accessToken}}",
-                "type": "text",
-                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
-              }
-            ],
+              }            ],
             "body": {
               "mode": "raw",
               "raw": "{\"limit\":1000}",
@@ -1127,19 +1228,19 @@
               "description": ""
             },
             "url": {
-              "raw": "{{baseUrl}}/migrator/tasks/{{taskId}}/replay-dl",
+              "raw": "{{migratorBaseUrl}}/migrator/tasks/{{taskIdA}}/replay-dl",
               "host": [
-                "{{baseUrl}}"
+                "{{migratorBaseUrl}}"
               ],
               "path": [
                 "migrator",
                 "tasks",
-                "{{taskId}}",
+                "{{taskIdA}}",
                 "replay-dl"
               ],
               "description": ""
             },
-            "description": "前置：手插死信（含一条坏 JSON 测失败计数）：\n\n```sql\nINSERT INTO dead_letter (task_id, op, table_name, biz_id, payload) VALUES\n  ({{taskId}}, 'insert', 'article', '100', '{\\\"id\\\":100,\\\"title\\\":\\\"replay-1\\\"}'),\n  ({{taskId}}, 'insert', 'article', '101', '{\\\"id\\\":101,\\\"title\\\":\\\"replay-2\\\"}'),\n  ({{taskId}}, 'insert', 'article', '102', 'this-is-not-json');\n```\n\n期望：{\"code\":0,\"data\":{\"replayed\":2,\"failed\":1}}\n\n验证：\n- SELECT * FROM article_v1 WHERE id IN (100,101) → 2 行\n- SELECT id, replayed, retry_count, last_error FROM dead_letter\n  - id=100, 101: replayed=1, replayed_at 有值\n  - id=102: replayed=0, retry_count=1, last_error 含 'payload unmarshal'（坏 JSON 进 retry）\n\n注意：POST /replay-dl 必须带 body，至少 {} 或 {\"limit\":1000}（handler 用 WrapReq[replayReq]，无 body 返 400）"
+            "description": "前置：手插死信（含一条坏 JSON 测失败计数）：\n\n```sql\nINSERT INTO dead_letter (task_id, op, table_name, biz_id, payload) VALUES\n  ({{taskIdA}}, 'insert', 'article', '100', '{\\\"id\\\":100,\\\"title\\\":\\\"replay-1\\\"}'),\n  ({{taskIdA}}, 'insert', 'article', '101', '{\\\"id\\\":101,\\\"title\\\":\\\"replay-2\\\"}'),\n  ({{taskIdA}}, 'insert', 'article', '102', 'this-is-not-json');\n```\n\n期望：{\"code\":0,\"data\":{\"replayed\":2,\"failed\":1}}\n\n验证：\n- SELECT * FROM article_v1 WHERE id IN (100,101) → 2 行\n- SELECT id, replayed, retry_count, last_error FROM dead_letter\n  - id=100, 101: replayed=1, replayed_at 有值\n  - id=102: replayed=0, retry_count=1, last_error 含 'payload unmarshal'（坏 JSON 进 retry）\n\n注意：POST /replay-dl 必须带 body，至少 {} 或 {\"limit\":1000}（handler 用 WrapReq[replayReq]，无 body 返 400）"
           },
           "description": ""
         }
@@ -1158,14 +1259,7 @@
                 "key": "Content-Type",
                 "value": "application/json",
                 "description": ""
-              },
-              {
-                "key": "x-access-token",
-                "value": "{{accessToken}}",
-                "type": "text",
-                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
-              }
-            ],
+              }            ],
             "body": {
               "mode": "raw",
               "raw": "{\"qps\":10000,\"shard_workers\":16}",
@@ -1179,14 +1273,14 @@
               "description": ""
             },
             "url": {
-              "raw": "{{baseUrl}}/migrator/tasks/{{taskId}}/throttle",
+              "raw": "{{migratorBaseUrl}}/migrator/tasks/{{taskIdA}}/throttle",
               "host": [
-                "{{baseUrl}}"
+                "{{migratorBaseUrl}}"
               ],
               "path": [
                 "migrator",
                 "tasks",
-                "{{taskId}}",
+                "{{taskIdA}}",
                 "throttle"
               ],
               "description": ""
@@ -1210,22 +1304,15 @@
               {
                 "key": "Content-Type",
                 "value": "application/json"
-              },
-              {
-                "key": "x-access-token",
-                "value": "{{accessToken}}",
-                "type": "text",
-                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
-              }
-            ],
+              }            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"user_mongo_to_mysql\",\n  \"mode\": \"cdc\",\n  \"kind\": \"heterogeneous\",\n  \"sourceType\": \"mongo\",\n  \"sourceDsnRef\": \"vault:mongo-src\",\n  \"sinkType\": \"mysql\",\n  \"sinkDsnRef\": \"vault:dst\",\n  \"tables\": [{\"src\": \"user_demo\", \"dst\": \"user_demo\", \"partitionKey\": \"_id\", \"transform\": \"mongo_to_relational\"}]\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/migrator/tasks",
+              "raw": "{{migratorBaseUrl}}/migrator/tasks",
               "host": [
-                "{{baseUrl}}"
+                "{{migratorBaseUrl}}"
               ],
               "path": [
                 "migrator",
@@ -1243,22 +1330,15 @@
               {
                 "key": "Content-Type",
                 "value": "application/json"
-              },
-              {
-                "key": "x-access-token",
-                "value": "{{accessToken}}",
-                "type": "text",
-                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
-              }
-            ],
+              }            ],
             "body": {
               "mode": "raw",
               "raw": "{\"phase\":\"full\"}"
             },
             "url": {
-              "raw": "{{baseUrl}}/migrator/tasks/{{taskIdB1}}/start",
+              "raw": "{{migratorBaseUrl}}/migrator/tasks/{{taskIdB1}}/start",
               "host": [
-                "{{baseUrl}}"
+                "{{migratorBaseUrl}}"
               ],
               "path": [
                 "migrator",
@@ -1278,22 +1358,15 @@
               {
                 "key": "Content-Type",
                 "value": "application/json"
-              },
-              {
-                "key": "x-access-token",
-                "value": "{{accessToken}}",
-                "type": "text",
-                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
-              }
-            ],
+              }            ],
             "body": {
               "mode": "raw",
               "raw": "{\"phase\":\"incr\"}"
             },
             "url": {
-              "raw": "{{baseUrl}}/migrator/tasks/{{taskIdB1}}/start",
+              "raw": "{{migratorBaseUrl}}/migrator/tasks/{{taskIdB1}}/start",
               "host": [
-                "{{baseUrl}}"
+                "{{migratorBaseUrl}}"
               ],
               "path": [
                 "migrator",
@@ -1319,22 +1392,15 @@
               {
                 "key": "Content-Type",
                 "value": "application/json"
-              },
-              {
-                "key": "x-access-token",
-                "value": "{{accessToken}}",
-                "type": "text",
-                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
-              }
-            ],
+              }            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"article_to_mongo\",\n  \"mode\": \"cdc\",\n  \"kind\": \"heterogeneous\",\n  \"sourceType\": \"mysql\",\n  \"sourceDsnRef\": \"vault:src\",\n  \"sinkType\": \"mongo\",\n  \"sinkDsnRef\": \"vault:mongo-dst\",\n  \"tables\": [{\"src\": \"article\", \"dst\": \"article\", \"partitionKey\": \"id\"}]\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/migrator/tasks",
+              "raw": "{{migratorBaseUrl}}/migrator/tasks",
               "host": [
-                "{{baseUrl}}"
+                "{{migratorBaseUrl}}"
               ],
               "path": [
                 "migrator",
@@ -1352,22 +1418,15 @@
               {
                 "key": "Content-Type",
                 "value": "application/json"
-              },
-              {
-                "key": "x-access-token",
-                "value": "{{accessToken}}",
-                "type": "text",
-                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
-              }
-            ],
+              }            ],
             "body": {
               "mode": "raw",
               "raw": "{\"phase\":\"full\"}"
             },
             "url": {
-              "raw": "{{baseUrl}}/migrator/tasks/{{taskIdB2}}/start",
+              "raw": "{{migratorBaseUrl}}/migrator/tasks/{{taskIdB2}}/start",
               "host": [
-                "{{baseUrl}}"
+                "{{migratorBaseUrl}}"
               ],
               "path": [
                 "migrator",
@@ -1387,22 +1446,15 @@
               {
                 "key": "Content-Type",
                 "value": "application/json"
-              },
-              {
-                "key": "x-access-token",
-                "value": "{{accessToken}}",
-                "type": "text",
-                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
-              }
-            ],
+              }            ],
             "body": {
               "mode": "raw",
               "raw": "{\"phase\":\"incr\"}"
             },
             "url": {
-              "raw": "{{baseUrl}}/migrator/tasks/{{taskIdB2}}/start",
+              "raw": "{{migratorBaseUrl}}/migrator/tasks/{{taskIdB2}}/start",
               "host": [
-                "{{baseUrl}}"
+                "{{migratorBaseUrl}}"
               ],
               "path": [
                 "migrator",
@@ -1422,22 +1474,15 @@
               {
                 "key": "Content-Type",
                 "value": "application/json"
-              },
-              {
-                "key": "x-access-token",
-                "value": "{{accessToken}}",
-                "type": "text",
-                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
-              }
-            ],
+              }            ],
             "body": {
               "mode": "raw",
               "raw": "{\"mode\":\"full\"}"
             },
             "url": {
-              "raw": "{{baseUrl}}/migrator/tasks/{{taskIdB2}}/verify",
+              "raw": "{{migratorBaseUrl}}/migrator/tasks/{{taskIdB2}}/verify",
               "host": [
-                "{{baseUrl}}"
+                "{{migratorBaseUrl}}"
               ],
               "path": [
                 "migrator",
@@ -1463,22 +1508,15 @@
               {
                 "key": "Content-Type",
                 "value": "application/json"
-              },
-              {
-                "key": "x-access-token",
-                "value": "{{accessToken}}",
-                "type": "text",
-                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
-              }
-            ],
+              }            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"art_to_es_v1\",\n  \"mode\": \"cdc\",\n  \"kind\": \"heterogeneous\",\n  \"sourceDsnRef\": \"vault:src\",\n  \"sinkType\": \"es\",\n  \"sinkDsnRef\": \"vault:es-dst\",\n  \"tables\": [{\"src\": \"article\", \"dst\": \"article_v1\", \"partitionKey\": \"id\"}]\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/migrator/tasks",
+              "raw": "{{migratorBaseUrl}}/migrator/tasks",
               "host": [
-                "{{baseUrl}}"
+                "{{migratorBaseUrl}}"
               ],
               "path": [
                 "migrator",
@@ -1496,22 +1534,15 @@
               {
                 "key": "Content-Type",
                 "value": "application/json"
-              },
-              {
-                "key": "x-access-token",
-                "value": "{{accessToken}}",
-                "type": "text",
-                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
-              }
-            ],
+              }            ],
             "body": {
               "mode": "raw",
               "raw": "{\"phase\":\"full\"}"
             },
             "url": {
-              "raw": "{{baseUrl}}/migrator/tasks/{{taskIdB3}}/start",
+              "raw": "{{migratorBaseUrl}}/migrator/tasks/{{taskIdB3}}/start",
               "host": [
-                "{{baseUrl}}"
+                "{{migratorBaseUrl}}"
               ],
               "path": [
                 "migrator",
@@ -1531,22 +1562,15 @@
               {
                 "key": "Content-Type",
                 "value": "application/json"
-              },
-              {
-                "key": "x-access-token",
-                "value": "{{accessToken}}",
-                "type": "text",
-                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
-              }
-            ],
+              }            ],
             "body": {
               "mode": "raw",
               "raw": "{\"mode\":\"full\"}"
             },
             "url": {
-              "raw": "{{baseUrl}}/migrator/tasks/{{taskIdB3}}/verify",
+              "raw": "{{migratorBaseUrl}}/migrator/tasks/{{taskIdB3}}/verify",
               "host": [
-                "{{baseUrl}}"
+                "{{migratorBaseUrl}}"
               ],
               "path": [
                 "migrator",
@@ -1566,22 +1590,15 @@
               {
                 "key": "Content-Type",
                 "value": "application/json"
-              },
-              {
-                "key": "x-access-token",
-                "value": "{{accessToken}}",
-                "type": "text",
-                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
-              }
-            ],
+              }            ],
             "body": {
               "mode": "raw",
               "raw": "{\"strategy\":\"src_overwrite_dst\",\"ids\":[/* 替换为 B3.3 拿到的 validate_log ids */]}"
             },
             "url": {
-              "raw": "{{baseUrl}}/migrator/tasks/{{taskIdB3}}/repair",
+              "raw": "{{migratorBaseUrl}}/migrator/tasks/{{taskIdB3}}/repair",
               "host": [
-                "{{baseUrl}}"
+                "{{migratorBaseUrl}}"
               ],
               "path": [
                 "migrator",
@@ -1601,22 +1618,15 @@
               {
                 "key": "Content-Type",
                 "value": "application/json"
-              },
-              {
-                "key": "x-access-token",
-                "value": "{{accessToken}}",
-                "type": "text",
-                "description": "JWT access token；web.jwt.disabled=true 时不验签，空值也通。"
-              }
-            ],
+              }            ],
             "body": {
               "mode": "raw",
               "raw": "{\"stage\":\"SRC_FIRST\"}"
             },
             "url": {
-              "raw": "{{baseUrl}}/migrator/tasks/{{taskIdB3}}/switch",
+              "raw": "{{migratorBaseUrl}}/migrator/tasks/{{taskIdB3}}/switch",
               "host": [
-                "{{baseUrl}}"
+                "{{migratorBaseUrl}}"
               ],
               "path": [
                 "migrator",
@@ -1633,21 +1643,28 @@
   ],
   "variable": [
     {
-      "key": "baseUrl",
+      "key": "migratorBaseUrl",
       "value": "http://localhost:8083",
       "type": "string",
-      "description": ""
+      "description": "webook-migrator 服务地址（直连，绕过 nginx）"
     },
     {
-      "key": "taskId",
+      "key": "coreBaseUrl",
+      "value": "http://localhost:8089",
+      "type": "string",
+      "description": "webook-core 服务地址，A0 登录 / 注册等 token 颁发接口在此。core HTTP 默认 :8089（local.yaml 无 http.addr 时的兜底端口）"
+    },
+    {
+      "key": "taskIdA",
       "value": "1",
       "type": "string",
-      "description": ""
+      "description": "A 段 task id（A2 创建后回填）"
     },
     {
-      "key": "taskName",
+      "key": "taskNameA",
       "value": "art_schema_v1",
-      "type": "string"
+      "type": "string",
+      "description": "A 段 task name；Redis stage/gray key 用它"
     },
     {
       "key": "taskIdB1",
@@ -1680,10 +1697,28 @@
       "type": "string"
     },
     {
+      "key": "email",
+      "value": "",
+      "type": "string",
+      "description": "登录邮箱（A0.1 注册 / A0.2 密码登录用）"
+    },
+    {
+      "key": "password",
+      "value": "",
+      "type": "string",
+      "description": "登录密码（A0.1 注册 / A0.2 密码登录用）"
+    },
+    {
       "key": "accessToken",
       "value": "",
       "type": "string",
-      "description": "x-access-token header 值（webook-core JWT）。web.jwt.disabled=true 时可空；接 SSO 后填实际 token。"
+      "description": "access token，A0.2 / A0.4 登录成功后由测试脚本从 x-access-token 响应头自动回填；作为 Authorization: Bearer 发送给 migrator。"
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "type": "string",
+      "description": "refresh token，登录成功后自动回填；A0.5 刷新 access token 时用。"
     }
   ],
   "description": ""
