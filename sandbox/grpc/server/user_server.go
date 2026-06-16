@@ -17,7 +17,32 @@ type MemoryUserServer struct {
 }
 
 func NewMemoryUserServer() *MemoryUserServer {
-	return &MemoryUserServer{users: seedUsers()}
+	return &MemoryUserServer{
+		users: map[int64]*userv1.User{
+			1: {
+				Id:     1,
+				Name:   "Alice",
+				Avatar: "https://cdn.example.com/a.png",
+				Attributes: map[string]string{
+					"role": "admin",
+				},
+				Nicknames: []string{"Ally", "Lis"},
+				Age:       proto.Int32(28),
+				Address: &userv1.Address{
+					Province: "Guangdong",
+					City:     "Shenzhen",
+				},
+				Contacts: &userv1.User_Email{Email: "alice@example.com"},
+				Gender:   userv1.Gender_GENDER_FEMALE,
+			},
+			2: {
+				Id:       2,
+				Name:     "Bob",
+				Contacts: &userv1.User_Phone{Phone: "13800000000"},
+				Gender:   userv1.Gender_GENDER_MALE,
+			},
+		},
+	}
 }
 
 func (s *MemoryUserServer) GetUser(_ context.Context, req *userv1.GetUserRequest) (*userv1.User, error) {
@@ -28,32 +53,7 @@ func (s *MemoryUserServer) GetUser(_ context.Context, req *userv1.GetUserRequest
 	if !ok {
 		return nil, status.Errorf(codes.NotFound, "user %d not found", req.GetId())
 	}
-	return u, nil
-}
-
-func seedUsers() map[int64]*userv1.User {
-	return map[int64]*userv1.User{
-		1: {
-			Id:     1,
-			Name:   "Alice",
-			Avatar: "https://cdn.example.com/a.png",
-			Attributes: map[string]string{
-				"role": "admin",
-			},
-			Nicknames: []string{"Ally", "Lis"},
-			Age:       proto.Int32(28),
-			Address: &userv1.Address{
-				Province: "Guangdong",
-				City:     "Shenzhen",
-			},
-			Contacts: &userv1.User_Email{Email: "alice@example.com"},
-			Gender:   userv1.Gender_GENDER_FEMALE,
-		},
-		2: {
-			Id:       2,
-			Name:     "Bob",
-			Contacts: &userv1.User_Phone{Phone: "13800000000"},
-			Gender:   userv1.Gender_GENDER_MALE,
-		},
-	}
+	// 返回深拷贝：map 里存的是共享指针，直接返回会让并发请求拿到同一 message，
+	// gRPC 随后对其做 marshal，而 proto message 并发 marshal 不保证安全。
+	return proto.Clone(u).(*userv1.User), nil
 }
