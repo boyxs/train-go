@@ -46,6 +46,8 @@ func NewMemoryUserServer() *MemoryUserServer {
 }
 
 func (s *MemoryUserServer) GetUser(_ context.Context, req *userv1.GetUserRequest) (*userv1.User, error) {
+	// 模拟超时
+	//time.Sleep(1500 * time.Millisecond)
 	if req.GetId() <= 0 {
 		return nil, status.Errorf(codes.InvalidArgument, "id must be positive, got %d", req.GetId())
 	}

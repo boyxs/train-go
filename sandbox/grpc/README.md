@@ -1,8 +1,8 @@
-# gRPC + etcd 服务注册/发现 — 架构设计
+# gRPC + etcd 服务注册/发现(设计 + demo)
 
-> 基础设施文档，跨 webook-core / webook-chat / webook-migrator。
-> 把 gRPC 服务的「注册自己」「发现并调用别人」收敛到 `pkg/grpcx` + 各服务 `ioc`，
-> 配套可运行 demo 在 `sandbox/grpc`。
+> 本仓 gRPC 服务注册/发现的设计文档 + 可运行 demo。
+> 生产实现:`webook/pkg/grpcx` + 各服务 `ioc`(§1–§6、§8–§10)。
+> 本目录 `sandbox/grpc`:自包含可运行 demo,原生 / go-zero / kratos 三种(§7)。
 
 ## 1. 背景与目标
 
@@ -182,36 +182,65 @@ func InitSearchClient(c CoreConn) searchv1.SearchServiceClient { return searchv1
 
 **关键点 — `CoreConn` 命名类型解决 wire 多 conn 冲突**：wire 按**类型**注入，若两个下游的 `InitXxxConn` 都返回裸 `*grpc.ClientConn` 会冲突。给每条 conn 一个独立类型（内嵌 `*grpc.ClientConn` → 自带 `ClientConnInterface` 方法），wire 即可区分。
 
-## 7. Demo：`sandbox/grpc`
+## 7. 可运行 demo(本目录 `sandbox/grpc`)
 
-一个自包含、可运行的 etcd 服务注册/发现沙盒，用 `UserService` 演示。
+用 `UserService` 把上面的注册/发现落成可跑代码,并对比**三种实现**:原生 gRPC+etcd、go-zero、kratos。`sandbox/grpc` 是独立 module(自带 go.mod)。
 
-```
-sandbox/grpc/
-├── proto/user/v1/user.proto       # 演示用 proto（oneof/map/repeated/enum 全字段）
-├── gen/user/v1/                    # protoc 生成
-├── server/user_server.go          # MemoryUserServer（GetUser 返回 proto.Clone 深拷贝，并发 marshal 安全）
-└── registry/
-    ├── registry.go                # Registry 接口 + ServiceInstance{Name,Addr,Weight,Metadata}
-    ├── etcd.go                    # EtcdRegistry 实现（多服务、metadata/weight、WithTTL、失败回收租约）
-    ├── registry_test.go           # TestRegistryRoundTrip：自动化往返（无 etcd 自动 skip）
-    └── etcd_demo_test.go          # 手动 EtcdSuite：裸 etcd 原语探索脚本
-```
+### 目录
 
-`sandbox/grpc/registry` 的 `Registry` 接口 + `EtcdRegistry` 是 `pkg/grpcx.Server` 注册逻辑的「教学拆解版」：接口化、支持多服务、端点带 weight/metadata（为加权负载均衡预留）。
+| 路径 | 说明 |
+|------|------|
+| `proto/user/v1/` · `gen/user/v1/` | UserService 契约与 protoc 生成（`make gen`） |
+| `server/user_server.go` | `MemoryUserServer`:内存实现,三种 demo 共用（含一行注释掉的「模拟超时」`time.Sleep` 开关） |
+| `registry/registry.go` | `Registry` 接口 + `ServiceInstance{Name,Addr,Weight,Metadata}` |
+| `registry/etcd.go` | `EtcdRegistry`:原生 etcd 注册器（多服务、weight/metadata、`WithTTL`、失败回收租约）—— `pkg/grpcx.Server` 注册逻辑的教学拆解版 |
+| `registry/registry_test.go` | `TestRegistryRoundTrip`:自动化往返（无 etcd 自动 skip） |
+| `registry/{etcd,gozero,kratos}_demo_test.go` | 三种框架的手动 demo（见下） |
 
-### 怎么跑
+### 三种实现对比
+
+| Demo | 注册/发现机制 |
+|------|--------------|
+| `etcd_demo_test.go`（原生） | 手动 `endpoints.Manager` + `Grant`/`KeepAlive` 续租;client 走 etcd resolver（即 §3~§5 的裸实现） |
+| `gozero_demo_test.go` | go-zero:`zrpc.RpcServerConf/RpcClientConf` + `discov.EtcdConf`，框架托管 |
+| `kratos_demo_test.go` | kratos:`kratos.Registrar(etcd.New)` + `grpc.WithDiscovery`，注册键带 `/microservices/` 前缀 |
+
+> 三者注册键编码不同（原生 `service/<name>/…`、go-zero `user.rpc/…`、kratos `/microservices/user.rpc/…`），**不跨框架互通**，各自 server+client 配对自洽。
+
+### 前置:本地 etcd（:2379）
 
 ```bash
-# 自动化往返（注册 → resolver 发现 → 调用 → 注销）；本机没 etcd 会显式 t.Skip
-go test ./sandbox/grpc/registry/ -run TestRegistryRoundTrip -v
-
-# 手动探索（需本地 etcd + 两个终端；Serve 阻塞，-timeout 0 关超时，Ctrl+C 停）
-ETCD_MANUAL=1 go test ./sandbox/grpc/registry/ -run 'TestEtcd/TestServer' -v -timeout 0
-ETCD_MANUAL=1 go test ./sandbox/grpc/registry/ -run 'TestEtcd/TestClient' -v
+docker run -d --name etcd -p 2379:2379 \
+  -e ALLOW_NONE_AUTHENTICATION=yes \
+  -e ETCD_ADVERTISE_CLIENT_URLS=http://0.0.0.0:2379 \
+  bitnami/etcd:latest
 ```
 
-> 注：`sandbox/grpc` 是独立 module（自带 go.mod），命令从仓根用相对路径或 `cd` 进目录跑。
+### 怎么跑（命令在 `sandbox/grpc/` 下执行）
+
+```bash
+make gen     # 改了 .proto 才需要
+make test    # 全量;无 etcd 手动开关时,注册/发现用例安全 SKIP,不会挂
+
+# 自动化往返(注册 → resolver 发现 → 调用 → 注销),无 etcd 自动 skip
+go test ./registry/ -run TestRegistryRoundTrip -v
+```
+
+各框架 demo 的 `TestServer` / `TestClient` 是**手动**用例（Server 阻塞），裸 `go test` 一律 SKIP。真跑需 `ETCD_MANUAL=1` + 两个终端，以 go-zero 为例：
+
+```bash
+# 终端1:起 server 注册到 etcd
+ETCD_MANUAL=1 go test ./registry/ -run 'TestGoZero/TestServer' -v
+# 终端2:发现并调用
+ETCD_MANUAL=1 go test ./registry/ -run 'TestGoZero/TestClient' -v
+```
+
+`TestGoZero` 换成 `TestKratos` / `TestEtcd` 跑另两种。Windows PowerShell 用 `$env:ETCD_MANUAL="1";` 前缀。
+
+### demo 里的两个坑
+
+- **go-zero `Timeout` 不生效**:手写 `RpcClientConf` 字面量不经 `conf.Load`，`Middlewares` 的 `default=true` 不会被填（零值=全关）→ 必须显式 `Middlewares: zrpc.ClientMiddlewaresConf{Timeout: true}`，否则 TimeoutInterceptor 根本不装、`Timeout` 形同虚设。
+- **模拟超时**:`server/user_server.go` 那行注释掉的 `time.Sleep` 取消注释后，client（Timeout 短于它）即可触发 `DeadlineExceeded`;平时保持注释，免得拖慢共用 server。
 
 ## 8. 扩展指南
 
@@ -264,4 +293,4 @@ func InitFeedClient(c FeedConn) feedv1.FeedServiceClient { return feedv1.NewFeed
 | core 组装 server | `webook/internal/ioc/grpc.go` + `internal/main.go` |
 | chat 组装 client | `webook/chat/ioc/grpc.go` + `chat/wire.go` |
 | 出口 IP | `webook/pkg/netx/ip.go` |
-| 可运行 demo | `sandbox/grpc/registry/`（`registry.go` / `etcd.go` / `*_test.go`） |
+| 可运行 demo | 本目录 `registry/`（原生 / go-zero / kratos 三种,见 §7） |
