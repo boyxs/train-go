@@ -10,7 +10,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/test/bufconn"
 
-	"github.com/webook/pkg/grpcx"
+	"github.com/webook/pkg/grpcx/interceptor"
 )
 
 const bufSize = 1024 * 1024
@@ -24,7 +24,7 @@ func startBufServer(t *testing.T, register func(*grpc.Server)) *grpc.ClientConn 
 
 	lis := bufconn.Listen(bufSize)
 	srv := grpc.NewServer(
-		grpc.UnaryInterceptor(grpcx.UnaryServerErrorInterceptor()),
+		grpc.UnaryInterceptor(interceptor.UnaryServerError()),
 	)
 	register(srv)
 
@@ -41,7 +41,7 @@ func startBufServer(t *testing.T, register func(*grpc.Server)) *grpc.ClientConn 
 		"passthrough:///bufnet",
 		grpc.WithContextDialer(dialer),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithUnaryInterceptor(grpcx.UnaryClientErrorInterceptor()),
+		grpc.WithUnaryInterceptor(interceptor.UnaryClientError()),
 	)
 	require.NoError(t, err)
 

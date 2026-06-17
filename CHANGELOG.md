@@ -2,6 +2,14 @@
 
 <!-- 新功能前插在此，日期降序 -->
 
+## [2026-06-17] gRPC + etcd 服务注册/发现集成
+
+**变更内容**：`pkg/grpcx` 收敛 gRPC「注册自己 / 发现下游」——`NewServer`（租约 + 自动续租 + 中断重注册 + 优雅注销）/ `NewClient`（etcd resolver + 按 `ClientConfig{Target,Secure,CAFile}` 构造凭证），otel/拦截器经 `opts` 由调用方传；抽 `pkg/viperx`（`LoadLocal`/`WatchRemote`）统一三服务配置引导，`pkg/netx` 探出口 IP。core 注册自己、chat 经 resolver 发现 core，main 接 SIGTERM 优雅停机 + gRPC 健康检查；配套 `sandbox/grpc/registry` 可运行 demo + `prd/grpc-etcd` 架构文档。
+**影响范围**：新增 `pkg/grpcx`（server/client/interceptor）、`pkg/viperx`、`pkg/netx`、`{internal,chat}/ioc/etcd.go`；改 `{internal,chat,migrator}/main.go`、`internal/ioc/grpc.go`、`chat/ioc/grpc.go`、15 份 config yaml（`etcd.endpoints` 列表 + grpc 段）、wire；`go.mod` 锁 `etcd client/v3 v3.6.12`。
+**技术决策**：①etcd 既做配置中心又做注册中心，复用同一集群；②横切 option 调用方传、grpcx 不内置默认；③`etcd.endpoints` 未配置即 fail-fast（注册/发现侧），不静默兜底 localhost；④服务名统一 `webook-core` + `service/` 前缀，client target 约定 `etcd:///service/<name>` 零配置接入。
+**会话**：260617-grpc-etcd服务注册发现
+**发布**：（基础设施代码，随后续服务发版生效）
+
 ## [2026-06-14] 监控告警修复与完善（NaN 误报 + 邮件链路）
 
 **变更内容**：①prometheus 录制规则加 NaN 守卫（`分母 >0` / `and 观测计数 >0`），消除无流量时 5xx/分位/比率 `0/0=NaN` 抖出的 fire+instant-resolve 误告警；②grafana 邮件链路：root_url 改 `GRAFANA_ROOT_URL` 按 env 注入（修链接端口/协议）、contactpoints 模板 resolved 不显示 Summary、新增默认 `isPaused` 的冒烟测试规则验证「规则→通知→SMTP」整链。

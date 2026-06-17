@@ -5,7 +5,6 @@ package main
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
-	"google.golang.org/grpc"
 
 	"github.com/webook/chat/ioc"
 	"github.com/webook/chat/repository"
@@ -19,7 +18,7 @@ import (
 // App chat 服务进程入口。
 type App struct {
 	Server *gin.Engine
-	Conn   *grpc.ClientConn
+	Conn   ioc.CoreConn
 }
 
 func InitApp() (App, func(), error) {
@@ -30,7 +29,8 @@ func InitApp() (App, func(), error) {
 		ioc.InitLogger,
 		ioc.InitDB,
 		ioc.InitRedis,
-		// gRPC 客户端（拨号到主仓 webook-core :8090）
+		// gRPC
+		ioc.InitEtcdClient,
 		ioc.InitCoreConn,
 		ioc.InitSearchClient,
 		ioc.InitArticleReaderClient,

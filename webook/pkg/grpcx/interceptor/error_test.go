@@ -1,4 +1,4 @@
-package grpcx
+package interceptor
 
 import (
 	"context"
@@ -55,7 +55,7 @@ func startBufServer(t *testing.T, srvErr error, srvOpts ...grpc.ServerOption) (*
 	conn, err := grpc.NewClient("passthrough://bufnet",
 		grpc.WithContextDialer(dialer),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithUnaryInterceptor(UnaryClientErrorInterceptor()),
+		grpc.WithUnaryInterceptor(UnaryClientError()),
 	)
 	require.NoError(t, err)
 
@@ -69,7 +69,7 @@ func startBufServer(t *testing.T, srvErr error, srvOpts ...grpc.ServerOption) (*
 // 5.1 server: handler 返 *errs.Error{Code:404} → 客户端 status.Code(err)==NotFound
 func TestUnaryServerInterceptor_BizError_ConvertsToStatus(t *testing.T) {
 	be := errs.New(404, "用户不存在")
-	conn, cleanup := startBufServer(t, be, grpc.UnaryInterceptor(UnaryServerErrorInterceptor()))
+	conn, cleanup := startBufServer(t, be, grpc.UnaryInterceptor(UnaryServerError()))
 	defer cleanup()
 
 	client := healthpb.NewHealthClient(conn)
@@ -89,7 +89,7 @@ func TestUnaryServerInterceptor_BizError_ConvertsToStatus(t *testing.T) {
 func TestUnaryServerInterceptor_PlainError_ConvertsToInternal(t *testing.T) {
 	const sensitive = "DSN=root:pass@tcp(internal-db:3306)/secret"
 	conn, cleanup := startBufServer(t, errors.New(sensitive),
-		grpc.UnaryInterceptor(UnaryServerErrorInterceptor()))
+		grpc.UnaryInterceptor(UnaryServerError()))
 	defer cleanup()
 
 	client := healthpb.NewHealthClient(conn)
@@ -106,7 +106,7 @@ func TestUnaryServerInterceptor_PlainError_ConvertsToInternal(t *testing.T) {
 
 // 5.3 server: nil err 透传
 func TestUnaryServerInterceptor_NilErr_PassesThrough(t *testing.T) {
-	conn, cleanup := startBufServer(t, nil, grpc.UnaryInterceptor(UnaryServerErrorInterceptor()))
+	conn, cleanup := startBufServer(t, nil, grpc.UnaryInterceptor(UnaryServerError()))
 	defer cleanup()
 
 	client := healthpb.NewHealthClient(conn)
@@ -136,7 +136,7 @@ func TestUnaryClientInterceptor_StatusError_WrapsToBizError(t *testing.T) {
 //	客户端 client interceptor 转回 *errs.Error，Code/Message 无损
 func TestRoundTrip_BizError_ServerToClient(t *testing.T) {
 	original := errs.New(409, "邮箱已被注册")
-	conn, cleanup := startBufServer(t, original, grpc.UnaryInterceptor(UnaryServerErrorInterceptor()))
+	conn, cleanup := startBufServer(t, original, grpc.UnaryInterceptor(UnaryServerError()))
 	defer cleanup()
 
 	client := healthpb.NewHealthClient(conn)
@@ -161,7 +161,7 @@ func TestUnaryClientInterceptor_NilErr_PassesThrough(t *testing.T) {
 	conn, err := grpc.NewClient("passthrough://bufnet",
 		grpc.WithContextDialer(func(ctx context.Context, _ string) (net.Conn, error) { return lis.DialContext(ctx) }),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithUnaryInterceptor(UnaryClientErrorInterceptor()),
+		grpc.WithUnaryInterceptor(UnaryClientError()),
 	)
 	require.NoError(t, err)
 	defer conn.Close()

@@ -1,10 +1,14 @@
 etcd:
-  endpoint: http://127.0.0.1:2379
+  endpoints:
+    - "http://127.0.0.1:2379"
   path: /webook-core-test
   type: yaml
 
 grpc:
-  addr: ":8090"
+  server:
+    port: 8090
+    name: "webook-core"
+    ttl: 30
 
 mysql:
   dsn: root:13520@tcp(localhost:3306)/webook_test?parseTime=true&loc=UTC

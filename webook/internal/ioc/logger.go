@@ -8,7 +8,7 @@ import (
 	"go.uber.org/zap/zapcore"
 
 	"github.com/webook/pkg/ginx"
-	"github.com/webook/pkg/grpcx"
+	"github.com/webook/pkg/grpcx/interceptor"
 	"github.com/webook/pkg/logger"
 )
 
@@ -39,6 +39,6 @@ func InitLogger() logger.LoggerX {
 	lx := logger.NewZapLogger(l)
 	// 注入 ginx / grpcx 用的全局 logger，让 wrap 和 gRPC interceptor 都用同一个 logger
 	ginx.L = lx
-	grpcx.L = lx
+	interceptor.L = lx
 	return lx
 }
