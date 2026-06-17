@@ -10,7 +10,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
 	"github.com/robfig/cron/v3"
-	grpc2 "google.golang.org/grpc"
 
 	"github.com/webook/internal/events"
 	"github.com/webook/internal/events/interaction"
@@ -22,6 +21,7 @@ import (
 	"github.com/webook/internal/repository/dao"
 	"github.com/webook/internal/service"
 	"github.com/webook/internal/web"
+	"github.com/webook/pkg/grpcx"
 
 	_ "github.com/spf13/viper/remote"
 )
@@ -99,8 +99,12 @@ func InitWebServer() (App, func(), error) {
 	searchServer := grpc.NewSearchServer(articleSearchService)
 	articleReaderServer := grpc.NewArticleReaderServer(articleReaderService)
 	interactionServer := grpc.NewInteractionServer(interactionService)
-	server := ioc.InitGRPCServer(searchServer, articleReaderServer, interactionServer)
-	grpcServerConfig := ioc.InitGRPCConfig()
+	clientv3Client, cleanup2, err := ioc.InitEtcdClient()
+	if err != nil {
+		cleanup()
+		return App{}, nil, err
+	}
+	server := ioc.InitGRPCServer(searchServer, articleReaderServer, interactionServer, clientv3Client, loggerX)
 	saramaClient := ioc.InitSaramaClient(kafkaConfig, saramaConfig)
 	consumerConfig := ioc.InitInteractionConsumerConfig(kafkaConfig)
 	consumer := interaction.NewSaramaInteractionEventConsumer(saramaClient, interactionRepository, consumerConfig, loggerX)
@@ -108,15 +112,15 @@ func InitWebServer() (App, func(), error) {
 	metrics := ioc.InitCronMetrics()
 	wrapper := ioc.InitCronWrapper(redislockxClient, metrics, loggerX)
 	rankingJob := job.NewRankingJob(rankingService, wrapper)
-	cron, cleanup2 := ioc.InitCron(rankingJob, loggerX)
+	cron, cleanup3 := ioc.InitCron(rankingJob, loggerX)
 	app := App{
 		Server:      engine,
 		GRPCServer:  server,
-		GRPCConfig:  grpcServerConfig,
 		Consumer:    consumer,
 		RankingCron: cron,
 	}
 	return app, func() {
+		cleanup3()
 		cleanup2()
 		cleanup()
 	}, nil
@@ -145,8 +149,7 @@ var kafkaProviderSet = wire.NewSet(ioc.InitKafkaConfig, ioc.InitSaramaConfig, io
 // App 应用入口，包含 Web 服务、后台消费者、gRPC 服务。
 type App struct {
 	Server      *gin.Engine
-	GRPCServer  *grpc2.Server
-	GRPCConfig  ioc.GRPCServerConfig
+	GRPCServer  *grpcx.Server
 	Consumer    events.Consumer
 	RankingCron *cron.Cron
 }

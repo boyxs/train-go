@@ -8,7 +8,6 @@ package main
 
 import (
 	"github.com/gin-gonic/gin"
-	"google.golang.org/grpc"
 
 	"github.com/webook/chat/ioc"
 	"github.com/webook/chat/repository"
@@ -41,14 +40,20 @@ func InitApp() (App, func(), error) {
 	messageRepository := repository.NewCacheMessageRepository(messageDAO, messageCache, loggerX)
 	config := ioc.InitLLMConfig()
 	client := ioc.InitLLMClient(config, loggerX)
-	clientConn, cleanup2, err := ioc.InitCoreConn()
+	clientv3Client, cleanup2, err := ioc.InitEtcdClient()
 	if err != nil {
 		cleanup()
 		return App{}, nil, err
 	}
-	searchServiceClient := ioc.InitSearchClient(clientConn)
-	articleReaderServiceClient := ioc.InitArticleReaderClient(clientConn)
-	interactionServiceClient := ioc.InitInteractionClient(clientConn)
+	coreConn, cleanup3, err := ioc.InitCoreConn(clientv3Client)
+	if err != nil {
+		cleanup2()
+		cleanup()
+		return App{}, nil, err
+	}
+	searchServiceClient := ioc.InitSearchClient(coreConn)
+	articleReaderServiceClient := ioc.InitArticleReaderClient(coreConn)
+	interactionServiceClient := ioc.InitInteractionClient(coreConn)
 	toolExecutor := service.NewAIChatToolExecutor(searchServiceClient, articleReaderServiceClient, interactionServiceClient, loggerX)
 	eventStreamer := streamer.NewRedisStreamer(cmdable)
 	chatService := service.NewAIChatService(conversationRepository, messageRepository, client, searchServiceClient, toolExecutor, loggerX, eventStreamer)
@@ -57,9 +62,10 @@ func InitApp() (App, func(), error) {
 	engine := ioc.InitWebServer(v, chatHandler)
 	app := App{
 		Server: engine,
-		Conn:   clientConn,
+		Conn:   coreConn,
 	}
 	return app, func() {
+		cleanup3()
 		cleanup2()
 		cleanup()
 	}, nil
@@ -70,5 +76,5 @@ func InitApp() (App, func(), error) {
 // App chat 服务进程入口。
 type App struct {
 	Server *gin.Engine
-	Conn   *grpc.ClientConn
+	Conn   ioc.CoreConn
 }

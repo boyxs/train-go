@@ -17,8 +17,7 @@ import (
 	"github.com/webook/internal/repository/dao"
 	"github.com/webook/internal/service"
 	"github.com/webook/internal/web"
-
-	stdgrpc "google.golang.org/grpc"
+	"github.com/webook/pkg/grpcx"
 )
 
 // searchProviderSet 搜索模块的 Wire Provider 集合（不含 Handler）
@@ -80,8 +79,7 @@ var kafkaProviderSet = wire.NewSet(
 // App 应用入口，包含 Web 服务、后台消费者、gRPC 服务。
 type App struct {
 	Server      *gin.Engine
-	GRPCServer  *stdgrpc.Server
-	GRPCConfig  ioc.GRPCServerConfig
+	GRPCServer  *grpcx.Server
 	Consumer    events.Consumer
 	RankingCron *cron.Cron
 }
@@ -142,7 +140,7 @@ func InitWebServer() (App, func(), error) {
 		ioc.InitMiddlewares,
 		ioc.InitWebServer,
 		// gRPC server
-		ioc.InitGRPCConfig,
+		ioc.InitEtcdClient,
 		ioc.InitGRPCServer,
 		grpcsrv.NewSearchServer,
 		grpcsrv.NewArticleReaderServer,
