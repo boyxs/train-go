@@ -84,5 +84,5 @@ func TestRegistryRoundTrip(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, u)
 	require.Equal(t, int64(1), u.GetId())
-	require.Equal(t, "Alice", u.GetName())
+	require.Equal(t, "Alice from x", u.GetName()) // server 把 Flag 拼进 Name(NewMemoryUserServer("x"))
 }

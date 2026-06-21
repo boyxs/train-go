@@ -1,6 +1,6 @@
 // Package swrr 是一组基于平滑加权轮询(SWRR)的 gRPC 自定义负载均衡器:
 //   - custom_swrr : 基础 SWRR,按权重平滑分流(Name,本文件)
-//   - health_swrr : 在 SWRR 上加应用级错误熔断(NameHealth,见 health.go)
+//   - breaker_swrr : 在 SWRR 上加错误熔断(NameBreaker,见 breaker.go)
 //   - group_swrr  : 按请求 tier 分流到节点组,组内 SWRR(NameGroup,见 tier.go)
 //
 // 三者共用 conn 与 swrrPick;权重 / 分组标签由 resolver 经 weight / group 包打在 Address 上。
@@ -28,7 +28,7 @@ func init() {
 }
 
 // conn 是参与 SWRR 的就绪后端。weight/curWeight 三个变体都用;available/fails/downAt 仅
-// health_swrr(health.go)用。
+// breaker_swrr(breaker.go)用。
 type conn struct {
 	sc        balancer.SubConn
 	weight    int

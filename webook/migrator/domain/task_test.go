@@ -6,7 +6,7 @@ import (
 )
 
 func TestMode_Valid(t *testing.T) {
-	cases := []struct {
+	testCases := []struct {
 		name string
 		m    Mode
 		want bool
@@ -17,7 +17,7 @@ func TestMode_Valid(t *testing.T) {
 		{"未知值不合法", Mode("foo"), false},
 		{"大小写敏感不合法", Mode("DUAL_WRITE"), false},
 	}
-	for _, c := range cases {
+	for _, c := range testCases {
 		t.Run(c.name, func(t *testing.T) {
 			if got := c.m.Valid(); got != c.want {
 				t.Errorf("Mode(%q).Valid() = %v, want %v", c.m, got, c.want)
@@ -27,7 +27,7 @@ func TestMode_Valid(t *testing.T) {
 }
 
 func TestKind_Valid(t *testing.T) {
-	cases := []struct {
+	testCases := []struct {
 		name string
 		k    Kind
 		want bool
@@ -39,7 +39,7 @@ func TestKind_Valid(t *testing.T) {
 		{"空字符串不合法", Kind(""), false},
 		{"未知值不合法", Kind("bar"), false},
 	}
-	for _, c := range cases {
+	for _, c := range testCases {
 		t.Run(c.name, func(t *testing.T) {
 			if got := c.k.Valid(); got != c.want {
 				t.Errorf("Kind(%q).Valid() = %v, want %v", c.k, got, c.want)
@@ -49,7 +49,7 @@ func TestKind_Valid(t *testing.T) {
 }
 
 func TestSourceType_Valid(t *testing.T) {
-	cases := []struct {
+	testCases := []struct {
 		name string
 		s    SourceType
 		want bool
@@ -60,7 +60,7 @@ func TestSourceType_Valid(t *testing.T) {
 		{"未知值不合法", SourceType("redis"), false},
 		{"大小写敏感不合法", SourceType("MySQL"), false},
 	}
-	for _, c := range cases {
+	for _, c := range testCases {
 		t.Run(c.name, func(t *testing.T) {
 			if got := c.s.Valid(); got != c.want {
 				t.Errorf("SourceType(%q).Valid() = %v, want %v", c.s, got, c.want)
@@ -70,7 +70,7 @@ func TestSourceType_Valid(t *testing.T) {
 }
 
 func TestSourceType_Normalize(t *testing.T) {
-	cases := []struct {
+	testCases := []struct {
 		name string
 		s    SourceType
 		want SourceType
@@ -80,7 +80,7 @@ func TestSourceType_Normalize(t *testing.T) {
 		{"mongo 原样", SourceTypeMongo, SourceTypeMongo},
 		{"未知值原样（交给 Valid 拦）", SourceType("redis"), SourceType("redis")},
 	}
-	for _, c := range cases {
+	for _, c := range testCases {
 		t.Run(c.name, func(t *testing.T) {
 			if got := c.s.Normalize(); got != c.want {
 				t.Errorf("SourceType(%q).Normalize() = %q, want %q", c.s, got, c.want)

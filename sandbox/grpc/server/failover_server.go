@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -10,20 +11,19 @@ import (
 	userv1 "webook/sandbox/grpc/gen/user/v1"
 )
 
-// MemoryUserServer 内存版 UserService 实现，演示用。
-type MemoryUserServer struct {
+// AlwaysFailedServer 模拟失败服务
+type AlwaysFailedServer struct {
 	userv1.UnimplementedUserServiceServer
 	users map[int64]*userv1.User
 	Flag  string
 }
 
-// NewMemoryUserServer 创建内存版 server。flag 可选:传了会被拼进返回的 Name
-func NewMemoryUserServer(flag ...string) *MemoryUserServer {
+func NewAlwaysFailedServer(flag ...string) *AlwaysFailedServer {
 	f := ""
 	if len(flag) > 0 {
 		f = flag[0]
 	}
-	return &MemoryUserServer{
+	return &AlwaysFailedServer{
 		Flag: f,
 		users: map[int64]*userv1.User{
 			1: {
@@ -52,9 +52,8 @@ func NewMemoryUserServer(flag ...string) *MemoryUserServer {
 	}
 }
 
-func (s *MemoryUserServer) GetUser(_ context.Context, req *userv1.GetUserRequest) (*userv1.User, error) {
-	// 模拟超时
-	//time.Sleep(1500 * time.Millisecond)
+func (s *AlwaysFailedServer) GetUser(_ context.Context, req *userv1.GetUserRequest) (*userv1.User, error) {
+	fmt.Println("failover in")
 	if req.GetId() <= 0 {
 		return nil, status.Errorf(codes.InvalidArgument, "id must be positive, got %d", req.GetId())
 	}
@@ -66,8 +65,7 @@ func (s *MemoryUserServer) GetUser(_ context.Context, req *userv1.GetUserRequest
 	// gRPC 随后对其做 marshal，而 proto message 并发 marshal 不保证安全。
 	nu := proto.Clone(u).(*userv1.User)
 	if s.Flag != "" {
-		// 仅在指定 flag 时拼来源,空 flag 保持 "Alice",兼容无参 NewMemoryUserServer()
-		nu.Name = nu.Name + " from " + s.Flag
+		nu.Name = "failover from " + s.Flag
 	}
-	return nu, nil
+	return nu, status.Errorf(codes.Unavailable, "模拟服务端异常")
 }

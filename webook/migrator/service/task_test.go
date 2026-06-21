@@ -51,7 +51,7 @@ func validReq() CreateReq {
 }
 
 func TestTaskService_Create_Validate(t *testing.T) {
-	cases := []struct {
+	testCases := []struct {
 		name   string
 		mutate func(*CreateReq)
 		want   string // 期望的错误 message 子串（在 ErrInvalidArgument wrap 后）
@@ -65,7 +65,7 @@ func TestTaskService_Create_Validate(t *testing.T) {
 		{"tables 空", func(r *CreateReq) { r.Tables = nil }, "tables 至少 1 张"},
 		{"sourceType 不合法", func(r *CreateReq) { r.SourceType = "redis" }, "sourceType 不合法"},
 	}
-	for _, c := range cases {
+	for _, c := range testCases {
 		t.Run(c.name, func(t *testing.T) {
 			req := validReq()
 			c.mutate(&req)

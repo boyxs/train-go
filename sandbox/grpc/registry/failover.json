@@ -1,0 +1,27 @@
+{
+  "loadBalancingConfig": [
+    {
+      "custom_swrr": {}
+    }
+  ],
+  "methodConfig": [
+    {
+      "name": [
+        {
+          "service": "webook.user.v1.UserService"
+        }
+      ],
+      "retryPolicy": {
+        "maxAttempts": 3,
+        "initialBackoff": "0.01s",
+        "maxBackoff": "0.1s",
+        "backoffMultiplier": 2.0,
+        "retryableStatusCodes": [
+          "UNAVAILABLE",
+          "UNKNOWN",
+          "DEADLINE_EXCEEDED"
+        ]
+      }
+    }
+  ]
+}
