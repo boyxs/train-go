@@ -287,7 +287,7 @@ func TestStage_Valid(t *testing.T) {
 }
 
 func TestStage_CanTransitionTo(t *testing.T) {
-	cases := []struct {
+	testCases := []struct {
 		from, to domain.Stage
 		ok       bool
 	}{
@@ -299,7 +299,7 @@ func TestStage_CanTransitionTo(t *testing.T) {
 		{domain.StageDstOnly, domain.StageSrcOnly, false},  // 倒退（rollback 走独立方法）
 		{domain.StageSrcFirst, domain.StageSrcOnly, false}, // 倒退
 	}
-	for _, c := range cases {
+	for _, c := range testCases {
 		assert.Equal(t, c.ok, c.from.CanTransitionTo(c.to),
 			strconv.Itoa(int(c.from[0]))+"→"+strconv.Itoa(int(c.to[0])))
 	}

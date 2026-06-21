@@ -2,13 +2,14 @@ package registry
 
 import (
 	"context"
+	_ "embed"
 	"net"
 	"os"
 	"testing"
 	"time"
 	_ "webook/sandbox/grpc/balancer/balancer/swrr"
 	userv1 "webook/sandbox/grpc/gen/user/v1"
-	server2 "webook/sandbox/grpc/server"
+	"webook/sandbox/grpc/server"
 
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -19,24 +20,12 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-// EtcdSuite 是一组手动探索脚本,演示 gRPC + etcd 的服务注册 / 续租 / 发现链路。
-// 需本地 etcd(127.0.0.1:2379),默认 Skip(设 ETCD_MANUAL=1 才跑)。自动化版本见 TestRegistryRoundTrip。
-//
-// 注意:TestServer 的 Serve 会一直阻塞需手动 Ctrl+C 停,且不能和 TestClient 同一次
-// go test 跑(suite 按字母序先跑 TestClient,Serve 阻塞后根本到不了它)。分两个终端跑:
-//
-//	# 终端1 起 server(阻塞,Ctrl+C 停;-timeout 0 关掉默认超时,否则 Serve 永不返回会被 panic)
-//	$env:ETCD_MANUAL="1"; go test ./registry/ -run 'TestEtcd/TestServer' -v -timeout 0
-//	ETCD_MANUAL="1" go test ./registry/ -run 'TestEtcd/TestServer' -v -timeout 0
-//	# 终端2 趁 server 在,跑 client 调一次
-//	$env:ETCD_MANUAL="1"; go test ./registry/ -run 'TestEtcd/TestClient' -v
-//	ETCD_MANUAL="1" go test ./registry/ -run 'TestEtcd/TestClient' -v
-type EtcdSuite struct {
+type FailoverSuite struct {
 	suite.Suite
 	cli *etcdv3.Client
 }
 
-func (e *EtcdSuite) SetupSuite() {
+func (e *FailoverSuite) SetupSuite() {
 	cli, err := etcdv3.New(etcdv3.Config{
 		Endpoints: []string{"127.0.0.1:2379"},
 	})
@@ -46,58 +35,36 @@ func (e *EtcdSuite) SetupSuite() {
 }
 
 // TearDownSuite 关闭整个 suite 共享的 etcd client。
-func (e *EtcdSuite) TearDownSuite() {
+func (e *FailoverSuite) TearDownSuite() {
 	if e.cli != nil {
 		require.NoError(e.T(), e.cli.Close())
 	}
 }
 
-func (e *EtcdSuite) TestServer() {
+//go:embed failover.json
+var svcCfg string
+
+func (e *FailoverSuite) TestServer() {
 	if os.Getenv("ETCD_MANUAL") == "" {
 		e.T().Skip("手动脚本:Serve 会阻塞需手动停;设 ETCD_MANUAL=1 且本地有 etcd 时运行")
 	}
 	go func() {
-		e.startServer(":8090", 10)
+		e.startServer(":8090", server.NewAlwaysFailedServer("failed"))
 	}()
 	go func() {
-		e.startServer(":8091", 40)
+		e.startServer(":8091", server.NewMemoryUserServer(":8091"))
 	}()
-	e.startServer(":8092", 50)
+	e.startServer(":8092", server.NewMemoryUserServer(":8092"))
 }
 
-func (e *EtcdSuite) TestCustomWRRClient() {
+func (e *FailoverSuite) TestRoundRobinClient() {
 	if os.Getenv("ETCD_MANUAL") == "" {
 		e.T().Skip("手动脚本:需 TestServer 在另一终端注册端点;设 ETCD_MANUAL=1 运行")
 	}
-	svcCfg := `{"loadBalancingConfig": [{"custom_swrr": {}}]}`
 	e.startClient(svcCfg)
 }
 
-func (e *EtcdSuite) TestWeightedRoundRobinClient() {
-	if os.Getenv("ETCD_MANUAL") == "" {
-		e.T().Skip("手动脚本:需 TestServer 在另一终端注册端点;设 ETCD_MANUAL=1 运行")
-	}
-	svcCfg := `{"loadBalancingConfig":[{"weighted_round_robin":{}}]}`
-	// Important : 需要匿名引入 _ "google.golang.org/grpc/balancer/weightedroundrobin"
-	e.startClient(svcCfg)
-}
-
-func (e *EtcdSuite) TestRoundRobinClient() {
-	if os.Getenv("ETCD_MANUAL") == "" {
-		e.T().Skip("手动脚本:需 TestServer 在另一终端注册端点;设 ETCD_MANUAL=1 运行")
-	}
-	svcCfg := `{"loadBalancingConfig":[{"round_robin":{}}]}`
-	e.startClient(svcCfg)
-}
-
-func (e *EtcdSuite) TestClient() {
-	if os.Getenv("ETCD_MANUAL") == "" {
-		e.T().Skip("手动脚本:需 TestServer 已注册端点;设 ETCD_MANUAL=1 运行")
-	}
-	e.startClient("{}") // pick_first
-}
-
-func (e *EtcdSuite) startServer(port string, weight int) {
+func (e *FailoverSuite) startServer(port string, srv userv1.UserServiceServer) {
 	t := e.T()
 	em, err := endpoints.NewManager(e.cli, "service/user")
 	require.NoError(t, err)
@@ -115,9 +82,6 @@ func (e *EtcdSuite) startServer(port string, weight int) {
 	// 添加端点
 	err = em.AddEndpoint(ctx, key, endpoints.Endpoint{
 		Addr: addr,
-		Metadata: map[string]any{
-			"weight": weight,
-		},
 	}, etcdv3.WithLease(leaseGrantResp.ID))
 	require.NoError(t, err)
 
@@ -133,7 +97,7 @@ func (e *EtcdSuite) startServer(port string, weight int) {
 	}()
 
 	server := grpc.NewServer()
-	userv1.RegisterUserServiceServer(server, server2.NewMemoryUserServer(port))
+	userv1.RegisterUserServiceServer(server, srv)
 	// Serve 阻塞直到外部停掉 server 才返回,因此下面的 cCancel / 注销 / GracefulStop
 	// 只有手动中断后才执行——这也是本用例只能手动观察、不进自动化套件的根因。
 	err = server.Serve(lis)
@@ -153,7 +117,7 @@ func (e *EtcdSuite) startServer(port string, weight int) {
 	// e.cli 由 SetupSuite 创建、整个 suite 共享,这里不关,统一在 TearDownSuite 关。
 }
 
-func (e *EtcdSuite) startClient(svcCfg string) {
+func (e *FailoverSuite) startClient(svcCfg string) {
 	t := e.T()
 	// "etcd:///service/user" 里整段 path 即注册命名空间,
 	// 自定义 resolver watch "service/user/" 前缀,把地址 + 权重下发给均衡器。
@@ -175,7 +139,7 @@ func (e *EtcdSuite) startClient(svcCfg string) {
 	var prev *userv1.User
 	maxRun := map[string]int{}
 	run := 0
-	for i := 0; i < 1000; i++ {
+	for i := 0; i < 10; i++ {
 		user, err := client.GetUser(ctx, &userv1.GetUserRequest{Id: 1}, grpc.WaitForReady(true))
 		require.NoError(t, err)
 		counts[user.GetName()]++
@@ -194,6 +158,6 @@ func (e *EtcdSuite) startClient(svcCfg string) {
 	}
 }
 
-func TestEtcd(t *testing.T) {
-	suite.Run(t, new(EtcdSuite))
+func TestFailover(t *testing.T) {
+	suite.Run(t, new(FailoverSuite))
 }

@@ -12,10 +12,10 @@ import (
 	"github.com/webook/pkg/grpcx/balancer/weight"
 )
 
-// NameHealth 是带应用级错误熔断的 SWRR 均衡器名:在 custom_swrr 基础上,RPC 失败经 Done 累计,
-// 连续失败达阈值即把节点摘出可用组,摘除后过冷却期半开放行一次探活,探活成功则恢复。
-// 与 base 的 HealthCheck(连接级 gRPC health 协议)互补——那个管连接健康,这个管调用结果。
-const NameHealth = "health_swrr"
+// NameBreaker 是带熔断的 SWRR 均衡器名(circuit breaker):在 custom_swrr 基础上,RPC 失败经 Done
+// 累计,连续失败达阈值即把节点摘出可用组,摘除后过冷却期半开放行一次探活,探活成功则恢复。
+// 与 base 的 HealthCheck(连接级 gRPC health 协议)互补——那个管连接是否健康,这个管调用结果。
+const NameBreaker = "breaker_swrr"
 
 const (
 	failThreshold = 3               // 连续失败多少次摘除节点
@@ -23,12 +23,12 @@ const (
 )
 
 func init() {
-	balancer.Register(base.NewBalancerBuilder(NameHealth, healthPickerBuilder{}, base.Config{HealthCheck: true}))
+	balancer.Register(base.NewBalancerBuilder(NameBreaker, breakerPickerBuilder{}, base.Config{HealthCheck: true}))
 }
 
-type healthPickerBuilder struct{}
+type breakerPickerBuilder struct{}
 
-func (healthPickerBuilder) Build(info base.PickerBuildInfo) balancer.Picker {
+func (breakerPickerBuilder) Build(info base.PickerBuildInfo) balancer.Picker {
 	if len(info.ReadySCs) == 0 {
 		return base.NewErrPicker(balancer.ErrNoSubConnAvailable)
 	}
@@ -36,18 +36,18 @@ func (healthPickerBuilder) Build(info base.PickerBuildInfo) balancer.Picker {
 	for sc, sci := range info.ReadySCs {
 		conns = append(conns, &conn{sc: sc, weight: weight.Of(sci.Address), available: true})
 	}
-	return &healthPicker{conns: conns}
+	return &breakerPicker{conns: conns}
 }
 
-// healthPicker 的熔断状态(available/fails/downAt)挂在 picker 上,而 gRPC 在任一连接状态变化时
+// breakerPicker 的熔断状态(available/fails/downAt)挂在 picker 上,而 gRPC 在任一连接状态变化时
 // 会重建 picker → 状态重置回全可用。轻量场景够用;要跨重建持久,需把这组状态提到 builder 层按
 // address 存。
-type healthPicker struct {
+type breakerPicker struct {
 	mu    sync.Mutex
 	conns []*conn
 }
 
-func (p *healthPicker) Pick(balancer.PickInfo) (balancer.PickResult, error) {
+func (p *breakerPicker) Pick(balancer.PickInfo) (balancer.PickResult, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -81,7 +81,7 @@ func (p *healthPicker) Pick(balancer.PickInfo) (balancer.PickResult, error) {
 
 // liveConns 选出本轮参选节点:available 的,加上熔断后冷却到点可半开探活的;若全部熔断且都还在
 // 冷却期(live 为空),fail-open 放行全部,避免整体不可用。
-func (p *healthPicker) liveConns() (live []*conn, total int) {
+func (p *breakerPicker) liveConns() (live []*conn, total int) {
 	now := nowMs()
 	live = make([]*conn, 0, len(p.conns))
 	for _, c := range p.conns {

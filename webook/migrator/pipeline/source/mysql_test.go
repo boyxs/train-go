@@ -176,7 +176,7 @@ func TestMySQLSource_Close(t *testing.T) {
 }
 
 func TestToInt64(t *testing.T) {
-	cases := []struct {
+	testCases := []struct {
 		name string
 		in   any
 		want int64
@@ -191,7 +191,7 @@ func TestToInt64(t *testing.T) {
 		{"float64", 42.0, 0, false},
 		{"nil", nil, 0, false},
 	}
-	for _, c := range cases {
+	for _, c := range testCases {
 		t.Run(c.name, func(t *testing.T) {
 			got, ok := toInt64(c.in)
 			assert.Equal(t, c.want, got)

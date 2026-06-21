@@ -15,16 +15,16 @@ type fakeSubConn struct {
 	addr string
 }
 
-func newHealthPicker(addrs ...string) *healthPicker {
+func newBreakerPicker(addrs ...string) *breakerPicker {
 	conns := make([]*conn, len(addrs))
 	for i, a := range addrs {
 		conns[i] = &conn{sc: fakeSubConn{addr: a}, weight: 1, available: true}
 	}
-	return &healthPicker{conns: conns}
+	return &breakerPicker{conns: conns}
 }
 
 // pickOnce 选一次,返回命中地址 + 对本次结果回报错误的 Done 闭包。
-func pickOnce(t *testing.T, p *healthPicker) (string, func(error)) {
+func pickOnce(t *testing.T, p *breakerPicker) (string, func(error)) {
 	t.Helper()
 	res, err := p.Pick(balancer.PickInfo{})
 	require.NoError(t, err)
@@ -33,7 +33,7 @@ func pickOnce(t *testing.T, p *healthPicker) (string, func(error)) {
 	}
 }
 
-func connByAddr(p *healthPicker, addr string) *conn {
+func connByAddr(p *breakerPicker, addr string) *conn {
 	for _, c := range p.conns {
 		if c.sc.(fakeSubConn).addr == addr {
 			return c
@@ -42,9 +42,9 @@ func connByAddr(p *healthPicker, addr string) *conn {
 	return nil
 }
 
-// TestHealthSWRR_NodeFailureBreaks 验证:业务错误不熔断,节点级错误连续达阈值才摘除。
-func TestHealthSWRR_NodeFailureBreaks(t *testing.T) {
-	p := newHealthPicker("A", "B", "C")
+// TestBreakerSWRR_NodeFailureBreaks 验证:业务错误不熔断,节点级错误连续达阈值才摘除。
+func TestBreakerSWRR_NodeFailureBreaks(t *testing.T) {
+	p := newBreakerPicker("A", "B", "C")
 
 	// 业务错误(NotFound)不计入熔断
 	addr, done := pickOnce(t, p)
@@ -66,9 +66,9 @@ func TestHealthSWRR_NodeFailureBreaks(t *testing.T) {
 	require.False(t, c2.available, "连续失败达阈值应摘除")
 }
 
-// TestHealthSWRR_BreakDivertsTraffic 验证:节点被摘后,冷却期内流量全部转移到健康节点。
-func TestHealthSWRR_BreakDivertsTraffic(t *testing.T) {
-	p := newHealthPicker("A", "B", "C")
+// TestBreakerSWRR_BreakDivertsTraffic 验证:节点被摘后,冷却期内流量全部转移到健康节点。
+func TestBreakerSWRR_BreakDivertsTraffic(t *testing.T) {
+	p := newBreakerPicker("A", "B", "C")
 	a := connByAddr(p, "A")
 	a.available, a.fails, a.downAt = false, failThreshold, nowMs() // 模拟刚摘除,在冷却期
 
@@ -83,9 +83,9 @@ func TestHealthSWRR_BreakDivertsTraffic(t *testing.T) {
 	require.Equal(t, n, counts["B"]+counts["C"], "流量应全部转移到 B/C")
 }
 
-// TestHealthSWRR_HalfOpenRecovers 验证:冷却到点后半开放行探活,探活成功则节点恢复。
-func TestHealthSWRR_HalfOpenRecovers(t *testing.T) {
-	p := newHealthPicker("A", "B", "C")
+// TestBreakerSWRR_HalfOpenRecovers 验证:冷却到点后半开放行探活,探活成功则节点恢复。
+func TestBreakerSWRR_HalfOpenRecovers(t *testing.T) {
+	p := newBreakerPicker("A", "B", "C")
 	a := connByAddr(p, "A")
 	a.available, a.fails, a.downAt = false, failThreshold, nowMs()
 

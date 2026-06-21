@@ -164,7 +164,7 @@ func TestAuditMiddleware(t *testing.T) {
 }
 
 func TestActionFor(t *testing.T) {
-	cases := []struct {
+	testCases := []struct {
 		name, path, method, body, want string
 	}{
 		{"GET 跳过", "/migrator/tasks/1", http.MethodGet, "", AuditActionUnknown},
@@ -185,7 +185,7 @@ func TestActionFor(t *testing.T) {
 		{"replay-dl", "/migrator/tasks/1/replay-dl", http.MethodPost, "{}", consts.AuditActionReplayDL},
 		{"未知路径 → unknown", "/migrator/tasks/1/foobar", http.MethodPost, "{}", AuditActionUnknown},
 	}
-	for _, c := range cases {
+	for _, c := range testCases {
 		t.Run(c.name, func(t *testing.T) {
 			assert.Equal(t, c.want, actionFor(c.path, c.method, []byte(c.body)))
 		})

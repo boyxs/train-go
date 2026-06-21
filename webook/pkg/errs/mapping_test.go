@@ -14,7 +14,7 @@ import (
 // ── 用例 2.x：HTTP ↔ gRPC code 映射 ─────────────────────────────────────────
 
 func TestHttpToGRPC(t *testing.T) {
-	cases := []struct {
+	testCases := []struct {
 		http int
 		grpc codes.Code
 	}{
@@ -28,13 +28,13 @@ func TestHttpToGRPC(t *testing.T) {
 		{500, codes.Internal},
 		{999, codes.Unknown}, // 未知 HTTP code
 	}
-	for _, c := range cases {
+	for _, c := range testCases {
 		assert.Equal(t, c.grpc, httpToGRPC(c.http), "http=%d", c.http)
 	}
 }
 
 func TestGrpcToHTTP_RoundTripAllStandardCodes(t *testing.T) {
-	cases := []struct {
+	testCases := []struct {
 		grpc codes.Code
 		http int
 	}{
@@ -51,7 +51,7 @@ func TestGrpcToHTTP_RoundTripAllStandardCodes(t *testing.T) {
 		{codes.Unavailable, 503},
 		{codes.DeadlineExceeded, 504},
 	}
-	for _, c := range cases {
+	for _, c := range testCases {
 		got := grpcToHTTP(c.grpc)
 		assert.Equal(t, c.http, got, "grpc=%v → http", c.grpc)
 		// 双向 round-trip
