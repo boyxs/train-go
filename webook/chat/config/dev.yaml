@@ -17,6 +17,7 @@ grpc:
   client:
     webook-core:
       target: "etcd:///service/webook-core"
+      balancer: "breaker_swrr"
 #      secure: false
 #      caFile: ""
 mysql:

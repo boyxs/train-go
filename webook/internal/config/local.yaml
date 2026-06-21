@@ -9,6 +9,7 @@ grpc:
     port: 8090
     name: "webook-core"
     ttl: 30
+    weight: 10
 
 mysql:
   dsn: root:13520@tcp(localhost:3306)/webook?parseTime=true&loc=UTC
