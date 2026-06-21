@@ -2,6 +2,14 @@
 
 <!-- 新功能前插在此，日期降序 -->
 
+## [2026-06-21] gRPC 自定义负载均衡器套件（SWRR / 熔断 / VIP 分组）
+
+**变更内容**：`pkg/grpcx/balancer/swrr` 铺平三个平滑加权轮询（SWRR）balancer——`custom_swrr`（按权重平滑分流）、`health_swrr`（应用级熔断：连续失败摘除 + 冷却半开探活恢复）、`group_swrr`（按请求 `x-tier` metadata 分流到节点组，如 VIP 池），三者共享 `conn` + `swrrPick`；配套中立标签包 `balancer/{weight,group}`（resolver 写、balancer 读，互不依赖）；`resolver/etcd` 改编官方 etcd naming/resolver，watch 时额外下发带权 + 带组 `Addresses`。
+**影响范围**：新增 `pkg/grpcx/balancer/{swrr,weight,group}`、`pkg/grpcx/resolver/etcd`；测试覆盖三 balancer（真链路 + 白盒熔断）+ 标签包 + metadata 解析。
+**技术决策**：①`base.NewBalancerBuilder` 只读 `State.Addresses`、不读 `Endpoints`，故 weight/group 经 `Address.Attributes` 携带（`BalancerAttributes` 已 deprecated 且参与 `Address.Equal`，弃用）；②官方 etcd resolver 只填 `Endpoints` 且丢 Metadata，base 系拿不到地址/权重，故 fork 后补填带标签 Addresses；③熔断状态挂 Picker 层（gRPC 重建会重置，轻量取舍）；④VIP 分组用请求 metadata 路由（无 xDS 控制面时的标准做法）。
+**会话**：260621-grpcx-负载均衡器套件
+**发布**：（基础设施代码，随后续服务发版生效）
+
 ## [2026-06-17] gRPC + etcd 服务注册/发现集成
 
 **变更内容**：`pkg/grpcx` 收敛 gRPC「注册自己 / 发现下游」——`NewServer`（租约 + 自动续租 + 中断重注册 + 优雅注销）/ `NewClient`（etcd resolver + 按 `ClientConfig{Target,Secure,CAFile}` 构造凭证），otel/拦截器经 `opts` 由调用方传；抽 `pkg/viperx`（`LoadLocal`/`WatchRemote`）统一三服务配置引导，`pkg/netx` 探出口 IP。core 注册自己、chat 经 resolver 发现 core，main 接 SIGTERM 优雅停机 + gRPC 健康检查；配套 `sandbox/grpc/registry` 可运行 demo + `prd/grpc-etcd` 架构文档。
