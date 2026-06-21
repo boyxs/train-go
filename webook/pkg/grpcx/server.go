@@ -27,6 +27,7 @@ type Server struct {
 	Name   string
 	Host   string // 注册到 etcd 的广告 host;空则用 netx.ExternalIp()
 	TTL    int64  // 租约 TTL(秒),<=0 用 defaultLeaseTTL
+	Weight int    // 注册权重(供带权 balancer 读)
 	Client *etcdv3.Client
 	L      logger.LoggerX
 
@@ -38,10 +39,11 @@ type Server struct {
 
 // ServerConfig 是 gRPC server 的配置。
 type ServerConfig struct {
-	Port int    `yaml:"port"`
-	Name string `yaml:"name"`
-	Host string `yaml:"host"` // 广告 host(k8s 填 POD_IP);空则探测出口 IP
-	TTL  int64  `yaml:"ttl"`  // 租约 TTL(秒),<=0 用 defaultLeaseTTL
+	Port   int    `yaml:"port"`
+	Name   string `yaml:"name"`
+	Host   string `yaml:"host"`   // 广告 host(k8s 填 POD_IP);空则探测出口 IP
+	TTL    int64  `yaml:"ttl"`    // 租约 TTL(秒),<=0 用 defaultLeaseTTL
+	Weight int    `yaml:"weight"` // 注册到 etcd 的权重(供带权 balancer 读);<=0 不写,resolver 按 1 计
 }
 
 // NewServer 建底层 grpc.Server(option 全由调用方经 opts 传入,如 otel StatsHandler、错误拦截器);
@@ -53,6 +55,7 @@ func NewServer(cfg ServerConfig, client *etcdv3.Client, l logger.LoggerX, opts .
 		Name:   cfg.Name,
 		Host:   cfg.Host,
 		TTL:    cfg.TTL,
+		Weight: cfg.Weight,
 		Client: client,
 		L:      l,
 	}
@@ -105,7 +108,11 @@ func (s *Server) register(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if err = s.em.AddEndpoint(gctx, s.key, endpoints.Endpoint{Addr: s.addr}, etcdv3.WithLease(lease.ID)); err != nil {
+	ep := endpoints.Endpoint{Addr: s.addr}
+	if s.Weight > 0 {
+		ep.Metadata = map[string]any{"weight": s.Weight}
+	}
+	if err = s.em.AddEndpoint(gctx, s.key, ep, etcdv3.WithLease(lease.ID)); err != nil {
 		return errors.Join(err, s.revoke(lease.ID)) // 注册失败回收租约,不悬挂
 	}
 	kaCh, err := s.Client.KeepAlive(ctx, lease.ID) // etcd 按 ttl/3 自动续租
