@@ -19,6 +19,8 @@ type MessageDAO interface {
 	ListBefore(ctx context.Context, convId int64, beforeId int64, limit int) ([]Message, error)
 	// ListAll 获取全部消息（buildPrompt 用）
 	ListAll(ctx context.Context, convId int64) ([]Message, error)
+	// Delete 软删除消息（清理生成中断残留的空占位行）
+	Delete(ctx context.Context, convId int64, id int64) error
 }
 
 type GormMessageDAO struct {
@@ -98,6 +100,13 @@ func (d *GormMessageDAO) ListAll(ctx context.Context, convId int64) ([]Message, 
 		Order("created_at ASC").
 		Find(&msgs).Error
 	return msgs, err
+}
+
+func (d *GormMessageDAO) Delete(ctx context.Context, convId int64, id int64) error {
+	// 软删除：Message 带 soft_delete.DeletedAt，GORM 自动置 deleted_at
+	return d.db.WithContext(ctx).
+		Where("id = ? AND conversation_id = ?", id, convId).
+		Delete(&Message{}).Error
 }
 
 func reverse(msgs []Message) {

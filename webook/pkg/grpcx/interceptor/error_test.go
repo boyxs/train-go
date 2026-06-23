@@ -3,6 +3,7 @@ package interceptor
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"testing"
 
@@ -17,6 +18,7 @@ import (
 	"google.golang.org/grpc/test/bufconn"
 
 	"github.com/webook/pkg/errs"
+	"github.com/webook/pkg/logger"
 )
 
 // 用例 5.x：bufconn 起真实 gRPC server + client，端到端验证双向转换。
@@ -170,4 +172,53 @@ func TestUnaryClientInterceptor_NilErr_PassesThrough(t *testing.T) {
 	resp, err := client.Check(context.Background(), &healthpb.HealthCheckRequest{})
 	require.NoError(t, err)
 	assert.NotNil(t, resp)
+}
+
+// recLogger 记录各级别调用次数，验证 UnaryServerError 的日志分级。
+type recLogger struct {
+	debugN, infoN, warnN, errorN int
+}
+
+func (r *recLogger) Debug(string, ...logger.Field) { r.debugN++ }
+func (r *recLogger) Info(string, ...logger.Field)  { r.infoN++ }
+func (r *recLogger) Warn(string, ...logger.Field)  { r.warnN++ }
+func (r *recLogger) Error(string, ...logger.Field) { r.errorN++ }
+
+// 5.7 客户端取消（context.Canceled）：降级 Debug 不刷 ERROR，回 codes.Canceled 而非 Internal。
+func TestUnaryServerError_ClientCanceled_DebugNotError(t *testing.T) {
+	rec := &recLogger{}
+	old := L
+	L = rec
+	defer func() { L = old }()
+
+	intercept := UnaryServerError()
+	handler := func(_ context.Context, _ any) (any, error) {
+		// 真实链路：向量化查询失败 -> do request -> context canceled
+		return nil, fmt.Errorf("向量化查询失败: %w", context.Canceled)
+	}
+	_, err := intercept(context.Background(), nil,
+		&grpc.UnaryServerInfo{FullMethod: "/webook.search.v1.SearchService/SearchArticles"}, handler)
+
+	assert.Equal(t, codes.Canceled, status.Code(err), "客户端取消应回 Canceled，不是 Internal")
+	assert.Equal(t, 0, rec.errorN, "客户端取消不应记 ERROR")
+	assert.Equal(t, 1, rec.debugN, "客户端取消应记一条 Debug")
+}
+
+// 5.8 非取消的系统错误仍记 ERROR + 转 Internal（回归保护）。
+func TestUnaryServerError_SystemError_StillError(t *testing.T) {
+	rec := &recLogger{}
+	old := L
+	L = rec
+	defer func() { L = old }()
+
+	intercept := UnaryServerError()
+	handler := func(_ context.Context, _ any) (any, error) {
+		return nil, errors.New("db connection broken")
+	}
+	_, err := intercept(context.Background(), nil,
+		&grpc.UnaryServerInfo{FullMethod: "/x"}, handler)
+
+	assert.Equal(t, codes.Internal, status.Code(err))
+	assert.Equal(t, 1, rec.errorN, "系统错误仍应记 ERROR")
+	assert.Equal(t, 0, rec.debugN)
 }
