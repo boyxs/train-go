@@ -4,9 +4,12 @@ etcd:
   path: /webook-core
   type: yaml
 
+http:
+  addr: ":8010"
+
 grpc:
   server:
-    port: 8090
+    port: 8011
     name: "webook-core"
     ttl: 30
     weight: 10

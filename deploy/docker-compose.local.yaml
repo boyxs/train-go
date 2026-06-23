@@ -20,7 +20,7 @@ services:
       args:
         VERSION: local
     ports:
-      - "${CORE_HOST_PORT:-8089}:8089"
+      - "${CORE_HOST_PORT:-8010}:8010"
 
   webook-chat:
     image: webook-chat:local
@@ -32,7 +32,7 @@ services:
       args:
         VERSION: local
     ports:
-      - "${CHAT_HOST_PORT:-8189}:8189"
+      - "${CHAT_HOST_PORT:-8020}:8020"
 
   webook-migrator:
     image: webook-migrator:local
@@ -44,7 +44,7 @@ services:
       args:
         VERSION: local
     ports:
-      - "${MIGRATOR_HOST_PORT:-8083}:8083"
+      - "${MIGRATOR_HOST_PORT:-8030}:8030"
 
   webook-fe:
     image: webook-fe:local

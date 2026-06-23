@@ -31,7 +31,7 @@ func LoadLocal() error {
 		return err
 	}
 	viper.AutomaticEnv()
-	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_")) // 把 http.addr 映射成 HTTP_ADDR
 	log.Printf("[config] loaded: %s", viper.ConfigFileUsed())
 	return nil
 }

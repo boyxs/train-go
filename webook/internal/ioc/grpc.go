@@ -27,9 +27,16 @@ func InitGRPCServer(
 	client *etcdv3.Client,
 	l logger.LoggerX,
 ) *grpcx.Server {
-	var cfg grpcx.ServerConfig
-	if err := viper.UnmarshalKey("grpc.server", &cfg); err != nil {
-		panic(err)
+	//var cfg grpcx.ServerConfig
+	//if err := viper.UnmarshalKey("grpc.server", &cfg); err != nil {
+	//	panic(err)
+	//}
+	cfg := grpcx.ServerConfig{
+		Port:   viper.GetInt("grpc.server.port"),
+		Name:   viper.GetString("grpc.server.name"),
+		Host:   viper.GetString("grpc.server.host"),
+		TTL:    viper.GetInt64("grpc.server.ttl"),
+		Weight: viper.GetInt("grpc.server.weight"),
 	}
 	srv := grpcx.NewServer(cfg, client, l,
 		grpc.StatsHandler(otelgrpc.NewServerHandler()),

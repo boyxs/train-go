@@ -27,7 +27,7 @@
 2. **检查 gray，必要时降到 0**（避免业务读到陈旧 NEW 数据）
 
    ```bash
-   curl -X POST http://migrator.internal:8083/migrator/tasks/$TASK_ID/gray \
+   curl -X POST http://migrator.internal:8030/migrator/tasks/$TASK_ID/gray \
      -H "Authorization: Bearer $ADMIN_TOKEN" \
      -d '{"percent": 0}'
    ```
@@ -67,16 +67,16 @@ mysql webook_migrator -e "SELECT phase, cursor_value, updated_at FROM checkpoint
 
 ```bash
 # 1. lag 恢复
-curl http://migrator.internal:8083/migrator/tasks/$TASK_ID/lag
+curl http://migrator.internal:8030/migrator/tasks/$TASK_ID/lag
 # 期望：lagMs < 5000 持续 5 min
 
 # 2. 跑采样对账，确认无数据丢
-curl -X POST http://migrator.internal:8083/migrator/tasks/$TASK_ID/verify \
+curl -X POST http://migrator.internal:8030/migrator/tasks/$TASK_ID/verify \
   -d '{"mode":"sample","sampleRate":0.001}'
 # 期望：mismatch 增量 < 100
 
 # 3. lag 稳定后，恢复 gray
-curl -X POST http://migrator.internal:8083/migrator/tasks/$TASK_ID/gray \
+curl -X POST http://migrator.internal:8030/migrator/tasks/$TASK_ID/gray \
   -d '{"percent": '$LAST_GRAY'}'
 ```
 

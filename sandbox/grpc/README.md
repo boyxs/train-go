@@ -7,7 +7,7 @@
 ## 1. 背景与目标
 
 服务从单体 core 拆出 chat / migrator 后，chat 要 RPC 调 core 的 search / article / interaction。
-写死 `coreAddr: "webook-core:8090"` 的问题：core 多副本/换 IP/扩缩容时客户端不感知。
+写死 `coreAddr: "webook-core:8011"` 的问题：core 多副本/换 IP/扩缩容时客户端不感知。
 
 目标：
 
@@ -22,8 +22,8 @@
                     ┌─────────────── etcd 集群 ───────────────┐
                     │  /webook-core         (配置中心 KV)        │
    配置热更 ◀───────│  /webook-chat                            │
-                    │  service/webook-core/10.0.0.1:8090  ◀──┐ │
-                    │  service/webook-core/10.0.0.2:8090     │ │ 注册(带 lease)
+                    │  service/webook-core/10.0.0.1:8011  ◀──┐ │
+                    │  service/webook-core/10.0.0.2:8011     │ │ 注册(带 lease)
                     └────────────────┬───────────────────────┼─┘
                           resolver   │ watch prefix           │ KeepAlive(ttl/3)
                           发现        ▼ "service/webook-core/" │
@@ -91,7 +91,7 @@ func NewClient(client *etcdv3.Client, cfg ClientConfig, opts ...grpc.DialOption)
 | 配置键 | 用途 | 示例 |
 |--------|------|------|
 | `etcd.endpoints` | etcd 集群地址列表（配置中心 + 注册中心共用） | `["http://webook-etcd:2379"]` |
-| `grpc.server.port` | 本服务 gRPC 监听端口 | `8090` |
+| `grpc.server.port` | 本服务 gRPC 监听端口 | `8011` |
 | `grpc.server.name` | 服务名（注册命名空间） | `webook-core` |
 | `grpc.server.ttl` | 租约 TTL(秒) | `30` |
 | `grpc.server.host` | 注册广告 host(k8s 填 POD_IP)；空则探测出口 IP | `""` |
@@ -136,7 +136,7 @@ resolver.NewBuilder(etcdClient)                    建 etcd resolver
 // internal/ioc/grpc.go
 func InitGRPCServer(searchSrv, articleSrv, intrSrv, client *etcdv3.Client, l logger.LoggerX) *grpcx.Server {
     var cfg grpcx.ServerConfig
-    viper.UnmarshalKey("grpc.server", &cfg)        // {8090, webook-core, 30}
+    viper.UnmarshalKey("grpc.server", &cfg)        // {8011, webook-core, 30}
     srv := grpcx.NewServer(cfg, client, l,           // otel + 错误拦截器经 opts 显式传
         grpc.StatsHandler(otelgrpc.NewServerHandler()),
         grpc.UnaryInterceptor(interceptor.UnaryServerError()))

@@ -531,7 +531,7 @@ switched           DST_ONLY       100 ──────────────
 
 ## 6. HTTP 接口设计
 
-服务端口：**8083**（service-port，与 webook-core / webook-chat 隔离）。URL 前缀：`/api/migrator/`。
+服务端口：**8030**（service-port，与 webook-core / webook-chat 隔离）。URL 前缀：`/api/migrator/`。
 
 | Method | Path | 请求 | 响应 | 认证 |
 |--------|------|---------|------|------|

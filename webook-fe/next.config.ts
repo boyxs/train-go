@@ -4,9 +4,9 @@ import type { NextConfig } from 'next';
 // 与生产环境 nginx 路由规则保持完全一致（参考 deploy/nginx/conf.d/default.conf）
 // 加新服务时只需在这里追加一条 rewrites 规则，前端代码零改动
 const CORE_BACKEND =
-  process.env.NEXT_PUBLIC_DEV_CORE_URL || 'http://localhost:8089';
+  process.env.NEXT_PUBLIC_DEV_CORE_URL || 'http://localhost:8010';
 const CHAT_BACKEND =
-  process.env.NEXT_PUBLIC_DEV_CHAT_URL || 'http://localhost:8189';
+  process.env.NEXT_PUBLIC_DEV_CHAT_URL || 'http://localhost:8020';
 
 const nextConfig: NextConfig = {
   // 企业级部署：standalone 输出，Docker 镜像只装最小 node_modules

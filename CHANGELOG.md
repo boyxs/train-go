@@ -38,7 +38,7 @@
 
 ## [2026-06-14] webook-migrator postman/README 鉴权对齐 Bearer（webook-migrator-v1.2.1）
 
-**变更内容**：postman 集合改 `Authorization: Bearer`（移除无效的 x-access-token 请求头）+ 新增 A0 授权登录文件夹（登录脚本自动回填 token）+ 变量统一命名；README A.5 curl 修 Bearer 头 / 端口 :8089 / `$token` 变量，B3 ES 注入 `--data-raw`→`-d`（兼容旧 curl）。
+**变更内容**：postman 集合改 `Authorization: Bearer`（移除无效的 x-access-token 请求头）+ 新增 A0 授权登录文件夹（登录脚本自动回填 token）+ 变量统一命名；README A.5 curl 修 Bearer 头 / 端口 :8090 / `$token` 变量，B3 ES 注入 `--data-raw`→`-d`（兼容旧 curl）。
 **影响范围**：`webook/migrator/scripts/postman.json`、`webook/migrator/README.md`。tag `webook-migrator-v1.2.1`（dev 资产 + 文档，镜像功能无变化）。
 **技术决策**：migrator 与 core 共用 `jwtx.ExtractBearer`，只认 `Authorization` 头；x-access-token 仅是登录响应头，旧集合靠 `jwt.disabled` 蒙混、从未真鉴权。
 **会话**：260614-postman鉴权与监控告警
@@ -752,9 +752,9 @@ ALTER TABLE dead_letter MODIFY COLUMN biz_id varchar(64) NOT NULL;
 **技术决策**:
 - 同源部署：`NEXT_PUBLIC_API_BASE_URL=/api`，构建一次到处部署，无 CORS，外暴露端口仅 80
 - standalone 输出：镜像最小化，仅装运行时 node_modules
-- nginx 在容器网络内部通过 upstream `webook:8089` / `webook-fe:3000` 拼接，无需暴露后端端口（保留 8089 暂供调试）
+- nginx 在容器网络内部通过 upstream `webook:8090` / `webook-fe:3000` 拼接，无需暴露后端端口（保留 8090 暂供调试）
 - 顶层化：`webook/` 不再承担"基础设施 + 后端"双重职责，`nginx/prometheus/grafana` 是跨前后端基础设施，与 `webook/` 平级更清晰
-**待办**: 后端去掉 8089 公网端口（仅走 nginx）；TLS（443）+ HSTS；webook 接 OTel；Grafana provisioning 切 `editable=false` 三件套
+**待办**: 后端去掉 8090 公网端口（仅走 nginx）；TLS（443）+ HSTS；webook 接 OTel；Grafana provisioning 切 `editable=false` 三件套
 **会话**: 260418-deploy-前端Docker部署
 
 ## [2026-04-18] Grafana / OpenTelemetry 文档 + Zipkin 接入

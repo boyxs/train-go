@@ -73,14 +73,14 @@ nc -zv canal-master 11111
 
 ```bash
 # 1. 健康检查
-curl http://migrator.internal:8083/health
+curl http://migrator.internal:8030/health
 # {"status":"ok","service":"migrator"}
 
 # 2. 正在运行的 task 状态
-curl http://migrator.internal:8083/migrator/tasks?status=incr_running
+curl http://migrator.internal:8030/migrator/tasks?status=incr_running
 
 # 3. lag 是否在恢复
-curl http://migrator.internal:8083/migrator/tasks/$TASK_ID/lag
+curl http://migrator.internal:8030/migrator/tasks/$TASK_ID/lag
 # 期望：从高位逐步下降
 
 # 4. 业务侧 SDK 是否正确读到 Redis

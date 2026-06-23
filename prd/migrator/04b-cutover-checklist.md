@@ -61,7 +61,7 @@
 
 ```bash
 # 系统在收到切流申请时自动校验
-curl -X POST http://migrator.internal:8083/migrator/tasks/$TASK_ID/switch \
+curl -X POST http://migrator.internal:8030/migrator/tasks/$TASK_ID/switch \
   -H "Authorization: Bearer $ADMIN_TOKEN_A" \
   -d '{
     "stage": "DST_ONLY",

@@ -21,19 +21,19 @@ scrape_configs:
   - job_name: 'webook-core'
     metrics_path: '/metrics'
     static_configs:
-      - targets: ['webook-core:8089']
+      - targets: ['webook-core:8010']
 
   # webook-chat 微服务
   - job_name: 'webook-chat'
     metrics_path: '/metrics'
     static_configs:
-      - targets: ['webook-chat:8189']
+      - targets: ['webook-chat:8020']
 
   # webook-migrator 控制台
   - job_name: 'webook-migrator'
     metrics_path: '/metrics'
     static_configs:
-      - targets: ['webook-migrator:8083']
+      - targets: ['webook-migrator:8030']
 
   # MySQL
   - job_name: 'mysql'

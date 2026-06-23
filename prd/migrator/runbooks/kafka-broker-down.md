@@ -67,11 +67,11 @@ kafka-topics.sh --describe --topic <目标 topic> | awk '{print $6}' | grep -c "
 # 期望：0
 
 # 2. broker 恢复后，重放宕机期间积累的死信
-curl -sS -X POST http://migrator.internal:8083/migrator/tasks/$TASK_ID/replay-dl
+curl -sS -X POST http://migrator.internal:8030/migrator/tasks/$TASK_ID/replay-dl
 
 # 3. 死信清零 + lag 收敛
 mysql webook_migrator -e "SELECT COUNT(*) FROM dead_letter WHERE task_id=$TASK_ID AND replayed=0"  # 期望趋 0
-curl -s http://migrator.internal:8083/migrator/tasks/$TASK_ID/lag | jq '.data.dstLagMs'                  # 期望下降
+curl -s http://migrator.internal:8030/migrator/tasks/$TASK_ID/lag | jq '.data.dstLagMs'                  # 期望下降
 ```
 
 ## 事后

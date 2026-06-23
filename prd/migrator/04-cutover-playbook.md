@@ -123,7 +123,7 @@ grep -rn "migratorsdk" webook/wire.go
 | Canal 集群 | `curl canal:11111/metrics` | 至少 3 节点，无单点 |
 | Kafka *(仅 `sinkType=kafka`)* | `kafka-topics.sh --list` 含目标 topic | topic 已建（CDC 传输不经 Kafka，走进程内 channel） |
 | Redis | `redis-cli ping` | PONG，5min 不丢连接 |
-| webook-migrator | `curl migrator:8083/health` | `{"status":"ok","service":"migrator"}` |
+| webook-migrator | `curl migrator:8030/health` | `{"status":"ok","service":"migrator"}` |
 | Prometheus | `curl prom:9090/api/v1/targets` | webook-migrator job up=1 |
 | Grafana 告警 | 看板 `migrator-overview` 已加载 | 4 panel 都有数据 |
 
@@ -261,11 +261,11 @@ cd deploy
 ./deploy.sh prod
 
 # 4. 健康检查
-curl http://migrator.internal:8083/health
+curl http://migrator.internal:8030/health
 # {"status":"ok","service":"migrator"}
 
 # 5. Prometheus 指标接入验证
-curl http://migrator.internal:8083/metrics | grep -E 'webook_http_|webook_db_|go_goroutines'
+curl http://migrator.internal:8030/metrics | grep -E 'webook_http_|webook_db_|go_goroutines'
 # 至少有 webook_http_* / webook_db_* / go_* 基础设施 metric
 
 # 6. Grafana 看板加载验证
@@ -287,7 +287,7 @@ curl http://migrator.internal:8083/metrics | grep -E 'webook_http_|webook_db_|go
 
 ```bash
 # 跑 webook-migrator 提供的预检脚本
-curl -X POST http://migrator.internal:8083/migrator/preflight \
+curl -X POST http://migrator.internal:8030/migrator/preflight \
   -H "Content-Type: application/json" \
   -d '{
     "sourceDsnRef": "vault:webook/db/source",
@@ -329,7 +329,7 @@ curl -X POST http://migrator.internal:8083/migrator/preflight \
 **操作**（以 article→ES 为例，CDC 模式）：
 
 ```bash
-TASK_ID=$(curl -sX POST http://migrator.internal:8083/migrator/tasks \
+TASK_ID=$(curl -sX POST http://migrator.internal:8030/migrator/tasks \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -374,7 +374,7 @@ echo "TaskId = $TASK_ID"
 **操作**：
 
 ```bash
-curl -X POST http://migrator.internal:8083/migrator/tasks/$TASK_ID/start \
+curl -X POST http://migrator.internal:8030/migrator/tasks/$TASK_ID/start \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"phase": "full"}'
@@ -414,7 +414,7 @@ curl -X POST http://migrator.internal:8083/migrator/tasks/$TASK_ID/start \
 
 ```bash
 # 实时进度
-watch -n 5 'curl -sX GET http://migrator.internal:8083/migrator/tasks/$TASK_ID | jq ".data.checkpoints"'
+watch -n 5 'curl -sX GET http://migrator.internal:8030/migrator/tasks/$TASK_ID | jq ".data.checkpoints"'
 
 # Grafana 看板：migrator-overview → 基础设施 panel（HTTP / DB / Redis）
 # 全量进度看上面的 API checkpoints（v1 无业务 metric）
@@ -443,7 +443,7 @@ watch -n 5 'curl -sX GET http://migrator.internal:8083/migrator/tasks/$TASK_ID |
 ### 4.6 全量完成确认
 
 ```bash
-curl -X GET http://migrator.internal:8083/migrator/tasks/$TASK_ID | jq '.data.task.status'
+curl -X GET http://migrator.internal:8030/migrator/tasks/$TASK_ID | jq '.data.task.status'
 # 期望：2（full_done）
 
 # checkpoint 表所有 shard.progress=100
@@ -462,7 +462,7 @@ mysql webook_migrator -e "SELECT shard_no, progress_percent FROM checkpoint WHER
 **操作**：
 
 ```bash
-curl -X POST http://migrator.internal:8083/migrator/tasks/$TASK_ID/start \
+curl -X POST http://migrator.internal:8030/migrator/tasks/$TASK_ID/start \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"phase": "incr"}'
@@ -504,7 +504,7 @@ curl -X POST http://migrator.internal:8083/migrator/tasks/$TASK_ID/start \
 ### 5.3 lag 监控
 
 ```bash
-curl -X GET http://migrator.internal:8083/migrator/tasks/$TASK_ID/lag
+curl -X GET http://migrator.internal:8030/migrator/tasks/$TASK_ID/lag
 
 # 期望：
 # {
@@ -544,7 +544,7 @@ lag = now() - worker_last_processed_ts
 **schema 演进 / 强一致过渡**：业务侧 SDK 进入 `SRC_FIRST` 阶段：
 
 ```bash
-curl -X POST http://migrator.internal:8083/migrator/tasks/$TASK_ID/switch \
+curl -X POST http://migrator.internal:8030/migrator/tasks/$TASK_ID/switch \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -d '{"stage": "SRC_FIRST"}'
 
@@ -577,7 +577,7 @@ v1 对账是 API 触发的批对账：增量追平期间周期性调 `POST /task
 **查 mismatch**：
 
 ```bash
-curl -X GET "http://migrator.internal:8083/migrator/tasks/$TASK_ID/mismatch?repaired=0&offset=0&limit=50" \
+curl -X GET "http://migrator.internal:8030/migrator/tasks/$TASK_ID/mismatch?repaired=0&offset=0&limit=50" \
   -H "Authorization: Bearer $ADMIN_TOKEN"
 
 # 返回：
@@ -610,7 +610,7 @@ curl -X GET "http://migrator.internal:8083/migrator/tasks/$TASK_ID/mismatch?repa
 **操作**：
 
 ```bash
-curl -X POST http://migrator.internal:8083/migrator/tasks/$TASK_ID/verify \
+curl -X POST http://migrator.internal:8030/migrator/tasks/$TASK_ID/verify \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -d '{
     "mode": "sample",
@@ -618,7 +618,7 @@ curl -X POST http://migrator.internal:8083/migrator/tasks/$TASK_ID/verify \
   }'
 
 # 异步执行；查询进度：
-curl -X GET http://migrator.internal:8083/migrator/tasks/$TASK_ID | jq '.data.task.status'
+curl -X GET http://migrator.internal:8030/migrator/tasks/$TASK_ID | jq '.data.task.status'
 # 对账期间 status 仍是 incr_running（v1 无独立 verifying 状态）
 ```
 
@@ -653,7 +653,7 @@ spark-submit \
 **自动修复**（src 覆盖 dst）：
 
 ```bash
-curl -X POST http://migrator.internal:8083/migrator/tasks/$TASK_ID/repair \
+curl -X POST http://migrator.internal:8030/migrator/tasks/$TASK_ID/repair \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -d '{
     "strategy": "src_overwrite_dst",
@@ -676,7 +676,7 @@ curl -X POST http://migrator.internal:8083/migrator/tasks/$TASK_ID/repair \
 
 ```bash
 # 改 gray 比例
-curl -X POST http://migrator.internal:8083/migrator/tasks/$TASK_ID/gray \
+curl -X POST http://migrator.internal:8030/migrator/tasks/$TASK_ID/gray \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -d '{"percent": 5}'
 
@@ -696,7 +696,7 @@ watch -n 5 'curl -G http://prom:9090/api/v1/query --data-urlencode \
   "query=histogram_quantile(0.99, rate(webook_core_http_request_duration_seconds_bucket[1m]))"'
 
 # Sink 侧延迟（v1 无 apply metric，查 /lag 的 dstLagMs）
-watch -n 5 'curl -s http://migrator.internal:8083/migrator/tasks/$TASK_ID/lag | jq ".data.dstLagMs"'
+watch -n 5 'curl -s http://migrator.internal:8030/migrator/tasks/$TASK_ID/lag | jq ".data.dstLagMs"'
 ```
 
 **红线（任一触发立即 gray=0 回滚）**：
@@ -711,7 +711,7 @@ watch -n 5 'curl -s http://migrator.internal:8083/migrator/tasks/$TASK_ID/lag | 
 **回滚**（5 秒内）：
 
 ```bash
-curl -X POST http://migrator.internal:8083/migrator/tasks/$TASK_ID/gray \
+curl -X POST http://migrator.internal:8030/migrator/tasks/$TASK_ID/gray \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -d '{"percent": 0}'
 ```
@@ -721,7 +721,7 @@ curl -X POST http://migrator.internal:8083/migrator/tasks/$TASK_ID/gray \
 5% 试水持续 30 min 无异常 → 升 50%：
 
 ```bash
-curl -X POST http://migrator.internal:8083/migrator/tasks/$TASK_ID/gray \
+curl -X POST http://migrator.internal:8030/migrator/tasks/$TASK_ID/gray \
   -d '{"percent": 50}' \
   ...
 ```
@@ -731,7 +731,7 @@ curl -X POST http://migrator.internal:8083/migrator/tasks/$TASK_ID/gray \
 ### 7.3 100%（11:30 ~ 14:30）
 
 ```bash
-curl -X POST http://migrator.internal:8083/migrator/tasks/$TASK_ID/gray \
+curl -X POST http://migrator.internal:8030/migrator/tasks/$TASK_ID/gray \
   -d '{"percent": 100}' \
   ...
 ```
@@ -743,7 +743,7 @@ curl -X POST http://migrator.internal:8083/migrator/tasks/$TASK_ID/gray \
 灰度期（SRC_FIRST 双写中）发现问题，单条命令秒级把读路由切回 OLD：
 
 ```bash
-curl -X POST http://migrator.internal:8083/migrator/tasks/$TASK_ID/gray \
+curl -X POST http://migrator.internal:8030/migrator/tasks/$TASK_ID/gray \
   -d '{"percent": 0}' \
   ...
 
@@ -772,7 +772,7 @@ curl -X POST http://migrator.internal:8083/migrator/tasks/$TASK_ID/gray \
 
 ```bash
 # 1. 操作人 A 提请 cutover
-curl -X POST http://migrator.internal:8083/migrator/tasks/$TASK_ID/switch \
+curl -X POST http://migrator.internal:8030/migrator/tasks/$TASK_ID/switch \
   -H "Authorization: Bearer $ADMIN_TOKEN_A" \
   -H "X-Cutover-Approver: actor_a" \
   -d '{"stage": "DST_ONLY", "action": "propose"}'
@@ -780,7 +780,7 @@ curl -X POST http://migrator.internal:8083/migrator/tasks/$TASK_ID/switch \
 # 这一步只是把 task 标为 pending_cutover，等第二个 admin 批准
 
 # 2. 操作人 B 批准
-curl -X POST http://migrator.internal:8083/migrator/tasks/$TASK_ID/switch \
+curl -X POST http://migrator.internal:8030/migrator/tasks/$TASK_ID/switch \
   -H "Authorization: Bearer $ADMIN_TOKEN_B" \
   -H "X-Cutover-Approver: actor_b" \
   -d '{"stage": "DST_ONLY", "action": "approve"}'
@@ -819,7 +819,7 @@ T+30s+  status = switched
 watch -n 1 'redis-cli get migrator:stage:'$TASK_NAME
 
 # 切流后 lag 验证
-curl -X GET http://migrator.internal:8083/migrator/tasks/$TASK_ID/lag
+curl -X GET http://migrator.internal:8030/migrator/tasks/$TASK_ID/lag
 # 期望：data 里 srcLagMs / dstLagMs 正常
 ```
 
@@ -828,7 +828,7 @@ curl -X GET http://migrator.internal:8083/migrator/tasks/$TASK_ID/lag
 cutover 分两步：DST_FIRST（30s 同步双写过渡）→ DST_ONLY（单写）。**仅在 DST_FIRST 过渡期、尚未切单写时可回滚**；一旦进入 DST_ONLY 单写，OLD 停止更新、**不可回滚**（point of no return）：
 
 ```bash
-curl -X POST http://migrator.internal:8083/migrator/tasks/$TASK_ID/switch \
+curl -X POST http://migrator.internal:8030/migrator/tasks/$TASK_ID/switch \
   -H "Authorization: Bearer $ADMIN_TOKEN_A" \
   -d '{"stage": "SRC_FIRST", "action": "rollback"}'
 
@@ -1434,7 +1434,7 @@ curl -X POST .../tasks/$TASK_ID/switch -d '{"stage":"SRC_FIRST","action":"rollba
 
 set -e
 TASK_NAME="article_to_es_v1"
-BASE="http://migrator.internal:8083/migrator"
+BASE="http://migrator.internal:8030/migrator"
 AUTH="Authorization: Bearer $ADMIN_TOKEN"
 
 

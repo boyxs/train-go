@@ -34,8 +34,8 @@ services:
       webook-kafka:   {condition: service_healthy}
       webook-es:      {condition: service_healthy}
     healthcheck:
-      # 用 /metrics 探活（HTTP 8089 正常监听）；下游 webook-chat 依赖此 healthy 状态再启动
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8089/metrics || exit 1"]
+      # 用 /metrics 探活（HTTP 8010 正常监听）；下游 webook-chat 依赖此 healthy 状态再启动
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8010/metrics || exit 1"]
       interval: 10s
       timeout: 3s
       retries: 6
@@ -54,12 +54,12 @@ services:
       GOMEMLIMIT: "${CHAT_GOMEMLIMIT:-320MiB}"
       GOGC: "${CHAT_GOGC:-80}"
     depends_on:
-      webook-core:    {condition: service_healthy}    # 主仓 gRPC :8090 就绪后再起 chat
+      webook-core:    {condition: service_healthy}    # 主仓 gRPC :8011 就绪后再起 chat
       webook-mysql:   {condition: service_healthy}
       webook-redis:   {condition: service_healthy}
     healthcheck:
       # /health 探活（chat/ioc/web.go 注册）；让 nginx depends_on 能等到 chat 真正起来
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8189/health || exit 1"]
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8020/health || exit 1"]
       interval: 10s
       timeout: 3s
       retries: 6
@@ -82,7 +82,7 @@ services:
       webook-redis:   {condition: service_healthy}    # stage/gray/throttle/propose 控制位
     healthcheck:
       # /health 探活（migrator/ioc/web.go:41 注册）；让 nginx depends_on 能等到 migrator 真正起来
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8083/health || exit 1"]
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8030/health || exit 1"]
       interval: 10s
       timeout: 3s
       retries: 6

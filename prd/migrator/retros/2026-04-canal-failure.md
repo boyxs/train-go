@@ -87,7 +87,7 @@ docker start canal-master
 
 ```bash
 # 14:42:00
-curl http://migrator.internal:8083/migrator/tasks/12/lag
+curl http://migrator.internal:8030/migrator/tasks/12/lag
 # {"lagMs": 12000, "lastSyncAt": 1715234560000}
 # lag 12s 已经在收敛
 

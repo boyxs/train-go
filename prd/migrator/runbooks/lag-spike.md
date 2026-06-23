@@ -19,7 +19,7 @@
 
    ```bash
    # binlog 事件时间 vs 当前时间
-   curl http://migrator.internal:8083/migrator/tasks/$TASK_ID/lag
+   curl http://migrator.internal:8030/migrator/tasks/$TASK_ID/lag
    # 看 lastSyncAt 是否合理（毫秒戳，应该接近 now()）
    ```
 
@@ -47,7 +47,7 @@ mysql -e "SHOW MASTER STATUS\G"
 # 多次执行看 Position 增长速率
 
 # 3. Sink 是否反压（checkpoint 推进慢 / lag 不收敛）
-curl -s http://migrator.internal:8083/migrator/tasks/$TASK_ID/lag | jq '.data'
+curl -s http://migrator.internal:8030/migrator/tasks/$TASK_ID/lag | jq '.data'
 # dstLagMs 持续高 = Sink 写不动
 
 # 4. checkpoint 是否在更新

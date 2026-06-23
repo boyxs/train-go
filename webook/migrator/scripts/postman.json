@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "webook-migrator-e2e",
     "name": "Go",
-    "description": "webook-migrator v1 — 手动测试集（A0 授权登录 + 14 endpoint + 切流状态机 + 异构对账 + 任意源框架）\n\n## 鉴权（重要）\n\nmigrator 从 `Authorization: Bearer <token>` 头取 JWT（不是 x-access-token——后者只是登录响应头）。本 collection 在 Collection 级配了 Bearer Token = {{accessToken}}，所有请求自动带上，无需逐个加头。\n\ntoken 由 webook-core 颁发：先跑 A0.2 密码登录（或 A0.4 短信登录），测试脚本自动把 x-access-token / x-refresh-token 响应头写进 accessToken / refreshToken 变量。本地 migrator web.jwt.disabled=true 时不验签，可跳过 A0 直接打。\n\n## 用法\n\n1. （需鉴权时）先执行 A0.2 密码登录，自动回填 accessToken。\n2. 按 A1 → A12 顺序执行 A 段（同构 MySQL→MySQL 完整生命周期，覆盖全部 14 endpoint）。\n3. B1/B2/B3 演示异构方向（任意源框架）：B1 Mongo→MySQL、B2 MySQL→Mongo、B3 MySQL→ES。\n4. 请求里的 `{{migratorBaseUrl}}` / `{{coreBaseUrl}}` / `{{taskIdA}}` 等是 Postman 变量，在 Collection Variables 里改。\n\n## Collection Variables\n\n| key | 默认 | 说明 |\n|-----|------|------|\n| migratorBaseUrl | http://localhost:8083 | migrator 服务地址（直连） |\n| coreBaseUrl | http://localhost:8089 | webook-core 地址，A0 登录 / 注册接口在此 |\n| taskIdA | 1 | A 段 task id（A2 创建后回填） |\n| taskNameA | art_schema_v1 | A 段 task name；Redis stage/gray key 用它 |\n| taskIdB1/B2/B3 | (空) | B 段各任务 id |\n| taskNameB1/B2/B3 | user_mongo_to_mysql / article_to_mongo / art_to_es_v1 | B 段各 task name |\n| email / password | (空) | A0 密码登录凭据 |\n| accessToken / refreshToken | (空) | 登录后自动回填，无需手填 |\n\n## 与 README 对齐\n\n本 collection 编号 A1-A12 / B1-B3 与 `webook/migrator/README.md` 章节号一一对应。请求里的期望响应字段名（如 mismatchVO 的 camelCase）与 v1 实际 API 形态一致。",
+    "description": "webook-migrator v1 — 手动测试集（A0 授权登录 + 14 endpoint + 切流状态机 + 异构对账 + 任意源框架）\n\n## 鉴权（重要）\n\nmigrator 从 `Authorization: Bearer <token>` 头取 JWT（不是 x-access-token——后者只是登录响应头）。本 collection 在 Collection 级配了 Bearer Token = {{accessToken}}，所有请求自动带上，无需逐个加头。\n\ntoken 由 webook-core 颁发：先跑 A0.2 密码登录（或 A0.4 短信登录），测试脚本自动把 x-access-token / x-refresh-token 响应头写进 accessToken / refreshToken 变量。本地 migrator web.jwt.disabled=true 时不验签，可跳过 A0 直接打。\n\n## 用法\n\n1. （需鉴权时）先执行 A0.2 密码登录，自动回填 accessToken。\n2. 按 A1 → A12 顺序执行 A 段（同构 MySQL→MySQL 完整生命周期，覆盖全部 14 endpoint）。\n3. B1/B2/B3 演示异构方向（任意源框架）：B1 Mongo→MySQL、B2 MySQL→Mongo、B3 MySQL→ES。\n4. 请求里的 `{{migratorBaseUrl}}` / `{{coreBaseUrl}}` / `{{taskIdA}}` 等是 Postman 变量，在 Collection Variables 里改。\n\n## Collection Variables\n\n| key | 默认 | 说明 |\n|-----|------|------|\n| migratorBaseUrl | http://localhost:8030 | migrator 服务地址（直连） |\n| coreBaseUrl | http://localhost:8010 | webook-core 地址，A0 登录 / 注册接口在此 |\n| taskIdA | 1 | A 段 task id（A2 创建后回填） |\n| taskNameA | art_schema_v1 | A 段 task name；Redis stage/gray key 用它 |\n| taskIdB1/B2/B3 | (空) | B 段各任务 id |\n| taskNameB1/B2/B3 | user_mongo_to_mysql / article_to_mongo / art_to_es_v1 | B 段各 task name |\n| email / password | (空) | A0 密码登录凭据 |\n| accessToken / refreshToken | (空) | 登录后自动回填，无需手填 |\n\n## 与 README 对齐\n\n本 collection 编号 A1-A12 / B1-B3 与 `webook/migrator/README.md` 章节号一一对应。请求里的期望响应字段名（如 mismatchVO 的 camelCase）与 v1 实际 API 形态一致。",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -1644,15 +1644,15 @@
   "variable": [
     {
       "key": "migratorBaseUrl",
-      "value": "http://localhost:8083",
+      "value": "http://localhost:8030",
       "type": "string",
       "description": "webook-migrator 服务地址（直连，绕过 nginx）"
     },
     {
       "key": "coreBaseUrl",
-      "value": "http://localhost:8089",
+      "value": "http://localhost:8010",
       "type": "string",
-      "description": "webook-core 服务地址，A0 登录 / 注册等 token 颁发接口在此。core HTTP 默认 :8089（local.yaml 无 http.addr 时的兜底端口）"
+      "description": "webook-core 服务地址，A0 登录 / 注册等 token 颁发接口在此。core HTTP 默认 :8010（local.yaml 无 http.addr 时的兜底端口）"
     },
     {
       "key": "taskIdA",

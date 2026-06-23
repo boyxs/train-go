@@ -29,7 +29,7 @@
 1. **触发 rollback**
 
    ```bash
-   curl -X POST http://migrator.internal:8083/migrator/tasks/$TASK_ID/switch \
+   curl -X POST http://migrator.internal:8030/migrator/tasks/$TASK_ID/switch \
      -H "Authorization: Bearer $ADMIN_TOKEN_A" \
      -d '{"stage": "SRC_FIRST", "action": "rollback"}'
    ```
