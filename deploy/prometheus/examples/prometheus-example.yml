@@ -52,7 +52,7 @@ scrape_configs:
     scheme: http                     # http / https
     static_configs:
       - targets:
-          - 'webook:8089'            # 容器名:端口（docker 网络内）
+          - 'webook:8010'            # 容器名:端口（docker 网络内）
         labels:
           env: dev
           service: webook
@@ -84,9 +84,9 @@ scrape_configs:
   - job_name: 'webook-cluster'
     static_configs:
       - targets:
-          - 'webook-1:8089'
-          - 'webook-2:8089'
-          - 'webook-3:8089'
+          - 'webook-1:8010'
+          - 'webook-2:8010'
+          - 'webook-3:8010'
         labels: { env: prod, service: webook }
 
   # ─── MySQL / Redis / Kafka Exporter（已有 exporter 暴露 /metrics）──

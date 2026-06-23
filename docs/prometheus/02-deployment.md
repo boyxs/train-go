@@ -19,7 +19,7 @@ docker compose logs -f prometheus
 |------|------|------|
 | Prometheus UI | `http://虚拟机IP:9090` | PromQL 查询、Targets 状态 |
 | Grafana | `http://虚拟机IP:3001` | 可视化面板（admin/admin） |
-| webook /metrics | `http://localhost:8089/metrics` | 原始指标（给 Prometheus 抓的） |
+| webook /metrics | `http://localhost:8010/metrics` | 原始指标（给 Prometheus 抓的） |
 
 ## 配置文件说明
 
@@ -39,7 +39,7 @@ scrape_configs:
   - job_name: 'webook-app'           # webook 应用
     metrics_path: '/metrics'
     static_configs:
-      - targets: ['host.docker.internal:8089']  # Docker 容器访问宿主机
+      - targets: ['host.docker.internal:8010']  # Docker 容器访问宿主机
 
   - job_name: 'mysql'
     static_configs:

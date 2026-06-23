@@ -67,7 +67,7 @@ webook-core / webook-chat                    webook-migrator
 │                                                                    │
 │  ┌─────────────────┐   ┌─────────────────┐   ┌─────────────────┐  │
 │  │  webook-core    │   │  webook-chat    │   │ webook-migrator │  │
-│  │  :8081          │   │  :8189          │   │ :8083           │  │
+│  │  :8010          │   │  :8020          │   │ :8030           │  │
 │  │                 │   │                 │   │                 │  │
 │  │ ┌─────────────┐ │   │ ┌─────────────┐ │   │ ┌─────────────┐ │  │
 │  │ │ DAO 层      │ │   │ │ DAO 层      │ │   │ │ 14 endpoint │ │  │
@@ -1018,7 +1018,7 @@ migrator:
 docker compose --env-file deploy/.env.dev up -d
 
 # 1. 创建 task（D-3）
-curl -X POST http://localhost:8083/migrator/tasks \
+curl -X POST http://localhost:8030/migrator/tasks \
   -H "Authorization: Bearer $TOKEN" \
   -d '{
     "name": "published_article_v1",
@@ -1032,51 +1032,51 @@ curl -X POST http://localhost:8083/migrator/tasks \
 # → { "taskId": 1 }
 
 # 2. preflight 检查（D-3，建任务前的源检查，传 DSN + 表名，不收 taskId）
-curl -X POST http://localhost:8083/migrator/preflight \
+curl -X POST http://localhost:8030/migrator/preflight \
   -H "Authorization: Bearer $TOKEN" \
   -d '{"sourceDsnRef":"vault:src","tables":["article"]}'
 # → 检查 DSN 通 / 表结构对齐 / Canal 配置 / 监控就绪
 
 # 3. 全量启动（D-1）
-curl -X POST http://localhost:8083/migrator/tasks/1/start \
+curl -X POST http://localhost:8030/migrator/tasks/1/start \
   -H "Authorization: Bearer $TOKEN" \
   -d '{"phase": "full"}'
 # 监控：GET /tasks/1（status=2 表示 full_done）
 
 # 4. 增量启动（D-1，紧跟全量）
-curl -X POST http://localhost:8083/migrator/tasks/1/start \
+curl -X POST http://localhost:8030/migrator/tasks/1/start \
   -H "Authorization: Bearer $TOKEN" \
   -d '{"phase": "incr"}'
 # 监控：GET /tasks/1/lag（< 30000ms 即 30s）
 
 # 5. 对账采样（D0 前）
-curl -X POST http://localhost:8083/migrator/tasks/1/verify \
+curl -X POST http://localhost:8030/migrator/tasks/1/verify \
   -H "Authorization: Bearer $TOKEN" \
   -d '{"mode": "sample", "sampleRate": 0.01}'
 # → { "mismatch": 0 } 才推进
 
 # 6. 灰度推进（D0-D4，每天升一档）
-curl -X POST http://localhost:8083/migrator/tasks/1/gray \
+curl -X POST http://localhost:8030/migrator/tasks/1/gray \
   -H "Authorization: Bearer $TOKEN" \
   -d '{"percent": 10}'
 # 10 → 30 → 50 → 80 → 100
 
 # 7. cutover propose（D5，actorA）
-curl -X POST http://localhost:8083/migrator/tasks/1/switch \
+curl -X POST http://localhost:8030/migrator/tasks/1/switch \
   -H "Authorization: Bearer $TOKEN_A" \
   -H "X-Cutover-Approver: actorA" \
   -d '{"stage": "DST_ONLY", "action": "propose", "propose": "actorA"}'
 # → { "proposed_at": "...", "ttl": "10m" }
 
 # 8. cutover approve（D5，actorB，必须 actorA != actorB）
-curl -X POST http://localhost:8083/migrator/tasks/1/switch \
+curl -X POST http://localhost:8030/migrator/tasks/1/switch \
   -H "Authorization: Bearer $TOKEN_B" \
   -H "X-Cutover-Approver: actorB" \
   -d '{"stage": "DST_ONLY", "action": "approve", "approve": "actorB"}'
 # → { "stage": "DST_ONLY" }
 
 # 9. 任意步 rollback（紧急）
-curl -X POST http://localhost:8083/migrator/tasks/1/switch \
+curl -X POST http://localhost:8030/migrator/tasks/1/switch \
   -H "Authorization: Bearer $TOKEN" \
   -d '{"stage": "SRC_FIRST", "action": "rollback"}'
 # 业务读写瞬间回 OLD（gray=100 时无感）
@@ -1408,9 +1408,9 @@ docker compose -f deploy/docker-compose.yaml ps
 
 | 服务 | 端口 | 路由前缀 |
 |------|------|---------|
-| webook-core | :8090 | `/api/*`（业务） |
-| webook-chat | :8189 | `/chat/*` |
-| webook-migrator | :8083 | `/migrator/*` |
+| webook-core | :8010 | `/api/*`（业务） |
+| webook-chat | :8020 | `/chat/*` |
+| webook-migrator | :8030 | `/migrator/*` |
 | nginx | :80 | 反代上面三个 |
 | Grafana | :3000 | 监控面板 |
 | Prometheus | :9090 | 抓取 metrics |
@@ -1422,7 +1422,7 @@ docker compose -f deploy/docker-compose.yaml ps
 mysql -h localhost -u root -p13520 webook < webook/scripts/webook.sql
 
 # 1. 设默认 JWT 签发（本地跳 JWT 校验，yaml web.jwt.disabled=true）
-TOKEN=$(curl -s -X POST http://localhost:8081/users/login \
+TOKEN=$(curl -s -X POST http://localhost:8010/users/login \
   -d '{"email":"test@test.com","password":"test"}' \
   | jq -r '.token')
 
@@ -1443,13 +1443,13 @@ open http://localhost:3000  # admin/admin
 ```bash
 # 同时启动 full + incr（任意顺序，引擎独立）
 for phase in full incr; do
-  curl -X POST http://localhost:8083/migrator/tasks/1/start \
+  curl -X POST http://localhost:8030/migrator/tasks/1/start \
     -d "{\"phase\":\"$phase\"}"
 done
 
 # 等到 verify_mismatch_rate < 0.001%
 while true; do
-  RATE=$(curl -s http://localhost:8083/migrator/tasks/1/mismatch | jq '.rate')
+  RATE=$(curl -s http://localhost:8030/migrator/tasks/1/mismatch | jq '.rate')
   echo "mismatch_rate=$RATE"
   [ "$(echo "$RATE < 0.00001" | bc -l)" = "1" ] && break
   sleep 30
@@ -1457,7 +1457,7 @@ done
 
 # 自动灰度推进
 for p in 10 30 50 80 100; do
-  curl -X POST http://localhost:8083/migrator/tasks/1/gray -d "{\"percent\":$p}"
+  curl -X POST http://localhost:8030/migrator/tasks/1/gray -d "{\"percent\":$p}"
   sleep 600  # 10 min 观察期
 done
 ```
@@ -1484,10 +1484,10 @@ done
 
 ```bash
 # 1. 看当前 lag
-curl http://localhost:8083/migrator/tasks/1/lag
+curl http://localhost:8030/migrator/tasks/1/lag
 
 # 2. 看 Canal 状态
-curl http://localhost:8083/health
+curl http://localhost:8030/health
 # 看 binlog client 是否 connected
 
 # 3. 临时降业务峰值 qps（如能）
@@ -1496,7 +1496,7 @@ curl http://localhost:8083/health
 # kubectl rollout restart migrator
 
 # 4. 实在追不上 → rollback 灰度
-curl -X POST http://localhost:8083/migrator/tasks/1/gray -d '{"percent":0}'
+curl -X POST http://localhost:8030/migrator/tasks/1/gray -d '{"percent":0}'
 # 业务全部读 OLD，争取时间分析
 ```
 
@@ -1504,18 +1504,18 @@ curl -X POST http://localhost:8083/migrator/tasks/1/gray -d '{"percent":0}'
 
 ```bash
 # 1. 拉差异列表
-curl http://localhost:8083/migrator/tasks/1/mismatch?limit=20 \
+curl http://localhost:8030/migrator/tasks/1/mismatch?limit=20 \
   | jq '.list[]'
 
 # 2. 看差异类型分布
-curl http://localhost:8083/migrator/tasks/1/mismatch \
+curl http://localhost:8030/migrator/tasks/1/mismatch \
   | jq '[.list[] | .mismatch_kind] | group_by(.) | map({kind:.[0], count:length})'
 # 大量 "diff" → 双写时序问题（Version 乐观锁该启用了）
 # 大量 "missing" → 全量未完成或丢数据
 # 大量 "extra" → 反向 / 历史脏数据
 
 # 3. Repair 修复
-curl -X POST http://localhost:8083/migrator/tasks/1/repair \
+curl -X POST http://localhost:8030/migrator/tasks/1/repair \
   -d '{"strategy":"src_overwrite_dst","ids":[1,2,3]}'
 
 # 4. 大量差异（>1000）→ 别 repair，先停灰度，找原因

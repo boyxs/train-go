@@ -13,7 +13,7 @@ npm run lint:fix     # ESLint 自动修复
 ## 导航
 
 ```
-路由 (app/) → 页面 (views/) → API (api/) → 后端 (localhost:8089)
+路由 (app/) → 页面 (views/) → API (api/) → 后端 (localhost:8010)
                   ↓
           组件 (components/) + Hooks (hooks/)
 ```

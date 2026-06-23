@@ -57,7 +57,7 @@ curl -s sink-host/health
 
 ```bash
 # 单批重放（默认 1000 条）
-curl -X POST http://migrator.internal:8083/migrator/tasks/$TASK_ID/replay-dl \
+curl -X POST http://migrator.internal:8030/migrator/tasks/$TASK_ID/replay-dl \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -d '{"limit": 1000}'
 

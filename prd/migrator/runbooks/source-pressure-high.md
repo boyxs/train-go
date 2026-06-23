@@ -19,7 +19,7 @@
 1. **降全量限速**（如果在全量阶段）
 
    ```bash
-   curl -X POST http://migrator.internal:8083/migrator/tasks/$TASK_ID/throttle \
+   curl -X POST http://migrator.internal:8030/migrator/tasks/$TASK_ID/throttle \
      -H "Authorization: Bearer $ADMIN_TOKEN" \
      -d '{"qps": 1000, "shard_workers": 4}'
    # 默认 16 worker × 5k qps = 80k；降到 4 × 1k = 4k
@@ -29,7 +29,7 @@
 
    ```bash
    # 任务配置里应该是 readonly DSN
-   curl http://migrator.internal:8083/migrator/tasks/$TASK_ID | jq '.data.task.sourceDsnRef'
+   curl http://migrator.internal:8030/migrator/tasks/$TASK_ID | jq '.data.task.sourceDsnRef'
    # 应该指向 readonly endpoint，不是 master
    ```
 
@@ -46,7 +46,7 @@ mysql -h source -e "SHOW PROCESSLIST" | head -30
 mysql -h source -e "SELECT * FROM information_schema.processlist WHERE COMMAND != 'Sleep' AND TIME > 5\G"
 
 # 3. webook-migrator 全量进度推进速度（API 查 checkpoint）
-curl -s http://migrator.internal:8083/migrator/tasks/$TASK_ID | jq '.data.checkpoints[].progress_percent'
+curl -s http://migrator.internal:8030/migrator/tasks/$TASK_ID | jq '.data.checkpoints[].progress_percent'
 
 # 4. 主从延迟
 mysql -h replica -e "SHOW SLAVE STATUS\G" | grep Seconds_Behind_Master
@@ -74,7 +74,7 @@ mysql -h replica -e "SHOW SLAVE STATUS\G" | grep Seconds_Behind_Master
 如果限速无效，业务受严重影响：
 
 ```bash
-curl -X POST http://migrator.internal:8083/migrator/tasks/$TASK_ID/pause \
+curl -X POST http://migrator.internal:8030/migrator/tasks/$TASK_ID/pause \
 # task 暂停，全量 worker 退出，checkpoint 持久化
 # 业务恢复后 POST /start {phase: full} 续传
 ```

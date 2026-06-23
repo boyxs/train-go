@@ -9,7 +9,7 @@ etcd:
   type: "yaml"
 
 http:
-  addr: ":8189"
+  addr: ":8020"
 
 grpc:
   client:

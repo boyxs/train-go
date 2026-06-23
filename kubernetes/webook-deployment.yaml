@@ -23,6 +23,6 @@ spec:
           image: train/webook:1.0.0
           imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 8089
+            - containerPort: 8010
       restartPolicy: Always # OnFailure
       

@@ -10,7 +10,7 @@ etcd:
   type: "yaml"
 
 http:
-  addr: ":8083"
+  addr: ":8030"
 
 # dev 起着 webook-core 签发 token；JWT 校验生效
 web:

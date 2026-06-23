@@ -29,10 +29,10 @@ func main() {
 	}
 	defer cleanup()
 
-	// http.addr 由 yaml 提供；fallback 仅在漏配时兜底（与 chat :8189、core :8081 错开）
+	// http.addr 由 yaml 提供；fallback 仅在漏配时兜底（与 chat :8020、core :8010 错开）
 	addr := viper.GetString("http.addr")
 	if addr == "" {
-		addr = ":8083"
+		addr = ":8030"
 	}
 	log.Printf("[migrator] listening on %s", addr)
 	if err := app.Server.Run(addr); err != nil {

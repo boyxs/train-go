@@ -9,7 +9,7 @@ etcd:
   type: "yaml"
 
 http:
-  addr: ":8189"
+  addr: ":8020"
 
 # 主仓 webook-core gRPC server 地址（chat 工具调用 search/article/interaction 走这里）
 grpc:

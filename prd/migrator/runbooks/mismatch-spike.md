@@ -88,7 +88,7 @@ mysql webook_migrator -e "
 
 ```bash
 # 自动修复（src 覆盖 dst）
-curl -X POST http://migrator.internal:8083/migrator/tasks/$TASK_ID/repair \
+curl -X POST http://migrator.internal:8030/migrator/tasks/$TASK_ID/repair \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -d '{
     "strategy": "src_overwrite_dst",

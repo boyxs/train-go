@@ -32,7 +32,7 @@ func main() {
 	// http.addr 由 yaml 提供；这里 fallback 仅在 yaml 漏配时兜底，避免 nil 监听
 	addr := viper.GetString("http.addr")
 	if addr == "" {
-		addr = ":8189"
+		addr = ":8020"
 	}
 	log.Printf("[chat] listening on %s", addr)
 	if err := app.Server.Run(addr); err != nil {

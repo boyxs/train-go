@@ -48,5 +48,5 @@ help:
 # Service 创建的另一种方式（如果不想用 YAML，用命令行创建）：
 #   if ! kubectl get svc webook-record > /dev/null 2>&1; then
 #     kubectl expose deployment webook-record \
-#       --type=NodePort --port=8089 --target-port=8089 --name=webook-record
+#       --type=NodePort --port=8010 --target-port=8010 --name=webook-record
 #   fi

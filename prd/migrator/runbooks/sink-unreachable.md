@@ -81,7 +81,7 @@ mysql webook_migrator -e "SELECT COUNT(*) FROM dead_letter WHERE task_id=$TASK_I
 # 隔 1 min 两次，期望行数不再增长
 
 # 3. 死信重放
-curl -X POST http://migrator.internal:8083/migrator/tasks/$TASK_ID/replay-dl \
+curl -X POST http://migrator.internal:8030/migrator/tasks/$TASK_ID/replay-dl \
 
 # 4. 跑 verify 确认对账
 curl -X POST .../tasks/$TASK_ID/verify -d '{"mode":"sample","sampleRate":0.001}'

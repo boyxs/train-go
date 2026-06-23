@@ -59,7 +59,7 @@ func main() {
 	// HTTP server 用 http.Server(而非 engine.Run)以支持优雅关闭
 	httpAddr := viper.GetString("http.addr")
 	if httpAddr == "" {
-		httpAddr = ":8089"
+		httpAddr = ":8010"
 	}
 	httpSrv := &http.Server{Addr: httpAddr, Handler: app.Server}
 	go func() {

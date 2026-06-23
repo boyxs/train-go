@@ -1,5 +1,5 @@
 # chat dev 环境配置（同构 internal/config/dev.yaml）
-# 差异点：http.addr=8189 / grpc.coreAddr 指主仓 / serviceName=webook-chat
+# 差异点：http.addr=8020 / grpc.coreAddr 指主仓 / serviceName=webook-chat
 # 数据库与主仓共享同一份 webook 库（不分库），靠表名隔离
 
 # 远程配置中心：与主仓共用 etcd 实例，path 独立（/webook-chat 不踩 /webook）
@@ -10,7 +10,7 @@ etcd:
   type: "yaml"
 
 http:
-  addr: ":8189"
+  addr: ":8020"
 
 # 主仓 webook-core gRPC server（chat 工具调用走这里）
 grpc:
