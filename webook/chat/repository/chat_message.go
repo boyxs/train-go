@@ -18,6 +18,8 @@ type MessageRepository interface {
 	ListRecentLite(ctx context.Context, convId int64, limit int) ([]domain.Message, error)
 	ListBefore(ctx context.Context, convId int64, beforeId int64, limit int) ([]domain.Message, error)
 	ListAll(ctx context.Context, convId int64) ([]domain.Message, error)
+	// Delete 软删除消息（清理生成中断残留的空占位行）
+	Delete(ctx context.Context, convId int64, id int64) error
 }
 
 type CacheMessageRepository struct {
@@ -110,6 +112,17 @@ func (r *CacheMessageRepository) ListAll(ctx context.Context, convId int64) ([]d
 		return nil, err
 	}
 	return r.toDomainSlice(entities), nil
+}
+
+func (r *CacheMessageRepository) Delete(ctx context.Context, convId int64, id int64) error {
+	if err := r.dao.Delete(ctx, convId, id); err != nil {
+		return err
+	}
+	// 写后清缓存（Cache-Aside），失败仅记日志
+	if delErr := r.cache.Del(ctx, convId); delErr != nil {
+		r.l.Error("清除消息缓存失败", logger.Int64("convId", convId), logger.Error(delErr))
+	}
+	return nil
 }
 
 func (r *CacheMessageRepository) toDomainSlice(entities []dao.Message) []domain.Message {

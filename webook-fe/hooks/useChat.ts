@@ -321,10 +321,22 @@ export function useChat(conversationId: number | null) {
             }
             return updated;
           });
-          // 生成完成，清除 buffer
-          setTimeout(() => {
-            bufferRef.current.delete(convId);
-          }, 1000);
+          // 生成完成：重新拉取权威消息固化进 serverMessages 并清空 pending。
+          // 否则本轮只活在 pendingMessages 里，下一次 send 的 setPendingMessages 会覆盖丢失。
+          chatApi
+            .listMessages(convId, 0, PAGE_SIZE)
+            .then((res) => {
+              if (res.data.code === 0 && activeIdRef.current === convId) {
+                const list = res.data.data ?? [];
+                setServerMessages(list);
+                setHasMore(list.length >= PAGE_SIZE);
+                setPendingMessages([]);
+              }
+              bufferRef.current.delete(convId);
+            })
+            .catch(() => {
+              bufferRef.current.delete(convId);
+            });
           controllerRef.current = null;
         },
         onError: (err) => {

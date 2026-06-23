@@ -282,6 +282,11 @@ func (s *AIChatService) buildPrompt(ctx context.Context, convId int64) ([]llm.Ch
 		Content: systemPrompt,
 	})
 	for _, m := range recentMsgs {
+		// 跳过空 assistant 消息：生成被中断前内容为空的占位行会残留 DB，
+		// 带入 LLM 会违反 DeepSeek "assistant 必须有 content 或 tool_calls" 约束 → 400
+		if m.Role == "assistant" && m.Content == "" {
+			continue
+		}
 		messages = append(messages, llm.ChatMessage{
 			Role:    m.Role,
 			Content: m.Content,
@@ -586,6 +591,13 @@ func (s *AIChatService) finalizeReply(msgId int64, convId int64, uid int64, repl
 	if msgId <= 0 {
 		return
 	}
+	// 正常结束但无内容且无工具结果：删除空占位，避免脏数据（同 savePartialReply）
+	if reply == "" && len(toolResults) == 0 {
+		if err := s.msgRepo.Delete(context.Background(), convId, msgId); err != nil {
+			s.l.Error("删除空占位消息失败", logger.Int64("msgId", msgId), logger.Error(err))
+		}
+		return
+	}
 	var toolCallsJSON string
 	if len(toolResults) > 0 {
 		b, err := json.Marshal(toolResults)
@@ -603,7 +615,14 @@ func (s *AIChatService) finalizeReply(msgId int64, convId int64, uid int64, repl
 
 // savePartialReply 异常退出时立即保存最新内容到 placeholder（补 onFlush 的 2 秒间隔差）
 func (s *AIChatService) savePartialReply(msgId int64, convId int64, content string) {
-	if msgId <= 0 || content == "" {
+	if msgId <= 0 {
+		return
+	}
+	// 中断时无任何内容：删除空占位行，避免残留脏数据带入下次 LLM prompt（DeepSeek 400）
+	if content == "" {
+		if err := s.msgRepo.Delete(context.Background(), convId, msgId); err != nil {
+			s.l.Error("删除空占位消息失败", logger.Int64("msgId", msgId), logger.Error(err))
+		}
 		return
 	}
 	if err := s.msgRepo.UpdateContent(context.Background(), convId, msgId, content, ""); err != nil {

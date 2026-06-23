@@ -113,19 +113,24 @@ export function sendMessageSSE(
     .then(async (response) => {
       clearTimeout(connectTimer);
 
-      if (!response.ok || !response.body) {
-        callbacks.onError({ code: response.status, msg: '连接失败' });
-        return;
-      }
-
-      // 后端业务错误返回 JSON（非 SSE），需要提前识别
+      // 非 SSE 响应即错误：后端返回 JSON {code,msg}（429 限流 / 401 / 400 / 500）。
+      // 先读 body 拿后端文案，读不到再按状态码兜底（避免 429 笼统报「连接失败」）。
       const contentType = response.headers.get('Content-Type') || '';
-      if (!contentType.includes('text/event-stream')) {
-        const json = await response.json();
-        callbacks.onError({
-          code: json.code ?? 0,
-          msg: json.msg || '请求失败',
-        });
+      if (
+        !response.ok ||
+        !contentType.includes('text/event-stream') ||
+        !response.body
+      ) {
+        let code = response.status;
+        let msg = '连接失败';
+        try {
+          const json = await response.json();
+          code = json.code ?? response.status;
+          msg = json.msg || msg;
+        } catch {
+          // body 非 JSON（如 nginx 502 HTML），保留状态码兜底
+        }
+        callbacks.onError({ code, msg });
         return;
       }
 
