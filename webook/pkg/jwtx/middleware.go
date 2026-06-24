@@ -76,7 +76,7 @@ func (b *MiddlewareBuilder) Parse(ctx *gin.Context) (UserClaims, bool) {
 	if uc.UserAgent != ctx.GetHeader(HeaderUserAgent) {
 		return UserClaims{}, false
 	}
-	if b.cfg.Session != nil && b.cfg.Session(ctx, uc.Ssid) {
+	if b.cfg.Cmd != nil && ssidLoggedOut(ctx, b.cfg.Cmd, b.cfg.SsidKeyPattern, uc.Ssid) {
 		return UserClaims{}, false
 	}
 	return uc, true

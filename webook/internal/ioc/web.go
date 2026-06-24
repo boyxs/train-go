@@ -2,7 +2,6 @@ package ioc
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
 
@@ -120,12 +119,10 @@ func loggerMiddleware(l logger.LoggerX) gin.HandlerFunc {
 func loginJwtMiddleware(cmd redis.Cmdable) gin.HandlerFunc {
 	// 验签走 pkg/jwtx 公共中间件，跨服务一致；签发由 jwtx.Handler 在登录 handler 内完成
 	return jwtx.NewMiddlewareBuilder(jwtx.MiddlewareConfig{
-		AccessKey: consts.AccessKey,
-		UserKey:   consts.UserKey,
-		Session: func(ctx *gin.Context, ssid string) bool {
-			cnt, err := cmd.Exists(ctx, fmt.Sprintf(consts.UserSsidPattern, ssid)).Result()
-			return err == nil && cnt > 0
-		},
+		AccessKey:      consts.AccessKey,
+		UserKey:        consts.UserKey,
+		Cmd:            cmd,
+		SsidKeyPattern: consts.UserSsidPattern,
 	}).
 		IgnoredPaths("/user/register",
 			"/user/login",

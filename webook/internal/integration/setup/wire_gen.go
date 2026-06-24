@@ -7,8 +7,6 @@
 package setup
 
 import (
-	"fmt"
-
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
@@ -245,12 +243,10 @@ func provideTestMiddlewares(l logger.LoggerX, cmd redis.Cmdable, tp trace.Tracer
 		WithCounter().WithHistogram().WithSummary().WithInFlight().
 		Registry(prometheus2.NewRegistry()).
 		Build(), otelgin.Middleware("webook-test", otelgin.WithTracerProvider(tp)), cors.New(cors.Config{AllowOriginFunc: func(string) bool { return true }}), jwtx.NewMiddlewareBuilder(jwtx.MiddlewareConfig{
-		AccessKey: consts.AccessKey,
-		UserKey:   consts.UserKey,
-		Session: func(ctx *gin.Context, ssid string) bool {
-			cnt, err := cmd.Exists(ctx, fmt.Sprintf(consts.UserSsidPattern, ssid)).Result()
-			return err == nil && cnt > 0
-		},
+		AccessKey:      consts.AccessKey,
+		UserKey:        consts.UserKey,
+		Cmd:            cmd,
+		SsidKeyPattern: consts.UserSsidPattern,
 	}).
 		IgnoredPaths("/user/register", "/user/login", "/user/refresh_token",
 			"/user/login_sms/code/send", "/user/login_sms",

@@ -2,7 +2,6 @@ package ioc
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
 
@@ -68,12 +67,10 @@ func InitMiddlewares(l logger.LoggerX, cmd redis.Cmdable, tp trace.TracerProvide
 		}),
 		// 4. JWT 验签（pkg/jwtx 公共实现，所有服务共用）
 		jwtx.NewMiddlewareBuilder(jwtx.MiddlewareConfig{
-			AccessKey: consts.AccessKey,
-			UserKey:   consts.UserKey,
-			Session: func(ctx *gin.Context, ssid string) bool {
-				cnt, err := cmd.Exists(ctx, fmt.Sprintf(consts.UserSsidPattern, ssid)).Result()
-				return err == nil && cnt > 0
-			},
+			AccessKey:      consts.AccessKey,
+			UserKey:        consts.UserKey,
+			Cmd:            cmd,
+			SsidKeyPattern: consts.UserSsidPattern,
 		}).Build(),
 		// 5. Access log（chat yaml 没配 web.logger 段时仅记基础四元组，不抓 req/res body）
 		loggerMiddleware(l),
