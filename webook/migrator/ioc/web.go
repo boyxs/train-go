@@ -2,7 +2,6 @@ package ioc
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
 
@@ -91,12 +90,10 @@ func InitMiddlewares(
 	}
 	if !viper.GetBool("web.jwt.disabled") {
 		mws = append(mws, jwtx.NewMiddlewareBuilder(jwtx.MiddlewareConfig{
-			AccessKey: consts.AccessKey,
-			UserKey:   consts.UserKey,
-			Session: func(ctx *gin.Context, ssid string) bool {
-				cnt, err := cmd.Exists(ctx, fmt.Sprintf(consts.UserSsidPattern, ssid)).Result()
-				return err == nil && cnt > 0
-			},
+			AccessKey:      consts.AccessKey,
+			UserKey:        consts.UserKey,
+			Cmd:            cmd,
+			SsidKeyPattern: consts.UserSsidPattern,
 		}).Build())
 	}
 	// Rate limit：默认 IP 级，1 秒 100 请求；yaml `web.ratelimit.{interval,rate}` 可覆盖。

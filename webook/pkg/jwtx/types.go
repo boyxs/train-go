@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	stdjwt "github.com/golang-jwt/jwt/v5"
+	"github.com/redis/go-redis/v9"
 )
 
 // UserClaims 标准用户身份载荷（access token payload）。
@@ -24,15 +25,13 @@ type RefreshClaims struct {
 	Ssid   string
 }
 
-// SessionChecker 校验 ssid 是否被登出黑名单。
-// 返回 true = 已登出（拒绝放行），false = 有效。
-type SessionChecker func(ctx *gin.Context, ssid string) bool
-
 // MiddlewareConfig 验签中间件配置。
+// Cmd + SsidKeyPattern 用于查登出黑名单；pkg/jwtx 不依赖业务 consts，pattern 由调用方注入。
 type MiddlewareConfig struct {
-	AccessKey []byte
-	UserKey   string
-	Session   SessionChecker
+	AccessKey      []byte
+	UserKey        string
+	Cmd            redis.Cmdable // 查 ssid 登出黑名单；nil 则跳过 session 校验
+	SsidKeyPattern string        // 登出黑名单 redis key，含 %s，e.g. "user:ssid:%s"
 }
 
 // Handler JWT 处理器接口（签发 + 提取 + 校验 + 登出）。

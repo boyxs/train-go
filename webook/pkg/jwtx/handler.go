@@ -1,6 +1,7 @@
 package jwtx
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -75,15 +76,17 @@ func (h *RedisHandler) ExtractToken(ctx *gin.Context) string {
 }
 
 func (h *RedisHandler) CheckSession(ctx *gin.Context, ssid string) error {
-	cnt, err := h.cmd.Exists(ctx, fmt.Sprintf(h.cfg.SsidKeyPattern, ssid)).Result()
-	if err != nil {
-		// Redis 不可用时容错放行，宁可放行不可误判已登录用户为未登录
-		return nil
-	}
-	if cnt > 0 {
+	if ssidLoggedOut(ctx, h.cmd, h.cfg.SsidKeyPattern, ssid) {
 		return ErrTokenInvalid
 	}
 	return nil
+}
+
+// ssidLoggedOut 查 ssid 是否在登出黑名单（验签中间件与 Handler.CheckSession 共用同一份查询）。
+// 返回 true = 已登出。Redis 不可达时容错返回 false（宁可放行不可误判已登录用户为未登录）。
+func ssidLoggedOut(ctx context.Context, cmd redis.Cmdable, pattern, ssid string) bool {
+	cnt, err := cmd.Exists(ctx, fmt.Sprintf(pattern, ssid)).Result()
+	return err == nil && cnt > 0
 }
 
 func (h *RedisHandler) ClearToken(ctx *gin.Context) error {
