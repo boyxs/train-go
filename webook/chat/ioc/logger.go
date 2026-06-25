@@ -8,7 +8,6 @@ import (
 	"go.uber.org/zap/zapcore"
 
 	"github.com/webook/pkg/ginx"
-	"github.com/webook/pkg/grpcx/interceptor"
 	"github.com/webook/pkg/logger"
 )
 
@@ -40,6 +39,5 @@ func InitLogger() logger.LoggerX {
 	l.Sugar().Infof("[chat] logger config: %+v", cfg)
 	lx := logger.NewZapLogger(l)
 	ginx.L = lx
-	interceptor.L = lx
 	return lx
 }

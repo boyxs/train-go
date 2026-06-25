@@ -1,4 +1,4 @@
-package interceptor
+package errconv
 
 import (
 	"context"
@@ -57,7 +57,7 @@ func startBufServer(t *testing.T, srvErr error, srvOpts ...grpc.ServerOption) (*
 	conn, err := grpc.NewClient("passthrough://bufnet",
 		grpc.WithContextDialer(dialer),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithUnaryInterceptor(UnaryClientError()),
+		grpc.WithUnaryInterceptor(UnaryClientInterceptor()),
 	)
 	require.NoError(t, err)
 
@@ -71,7 +71,7 @@ func startBufServer(t *testing.T, srvErr error, srvOpts ...grpc.ServerOption) (*
 // 5.1 server: handler 返 *errs.Error{Code:404} → 客户端 status.Code(err)==NotFound
 func TestUnaryServerInterceptor_BizError_ConvertsToStatus(t *testing.T) {
 	be := errs.New(404, "用户不存在")
-	conn, cleanup := startBufServer(t, be, grpc.UnaryInterceptor(UnaryServerError()))
+	conn, cleanup := startBufServer(t, be, grpc.UnaryInterceptor(UnaryServerInterceptor(nil)))
 	defer cleanup()
 
 	client := healthpb.NewHealthClient(conn)
@@ -91,7 +91,7 @@ func TestUnaryServerInterceptor_BizError_ConvertsToStatus(t *testing.T) {
 func TestUnaryServerInterceptor_PlainError_ConvertsToInternal(t *testing.T) {
 	const sensitive = "DSN=root:pass@tcp(internal-db:3306)/secret"
 	conn, cleanup := startBufServer(t, errors.New(sensitive),
-		grpc.UnaryInterceptor(UnaryServerError()))
+		grpc.UnaryInterceptor(UnaryServerInterceptor(nil)))
 	defer cleanup()
 
 	client := healthpb.NewHealthClient(conn)
@@ -108,7 +108,7 @@ func TestUnaryServerInterceptor_PlainError_ConvertsToInternal(t *testing.T) {
 
 // 5.3 server: nil err 透传
 func TestUnaryServerInterceptor_NilErr_PassesThrough(t *testing.T) {
-	conn, cleanup := startBufServer(t, nil, grpc.UnaryInterceptor(UnaryServerError()))
+	conn, cleanup := startBufServer(t, nil, grpc.UnaryInterceptor(UnaryServerInterceptor(nil)))
 	defer cleanup()
 
 	client := healthpb.NewHealthClient(conn)
@@ -138,7 +138,7 @@ func TestUnaryClientInterceptor_StatusError_WrapsToBizError(t *testing.T) {
 //	客户端 client interceptor 转回 *errs.Error，Code/Message 无损
 func TestRoundTrip_BizError_ServerToClient(t *testing.T) {
 	original := errs.New(409, "邮箱已被注册")
-	conn, cleanup := startBufServer(t, original, grpc.UnaryInterceptor(UnaryServerError()))
+	conn, cleanup := startBufServer(t, original, grpc.UnaryInterceptor(UnaryServerInterceptor(nil)))
 	defer cleanup()
 
 	client := healthpb.NewHealthClient(conn)
@@ -163,7 +163,7 @@ func TestUnaryClientInterceptor_NilErr_PassesThrough(t *testing.T) {
 	conn, err := grpc.NewClient("passthrough://bufnet",
 		grpc.WithContextDialer(func(ctx context.Context, _ string) (net.Conn, error) { return lis.DialContext(ctx) }),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithUnaryInterceptor(UnaryClientError()),
+		grpc.WithUnaryInterceptor(UnaryClientInterceptor()),
 	)
 	require.NoError(t, err)
 	defer conn.Close()
@@ -174,7 +174,7 @@ func TestUnaryClientInterceptor_NilErr_PassesThrough(t *testing.T) {
 	assert.NotNil(t, resp)
 }
 
-// recLogger 记录各级别调用次数，验证 UnaryServerError 的日志分级。
+// recLogger 记录各级别调用次数，验证 UnaryServerInterceptor 的日志分级。
 type recLogger struct {
 	debugN, infoN, warnN, errorN int
 }
@@ -187,11 +187,7 @@ func (r *recLogger) Error(string, ...logger.Field) { r.errorN++ }
 // 5.7 客户端取消（context.Canceled）：降级 Debug 不刷 ERROR，回 codes.Canceled 而非 Internal。
 func TestUnaryServerError_ClientCanceled_DebugNotError(t *testing.T) {
 	rec := &recLogger{}
-	old := L
-	L = rec
-	defer func() { L = old }()
-
-	intercept := UnaryServerError()
+	intercept := UnaryServerInterceptor(rec)
 	handler := func(_ context.Context, _ any) (any, error) {
 		// 真实链路：向量化查询失败 -> do request -> context canceled
 		return nil, fmt.Errorf("向量化查询失败: %w", context.Canceled)
@@ -207,11 +203,7 @@ func TestUnaryServerError_ClientCanceled_DebugNotError(t *testing.T) {
 // 5.8 非取消的系统错误仍记 ERROR + 转 Internal（回归保护）。
 func TestUnaryServerError_SystemError_StillError(t *testing.T) {
 	rec := &recLogger{}
-	old := L
-	L = rec
-	defer func() { L = old }()
-
-	intercept := UnaryServerError()
+	intercept := UnaryServerInterceptor(rec)
 	handler := func(_ context.Context, _ any) (any, error) {
 		return nil, errors.New("db connection broken")
 	}

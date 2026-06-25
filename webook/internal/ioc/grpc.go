@@ -15,7 +15,8 @@ import (
 	searchv1 "github.com/webook/api/gen/search/v1"
 	grpcsrv "github.com/webook/internal/grpc"
 	"github.com/webook/pkg/grpcx"
-	"github.com/webook/pkg/grpcx/interceptor"
+	"github.com/webook/pkg/grpcx/interceptor/errconv"
+	"github.com/webook/pkg/grpcx/interceptor/metrics"
 )
 
 // InitGRPCServer 组装 server 并注册所有 gRPC service，由 main 起 goroutine 监听。
@@ -38,9 +39,12 @@ func InitGRPCServer(
 		TTL:    viper.GetInt64("grpc.server.ttl"),
 		Weight: viper.GetInt("grpc.server.weight"),
 	}
+	grpcMetrics := metrics.NewPrometheusBuilder("webook", "grpc", "requests", "gRPC 请求").
+		WithCounter().WithHistogram().WithInFlight()
 	srv := grpcx.NewServer(cfg, client, l,
 		grpc.StatsHandler(otelgrpc.NewServerHandler()),
-		grpc.UnaryInterceptor(interceptor.UnaryServerError()),
+		// metrics 在外层：观测 errconv 转换后的最终 status code
+		grpc.ChainUnaryInterceptor(grpcMetrics.BuildUnaryServer(), errconv.UnaryServerInterceptor(l)),
 	)
 	searchv1.RegisterSearchServiceServer(srv.Server, searchSrv)
 	articlev1.RegisterArticleReaderServiceServer(srv.Server, articleSrv)

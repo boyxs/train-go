@@ -4,6 +4,15 @@
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
+  # 由 .env.<env> 的 DEPLOY_ENV 透传到 webook 应用、otel trace；
+  # prometheus 配置是静态文件，需要 env 区分指标时手动改或用 file_sd_configs
+  external_labels:
+    cluster: "webook"
+
+# Recording Rules 目录（项目用 Grafana Alerting，Prometheus 这边只放预计算规则）
+# 空目录时 Prometheus 也能正常跑，不报错
+rule_files:
+  - rules/*.rules.yml
 
 scrape_configs:
   - job_name: 'prometheus'
@@ -21,3 +30,14 @@ scrape_configs:
     metrics_path: '/metrics'
     static_configs:
       - targets: ['localhost:8020']
+
+  # OTel Collector 自监控（需在 collector config 里 telemetry.metrics.address 暴露）
+  - job_name: 'otel-collector'
+    static_configs:
+      - targets: ['127.0.0.1:8888']
+
+  # Zipkin 自监控（micrometer 暴露在 /prometheus；slim 版无此端点）
+  - job_name: 'zipkin'
+    metrics_path: '/prometheus'
+    static_configs:
+      - targets: ['127.0.0.1:9411']
