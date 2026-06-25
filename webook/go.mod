@@ -13,6 +13,7 @@ require (
 	github.com/elastic/go-elasticsearch/v8 v8.19.6
 	github.com/gin-contrib/cors v1.7.6
 	github.com/gin-gonic/gin v1.11.0
+	github.com/go-kratos/aegis v0.2.0
 	github.com/go-mysql-org/go-mysql v1.15.0
 	github.com/go-sql-driver/mysql v1.9.3
 	github.com/golang-jwt/jwt/v5 v5.3.1

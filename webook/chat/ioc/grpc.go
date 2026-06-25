@@ -7,7 +7,8 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/webook/pkg/grpcx"
-	"github.com/webook/pkg/grpcx/interceptor"
+	"github.com/webook/pkg/grpcx/interceptor/errconv"
+	"github.com/webook/pkg/grpcx/interceptor/metrics"
 
 	articlev1 "github.com/webook/api/gen/article/v1"
 	interactionv1 "github.com/webook/api/gen/interaction/v1"
@@ -23,9 +24,11 @@ func InitCoreConn(client *etcdv3.Client) (CoreConn, func(), error) {
 	if err != nil {
 		return CoreConn{}, nil, err
 	}
+	grpcMetrics := metrics.NewPrometheusBuilder("webook", "grpc", "requests", "gRPC 请求").
+		WithCounter().WithHistogram().WithInFlight()
 	conn, cleanup, err := grpcx.NewClient(client, cfg,
 		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
-		grpc.WithUnaryInterceptor(interceptor.UnaryClientError()),
+		grpc.WithChainUnaryInterceptor(grpcMetrics.BuildUnaryClient(), errconv.UnaryClientInterceptor()),
 	)
 	if err != nil {
 		return CoreConn{}, nil, err

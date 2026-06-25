@@ -1,0 +1,151 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [],
+  "panels": [
+    {
+      "title": "gRPC QPS",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "sum(rate(webook_grpc_requests_total{job=~\"$service\"}[5m]))", "legendFormat": "QPS" }],
+      "fieldConfig": { "defaults": { "unit": "reqps", "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 100 }, { "color": "red", "value": 500 }] } }, "overrides": [] }
+    },
+    {
+      "title": "错误率（非 OK）",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "sum(rate(webook_grpc_requests_total{job=~\"$service\", code!=\"OK\"}[5m])) / sum(rate(webook_grpc_requests_total{job=~\"$service\"}[5m])) * 100", "legendFormat": "error %" }],
+      "fieldConfig": { "defaults": { "unit": "percent", "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 1 }, { "color": "red", "value": 5 }] } }, "overrides": [] }
+    },
+    {
+      "title": "P99 延迟",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "histogram_quantile(0.99, sum(rate(webook_grpc_requests_duration_seconds_bucket{job=~\"$service\"}[5m])) by (le))", "legendFormat": "P99" }],
+      "fieldConfig": { "defaults": { "unit": "s", "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 0.25 }, { "color": "red", "value": 1 }] } }, "overrides": [] }
+    },
+    {
+      "title": "在途请求",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "sum(webook_grpc_requests_in_flight{job=~\"$service\"})", "legendFormat": "in-flight" }],
+      "fieldConfig": { "defaults": { "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 50 }, { "color": "red", "value": 200 }] } }, "overrides": [] }
+    },
+    {
+      "title": "QPS（按方法）",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "sum(rate(webook_grpc_requests_total{job=~\"$service\"}[5m])) by (service, method)", "legendFormat": "{{service}}/{{method}}" }],
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] }
+    },
+    {
+      "title": "延迟分位数",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, sum(rate(webook_grpc_requests_duration_seconds_bucket{job=~\"$service\"}[5m])) by (le))", "legendFormat": "P50" },
+        { "expr": "histogram_quantile(0.90, sum(rate(webook_grpc_requests_duration_seconds_bucket{job=~\"$service\"}[5m])) by (le))", "legendFormat": "P90" },
+        { "expr": "histogram_quantile(0.95, sum(rate(webook_grpc_requests_duration_seconds_bucket{job=~\"$service\"}[5m])) by (le))", "legendFormat": "P95" },
+        { "expr": "histogram_quantile(0.99, sum(rate(webook_grpc_requests_duration_seconds_bucket{job=~\"$service\"}[5m])) by (le))", "legendFormat": "P99" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] }
+    },
+    {
+      "title": "状态码分布（code）",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "sum(rate(webook_grpc_requests_total{job=~\"$service\"}[5m])) by (code)", "legendFormat": "{{code}}" }],
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "drawStyle": "bars", "fillOpacity": 80, "stacking": { "mode": "normal" } } }, "overrides": [] }
+    },
+    {
+      "title": "P99 延迟（按方法）",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "histogram_quantile(0.99, sum(rate(webook_grpc_requests_duration_seconds_bucket{job=~\"$service\"}[5m])) by (le, service, method))", "legendFormat": "{{service}}/{{method}}" }],
+      "fieldConfig": { "defaults": { "unit": "s", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] }
+    },
+    {
+      "title": "在途请求（按方法）",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "sum(webook_grpc_requests_in_flight{job=~\"$service\"}) by (service, method)", "legendFormat": "{{service}}/{{method}}" }],
+      "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 20 } }, "overrides": [] }
+    },
+    {
+      "title": "调用方 QPS（peer，server 侧）",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "sum(rate(webook_grpc_requests_total{job=~\"$service\", type=\"server\"}[5m])) by (peer)", "legendFormat": "{{peer}}" }],
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] }
+    },
+    {
+      "title": "server / client QPS（type）",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "sum(rate(webook_grpc_requests_total{job=~\"$service\"}[5m])) by (type)", "legendFormat": "{{type}}" }],
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] }
+    },
+    {
+      "title": "平均延迟（按方法）",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "sum(rate(webook_grpc_requests_duration_seconds_sum{job=~\"$service\"}[5m])) by (service, method) / sum(rate(webook_grpc_requests_duration_seconds_count{job=~\"$service\"}[5m])) by (service, method)", "legendFormat": "{{service}}/{{method}}" }],
+      "fieldConfig": { "defaults": { "unit": "s", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] }
+    },
+    {
+      "title": "延迟分布热力图",
+      "type": "heatmap",
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 36 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [
+        { "expr": "sum(increase(webook_grpc_requests_duration_seconds_bucket{job=~\"$service\"}[$__rate_interval])) by (le)", "format": "heatmap", "legendFormat": "{{le}}" }
+      ],
+      "options": { "calculate": false, "cellGap": 1, "color": { "mode": "scheme", "scheme": "Spectral", "steps": 64 }, "yAxis": { "unit": "s" } },
+      "fieldConfig": { "defaults": { "custom": { "scaleDistribution": { "type": "linear" } } }, "overrides": [] }
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["webook", "grpc", "go"],
+  "templating": {
+    "list": [
+      {
+        "name": "DS_PROMETHEUS",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": { "text": "Prometheus", "value": "Prometheus" }
+      },
+      {
+        "name": "service",
+        "label": "Service",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "query": { "query": "label_values(up{job=~\"webook-.*\"}, job)", "refId": "PrometheusVariableQueryEditor-VariableQuery" },
+        "refresh": 2,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": "webook-.*",
+        "current": { "text": "All", "value": "$__all", "selected": false }
+      }
+    ]
+  },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": { "refresh_intervals": ["10s", "30s", "1m", "5m"] },
+  "timezone": "",
+  "title": "Webook gRPC",
+  "uid": "webook-grpc"
+}
