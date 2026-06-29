@@ -18,6 +18,8 @@ type InteractionService interface {
 	FindUserState(ctx context.Context, uid int64, biz string, bizId int64) (liked, collected bool, err error)
 	// FindByBizIds 批量查聚合计数，返回 map[bizId]Interaction
 	FindByBizIds(ctx context.Context, biz string, bizIds []int64) (map[int64]domain.Interaction, error)
+	// FindUserLiked 批量查用户对 bizIds 的点赞状态，返回 map[bizId]bool（只含已赞=true，未赞缺省取 false）
+	FindUserLiked(ctx context.Context, uid int64, biz string, bizIds []int64) (map[int64]bool, error)
 	// ListHotBizIds 按互动加权分降序，取前 limit 个 bizId（chat 工具 get_hot_articles 用）
 	ListHotBizIds(ctx context.Context, biz string, limit int) ([]int64, error)
 	// ListCollectedBizIds 按用户收藏时间降序，取前 limit 个 bizId（chat 工具 get_my_favorites 用）
@@ -68,6 +70,21 @@ func (s *InternalInteractionService) FindByBizIds(ctx context.Context, biz strin
 	result := make(map[int64]domain.Interaction, len(intrs))
 	for _, intr := range intrs {
 		result[intr.BizId] = intr
+	}
+	return result, nil
+}
+
+func (s *InternalInteractionService) FindUserLiked(ctx context.Context, uid int64, biz string, bizIds []int64) (map[int64]bool, error) {
+	if len(bizIds) == 0 {
+		return map[int64]bool{}, nil
+	}
+	likedIds, err := s.repo.FindLikedBizIds(ctx, uid, biz, bizIds)
+	if err != nil {
+		return nil, err
+	}
+	result := make(map[int64]bool, len(likedIds))
+	for _, id := range likedIds {
+		result[id] = true
 	}
 	return result, nil
 }

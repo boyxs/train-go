@@ -13,6 +13,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 	"go.opentelemetry.io/otel/trace/noop"
 
+	commentv1 "github.com/webook/api/gen/comment/v1"
 	"github.com/webook/internal/consts"
 	"github.com/webook/internal/ioc"
 	"github.com/webook/internal/job"
@@ -32,6 +33,13 @@ import (
 // 集成测试不连真实 OTel Collector，注入 Noop TracerProvider 满足依赖
 func provideNoopTracerProvider() trace.TracerProvider {
 	return noop.NewTracerProvider()
+}
+
+// provideNilCommentClient 集成测试不拉起 comment gRPC server / etcd，注入 nil client 满足
+// InitWebServer 依赖。现有集成用例不触达 /api/comment/*（RegisterRoutes 不调 client）；
+// 如后续要集成测评论网关，改为拨号真实 comment server。
+func provideNilCommentClient() commentv1.CommentServiceClient {
+	return nil
 }
 
 // 集成测试每次调用都给独立 prometheus Registry，避免 MustRegister 重复 panic。
@@ -102,6 +110,8 @@ func InitWebServer() *gin.Engine {
 		web.NewInternalArticleSearchHandler,
 		web.NewAIClickEventHandler,
 		web.NewAIArticlePolishHandler,
+		web.NewInternalCommentHandler,
+		provideNilCommentClient,
 		ioc.InitJwtHandler,
 		// 点击埋点
 		clickEventSvcProvider,

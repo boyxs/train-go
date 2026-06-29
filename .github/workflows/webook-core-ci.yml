@@ -9,6 +9,7 @@ on:
     paths-ignore:
       - 'webook-fe/**'
       - 'webook/chat/**'      # chat 服务有独立 CI
+      - 'webook/comment/**'   # comment 服务有独立 CI
       - 'deploy/**'
       - 'docs/**'
       - 'sandbox/**'

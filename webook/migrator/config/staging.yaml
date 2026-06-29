@@ -10,7 +10,7 @@ etcd:
   type: "yaml"
 
 http:
-  addr: ":8030"
+  addr: ":8200"
 
 web:
   jwt:

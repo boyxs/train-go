@@ -65,6 +65,30 @@ services:
       retries: 6
       start_period: 20s
 
+  # ── comment 微服务（纯 gRPC 后端：前端→core HTTP→gRPC(etcd)→comment；不直连 nginx） ──
+  webook-comment:
+    image: ${GHCR_REGISTRY:-ghcr.io}/${GH_USER}/webook-comment:${COMMENT_IMAGE_TAG}
+    container_name: webook-comment
+    restart: always
+    mem_limit: ${COMMENT_MEM:-384m}
+    environment:
+      APP_ENV: "${COMMENT_APP_ENV}"      # .env.<env> 指定 config/<env>.yaml
+      DEPLOY_ENV: "${DEPLOY_ENV}"
+      TZ: "Asia/Shanghai"
+      GOMEMLIMIT: "${COMMENT_GOMEMLIMIT:-320MiB}"
+      GOGC: "${COMMENT_GOGC:-80}"
+    depends_on:
+      webook-mysql:   {condition: service_healthy}
+      webook-redis:   {condition: service_healthy}
+      webook-etcd:    {condition: service_started}   # gRPC server 启动即注册到 etcd（core 经 etcd 解析调用）
+    healthcheck:
+      # /health 探活（comment/main.go 注册，HTTP :8030）；core 经 etcd 解析调用，不进 nginx upstream
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8030/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 20s
+
   # ── migrator 控制台服务（独立控制库 webook_migrator，需 mysql binlog 已开启） ──
   webook-migrator:
     image: ${GHCR_REGISTRY:-ghcr.io}/${GH_USER}/webook-migrator:${MIGRATOR_IMAGE_TAG}
@@ -82,7 +106,7 @@ services:
       webook-redis:   {condition: service_healthy}    # stage/gray/throttle/propose 控制位
     healthcheck:
       # /health 探活（migrator/ioc/web.go:41 注册）；让 nginx depends_on 能等到 migrator 真正起来
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8030/health || exit 1"]
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8200/health || exit 1"]
       interval: 10s
       timeout: 3s
       retries: 6

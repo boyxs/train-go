@@ -44,7 +44,7 @@ services:
       args:
         VERSION: local
     ports:
-      - "${MIGRATOR_HOST_PORT:-8030}:8030"
+      - "${MIGRATOR_HOST_PORT:-8200}:8200"
 
   webook-fe:
     image: webook-fe:local

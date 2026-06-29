@@ -16,6 +16,8 @@ type UserService interface {
 	Register(ctx context.Context, user domain.User) error
 	Login(ctx context.Context, email string, password string) (domain.User, error)
 	Profile(ctx context.Context, userid int64) (domain.User, error)
+	// FindByIds 批量取用户，返回 map[uid]User（评论区聚合 uid→昵称用）
+	FindByIds(ctx context.Context, ids []int64) (map[int64]domain.User, error)
 	Edit(ctx context.Context, user domain.User) (domain.User, error)
 	FindOrCreate(ctx context.Context, phone string) (domain.User, error)
 	FindOrCreateByWechat(ctx context.Context, wechatAuth domain.WechatAuth) (domain.User, error)
@@ -65,6 +67,21 @@ func (us *InternalUserService) Profile(ctx context.Context, userid int64) (domai
 	// 不要返回密码
 	user.Password = ""
 	return user, nil
+}
+
+func (us *InternalUserService) FindByIds(ctx context.Context, ids []int64) (map[int64]domain.User, error) {
+	if len(ids) == 0 {
+		return map[int64]domain.User{}, nil
+	}
+	users, err := us.repo.FindByIds(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	result := make(map[int64]domain.User, len(users))
+	for _, u := range users {
+		result[u.Id] = u
+	}
+	return result, nil
 }
 
 func (us *InternalUserService) Edit(ctx context.Context, user domain.User) (domain.User, error) {

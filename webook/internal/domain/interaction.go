@@ -13,4 +13,5 @@ type Interaction struct {
 // 业务类型常量
 const (
 	BizArticle = "article"
+	BizComment = "comment" // 评论点赞复用 interaction，biz="comment"、bizId=commentId
 )

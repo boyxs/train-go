@@ -31,6 +31,12 @@ scrape_configs:
     static_configs:
       - targets: ['localhost:8020']
 
+  # webook-comment 微服务
+  - job_name: 'webook-comment'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['localhost:8030']
+
   # OTel Collector 自监控（需在 collector config 里 telemetry.metrics.address 暴露）
   - job_name: 'otel-collector'
     static_configs:

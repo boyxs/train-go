@@ -2,6 +2,55 @@
 
 <!-- 新功能前插在此，日期降序 -->
 
+## [2026-06-29] interaction 点赞/互动端点泛化为 (biz, bizId)
+
+**变更内容**：interaction HTTP 端点（like/collect/detail/state/view）从写死 article 改为通用 `(biz, bizId)` + biz 白名单（article/comment）；评论点赞回归 interaction——删 core `/comment/like`，前端评论点赞改调 `/interaction/like {biz:"comment"}`。
+**影响范围**：后端 `internal/web/interaction.go`（泛化 + 白名单 + `ErrInvalidBiz`）、`internal/web/comment.go`（删 `Like`/`commentLikeReq`）、`comment_test.go`（移除 2 个 Like 测试）、新增 `interaction_test.go`（泛型 like + 白名单覆盖）；前端 `api/interaction.ts`（泛型 `like`/`collect` + 文章便捷包装）、`api/comment.ts`（删 `likeComment`）、`types/{comment,index}.ts`（删 `CommentLikeReq`）、`components/comment/CommentSection.tsx`（改调 interaction）。
+**技术决策**：点赞是交互行为，统一到 interaction，撤销原“`/comment/like` 不动 interaction 契约”的取舍。当前阶段只做契约泛化（service 仍在 core 进程内），为后续把 interaction 拆成独立 gRPC 服务铺路；文章前端用 `*Article` 包装器吸收 biz，调用点不变。
+**待办**：interaction 独立服务化（proto 补写 RPC → 拆包 → 独立部署 → core 转薄 gRPC 客户端 → 数据走 migrator 迁移）。
+**会话**：260628-comment-评论功能
+**发布**：（随 core 下次发版）
+
+## [2026-06-29] comment 评论者建模收敛为 user_id（去本地 User 实体）
+
+**变更内容**：comment 服务不再定义本地 `User{Id,Name}`，评论者仅存 `user_id`；昵称由 core 经 `userSvc.FindByIds` 批量解析填入对外 VO（与 likeCnt/liked 同一聚合层），并删掉 core VO 转换里恒空的 name 死兜底。
+**影响范围**：`api/proto/comment/v1/comment.proto`（Comment/Create/Delete 字段统一 `user_id`，删 `message User`）+ regen pb；`comment/{domain,grpc,repository,service}`；core `internal/web/comment.go`；comment grpc/service/integration + core comment 单测。
+**技术决策**：微服务不持有不拥有的用户展示数据（避免恒空字段的伪实体），不跨服务 import core `domain.User`（保服务边界）；昵称解析单一真相源在 core/user。注：interaction/chat proto 仍用 `uid`，跨 proto 命名统一留后续。
+**待办**：comment 集成测试需起 MySQL/Redis 验证；`prd/comment` 文档若引用旧 `User` message 需同步。
+**会话**：260628-comment-评论功能
+**发布**：（随 comment 服务首次打 tag）
+
+## [2026-06-29] migrator 端口移出业务段：8030 → 8200
+
+**变更内容**：webook-migrator HTTP 端口 8030 → 8200，移出 80xx 业务序列（core 8010 / chat 8020 / comment 8030 / …），划入 82xx 运维控制台段，业务服务再增也不与 migrator 撞端口。
+**影响范围**：`migrator/config/{local,dev,staging,prod,test}.yaml` http.addr + `migrator/main.go` 兜底；`deploy/`：`prometheus.yml` 抓取 target、`nginx/conf.d/default.conf` upstream、`docker-compose.yaml` healthcheck、`docker-compose.local.yaml` 端口映射、`.env.local(.example)` MIGRATOR_HOST_PORT。
+**技术决策**：comment 占用业务序列的 8030，migrator 作运维控制台让出序列；选 8200 与 80xx(业务) / 88xx(otel) / 9xxx(exporter) 分段，心智清晰。
+**待办**：`migrator/README.md` + `prd/migrator/**` 约 129 处 `:8030` 文档待同步。
+**会话**：260628-comment-评论功能
+**发布**：（随 migrator 下次打 tag）
+
+## [2026-06-28] 评论功能全链路（盖楼无限嵌套 + 敏感词 + 点赞复用 interaction）
+
+**变更内容**：新增评论功能端到端——①独立 gRPC 微服务 `webook/comment/`（CommentService：Create/List/BatchGet/GetReplies/Delete/Count），盖楼无限嵌套用 `root_id`(一级=0)+`pid`(自关联 FK)，敏感词本地 DFA `pkg/sensitive`；②core 作 HTTP 网关 `internal/web/comment.go`（list/replies/create/delete/like），经 etcd 解析调 comment gRPC，并聚合内部 interaction(biz="comment") 的 likeCnt/liked 填入 VO；点赞复用 interaction 数据层（新增 core `/comment/like` + interaction 批量 `FindUserLiked` 避免列表 N+1）；③前端 `api/comment.ts`+`types/comment.ts`+`CommentSection/CommentItem/CommentEditor` 挂载文章详情页（hot/new 排序、楼内回复懒加载、乐观点赞、删除本人评论）。
+
+**影响范围**：新增 `webook/comment/`（全分层 + 33 测试）、`webook/pkg/sensitive/`、`webook/api/{proto,gen}/comment/`；改 core `internal/{web/comment.go,ioc/grpc.go,ioc/web.go,wire.go}` + interaction service/repo/dao 加 `FindUserLiked`/`FindLikedBizIds`；前端 `webook-fe/{api,types,components/comment,views/article/read.tsx}`；部署监控按「新增服务 14 类」同步（5 yaml/prometheus/docker-compose/8 .env/CI/Grafana 告警）。
+
+**技术决策**：①点赞落 interaction(biz="comment") 不自建点赞表，core `/comment/like` 内部调 interaction service（不动 `/interaction/like` 的 article 契约）；②列表 liked 走批量 `FindUserLiked` map 而非 N+1；③最热由 core 聚合 interaction 计数内存 top N（comment 不存热度）；④core 同进程既是 gRPC server 又是 client，抽 `InitGRPCMetrics` 单例避免 `webook_grpc_requests_*` 重复注册 panic；⑤评论 list/replies 公开可读 + 登录态可选（中间件 `OptionalPaths`）有 token 才填 liked；⑥comment 纯 gRPC 后端不进 nginx，前端→core HTTP→gRPC(etcd)；⑦删除双模式：有子回复→`deleted` 占位（保留行清空内容，前端渲染「该评论已删除」、子树仍在，`Count` 不计），无子回复→`deleted_at` 软删消失；⑧回复 P0 扁平单层展示（每条带 `pid`，树形递归缩进 + @提及留 P1）；⑨删除走 `App.useApp().modal.confirm`（项目约定，避免 per-item `Popconfirm` 触发 antd CSS-in-JS 卸载告警）；⑩评论者昵称：comment 只存 uid，core 聚合时批量 `userSvc.FindByIds` 解析 uid→昵称填 VO（新增 user 服务 `FindByIds`）；⑪`reply_cnt` 维护在楼根（写/删回复增减 root_id），一级评论=整楼回复数，对齐扁平「展开 N 条回复」与展开实际条数。
+
+**待办（P1）**：①proto `reply_preview` 已声明但 service 未编排（一级评论默认带前 N 回复预览），P0 走 `GetReplies` 懒加载；②回复树形递归缩进 + @提及高亮（P0 扁平单层，`pid` 已存可前端重建树）；③comment mock 部分未登记 `mk/mock.mk`。
+
+**会话**：260628-comment-评论功能
+**发布**：（未上线，待 comment 服务首次打 tag）
+
+## [2026-06-25] gRPC 拦截器全家 + metrics 接入 + Grafana 看板
+
+**变更内容**：`pkg/grpcx/interceptor` 铺平整套 gRPC 拦截器——`errconv`（`*errs.Error`↔status 双向转换，无配置故用纯函数 `UnaryServerInterceptor/UnaryClientInterceptor`）、`ratelimit`（全局/服务/方法三档，「方法>服务>全局」最具体优先）、`metrics`（`PrometheusBuilder` 开关式 `WithCounter/Histogram/Summary/InFlight`）、`logging`（method/耗时/peer/code + panic recover 不泄漏）、`circuitbreaker`（`go-kratos/aegis` 自适应熔断 fail-fast）、`tracing`（OTel span 注入/透传，tracer/propagator 可注入）；`peer` 工具由「空结构体嵌入」重构为包级函数 `PeerName/PeerIp`（修 IPv6 改 `net.SplitHostPort`）。五个 builder 方法名统一 `BuildUnaryServer/BuildUnaryClient`。metrics 接入 core(server)/chat(client) 的 gRPC 拦截链、经现有 gin `/metrics` 暴露；新增 Grafana `webook-grpc` 看板。
+**影响范围**：新增 `pkg/grpcx/interceptor/{errconv,ratelimit,metrics,logging,circuitbreaker,tracing}` + `peer.go`（7 包 100% 测试覆盖 + metrics/logging/ratelimit benchmark）；改 `internal/ioc/grpc.go`、`chat/ioc/grpc.go`（`ChainUnaryInterceptor`，metrics 在外层）；新增 `deploy/grafana/provisioning/dashboards/webook-grpc.json`；`go.mod` 加 `go-kratos/aegis`；顺带 `prometheus.local.yml` 增 otel-collector/zipkin 抓取。
+**技术决策**：①无配置的 errconv 用纯函数、有依赖/开关的用 builder（构造机制按配置复杂度匹配）；②metrics 标签 type/service/method/code/peer，但高基数的 code/peer 只放无桶的 counter，histogram/gauge 只留 type/service/method 控 series×桶 爆炸；③ratelimit key 注册期预存（`rule{lim,key}`），热路径零字符串分配（实测 47.6ns/1alloc→10.7ns/0alloc）；④metrics 注册到 `DefaultRegisterer` 复用现有 `/metrics`、不另起端点；⑤tracing 与已接入的 otelgrpc StatsHandler 功能重叠，二选一（本拦截器暂未接线）；⑥看板延迟热力图 + P50/P90/P99 参考 go-zero 官方模板设计，指标名用自有 `webook_grpc_requests_*`（未抄 go-zero 的 `rpc_server_*`）。
+**待办**：①logging panic 是否升 Error 级便于告警；②`go-kratos/aegis` 与项目自带 `pkg/circuitbreaker` 二选一标准化；③看板 heatmap 与其余面板的 rate-interval 统一；④tracing 是否接线（与 otelgrpc 取舍）。
+**会话**：260625-grpcx-拦截器全家
+**发布**：（拦截器库 + 看板配置，随后续服务发版生效）
+
 ## [2026-06-21] gRPC 自定义负载均衡器套件（SWRR / 熔断 / VIP 分组）
 
 **变更内容**：`pkg/grpcx/balancer/swrr` 铺平三个平滑加权轮询（SWRR）balancer——`custom_swrr`（按权重平滑分流）、`breaker_swrr`（应用级熔断：连续失败摘除 + 冷却半开探活恢复）、`group_swrr`（按请求 `x-tier` metadata 分流到节点组，如 VIP 池），三者共享 `conn` + `swrrPick`；配套中立标签包 `balancer/{weight,group}`（resolver 写、balancer 读，互不依赖）；`resolver/etcd` 改编官方 etcd naming/resolver，watch 时额外下发带权 + 带组 `Addresses`。**已接入 chat→core 调用链**：`client.go` 换带权 resolver + 按 `ClientConfig.Balancer` 选均衡器、`server.go` 注册端点带 weight metadata；chat 默认 `breaker_swrr`、core 注册 weight。

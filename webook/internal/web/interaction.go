@@ -6,6 +6,7 @@ import (
 	"github.com/webook/internal/consts"
 	"github.com/webook/internal/domain"
 	"github.com/webook/internal/service"
+	"github.com/webook/pkg/errs"
 	"github.com/webook/pkg/ginx"
 	"github.com/webook/pkg/logger"
 )
@@ -17,42 +18,65 @@ type InteractionHandler interface {
 type InternalInteractionHandler struct {
 	svc service.InteractionService
 	l   logger.LoggerX
-	biz string
 }
 
 func NewInternalInteractionHandler(svc service.InteractionService, l logger.LoggerX) InteractionHandler {
-	return &InternalInteractionHandler{svc: svc, l: l, biz: domain.BizArticle}
+	return &InternalInteractionHandler{svc: svc, l: l}
 }
 
 func (h *InternalInteractionHandler) RegisterRoutes(server *gin.Engine) {
 	g := server.Group("/interaction")
 	g.POST("/like", ginx.WrapReqClaims[likeReq, UserClaims](consts.UserKey, h.Like))
 	g.POST("/collect", ginx.WrapReqClaims[collectReq, UserClaims](consts.UserKey, h.Collect))
-	g.POST("/detail", ginx.WrapReq[bizIdReq](h.Detail))
-	g.POST("/state", ginx.WrapReqClaims[bizIdReq, UserClaims](consts.UserKey, h.State))
-	g.POST("/view", ginx.WrapReq[bizIdReq](h.View))
+	g.POST("/detail", ginx.WrapReq[bizReq](h.Detail))
+	g.POST("/state", ginx.WrapReqClaims[bizReq, UserClaims](consts.UserKey, h.State))
+	g.POST("/view", ginx.WrapReq[bizReq](h.View))
 }
 
-type bizIdReq struct {
-	ArticleId int64 `json:"articleId"` // 前端传 articleId，handler 内部映射为 bizId
+// allowedBiz 限定可互动的业务类型，挡住任意 biz 污染 interaction 数据。
+// 新增可互动实体在此登记（与 domain.Biz* 对齐）。interaction 拆独立服务后这份白名单随之迁出。
+var allowedBiz = map[string]struct{}{
+	domain.BizArticle: {},
+	domain.BizComment: {},
+}
+
+// ErrInvalidBiz biz 不在白名单。
+var ErrInvalidBiz = errs.New(400, "biz 不合法")
+
+func checkBiz(biz string) error {
+	if _, ok := allowedBiz[biz]; !ok {
+		return ErrInvalidBiz
+	}
+	return nil
+}
+
+// bizReq 通用互动目标：biz 业务类型 + bizId 业务内主键（article→articleId、comment→commentId）。
+type bizReq struct {
+	Biz   string `json:"biz"`
+	BizId int64  `json:"bizId"`
 }
 
 type likeReq struct {
-	ArticleId int64 `json:"articleId"`
-	Liked     bool  `json:"liked"`
+	Biz   string `json:"biz"`
+	BizId int64  `json:"bizId"`
+	Liked bool   `json:"liked"`
 }
 
 type collectReq struct {
-	ArticleId int64 `json:"articleId"`
-	Collected bool  `json:"collected"`
+	Biz       string `json:"biz"`
+	BizId     int64  `json:"bizId"`
+	Collected bool   `json:"collected"`
 }
 
 func (h *InternalInteractionHandler) Like(ctx *gin.Context, req likeReq, uc UserClaims) (ginx.Result, error) {
+	if err := checkBiz(req.Biz); err != nil {
+		return ginx.Result{}, err
+	}
 	var err error
 	if req.Liked {
-		err = h.svc.Like(ctx, uc.Userid, h.biz, req.ArticleId)
+		err = h.svc.Like(ctx, uc.Userid, req.Biz, req.BizId)
 	} else {
-		err = h.svc.CancelLike(ctx, uc.Userid, h.biz, req.ArticleId)
+		err = h.svc.CancelLike(ctx, uc.Userid, req.Biz, req.BizId)
 	}
 	if err != nil {
 		return ginx.Result{}, err
@@ -61,11 +85,14 @@ func (h *InternalInteractionHandler) Like(ctx *gin.Context, req likeReq, uc User
 }
 
 func (h *InternalInteractionHandler) Collect(ctx *gin.Context, req collectReq, uc UserClaims) (ginx.Result, error) {
+	if err := checkBiz(req.Biz); err != nil {
+		return ginx.Result{}, err
+	}
 	var err error
 	if req.Collected {
-		err = h.svc.Collect(ctx, uc.Userid, h.biz, req.ArticleId)
+		err = h.svc.Collect(ctx, uc.Userid, req.Biz, req.BizId)
 	} else {
-		err = h.svc.CancelCollect(ctx, uc.Userid, h.biz, req.ArticleId)
+		err = h.svc.CancelCollect(ctx, uc.Userid, req.Biz, req.BizId)
 	}
 	if err != nil {
 		return ginx.Result{}, err
@@ -74,8 +101,11 @@ func (h *InternalInteractionHandler) Collect(ctx *gin.Context, req collectReq, u
 }
 
 // Detail 获取互动聚合计数（公开接口，不含用户个人状态）
-func (h *InternalInteractionHandler) Detail(ctx *gin.Context, req bizIdReq) (ginx.Result, error) {
-	intr, err := h.svc.FindInteraction(ctx, 0, h.biz, req.ArticleId)
+func (h *InternalInteractionHandler) Detail(ctx *gin.Context, req bizReq) (ginx.Result, error) {
+	if err := checkBiz(req.Biz); err != nil {
+		return ginx.Result{}, err
+	}
+	intr, err := h.svc.FindInteraction(ctx, 0, req.Biz, req.BizId)
 	if err != nil {
 		return ginx.Result{}, err
 	}
@@ -83,8 +113,11 @@ func (h *InternalInteractionHandler) Detail(ctx *gin.Context, req bizIdReq) (gin
 }
 
 // State 获取当前用户的互动状态（liked/collected），需登录
-func (h *InternalInteractionHandler) State(ctx *gin.Context, req bizIdReq, uc UserClaims) (ginx.Result, error) {
-	liked, collected, err := h.svc.FindUserState(ctx, uc.Userid, h.biz, req.ArticleId)
+func (h *InternalInteractionHandler) State(ctx *gin.Context, req bizReq, uc UserClaims) (ginx.Result, error) {
+	if err := checkBiz(req.Biz); err != nil {
+		return ginx.Result{}, err
+	}
+	liked, collected, err := h.svc.FindUserState(ctx, uc.Userid, req.Biz, req.BizId)
 	if err != nil {
 		return ginx.Result{}, err
 	}
@@ -94,8 +127,11 @@ func (h *InternalInteractionHandler) State(ctx *gin.Context, req bizIdReq, uc Us
 	}}, nil
 }
 
-func (h *InternalInteractionHandler) View(ctx *gin.Context, req bizIdReq) (ginx.Result, error) {
-	if err := h.svc.IncrReadCount(ctx, h.biz, req.ArticleId); err != nil {
+func (h *InternalInteractionHandler) View(ctx *gin.Context, req bizReq) (ginx.Result, error) {
+	if err := checkBiz(req.Biz); err != nil {
+		return ginx.Result{}, err
+	}
+	if err := h.svc.IncrReadCount(ctx, req.Biz, req.BizId); err != nil {
 		// View 失败不影响主流程，wrapper 会记日志
 		return ginx.Result{Msg: "OK"}, err
 	}

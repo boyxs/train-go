@@ -9,6 +9,7 @@ import (
 	"github.com/webook/internal/domain"
 	"github.com/webook/internal/repository/cache"
 	"github.com/webook/internal/repository/dao"
+	"github.com/webook/pkg/slicex"
 )
 
 type UserRepository interface {
@@ -17,6 +18,7 @@ type UserRepository interface {
 	FindByEmail(ctx context.Context, email string) (domain.User, error)
 	FindByPhone(ctx context.Context, phone string) (domain.User, error)
 	FindById(ctx context.Context, userid int64) (domain.User, error)
+	FindByIds(ctx context.Context, ids []int64) ([]domain.User, error)
 	FindByWechat(ctx context.Context, openId string) (domain.User, error)
 }
 
@@ -71,6 +73,15 @@ func (ur *RedisUserRepository) FindById(ctx context.Context, userid int64) (doma
 		zap.L().Error("设置用户缓存失败", zap.Error(err))
 	}
 	return cu, nil
+}
+
+// FindByIds 批量查用户（评论区聚合 uid→昵称用）。直查 DAO，不走单条用户缓存。
+func (ur *RedisUserRepository) FindByIds(ctx context.Context, ids []int64) ([]domain.User, error) {
+	us, err := ur.dao.FindByIds(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	return slicex.Map(us, ur.toDomain), nil
 }
 
 func (ur *RedisUserRepository) FindByPhone(ctx context.Context, phone string) (domain.User, error) {

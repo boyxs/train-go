@@ -1,0 +1,90 @@
+syntax = "proto3";
+
+package webook.comment.v1;
+
+option go_package = "github.com/webook/api/gen/comment/v1;commentv1";
+
+// CommentService 提供盖楼式评论的读写（无限嵌套：root_id 标记楼、pid 直接父）。
+// 由 webook-core 经 gRPC 调用，core 负责 JWT 鉴权后注入 uid、并做 VO 转换给前端。
+// 点赞/热度由 interaction 服务（biz="comment"）负责，本服务不涉及：
+//   - 最热评论 = core 调 interaction.GetHotBizIds(biz="comment") 拿热门 id → BatchGetComments 回查
+//   - 点赞数 / 是否已赞 = core 聚合 interaction 后填入对外 VO
+//
+// 命名（参考 Google AIP）：Create/Delete 标准动词；ListComments 一级评论分页；
+//   BatchGetComments 按 id 批量（AIP-231）；GetReplies/CountComment 自定义动词。
+service CommentService {
+  rpc CreateComment(CreateCommentRequest) returns (CreateCommentResponse);
+  rpc ListComments(ListCommentsRequest) returns (ListCommentsResponse);
+  rpc BatchGetComments(BatchGetCommentsRequest) returns (BatchGetCommentsResponse);
+  rpc GetReplies(GetRepliesRequest) returns (GetRepliesResponse);
+  rpc DeleteComment(DeleteCommentRequest) returns (DeleteCommentResponse);
+  rpc CountComment(CountCommentRequest) returns (CountCommentResponse);
+}
+
+message Comment {
+  int64 id = 1;
+  string biz = 2;
+  int64 biz_id = 3;
+  int64 user_id = 4;          // 评论者 uid；昵称由 core 聚合 user 填入对外 VO
+  string content = 5;
+  int64 root_id = 6;          // 根评论 ID（一级评论=0）
+  int64 pid = 7;              // 直接父评论 ID（一级=0）
+  int64 reply_cnt = 8;        // 直接回复数
+  int64 created_at = 9;       // Unix 毫秒
+  repeated Comment children = 10; // 一级评论携带的前 N 条回复预览
+  bool deleted = 11;          // 已删除占位：有子回复时保留该节点（内容清空），子树仍可见
+  // like_cnt / liked 不在此，由 core 聚合 interaction(biz="comment") 后填入对外 VO
+}
+
+message CreateCommentRequest {
+  string biz = 1;
+  int64 biz_id = 2;
+  int64 user_id = 3;          // 评论者 uid（core 从 JWT 注入）
+  string content = 4;
+  int64 pid = 5;             // 回复目标父评论；0=一级评论
+}
+message CreateCommentResponse {
+  Comment comment = 1;
+}
+
+message ListCommentsRequest {
+  string biz = 1;
+  int64 biz_id = 2;
+  int32 offset = 3;          // 一级评论按时间倒序分页
+  int32 limit = 4;
+  int32 reply_preview = 5;   // 每条一级评论预览的子回复条数
+}
+message ListCommentsResponse {
+  repeated Comment comments = 1;
+}
+
+// BatchGetComments 按 id 批量取（core 拿 interaction.GetHotBizIds 的热门 id 后回查详情）。
+message BatchGetCommentsRequest {
+  repeated int64 ids = 1;
+}
+message BatchGetCommentsResponse {
+  repeated Comment comments = 1;
+}
+
+message GetRepliesRequest {
+  int64 root_id = 1;
+  int32 offset = 2;
+  int32 limit = 3;
+}
+message GetRepliesResponse {
+  repeated Comment replies = 1;
+}
+
+message DeleteCommentRequest {
+  int64 id = 1;
+  int64 user_id = 2;         // 鉴权：仅评论作者本人
+}
+message DeleteCommentResponse {}
+
+message CountCommentRequest {
+  string biz = 1;
+  int64 biz_id = 2;
+}
+message CountCommentResponse {
+  int64 count = 1;
+}

@@ -6,6 +6,7 @@ on:
     tags: ['webook-migrator-v*.*.*']
     paths-ignore:
       - 'webook-fe/**'
+      - 'webook/comment/**'   # comment 服务有独立 CI
       - 'deploy/**'
       - 'docs/**'
       - 'sandbox/**'
