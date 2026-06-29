@@ -22,8 +22,6 @@ import (
 	"github.com/webook/internal/service"
 	"github.com/webook/internal/web"
 	"github.com/webook/pkg/grpcx"
-
-	_ "github.com/spf13/viper/remote"
 )
 
 // Injectors from wire.go:
@@ -95,16 +93,25 @@ func InitWebServer() (App, func(), error) {
 	articlePolishHandler := web.NewAIArticlePolishHandler(articlePolishService, cmdable, loggerX)
 	rankingService := service.NewArticleRankingService(rankingRepository, articleReaderRepository, interactionRepository, clickEventService, loggerX)
 	rankingHandler := web.NewArticleRankingHandler(rankingService, loggerX)
-	engine := ioc.InitWebServer(v, userHandler, articleAuthorHandler, articleReaderHandler, interactionHandler, oAuth2Handler, articleSearchHandler, clickEventHandler, articlePolishHandler, rankingHandler)
-	searchServer := grpc.NewSearchServer(articleSearchService)
-	articleReaderServer := grpc.NewArticleReaderServer(articleReaderService)
-	interactionServer := grpc.NewInteractionServer(interactionService)
 	clientv3Client, cleanup2, err := ioc.InitEtcdClient()
 	if err != nil {
 		cleanup()
 		return App{}, nil, err
 	}
-	server := ioc.InitGRPCServer(searchServer, articleReaderServer, interactionServer, clientv3Client, loggerX)
+	prometheusBuilder := ioc.InitGRPCMetrics()
+	commentConn, cleanup3, err := ioc.InitCommentConn(clientv3Client, prometheusBuilder)
+	if err != nil {
+		cleanup2()
+		cleanup()
+		return App{}, nil, err
+	}
+	commentServiceClient := ioc.InitCommentClient(commentConn)
+	commentHandler := web.NewInternalCommentHandler(commentServiceClient, interactionService, userService, loggerX)
+	engine := ioc.InitWebServer(v, userHandler, articleAuthorHandler, articleReaderHandler, interactionHandler, oAuth2Handler, articleSearchHandler, clickEventHandler, articlePolishHandler, rankingHandler, commentHandler)
+	searchServer := grpc.NewSearchServer(articleSearchService)
+	articleReaderServer := grpc.NewArticleReaderServer(articleReaderService)
+	interactionServer := grpc.NewInteractionServer(interactionService)
+	server := ioc.InitGRPCServer(searchServer, articleReaderServer, interactionServer, clientv3Client, prometheusBuilder, loggerX)
 	saramaClient := ioc.InitSaramaClient(kafkaConfig, saramaConfig)
 	consumerConfig := ioc.InitInteractionConsumerConfig(kafkaConfig)
 	consumer := interaction.NewSaramaInteractionEventConsumer(saramaClient, interactionRepository, consumerConfig, loggerX)
@@ -112,7 +119,7 @@ func InitWebServer() (App, func(), error) {
 	metrics := ioc.InitCronMetrics()
 	wrapper := ioc.InitCronWrapper(redislockxClient, metrics, loggerX)
 	rankingJob := job.NewRankingJob(rankingService, wrapper)
-	cron, cleanup3 := ioc.InitCron(rankingJob, loggerX)
+	cron, cleanup4 := ioc.InitCron(rankingJob, loggerX)
 	app := App{
 		Server:      engine,
 		GRPCServer:  server,
@@ -120,6 +127,7 @@ func InitWebServer() (App, func(), error) {
 		RankingCron: cron,
 	}
 	return app, func() {
+		cleanup4()
 		cleanup3()
 		cleanup2()
 		cleanup()

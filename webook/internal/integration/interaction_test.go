@@ -516,3 +516,35 @@ func (s *InteractionSuite) TestInteraction_DetailNoUserState() {
 	assert.False(t, r.Data.Liked)
 	assert.False(t, r.Data.Collected)
 }
+
+// TestInteraction_FindLikedBizIds 验证批量点赞状态查询：只返回「本人 + 已赞 + 同 biz + 在查询集内」的 bizId
+func (s *InteractionSuite) TestInteraction_FindLikedBizIds() {
+	t := s.T()
+	now := time.Now().UnixMilli()
+	const otherUid int64 = 2
+
+	s.truncate("published_article", "interaction", "user_interaction")
+
+	seed := []dao.UserInteraction{
+		{UserId: testUid, Biz: "article", BizId: 1, Liked: true, CreatedAt: now, UpdatedAt: now},  // ✓ 命中
+		{UserId: testUid, Biz: "article", BizId: 2, Liked: false, CreatedAt: now, UpdatedAt: now}, // ✗ 未赞
+		{UserId: otherUid, Biz: "article", BizId: 3, Liked: true, CreatedAt: now, UpdatedAt: now}, // ✗ 他人
+		{UserId: testUid, Biz: "comment", BizId: 4, Liked: true, CreatedAt: now, UpdatedAt: now},  // ✗ 他 biz
+	}
+	for i := range seed {
+		assert.NoError(t, s.db.Create(&seed[i]).Error)
+	}
+
+	d := dao.NewGormInteractionDAO(s.db)
+	ctx := context.Background()
+
+	// 集内仅 biz_id=1 满足全部条件
+	got, err := d.FindLikedBizIds(ctx, testUid, "article", []int64{1, 2, 3, 4})
+	assert.NoError(t, err)
+	assert.Equal(t, []int64{1}, got)
+
+	// 集内无任何已赞 → 空
+	none, err := d.FindLikedBizIds(ctx, testUid, "article", []int64{2, 3, 4})
+	assert.NoError(t, err)
+	assert.Empty(t, none)
+}

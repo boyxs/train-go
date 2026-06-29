@@ -8,14 +8,18 @@ export interface Interaction {
   collected: boolean; // 当前用户是否已收藏
 }
 
+// interaction 通用目标：biz 业务类型 + bizId 业务内主键（article→articleId、comment→commentId）
+export interface InteractionTarget {
+  biz: string;
+  bizId: number;
+}
+
 // POST /interaction/like
-export interface LikeReq {
-  articleId: number;
+export interface LikeReq extends InteractionTarget {
   liked: boolean; // true=点赞，false=取消
 }
 
 // POST /interaction/collect
-export interface CollectReq {
-  articleId: number;
+export interface CollectReq extends InteractionTarget {
   collected: boolean; // true=收藏，false=取消
 }

@@ -51,12 +51,14 @@
 work/
 ├── webook/          # Go 后端 → 详见 webook/CLAUDE.md
 ├── webook-fe/       # React 前端 → 详见 webook-fe/CLAUDE.md
+├── prd/             # 各模块产品/设计文档 + 原型资产（PRD / .pen / 导出 PNG）
 ├── CLAUDE.md        # 本文件：全局协作规则
 └── CHANGELOG.md     # 变更日志（日期降序）
 ```
 
 - **后端 API 路由**：查看各 Handler 的 `RegisterRoutes` 方法（`internal/web/*.go`）
 - **前端页面路由**：查看 `app/` 目录结构（`(auth)/` 公开、`(main)/` 需登录、`(chat)/` 聊天）
+- **设计 / 产品文档落点（铁律）**：每个模块的 PRD、原型 `.pen`、导出 PNG 等**所有设计资产统一放 `prd/<模块>/`**（如 `prd/comment/`、`prd/article/`、`prd/chat/`），与已有 `.pen` 同目录集中管理。**禁止**散落到 `webook/<svc>/docs/`、前端代码目录或别处；Pencil 原型 `export_nodes` 的 PNG 也必须写入对应 `prd/<模块>/`
 
 ## 前后端协作规则
 

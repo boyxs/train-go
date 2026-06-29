@@ -19,6 +19,7 @@ type UserDAO interface {
 	FindByEmail(ctx context.Context, email string) (User, error)
 	FindByPhone(ctx context.Context, phone string) (User, error)
 	FindById(ctx context.Context, userid int64) (User, error)
+	FindByIds(ctx context.Context, ids []int64) ([]User, error)
 	FindByWechat(ctx context.Context, openId string) (User, error)
 }
 
@@ -81,6 +82,15 @@ func (ud *GormUserDAO) FindById(ctx context.Context, userid int64) (User, error)
 	var u User
 	err := ud.db.WithContext(ctx).First(&u, "id = ?", userid).Error
 	return u, err
+}
+
+func (ud *GormUserDAO) FindByIds(ctx context.Context, ids []int64) ([]User, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	var us []User
+	err := ud.db.WithContext(ctx).Where("id IN ?", ids).Find(&us).Error
+	return us, err
 }
 
 func (ud *GormUserDAO) FindByWechat(ctx context.Context, openId string) (User, error) {

@@ -15,8 +15,10 @@ import React, { useEffect, useRef, useState } from 'react';
 
 import * as articleApi from '@/api/article';
 import * as interactionApi from '@/api/interaction';
+import { CommentSection } from '@/components/comment/CommentSection';
 import { Loading } from '@/components/common/Loading';
 import { PublicHeader } from '@/components/layout/PublicHeader';
+import { BIZ } from '@/constants/biz';
 import { useRequest } from '@/hooks/useRequest';
 import type { Interaction } from '@/types';
 import { tokenUtil } from '@/utils/token';
@@ -36,7 +38,7 @@ function ArticleReadPage({ articleId }: ArticleReadProps) {
   );
 
   const { data: intrRes } = useRequest(
-    () => interactionApi.findInteraction(id),
+    () => interactionApi.findInteraction({ biz: BIZ.ARTICLE, bizId: id }),
     [articleId],
   );
 
@@ -44,7 +46,7 @@ function ArticleReadPage({ articleId }: ArticleReadProps) {
   const { data: stateRes } = useRequest(
     () =>
       tokenUtil.hasToken()
-        ? interactionApi.findUserState(id)
+        ? interactionApi.findUserState({ biz: BIZ.ARTICLE, bizId: id })
         : Promise.resolve(null),
     [articleId],
   );
@@ -68,7 +70,9 @@ function ArticleReadPage({ articleId }: ArticleReadProps) {
   useEffect(() => {
     if (res?.data && !readReported.current) {
       readReported.current = true;
-      interactionApi.recordView(id).catch(() => {});
+      interactionApi
+        .recordView({ biz: BIZ.ARTICLE, bizId: id })
+        .catch(() => {});
     }
   }, [res?.data, id]);
 
@@ -78,8 +82,9 @@ function ArticleReadPage({ articleId }: ArticleReadProps) {
     }
     const newLiked = !intr.liked;
     try {
-      const result = await interactionApi.likeArticle({
-        articleId: id,
+      const result = await interactionApi.like({
+        biz: BIZ.ARTICLE,
+        bizId: id,
         liked: newLiked,
       });
       if (result.data.code === 0) {
@@ -103,8 +108,9 @@ function ArticleReadPage({ articleId }: ArticleReadProps) {
     }
     const newCollected = !intr.collected;
     try {
-      const result = await interactionApi.collectArticle({
-        articleId: id,
+      const result = await interactionApi.collect({
+        biz: BIZ.ARTICLE,
+        bizId: id,
         collected: newCollected,
       });
       if (result.data.code === 0) {
@@ -258,6 +264,9 @@ function ArticleReadPage({ articleId }: ArticleReadProps) {
               </div>
             </div>
           )}
+
+          {/* 评论区 */}
+          <CommentSection articleId={id} />
         </div>
       </div>
     </div>

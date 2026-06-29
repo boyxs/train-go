@@ -32,6 +32,7 @@ func InitWebServer(
 	clickEventHandler web.ClickEventHandler,
 	polishHandler web.ArticlePolishHandler,
 	rankingHandler web.RankingHandler,
+	commentHandler web.CommentHandler,
 ) *gin.Engine {
 	server := gin.Default()
 	// 开启后 *gin.Context.Value() 会 fallback 到 c.Request.Context().Value()；
@@ -50,6 +51,7 @@ func InitWebServer(
 	clickEventHandler.RegisterRoutes(server)
 	polishHandler.RegisterRoutes(server)
 	rankingHandler.RegisterRoutes(server)
+	commentHandler.RegisterRoutes(server)
 	return server
 }
 
@@ -139,5 +141,8 @@ func loginJwtMiddleware(cmd redis.Cmdable) gin.HandlerFunc {
 			"/article/ranking/archive/dates",
 			"/metrics", // Prometheus 抓取端点，由 nginx /metrics 的 IP 白名单层把关
 		).
+		// 评论 list/replies 公开可读，但登录态可选：有 token 才填 liked，无 token 不抛 401
+		// 路径无 /api 前缀（dev rewrite + nginx 已剥），与 IgnoredPaths 的 /interaction/* 同形
+		OptionalPaths("/comment/list", "/comment/replies").
 		Build()
 }

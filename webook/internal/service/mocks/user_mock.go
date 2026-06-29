@@ -57,6 +57,21 @@ func (mr *MockUserServiceMockRecorder) Edit(ctx, user any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Edit", reflect.TypeOf((*MockUserService)(nil).Edit), ctx, user)
 }
 
+// FindByIds mocks base method.
+func (m *MockUserService) FindByIds(ctx context.Context, ids []int64) (map[int64]domain.User, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FindByIds", ctx, ids)
+	ret0, _ := ret[0].(map[int64]domain.User)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// FindByIds indicates an expected call of FindByIds.
+func (mr *MockUserServiceMockRecorder) FindByIds(ctx, ids any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByIds", reflect.TypeOf((*MockUserService)(nil).FindByIds), ctx, ids)
+}
+
 // FindOrCreate mocks base method.
 func (m *MockUserService) FindOrCreate(ctx context.Context, phone string) (domain.User, error) {
 	m.ctrl.T.Helper()

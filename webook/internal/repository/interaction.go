@@ -22,6 +22,8 @@ type InteractionRepository interface {
 	// FindUserState 只查用户对指定业务的 liked/collected，不查聚合计数
 	FindUserState(ctx context.Context, uid int64, biz string, bizId int64) (liked, collected bool, err error)
 	FindByBizIds(ctx context.Context, biz string, bizIds []int64) ([]domain.Interaction, error)
+	// FindLikedBizIds 批量查用户在 bizIds 中已点赞的 bizId（供列表聚合 liked 状态，避免 N+1）
+	FindLikedBizIds(ctx context.Context, uid int64, biz string, bizIds []int64) ([]int64, error)
 	// ListCollectedBizIds 查询用户收藏的 bizId 列表，按收藏时间降序
 	ListCollectedBizIds(ctx context.Context, uid int64, biz string, limit int) ([]int64, error)
 	// ListHotBizIds 查询热门 bizId 列表，按互动加权分降序
@@ -174,6 +176,10 @@ func (r *CacheInteractionRepository) FindByBizIds(ctx context.Context, biz strin
 		}(intr)
 	}
 	return result, nil
+}
+
+func (r *CacheInteractionRepository) FindLikedBizIds(ctx context.Context, uid int64, biz string, bizIds []int64) ([]int64, error) {
+	return r.dao.FindLikedBizIds(ctx, uid, biz, bizIds)
 }
 
 func (r *CacheInteractionRepository) ListCollectedBizIds(ctx context.Context, uid int64, biz string, limit int) ([]int64, error) {

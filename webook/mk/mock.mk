@@ -46,6 +46,15 @@ mockgen:
 	@mockgen -source=./internal/service/embedding/types.go -package=embmocks -destination=./internal/service/embedding/mocks/embedding_mock.go
 	#pkg redislockx 分布式锁
 	@mockgen -source=./pkg/redislockx/types.go -package=lockmocks -destination=./pkg/redislockx/mocks/lock_mock.go
+	#pkg sensitive 敏感词过滤（comment 服务消费）
+	@mockgen -source=./pkg/sensitive/types.go -package=sensitivemocks -destination=./pkg/sensitive/mocks/filter.mock.go
+	#pkg ratelimit 限流器（comment 服务消费）
+	@mockgen -source=./pkg/ratelimit/types.go -package=limitmocks -destination=./pkg/ratelimit/mocks/limiter.mock.go
+	#comment 服务（独立 gRPC 微服务：service + repository 接口）
+	@mockgen -source=./comment/service/comment.go -package=svcmocks -destination=./comment/service/mocks/comment.mock.go
+	@mockgen -source=./comment/repository/comment.go -package=repomocks -destination=./comment/repository/mocks/comment.mock.go
+	#comment gRPC client（core HTTP 网关聚合用，reflect 模式 mock 生成的 client 接口）
+	@mockgen -destination=./internal/web/grpcmocks/comment_mock.go -package=grpcmocks github.com/webook/api/gen/comment/v1 CommentServiceClient
 	#update dependencies
 	@go mod tidy
 	#格式化生成文件的 import 顺序，避免 CI goimports 校验失败

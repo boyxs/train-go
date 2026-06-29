@@ -70,7 +70,7 @@ func main() {
 	}()
 
 	<-ctx.Done()
-	log.Println("[shutdown] 收到信号,开始优雅停机…")
+	log.Println("[core][shutdown] 收到信号，开始优雅停机…")
 	// gRPC 先于 cleanup 关闭:注销 etcd 端点 + GracefulStop(保留 OTel 上报)
 	if err := app.GRPCServer.Close(); err != nil {
 		log.Printf("[gRPC] 关闭: %v", err)
@@ -82,5 +82,5 @@ func main() {
 		log.Printf("[HTTP] 关闭: %v", err)
 	}
 	cleanup() // wire cleanup(OTel TracerProvider.Shutdown 等)
-	log.Println("[shutdown] 完成")
+	log.Println("[core][shutdown] 完成")
 }

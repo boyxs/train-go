@@ -273,12 +273,22 @@ func (h *InternalXxxHandler) Create(ctx *gin.Context, req createReq) (Result, er
 
 // 路由装饰
 func (h *InternalXxxHandler) RegisterRoutes(r *gin.Engine) {
-    g := r.Group("/api/xxx")
+    g := r.Group("/xxx")   // ⚠ 不带 /api 前缀！见下「路由前缀铁律」
     g.POST("", ginx.WrapReq[createReq](h.Create))
     g.GET("/:id", ginx.Wrap(h.Get))
     g.GET("", ginx.Wrap(h.List))  // List 返回 Result{Data: ginx.PageResult{...}}
 }
 ```
+
+### 路由前缀铁律（core 路由禁带 `/api`）
+
+**core 的 HTTP 路由组一律不带 `/api` 前缀**，与现有 `/interaction`、`/article`、`/user`、`/comment` 同形。
+
+- 前端 axios `baseURL = '/api'`，浏览器请求 `/api/xxx/*`；dev server rewrite(`webook-fe/next.config.ts` `/api/:path*`→core) 与生产 nginx(`deploy/nginx/conf.d/default.conf`) **都会剥掉 `/api`** 再转给 core。
+- 所以 core 注册 `Group("/api/xxx")` = 实际暴露 `/api/xxx`，而请求剥前缀后是 `/xxx` → **404**。注册 `Group("/xxx")` 才对。
+- 中间件 `IgnoredPaths`/`OptionalPaths` 同理写**剥后路径**（`/xxx/list`，不是 `/api/xxx/list`）。
+- 例外：拆分服务有自己的 rewrite 段（如 chat `/api/chat/:path*`→chat `/chat/*`），其路由在 `/chat/*` 下。新增直连前端的服务必须同步加 next.config + nginx 的 rewrite 段。
+- 新增 core 路由前先 `grep -rn 'Group("' internal/web/` 对齐，禁止照搬带 `/api` 的旧模板。
 
 ### 业务错误定义模板
 

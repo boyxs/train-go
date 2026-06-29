@@ -141,10 +141,15 @@ func InitWebServer() (App, func(), error) {
 		ioc.InitWebServer,
 		// gRPC server
 		ioc.InitEtcdClient,
+		ioc.InitGRPCMetrics, // server + comment client 共享同一指标 builder
 		ioc.InitGRPCServer,
 		grpcsrv.NewSearchServer,
 		grpcsrv.NewArticleReaderServer,
 		grpcsrv.NewInteractionServer,
+		// comment gRPC client（core 作 HTTP 网关 → comment 后端）
+		ioc.InitCommentConn,
+		ioc.InitCommentClient,
+		web.NewInternalCommentHandler,
 		wire.Struct(new(App), "*"),
 	)
 	return App{}, nil, nil

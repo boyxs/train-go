@@ -9,7 +9,7 @@ etcd:
   type: "yaml"
 
 http:
-  addr: ":8030"
+  addr: ":8200"
 
 # 本地无 webook-core 签发 token；跳过 JWT 让 curl 直接打通
 web:

@@ -15,6 +15,8 @@ type InteractionDAO interface {
 	FindByBizId(ctx context.Context, biz string, bizId int64) (Interaction, error)
 	FindByBizIds(ctx context.Context, biz string, bizIds []int64) ([]Interaction, error)
 	FindUserInteraction(ctx context.Context, uid int64, biz string, bizId int64) (UserInteraction, error)
+	// FindLikedBizIds 批量查用户在 bizIds 中已点赞的 bizId，按需聚合列表 liked 状态（避免 N+1）
+	FindLikedBizIds(ctx context.Context, uid int64, biz string, bizIds []int64) ([]int64, error)
 	// ListCollectedBizIds 查询用户收藏的 bizId 列表，按收藏时间降序
 	ListCollectedBizIds(ctx context.Context, uid int64, biz string, limit int) ([]int64, error)
 	// ListHotBizIds 查询热门 bizId 列表，按 read_count + like_count*3 + collect_count*5 降序
@@ -139,6 +141,19 @@ func (d *GormInteractionDAO) FindUserInteraction(ctx context.Context, uid int64,
 		Order("id DESC").
 		First(&ui).Error
 	return ui, err
+}
+
+func (d *GormInteractionDAO) FindLikedBizIds(ctx context.Context, uid int64, biz string, bizIds []int64) ([]int64, error) {
+	if len(bizIds) == 0 {
+		return nil, nil
+	}
+	var ids []int64
+	err := d.db.WithContext(ctx).
+		Model(&UserInteraction{}).
+		Select("biz_id").
+		Where("user_id = ? AND biz = ? AND liked = ? AND biz_id IN ?", uid, biz, true, bizIds).
+		Pluck("biz_id", &ids).Error
+	return ids, err
 }
 
 func (d *GormInteractionDAO) ListCollectedBizIds(ctx context.Context, uid int64, biz string, limit int) ([]int64, error) {

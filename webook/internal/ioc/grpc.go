@@ -11,6 +11,7 @@ import (
 	"github.com/webook/pkg/logger"
 
 	articlev1 "github.com/webook/api/gen/article/v1"
+	commentv1 "github.com/webook/api/gen/comment/v1"
 	interactionv1 "github.com/webook/api/gen/interaction/v1"
 	searchv1 "github.com/webook/api/gen/search/v1"
 	grpcsrv "github.com/webook/internal/grpc"
@@ -19,6 +20,14 @@ import (
 	"github.com/webook/pkg/grpcx/interceptor/metrics"
 )
 
+// InitGRPCMetrics 构造进程内唯一的 gRPC 指标 builder。
+// server 拦截器与下游 client 拦截器共享同一实例（builder.once 保证 collector 只注册一次，
+// type 标签区分 server/client）；分两个实例会因 webook_grpc_requests_* 重复注册而 panic。
+func InitGRPCMetrics() *metrics.PrometheusBuilder {
+	return metrics.NewPrometheusBuilder("webook", "grpc", "requests", "gRPC 请求").
+		WithCounter().WithHistogram().WithInFlight()
+}
+
 // InitGRPCServer 组装 server 并注册所有 gRPC service，由 main 起 goroutine 监听。
 // otel StatsHandler 与错误拦截器在此显式传入（grpcx 不内置默认 option）。
 func InitGRPCServer(
@@ -26,6 +35,7 @@ func InitGRPCServer(
 	articleSrv *grpcsrv.ArticleReaderServer,
 	intrSrv *grpcsrv.InteractionServer,
 	client *etcdv3.Client,
+	grpcMetrics *metrics.PrometheusBuilder,
 	l logger.LoggerX,
 ) *grpcx.Server {
 	//var cfg grpcx.ServerConfig
@@ -39,8 +49,6 @@ func InitGRPCServer(
 		TTL:    viper.GetInt64("grpc.server.ttl"),
 		Weight: viper.GetInt("grpc.server.weight"),
 	}
-	grpcMetrics := metrics.NewPrometheusBuilder("webook", "grpc", "requests", "gRPC 请求").
-		WithCounter().WithHistogram().WithInFlight()
 	srv := grpcx.NewServer(cfg, client, l,
 		grpc.StatsHandler(otelgrpc.NewServerHandler()),
 		// metrics 在外层：观测 errconv 转换后的最终 status code
@@ -51,4 +59,42 @@ func InitGRPCServer(
 	interactionv1.RegisterInteractionServiceServer(srv.Server, intrSrv)
 	healthpb.RegisterHealthServer(srv.Server, health.NewServer()) // k8s / LB 健康探测
 	return srv
+}
+
+// ── 下游 gRPC client（core 作 HTTP 网关调 comment 后端）─────────────────────
+
+// CommentConn 是到 webook-comment 的 gRPC 连接。独立类型(而非裸 *grpc.ClientConn)让 wire 能区分多个下游 conn。
+type CommentConn struct{ *grpc.ClientConn }
+
+// InitCommentConn 拨号 webook-comment(grpc.client.webook-comment,默认 etcd:///service/webook-comment)。
+// 复用进程内唯一的 grpcMetrics(与 server 共享)，拦截链与 chat→core 对称：otel + metrics(client) + errconv。
+func InitCommentConn(client *etcdv3.Client, grpcMetrics *metrics.PrometheusBuilder) (CommentConn, func(), error) {
+	cfg, err := grpcClientConfig("webook-comment")
+	if err != nil {
+		return CommentConn{}, nil, err
+	}
+	conn, cleanup, err := grpcx.NewClient(client, cfg,
+		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
+		grpc.WithChainUnaryInterceptor(grpcMetrics.BuildUnaryClient(), errconv.UnaryClientInterceptor()),
+	)
+	if err != nil {
+		return CommentConn{}, nil, err
+	}
+	return CommentConn{conn}, cleanup, nil
+}
+
+func InitCommentClient(c CommentConn) commentv1.CommentServiceClient {
+	return commentv1.NewCommentServiceClient(c)
+}
+
+// grpcClientConfig 读 grpc.client.<name>(target/secure/caFile),target 缺省按 etcd:///service/<name> 推导。
+func grpcClientConfig(name string) (grpcx.ClientConfig, error) {
+	var cfg grpcx.ClientConfig
+	if err := viper.UnmarshalKey("grpc.client."+name, &cfg); err != nil {
+		return grpcx.ClientConfig{}, err
+	}
+	if cfg.Target == "" {
+		cfg.Target = "etcd:///service/" + name
+	}
+	return cfg, nil
 }

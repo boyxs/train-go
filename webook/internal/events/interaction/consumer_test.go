@@ -42,6 +42,9 @@ func (m *mockRepo) FindUserState(context.Context, int64, string, int64) (bool, b
 func (m *mockRepo) FindByBizIds(context.Context, string, []int64) ([]domain.Interaction, error) {
 	return nil, nil
 }
+func (m *mockRepo) FindLikedBizIds(context.Context, int64, string, []int64) ([]int64, error) {
+	return nil, nil
+}
 func (m *mockRepo) ListCollectedBizIds(context.Context, int64, string, int) ([]int64, error) {
 	return nil, nil
 }
