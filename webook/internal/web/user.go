@@ -84,7 +84,7 @@ func (h *InternalUserHandler) RegisterRoutes(server *gin.Engine) {
 	ug.POST("/register", ginx.WrapReq[registerReq](h.Register))
 	ug.POST("/login", ginx.WrapReq[loginReq](h.Login))
 	ug.POST("/logout", ginx.Wrap(h.Logout))
-	ug.POST("/edit", ginx.WrapReqClaims[editReqUser, UserClaims](consts.UserKey, h.Edit))
+	ug.POST("/edit", ginx.WrapReq[editReqUser](h.Edit))
 	ug.GET("/refresh_token", h.RefreshToken) // 直接返 401，不走 wrapper
 	ug.GET("/profile", h.Profile)            // 不走 wrapper：前端期望直接 Profile 不带 Result 包装
 
@@ -192,7 +192,8 @@ func (h *InternalUserHandler) RefreshToken(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, ginx.Result{Msg: "OK"})
 }
 
-func (h *InternalUserHandler) Edit(ctx *gin.Context, req editReqUser, uc UserClaims) (ginx.Result, error) {
+func (h *InternalUserHandler) Edit(ctx *gin.Context, req editReqUser) (ginx.Result, error) {
+	uc := ginx.MustClaims[UserClaims](ctx)
 	user, err := h.userService.Edit(ctx, domain.User{
 		Id:       uc.Userid,
 		Nickname: req.Nickname,

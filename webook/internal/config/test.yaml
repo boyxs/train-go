@@ -58,11 +58,6 @@ kafka:
   metadataRetryMax: 1
   metadataRetryBackoff: 250  # 毫秒
   metadataTimeout: 5
-  # Consumer group
-  consumerGroup: "interaction-consumer"
-  # Consumer 失败退避（秒）
-  consumerBackoffInitial: 5
-  consumerBackoffMax: 60
 
 es:
   addr: "http://localhost:9200"

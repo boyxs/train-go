@@ -6,7 +6,9 @@ on:
     tags: ['webook-migrator-v*.*.*']
     paths-ignore:
       - 'webook-fe/**'
-      - 'webook/comment/**'   # comment 服务有独立 CI
+      - 'webook/comment/**'     # comment 服务有独立 CI
+      - 'webook/interaction/**' # interaction 服务有独立 CI
+      - 'webook/worker/**'      # worker 服务有独立 CI
       - 'deploy/**'
       - 'docs/**'
       - 'sandbox/**'
@@ -17,7 +19,7 @@ on:
     paths:
       - 'webook/migrator/**'
       - 'webook/pkg/**'
-      - 'webook-migrator-ci.yml'
+      - '.github/workflows/webook-migrator-ci.yml'
   workflow_dispatch:
 
 permissions:

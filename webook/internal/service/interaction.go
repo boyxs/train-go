@@ -3,8 +3,8 @@ package service
 import (
 	"context"
 
+	interactionv1 "github.com/webook/api/gen/interaction/v1"
 	"github.com/webook/internal/domain"
-	"github.com/webook/internal/repository"
 )
 
 type InteractionService interface {
@@ -26,73 +26,112 @@ type InteractionService interface {
 	ListCollectedBizIds(ctx context.Context, uid int64, biz string, limit int) ([]int64, error)
 }
 
-type InternalInteractionService struct {
-	repo repository.InteractionRepository
+// GRPCInteractionService 网关适配器：InteractionService 接口转调远端 interaction 服务。
+// ranking / Kafka 横切由外层装饰器追加（见 ioc/interaction.go）。
+type GRPCInteractionService struct {
+	client interactionv1.InteractionServiceClient
 }
 
-func NewInternalInteractionService(repo repository.InteractionRepository) InteractionService {
-	return &InternalInteractionService{repo: repo}
+func NewGRPCInteractionService(client interactionv1.InteractionServiceClient) InteractionService {
+	return &GRPCInteractionService{client: client}
 }
 
-func (s *InternalInteractionService) IncrReadCount(ctx context.Context, biz string, bizId int64) error {
-	return s.repo.IncrReadCount(ctx, biz, bizId)
+func (s *GRPCInteractionService) IncrReadCount(ctx context.Context, biz string, bizId int64) error {
+	_, err := s.client.IncrReadCount(ctx, &interactionv1.IncrReadCountRequest{Biz: biz, BizId: bizId})
+	return err
 }
 
-func (s *InternalInteractionService) Like(ctx context.Context, uid int64, biz string, bizId int64) error {
-	return s.repo.Like(ctx, uid, biz, bizId)
+func (s *GRPCInteractionService) Like(ctx context.Context, uid int64, biz string, bizId int64) error {
+	_, err := s.client.Like(ctx, &interactionv1.LikeRequest{Uid: uid, Biz: biz, BizId: bizId})
+	return err
 }
 
-func (s *InternalInteractionService) CancelLike(ctx context.Context, uid int64, biz string, bizId int64) error {
-	return s.repo.CancelLike(ctx, uid, biz, bizId)
+func (s *GRPCInteractionService) CancelLike(ctx context.Context, uid int64, biz string, bizId int64) error {
+	_, err := s.client.CancelLike(ctx, &interactionv1.CancelLikeRequest{Uid: uid, Biz: biz, BizId: bizId})
+	return err
 }
 
-func (s *InternalInteractionService) Collect(ctx context.Context, uid int64, biz string, bizId int64) error {
-	return s.repo.Collect(ctx, uid, biz, bizId)
+func (s *GRPCInteractionService) Collect(ctx context.Context, uid int64, biz string, bizId int64) error {
+	_, err := s.client.Collect(ctx, &interactionv1.CollectRequest{Uid: uid, Biz: biz, BizId: bizId})
+	return err
 }
 
-func (s *InternalInteractionService) CancelCollect(ctx context.Context, uid int64, biz string, bizId int64) error {
-	return s.repo.CancelCollect(ctx, uid, biz, bizId)
+func (s *GRPCInteractionService) CancelCollect(ctx context.Context, uid int64, biz string, bizId int64) error {
+	_, err := s.client.CancelCollect(ctx, &interactionv1.CancelCollectRequest{Uid: uid, Biz: biz, BizId: bizId})
+	return err
 }
 
-func (s *InternalInteractionService) FindInteraction(ctx context.Context, uid int64, biz string, bizId int64) (domain.Interaction, error) {
-	return s.repo.FindInteraction(ctx, uid, biz, bizId)
+func (s *GRPCInteractionService) FindInteraction(ctx context.Context, uid int64, biz string, bizId int64) (domain.Interaction, error) {
+	resp, err := s.client.GetInteraction(ctx, &interactionv1.GetInteractionRequest{Uid: uid, Biz: biz, BizId: bizId})
+	if err != nil {
+		return domain.Interaction{}, err
+	}
+	return toDomain(resp.GetInteraction()), nil
 }
 
-func (s *InternalInteractionService) FindUserState(ctx context.Context, uid int64, biz string, bizId int64) (bool, bool, error) {
-	return s.repo.FindUserState(ctx, uid, biz, bizId)
+func (s *GRPCInteractionService) FindUserState(ctx context.Context, uid int64, biz string, bizId int64) (bool, bool, error) {
+	resp, err := s.client.GetUserState(ctx, &interactionv1.GetUserStateRequest{Uid: uid, Biz: biz, BizId: bizId})
+	if err != nil {
+		return false, false, err
+	}
+	return resp.GetLiked(), resp.GetCollected(), nil
 }
 
-func (s *InternalInteractionService) FindByBizIds(ctx context.Context, biz string, bizIds []int64) (map[int64]domain.Interaction, error) {
-	intrs, err := s.repo.FindByBizIds(ctx, biz, bizIds)
+func (s *GRPCInteractionService) FindByBizIds(ctx context.Context, biz string, bizIds []int64) (map[int64]domain.Interaction, error) {
+	resp, err := s.client.BatchGetInteractions(ctx, &interactionv1.BatchGetInteractionsRequest{Biz: biz, BizIds: bizIds})
 	if err != nil {
 		return nil, err
 	}
-	result := make(map[int64]domain.Interaction, len(intrs))
-	for _, intr := range intrs {
-		result[intr.BizId] = intr
+	result := make(map[int64]domain.Interaction, len(resp.GetInteractions()))
+	for bizId, intr := range resp.GetInteractions() {
+		result[bizId] = toDomain(intr)
 	}
 	return result, nil
 }
 
-func (s *InternalInteractionService) FindUserLiked(ctx context.Context, uid int64, biz string, bizIds []int64) (map[int64]bool, error) {
+func (s *GRPCInteractionService) FindUserLiked(ctx context.Context, uid int64, biz string, bizIds []int64) (map[int64]bool, error) {
 	if len(bizIds) == 0 {
 		return map[int64]bool{}, nil
 	}
-	likedIds, err := s.repo.FindLikedBizIds(ctx, uid, biz, bizIds)
+	resp, err := s.client.GetUserLiked(ctx, &interactionv1.GetUserLikedRequest{Uid: uid, Biz: biz, BizIds: bizIds})
 	if err != nil {
 		return nil, err
 	}
-	result := make(map[int64]bool, len(likedIds))
-	for _, id := range likedIds {
+	result := make(map[int64]bool, len(resp.GetLikedBizIds()))
+	for _, id := range resp.GetLikedBizIds() {
 		result[id] = true
 	}
 	return result, nil
 }
 
-func (s *InternalInteractionService) ListHotBizIds(ctx context.Context, biz string, limit int) ([]int64, error) {
-	return s.repo.ListHotBizIds(ctx, biz, limit)
+func (s *GRPCInteractionService) ListHotBizIds(ctx context.Context, biz string, limit int) ([]int64, error) {
+	resp, err := s.client.GetHotBizIds(ctx, &interactionv1.GetHotBizIdsRequest{Biz: biz, Limit: int32(limit)})
+	if err != nil {
+		return nil, err
+	}
+	return resp.GetBizIds(), nil
 }
 
-func (s *InternalInteractionService) ListCollectedBizIds(ctx context.Context, uid int64, biz string, limit int) ([]int64, error) {
-	return s.repo.ListCollectedBizIds(ctx, uid, biz, limit)
+func (s *GRPCInteractionService) ListCollectedBizIds(ctx context.Context, uid int64, biz string, limit int) ([]int64, error) {
+	resp, err := s.client.GetCollectedBizIds(ctx, &interactionv1.GetCollectedBizIdsRequest{Uid: uid, Biz: biz, Limit: int32(limit)})
+	if err != nil {
+		return nil, err
+	}
+	return resp.GetBizIds(), nil
+}
+
+// toDomain pb → domain 单条转换（唯一映射点）。
+func toDomain(i *interactionv1.Interaction) domain.Interaction {
+	if i == nil {
+		return domain.Interaction{}
+	}
+	return domain.Interaction{
+		Biz:          i.GetBiz(),
+		BizId:        i.GetBizId(),
+		ReadCount:    i.GetReadCount(),
+		LikeCount:    i.GetLikeCount(),
+		CollectCount: i.GetCollectCount(),
+		Liked:        i.GetLiked(),
+		Collected:    i.GetCollected(),
+	}
 }

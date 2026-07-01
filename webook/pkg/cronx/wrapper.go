@@ -55,7 +55,7 @@ func NewWrapper(lock redislockx.Client, m *cronprom.Metrics, l logger.LoggerX, o
 		l:          l,
 		now:        time.Now,
 		keyFn:      func(name string) string { return "cronx:lock:" + name },
-		lockTTL:    2 * time.Second,
+		lockTTL:    30 * time.Second,
 		relTimeout: 2 * time.Second,
 	}
 	for _, o := range opts {

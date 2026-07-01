@@ -5,13 +5,10 @@ package main
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
-	"github.com/robfig/cron/v3"
 
-	"github.com/webook/internal/events"
 	intrevt "github.com/webook/internal/events/interaction"
 	grpcsrv "github.com/webook/internal/grpc"
 	"github.com/webook/internal/ioc"
-	"github.com/webook/internal/job"
 	"github.com/webook/internal/repository"
 	"github.com/webook/internal/repository/cache"
 	"github.com/webook/internal/repository/dao"
@@ -46,14 +43,14 @@ var polishProviderSet = wire.NewSet(
 	service.NewAIArticlePolishService,
 )
 
-// articleRankingProviderSet 文章榜单模块
+// articleRankingProviderSet 文章榜单模块（数据 + 重算逻辑留 core；定时调度由 webook-worker 经 RankingJobService gRPC 触发）
 var articleRankingProviderSet = wire.NewSet(
 	dao.NewGormArticleRankingDAO,
 	cache.NewRedisArticleRankingCache,
 	repository.NewCacheArticleRankingRepository,
 	service.NewArticleRankingService,
-	job.NewRankingJob,
 	web.NewArticleRankingHandler,
+	grpcsrv.NewRankingJobServer,
 )
 
 // migratorSDKProviderSet 业务侧迁移 SDK（默认 NoOp 零开销，yaml migrator.sdk.enabled=true 切 Redis 实现）
@@ -64,24 +61,18 @@ var migratorSDKProviderSet = wire.NewSet(
 	dao.NewGormArticleReaderNewDAO,
 )
 
-// kafkaProviderSet Kafka 基础设施 + 互动事件
+// kafkaProviderSet Kafka 生产侧：core 只产 read 事件，消费由 webook-worker（调度器）负责。
 var kafkaProviderSet = wire.NewSet(
 	ioc.InitKafkaConfig,
 	ioc.InitSaramaConfig,
-	ioc.InitSaramaSyncProducer,
-	ioc.InitSaramaClient,
 	ioc.InitEventProducer,
-	ioc.InitInteractionConsumerConfig,
 	intrevt.NewSaramaInteractionEventProducer,
-	intrevt.NewSaramaInteractionEventConsumer,
 )
 
-// App 应用入口，包含 Web 服务、后台消费者、gRPC 服务。
+// App 应用入口：Web 服务 + gRPC 服务（消费者/定时任务已抽到 webook-worker）。
 type App struct {
-	Server      *gin.Engine
-	GRPCServer  *grpcx.Server
-	Consumer    events.Consumer
-	RankingCron *cron.Cron
+	Server     *gin.Engine
+	GRPCServer *grpcx.Server
 }
 
 func InitWebServer() (App, func(), error) {
@@ -93,16 +84,13 @@ func InitWebServer() (App, func(), error) {
 		dao.NewGormUserDAO,
 		dao.NewGormArticleAuthorDAO,
 		dao.NewGormArticleReaderDAO,
-		dao.NewGormInteractionDAO,
 		//cache
 		cache.NewRedisUserCache, cache.NewRedisCodeCache, cache.NewRedisArticleCache,
-		cache.NewRedisInteractionCache,
 		//repository
 		repository.NewRedisUserRepository,
 		repository.NewRedisCodeRepository,
 		repository.NewCacheArticleAuthorRepository,
 		repository.NewCacheArticleReaderRepository,
-		repository.NewCacheInteractionRepository,
 		//service
 		ioc.InitSmsService,
 		ioc.InitWechatOAuth2Service,
@@ -110,6 +98,7 @@ func InitWebServer() (App, func(), error) {
 		service.NewSmsCodeService,
 		service.NewInternalArticleAuthorService,
 		service.NewInternalArticleReaderService,
+		ioc.InitRankingBoostPool,
 		ioc.InitInteractionService,
 		//handler
 		web.NewInternalUserHandler,
@@ -130,13 +119,9 @@ func InitWebServer() (App, func(), error) {
 		polishProviderSet,
 		// 文章榜单
 		articleRankingProviderSet,
-		// kafka + 互动事件
+		// kafka 生产侧（read 事件）
 		kafkaProviderSet,
 
-		ioc.InitCron,
-		ioc.InitCronMetrics,
-		ioc.InitCronWrapper,
-		ioc.InitLockClient,
 		ioc.InitMiddlewares,
 		ioc.InitWebServer,
 		// gRPC server
@@ -145,11 +130,13 @@ func InitWebServer() (App, func(), error) {
 		ioc.InitGRPCServer,
 		grpcsrv.NewSearchServer,
 		grpcsrv.NewArticleReaderServer,
-		grpcsrv.NewInteractionServer,
 		// comment gRPC client（core 作 HTTP 网关 → comment 后端）
 		ioc.InitCommentConn,
 		ioc.InitCommentClient,
 		web.NewInternalCommentHandler,
+		// interaction gRPC client（core 作 HTTP 网关 → interaction 后端）
+		ioc.InitInteractionConn,
+		ioc.InitInteractionClient,
 		wire.Struct(new(App), "*"),
 	)
 	return App{}, nil, nil

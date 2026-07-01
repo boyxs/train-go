@@ -34,7 +34,7 @@ func NewAIArticlePolishHandler(svc service.ArticlePolishService, cmd redis.Cmdab
 }
 
 func (h *AIArticlePolishHandler) RegisterRoutes(server *gin.Engine) {
-	server.POST("/article/polish", ginx.WrapReqClaims[polishReq, UserClaims](consts.UserKey, h.Polish))
+	server.POST("/article/polish", ginx.WrapReq[polishReq](h.Polish))
 }
 
 type polishReq struct {
@@ -42,7 +42,8 @@ type polishReq struct {
 	Content string `json:"content"`
 }
 
-func (h *AIArticlePolishHandler) Polish(ctx *gin.Context, req polishReq, uc UserClaims) (ginx.Result, error) {
+func (h *AIArticlePolishHandler) Polish(ctx *gin.Context, req polishReq) (ginx.Result, error) {
+	uc := ginx.MustClaims[UserClaims](ctx)
 	// 限流：5 次/小时
 	key := fmt.Sprintf(consts.PolishRateLimitPattern, uc.Userid)
 	limited, limitErr := h.limiter.Limit(ctx.Request.Context(), key)

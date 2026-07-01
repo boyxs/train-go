@@ -7,7 +7,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-module/carbon/v2"
 
-	"github.com/webook/internal/consts"
 	"github.com/webook/internal/domain"
 	"github.com/webook/internal/errs"
 	"github.com/webook/internal/service"
@@ -43,7 +42,7 @@ func (h *ArticleRankingHandler) RegisterRoutes(server *gin.Engine) {
 	if os.Getenv("DEPLOY_ENV") != "prod" {
 		g.POST("/archive", ginx.WrapReq[rankingArchiveReq](h.Archive))
 	}
-	g.POST("/click", ginx.WrapReqClaims[rankingClickReq, UserClaims](consts.UserKey, h.Click))
+	g.POST("/click", ginx.WrapReq[rankingClickReq](h.Click))
 }
 
 type rankingPageReq struct {
@@ -104,7 +103,8 @@ type rankingClickReq struct {
 // 榜单 Top100，上报 rank 超过这个值视为伪造
 const rankingClickMaxRank = 100
 
-func (h *ArticleRankingHandler) Click(ctx *gin.Context, req rankingClickReq, uc UserClaims) (Result, error) {
+func (h *ArticleRankingHandler) Click(ctx *gin.Context, req rankingClickReq) (Result, error) {
+	uc := ginx.MustClaims[UserClaims](ctx)
 	if req.ArticleId <= 0 {
 		return Result{}, errs.ErrClickInvalidArgs
 	}

@@ -68,7 +68,7 @@ func (s *ClickEventSuite) TestClick_Success() {
 	var res web.Result
 	err := json.NewDecoder(recorder.Body).Decode(&res)
 	assert.NoError(t, err)
-	assert.Equal(t, 0, res.Code)
+	assert.Equal(t, 200, res.Code)
 
 	// 验证 DB
 	var event dao.ClickEvent
@@ -129,7 +129,7 @@ func (s *ClickEventSuite) TestDashboard_Empty() {
 	var res web.Result
 	err := json.NewDecoder(recorder.Body).Decode(&res)
 	assert.NoError(t, err)
-	assert.Equal(t, 0, res.Code)
+	assert.Equal(t, 200, res.Code)
 }
 
 func (s *ClickEventSuite) TestDashboard_WithData() {
@@ -149,7 +149,7 @@ func (s *ClickEventSuite) TestDashboard_WithData() {
 	var res web.Result
 	err := json.NewDecoder(recorder.Body).Decode(&res)
 	assert.NoError(t, err)
-	assert.Equal(t, 0, res.Code)
+	assert.Equal(t, 200, res.Code)
 	assert.NotNil(t, res.Data)
 
 	// 解析 data 验证统计

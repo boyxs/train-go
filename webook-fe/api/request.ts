@@ -99,6 +99,14 @@ instance.interceptors.response.use(
       return Promise.reject(err);
     }
 
+    const reason: string | undefined = err?.response?.data?.reason;
+    if (reason !== 'ACCESS_TOKEN_EXPIRED') {
+      if (reason === 'TOKEN_INVALID') {
+        redirectLogin();
+      }
+      return Promise.reject(err);
+    }
+
     if (isRefreshing) {
       return new Promise<string>((resolve, reject) => {
         reqQueue.push({ resolve, reject });

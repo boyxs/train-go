@@ -21,6 +21,7 @@ import { PublicHeader } from '@/components/layout/PublicHeader';
 import { BIZ } from '@/constants/biz';
 import { useRequest } from '@/hooks/useRequest';
 import type { Interaction } from '@/types';
+import { getErrorMessage } from '@/utils/apiError';
 import { tokenUtil } from '@/utils/token';
 
 interface ArticleReadProps {
@@ -82,23 +83,19 @@ function ArticleReadPage({ articleId }: ArticleReadProps) {
     }
     const newLiked = !intr.liked;
     try {
-      const result = await interactionApi.like({
+      await interactionApi.like({
         biz: BIZ.ARTICLE,
         bizId: id,
         liked: newLiked,
       });
-      if (result.data.code === 0) {
-        const base = intr;
-        setIntrOverride({
-          ...base,
-          liked: newLiked,
-          likeCount: Math.max(0, base.likeCount + (newLiked ? 1 : -1)),
-        });
-      } else {
-        message.error(result.data.msg || '操作失败，请先登录');
-      }
-    } catch {
-      message.error('请先登录后再操作');
+      const base = intr;
+      setIntrOverride({
+        ...base,
+        liked: newLiked,
+        likeCount: Math.max(0, base.likeCount + (newLiked ? 1 : -1)),
+      });
+    } catch (e) {
+      message.error(getErrorMessage(e, '请先登录后再操作'));
     }
   };
 
@@ -108,26 +105,19 @@ function ArticleReadPage({ articleId }: ArticleReadProps) {
     }
     const newCollected = !intr.collected;
     try {
-      const result = await interactionApi.collect({
+      await interactionApi.collect({
         biz: BIZ.ARTICLE,
         bizId: id,
         collected: newCollected,
       });
-      if (result.data.code === 0) {
-        const base = intr;
-        setIntrOverride({
-          ...base,
-          collected: newCollected,
-          collectCount: Math.max(
-            0,
-            base.collectCount + (newCollected ? 1 : -1),
-          ),
-        });
-      } else {
-        message.error(result.data.msg || '操作失败，请先登录');
-      }
-    } catch {
-      message.error('请先登录后再操作');
+      const base = intr;
+      setIntrOverride({
+        ...base,
+        collected: newCollected,
+        collectCount: Math.max(0, base.collectCount + (newCollected ? 1 : -1)),
+      });
+    } catch (e) {
+      message.error(getErrorMessage(e, '请先登录后再操作'));
     }
   };
 

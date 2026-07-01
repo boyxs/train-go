@@ -6,9 +6,11 @@ on:
     tags: ['webook-comment-v*.*.*']
     paths-ignore:
       - 'webook-fe/**'
-      - 'webook/internal/**'   # core 服务有独立 CI
-      - 'webook/chat/**'       # chat 服务有独立 CI
-      - 'webook/migrator/**'   # migrator 服务有独立 CI
+      - 'webook/internal/**'    # core 服务有独立 CI
+      - 'webook/chat/**'        # chat 服务有独立 CI
+      - 'webook/migrator/**'    # migrator 服务有独立 CI
+      - 'webook/interaction/**' # interaction 服务有独立 CI
+      - 'webook/worker/**'      # worker 服务有独立 CI
       - 'deploy/**'
       - 'docs/**'
       - 'sandbox/**'

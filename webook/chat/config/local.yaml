@@ -11,7 +11,7 @@ etcd:
 http:
   addr: ":8020"
 
-# 主仓 webook-core gRPC server 地址（chat 工具调用 search/article/interaction 走这里）
+# 下游 gRPC server 地址：search/article 工具走 webook-core，互动走 webook-interaction（已拆独立服务）
 grpc:
   client:
     webook-core:
@@ -19,6 +19,9 @@ grpc:
       balancer: "breaker_swrr"
 #      secure: false
 #      caFile: ""
+    webook-interaction:
+      target: "etcd:///service/webook-interaction"
+      balancer: "breaker_swrr"
 
 mysql:
   dsn: root:13520@tcp(localhost:3306)/webook?parseTime=true&loc=UTC

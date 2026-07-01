@@ -18,6 +18,9 @@ grpc:
       balancer: "breaker_swrr"
 #      secure: true
 #      caFile: ""
+    webook-interaction:
+      target: "etcd:///service/webook-interaction"
+      balancer: "breaker_swrr"
 
 mysql:
   dsn: 'root:13520@tcp(webook-mysql:3306)/webook?parseTime=true&loc=UTC'

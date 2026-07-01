@@ -10,9 +10,8 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
-	prometheus2 "github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/redis/go-redis/v9"
-	"github.com/robfig/cron/v3"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"go.opentelemetry.io/otel/trace"
 	"go.opentelemetry.io/otel/trace/noop"
@@ -20,18 +19,14 @@ import (
 	commentv1 "github.com/webook/api/gen/comment/v1"
 	"github.com/webook/internal/consts"
 	"github.com/webook/internal/ioc"
-	"github.com/webook/internal/job"
 	"github.com/webook/internal/repository"
 	"github.com/webook/internal/repository/cache"
 	"github.com/webook/internal/repository/dao"
 	"github.com/webook/internal/service"
 	"github.com/webook/internal/web"
-	prometheus3 "github.com/webook/pkg/cronx/prometheus"
 	"github.com/webook/pkg/ginx/middleware/metrics"
 	"github.com/webook/pkg/jwtx"
 	"github.com/webook/pkg/logger"
-	"github.com/webook/pkg/redislockx"
-	"github.com/webook/pkg/redislockx/prometheus"
 )
 
 // Injectors from wire.go:
@@ -70,10 +65,7 @@ func InitWebServer() *gin.Engine {
 	client := ioc.InitEmbeddingClient(ollamaConfig, config, cmdable, loggerX)
 	articleSearchService := service.NewArticleSearchService(articleSearchRepository, client, loggerX)
 	articleAuthorService := service.NewInternalArticleAuthorService(articleAuthorRepository, articleReaderRepository, articleSearchService, loggerX)
-	interactionDAO := dao.NewGormInteractionDAO(db)
-	interactionCache := cache.NewRedisInteractionCache(cmdable)
-	interactionRepository := repository.NewCacheInteractionRepository(interactionDAO, interactionCache, loggerX)
-	interactionService := service.NewInternalInteractionService(interactionRepository)
+	interactionService := newFakeInteractionService()
 	articleAuthorHandler := web.NewInternalArticleAuthorHandler(articleAuthorService, interactionService, loggerX)
 	articleReaderService := service.NewInternalArticleReaderService(articleReaderRepository)
 	articleReaderHandler := web.NewInternalArticleReaderHandler(articleReaderService, interactionService, loggerX)
@@ -93,7 +85,7 @@ func InitWebServer() *gin.Engine {
 	rankingCache := cache.NewRedisArticleRankingCache(cmdable, loggerX)
 	rankingDAO := dao.NewGormArticleRankingDAO(db)
 	rankingRepository := repository.NewCacheArticleRankingRepository(rankingCache, rankingDAO, loggerX)
-	rankingService := service.NewArticleRankingService(rankingRepository, articleReaderRepository, interactionRepository, clickEventService, loggerX)
+	rankingService := service.NewArticleRankingService(rankingRepository, articleReaderRepository, interactionService, clickEventService, loggerX)
 	rankingHandler := web.NewArticleRankingHandler(rankingService, loggerX)
 	commentServiceClient := provideNilCommentClient()
 	commentHandler := web.NewInternalCommentHandler(commentServiceClient, interactionService, userService, loggerX)
@@ -122,10 +114,7 @@ func InitArticleAuthorHandler() web.ArticleAuthorHandler {
 	client := ioc.InitEmbeddingClient(ollamaConfig, config, cmdable, loggerX)
 	articleSearchService := service.NewArticleSearchService(articleSearchRepository, client, loggerX)
 	articleAuthorService := service.NewInternalArticleAuthorService(articleAuthorRepository, articleReaderRepository, articleSearchService, loggerX)
-	interactionDAO := dao.NewGormInteractionDAO(db)
-	interactionCache := cache.NewRedisInteractionCache(cmdable)
-	interactionRepository := repository.NewCacheInteractionRepository(interactionDAO, interactionCache, loggerX)
-	interactionService := service.NewInternalInteractionService(interactionRepository)
+	interactionService := newFakeInteractionService()
 	articleAuthorHandler := web.NewInternalArticleAuthorHandler(articleAuthorService, interactionService, loggerX)
 	return articleAuthorHandler
 }
@@ -142,22 +131,14 @@ func InitArticleReaderHandler() web.ArticleReaderHandler {
 	taskName := ioc.InitMigratorSDKTaskName()
 	articleReaderRepository := repository.NewCacheArticleReaderRepository(articleReaderDAO, articleReaderNewDAO, articleCache, switchReader, dualWriter, taskName, loggerX)
 	articleReaderService := service.NewInternalArticleReaderService(articleReaderRepository)
-	interactionDAO := dao.NewGormInteractionDAO(db)
-	interactionCache := cache.NewRedisInteractionCache(cmdable)
-	interactionRepository := repository.NewCacheInteractionRepository(interactionDAO, interactionCache, loggerX)
-	interactionService := service.NewInternalInteractionService(interactionRepository)
+	interactionService := newFakeInteractionService()
 	articleReaderHandler := web.NewInternalArticleReaderHandler(articleReaderService, interactionService, loggerX)
 	return articleReaderHandler
 }
 
 func InitInteractionHandler() web.InteractionHandler {
-	db := InitDB()
-	interactionDAO := dao.NewGormInteractionDAO(db)
-	cmdable := InitRedis()
-	interactionCache := cache.NewRedisInteractionCache(cmdable)
+	interactionService := newFakeInteractionService()
 	loggerX := InitLogger()
-	interactionRepository := repository.NewCacheInteractionRepository(interactionDAO, interactionCache, loggerX)
-	interactionService := service.NewInternalInteractionService(interactionRepository)
 	interactionHandler := web.NewInternalInteractionHandler(interactionService, loggerX)
 	return interactionHandler
 }
@@ -184,40 +165,6 @@ func InitClickEventHandler() web.ClickEventHandler {
 	return clickEventHandler
 }
 
-// InitRankingCron 集成测试用：拉起完整 cron + lock + wrapper + RankingJob 链路，
-// 返回 cleanup 验证 graceful shutdown。每次独立 prometheus Registry。
-func InitRankingCron() (*cron.Cron, func()) {
-	cmdable := InitRedis()
-	loggerX := InitLogger()
-	rankingCache := cache.NewRedisArticleRankingCache(cmdable, loggerX)
-	db := InitDB()
-	rankingDAO := dao.NewGormArticleRankingDAO(db)
-	rankingRepository := repository.NewCacheArticleRankingRepository(rankingCache, rankingDAO, loggerX)
-	articleReaderDAO := dao.NewGormArticleReaderDAO(db)
-	articleReaderNewDAO := dao.NewGormArticleReaderNewDAO(db)
-	articleCache := cache.NewRedisArticleCache(cmdable, loggerX)
-	switchReader := ioc.InitMigratorSDKSwitchReader(cmdable, loggerX)
-	dualWriter := ioc.InitMigratorSDKDualWriter(cmdable, loggerX)
-	taskName := ioc.InitMigratorSDKTaskName()
-	articleReaderRepository := repository.NewCacheArticleReaderRepository(articleReaderDAO, articleReaderNewDAO, articleCache, switchReader, dualWriter, taskName, loggerX)
-	interactionDAO := dao.NewGormInteractionDAO(db)
-	interactionCache := cache.NewRedisInteractionCache(cmdable)
-	interactionRepository := repository.NewCacheInteractionRepository(interactionDAO, interactionCache, loggerX)
-	clickEventDAO := dao.NewGormAIClickEventDAO(db)
-	clickEventCache := cache.NewRedisAIClickEventCache(cmdable)
-	clickEventRepository := repository.NewCacheAIClickEventRepository(clickEventDAO, clickEventCache, loggerX)
-	clickEventService := service.NewAIClickEventService(clickEventRepository)
-	rankingService := service.NewArticleRankingService(rankingRepository, articleReaderRepository, interactionRepository, clickEventService, loggerX)
-	client := provideTestLockClient(cmdable)
-	metrics := provideTestCronMetrics()
-	wrapper := ioc.InitCronWrapper(client, metrics, loggerX)
-	rankingJob := job.NewRankingJob(rankingService, wrapper)
-	cronCron, cleanup := ioc.InitCron(rankingJob, loggerX)
-	return cronCron, func() {
-		cleanup()
-	}
-}
-
 // wire.go:
 
 // 集成测试不连真实 OTel Collector，注入 Noop TracerProvider 满足依赖
@@ -232,26 +179,13 @@ func provideNilCommentClient() commentv1.CommentServiceClient {
 	return nil
 }
 
-// 集成测试每次调用都给独立 prometheus Registry，避免 MustRegister 重复 panic。
-// 生产 ioc.InitLockClient / InitCronMetrics 走 DefaultRegisterer，跨测试调用会撞名。
-func provideTestLockClient(cmd redis.Cmdable) redislockx.Client {
-	return prometheus.NewPrometheusBuilder("test", "lock", "test").
-		Registry(prometheus2.NewRegistry()).
-		Build(redislockx.NewClient(cmd))
-}
-
-func provideTestCronMetrics() *prometheus3.Metrics {
-	return prometheus3.NewPrometheusBuilder("test", "cron", "test").
-		Registry(prometheus2.NewRegistry()).Build()
-}
-
 // provideTestMiddlewares 与 ioc.InitMiddlewares 同结构，但 metrics 走独立 Registry，
 // 避免每个集成测试 SetupSuite 调 InitWebServer 时 DefaultRegisterer.MustRegister 重复 panic。
 // 省略 cors / 限流 / logger（httptest 无 cross-origin、不需限流、避免输出污染）。
 func provideTestMiddlewares(l logger.LoggerX, cmd redis.Cmdable, tp trace.TracerProvider) []gin.HandlerFunc {
 	return []gin.HandlerFunc{metrics.NewPrometheusBuilder("test", "http", "requests", "test").
 		WithCounter().WithHistogram().WithSummary().WithInFlight().
-		Registry(prometheus2.NewRegistry()).
+		Registry(prometheus.NewRegistry()).
 		Build(), otelgin.Middleware("webook-test", otelgin.WithTracerProvider(tp)), cors.New(cors.Config{AllowOriginFunc: func(string) bool { return true }}), jwtx.NewMiddlewareBuilder(jwtx.MiddlewareConfig{
 		AccessKey:      consts.AccessKey,
 		UserKey:        consts.UserKey,
@@ -285,7 +219,10 @@ var articleSvcProvider = wire.NewSet(dao.NewGormArticleAuthorDAO, dao.NewGormArt
 
 var articleReaderSvcProvider = wire.NewSet(dao.NewGormArticleReaderDAO, dao.NewGormArticleReaderNewDAO, cache.NewRedisArticleCache, repository.NewCacheArticleReaderRepository, service.NewInternalArticleReaderService, ioc.InitMigratorSDKSwitchReader, ioc.InitMigratorSDKDualWriter, ioc.InitMigratorSDKTaskName, interactionSvcProvider)
 
-var interactionSvcProvider = wire.NewSet(dao.NewGormInteractionDAO, cache.NewRedisInteractionCache, repository.NewCacheInteractionRepository, service.NewInternalInteractionService)
+// 互动已拆 webook-interaction 独立服务；集成测试注入桩 InteractionService（见 fake_interaction.go）。
+var interactionSvcProvider = wire.NewSet(
+	newFakeInteractionService,
+)
 
 var clickEventSvcProvider = wire.NewSet(dao.NewGormAIClickEventDAO, cache.NewRedisAIClickEventCache, repository.NewCacheAIClickEventRepository, service.NewAIClickEventService)
 

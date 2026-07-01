@@ -36,9 +36,6 @@ kafka:
   metadataRetryMax: 3
   metadataRetryBackoff: 250
   metadataTimeout: 5
-  consumerGroup: "interaction-consumer"
-  consumerBackoffInitial: 5
-  consumerBackoffMax: 60
 
 llm:
   providers:

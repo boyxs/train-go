@@ -6,7 +6,9 @@ on:
     tags: ['webook-chat-v*.*.*']
     paths-ignore:
       - 'webook-fe/**'
-      - 'webook/comment/**'   # comment 服务有独立 CI
+      - 'webook/comment/**'     # comment 服务有独立 CI
+      - 'webook/interaction/**' # interaction 服务有独立 CI
+      - 'webook/worker/**'      # worker 服务有独立 CI
       - 'deploy/**'
       - 'docs/**'
       - 'sandbox/**'
@@ -18,7 +20,7 @@ on:
       - 'webook/chat/**'
       - 'webook/api/**'
       - 'webook/pkg/**'
-      - 'webook-chat-ci.yml'
+      - '.github/workflows/webook-chat-ci.yml'
   workflow_dispatch:
 
 permissions:

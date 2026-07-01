@@ -8,8 +8,10 @@ on:
     tags: ['webook-core-v*.*.*']
     paths-ignore:
       - 'webook-fe/**'
-      - 'webook/chat/**'      # chat 服务有独立 CI
-      - 'webook/comment/**'   # comment 服务有独立 CI
+      - 'webook/chat/**'        # chat 服务有独立 CI
+      - 'webook/comment/**'     # comment 服务有独立 CI
+      - 'webook/interaction/**' # interaction 服务有独立 CI
+      - 'webook/worker/**'      # worker 服务有独立 CI
       - 'deploy/**'
       - 'docs/**'
       - 'sandbox/**'

@@ -13,6 +13,7 @@ import (
 	articlev1 "github.com/webook/api/gen/article/v1"
 	commentv1 "github.com/webook/api/gen/comment/v1"
 	interactionv1 "github.com/webook/api/gen/interaction/v1"
+	rankingv1 "github.com/webook/api/gen/ranking/v1"
 	searchv1 "github.com/webook/api/gen/search/v1"
 	grpcsrv "github.com/webook/internal/grpc"
 	"github.com/webook/pkg/grpcx"
@@ -33,7 +34,7 @@ func InitGRPCMetrics() *metrics.PrometheusBuilder {
 func InitGRPCServer(
 	searchSrv *grpcsrv.SearchServer,
 	articleSrv *grpcsrv.ArticleReaderServer,
-	intrSrv *grpcsrv.InteractionServer,
+	rankingJobSrv *grpcsrv.RankingJobServer,
 	client *etcdv3.Client,
 	grpcMetrics *metrics.PrometheusBuilder,
 	l logger.LoggerX,
@@ -56,8 +57,8 @@ func InitGRPCServer(
 	)
 	searchv1.RegisterSearchServiceServer(srv.Server, searchSrv)
 	articlev1.RegisterArticleReaderServiceServer(srv.Server, articleSrv)
-	interactionv1.RegisterInteractionServiceServer(srv.Server, intrSrv)
-	healthpb.RegisterHealthServer(srv.Server, health.NewServer()) // k8s / LB 健康探测
+	rankingv1.RegisterRankingJobServiceServer(srv.Server, rankingJobSrv) // webook-worker 调度器触发重算
+	healthpb.RegisterHealthServer(srv.Server, health.NewServer())        // k8s / LB 健康探测
 	return srv
 }
 
@@ -85,6 +86,30 @@ func InitCommentConn(client *etcdv3.Client, grpcMetrics *metrics.PrometheusBuild
 
 func InitCommentClient(c CommentConn) commentv1.CommentServiceClient {
 	return commentv1.NewCommentServiceClient(c)
+}
+
+// InteractionConn 是到 webook-interaction 的 gRPC 连接。独立类型让 wire 能区分多个下游 conn。
+type InteractionConn struct{ *grpc.ClientConn }
+
+// InitInteractionConn 拨号 webook-interaction(grpc.client.webook-interaction,默认 etcd:///service/webook-interaction)。
+// 复用进程内唯一的 grpcMetrics(与 server / comment client 共享)，拦截链与 comment client 对称。
+func InitInteractionConn(client *etcdv3.Client, grpcMetrics *metrics.PrometheusBuilder) (InteractionConn, func(), error) {
+	cfg, err := grpcClientConfig("webook-interaction")
+	if err != nil {
+		return InteractionConn{}, nil, err
+	}
+	conn, cleanup, err := grpcx.NewClient(client, cfg,
+		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
+		grpc.WithChainUnaryInterceptor(grpcMetrics.BuildUnaryClient(), errconv.UnaryClientInterceptor()),
+	)
+	if err != nil {
+		return InteractionConn{}, nil, err
+	}
+	return InteractionConn{conn}, cleanup, nil
+}
+
+func InitInteractionClient(c InteractionConn) interactionv1.InteractionServiceClient {
+	return interactionv1.NewInteractionServiceClient(c)
 }
 
 // grpcClientConfig 读 grpc.client.<name>(target/secure/caFile),target 缺省按 etcd:///service/<name> 推导。

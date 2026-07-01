@@ -14,6 +14,7 @@ import React, { useRef, useState } from 'react';
 
 import { useChat } from '@/hooks/useChat';
 import { useConversations } from '@/hooks/useConversations';
+import { getErrorMessage } from '@/utils/apiError';
 import { ChatInput } from '@/views/chat/ChatInput';
 import { ChatMessages } from '@/views/chat/ChatMessages';
 import { ChatSidebar } from '@/views/chat/ChatSidebar';
@@ -53,8 +54,8 @@ export const ChatBubble: React.FC = () => {
     initializedRef.current = true;
     try {
       await fetchList();
-    } catch {
-      message.error('初始化对话失败');
+    } catch (e) {
+      message.error(getErrorMessage(e, '初始化对话失败'));
     }
   };
 
@@ -64,16 +65,16 @@ export const ChatBubble: React.FC = () => {
       if (ok) {
         setShowHistory(false);
       }
-    } catch {
-      message.error('创建对话失败');
+    } catch (e) {
+      message.error(getErrorMessage(e, '创建对话失败'));
     }
   };
 
   const handleDelete = async (id: number) => {
     try {
       await remove(id);
-    } catch {
-      message.error('删除失败');
+    } catch (e) {
+      message.error(getErrorMessage(e, '删除失败'));
     }
   };
 
@@ -86,8 +87,8 @@ export const ChatBubble: React.FC = () => {
     setShowHistory(true);
     try {
       await fetchList();
-    } catch {
-      message.error('加载历史失败');
+    } catch (e) {
+      message.error(getErrorMessage(e, '加载历史失败'));
     }
   };
 

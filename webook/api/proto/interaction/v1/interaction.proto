@@ -4,26 +4,132 @@ package webook.interaction.v1;
 
 option go_package = "github.com/webook/api/gen/interaction/v1;interactionv1";
 
-// InteractionService 暴露互动数据的批量查询能力。
-// 当前仅提供 chat 工具调用所需的两个方法，后续 ranking-service 拆分时复用同一 proto。
+// InteractionService 暴露互动（点赞/收藏/浏览/计数）的读写。core 经 gRPC 调用，鉴权后注入 uid。
+// 按 (biz, biz_id) 的通用限界上下文：新增可互动实体 = 新 biz 值，零代码改动。
 //
-// 命名规范（Google AIP）：
-//   - 标准 Get：单资源查询（AIP-131）
-//   - 标准 BatchGet：按 id 批量查询（AIP-231）
-//   - 标准 Search：全文/复杂查询（AIP-136 已知动词）
-//   - 其它"按某种维度取多条"的查询统一用 Get 前缀作为 AIP-136 自定义动词，
-//     避免与 AIP-132 标准 List（带 page_token 分页）混淆。
-//   - 每个 RPC 拥有独立的 Request 与 Response message，即便 shape 一致也不复用。
+// 命名（Google AIP）：查询用 Get/BatchGet（避免与带分页的 List 混淆），写操作用业务动作动词
+// （Like/Collect/IncrReadCount，与 service 方法同名）；每个 RPC 独立 Request/Response。
 service InteractionService {
+  // ── 写 ────────────────────────────────────────────────
+  rpc Like(LikeRequest) returns (LikeResponse);
+  rpc CancelLike(CancelLikeRequest) returns (CancelLikeResponse);
+  rpc Collect(CollectRequest) returns (CollectResponse);
+  rpc CancelCollect(CancelCollectRequest) returns (CancelCollectResponse);
+  rpc IncrReadCount(IncrReadCountRequest) returns (IncrReadCountResponse);
+  rpc BatchIncrReadCount(BatchIncrReadCountRequest) returns (BatchIncrReadCountResponse);
+
+  // ── 读 ────────────────────────────────────────────────
+  rpc GetInteraction(GetInteractionRequest) returns (GetInteractionResponse);
+  rpc GetUserState(GetUserStateRequest) returns (GetUserStateResponse);
+  rpc BatchGetInteractions(BatchGetInteractionsRequest) returns (BatchGetInteractionsResponse);
+  rpc GetUserLiked(GetUserLikedRequest) returns (GetUserLikedResponse);
   rpc GetHotBizIds(GetHotBizIdsRequest) returns (GetHotBizIdsResponse);
   rpc GetCollectedBizIds(GetCollectedBizIdsRequest) returns (GetCollectedBizIdsResponse);
+}
+
+// Interaction 互动聚合视图。计数对所有人一致；liked/collected 仅在请求带 uid 时有意义。
+message Interaction {
+  string biz = 1;
+  int64 biz_id = 2;
+  int64 read_count = 3;
+  int64 like_count = 4;
+  int64 collect_count = 5;
+  bool liked = 6;       // 当前用户是否已赞（uid<=0 时恒为 false）
+  bool collected = 7;   // 当前用户是否已收藏（uid<=0 时恒为 false）
+}
+
+message LikeRequest {
+  int64 uid = 1;
+  string biz = 2;
+  int64 biz_id = 3;
+}
+message LikeResponse {}
+
+message CancelLikeRequest {
+  int64 uid = 1;
+  string biz = 2;
+  int64 biz_id = 3;
+}
+message CancelLikeResponse {}
+
+message CollectRequest {
+  int64 uid = 1;
+  string biz = 2;
+  int64 biz_id = 3;
+}
+message CollectResponse {}
+
+message CancelCollectRequest {
+  int64 uid = 1;
+  string biz = 2;
+  int64 biz_id = 3;
+}
+message CancelCollectResponse {}
+
+// IncrReadCount 阅读/浏览数 +1（无需登录，故无 uid）。
+message IncrReadCountRequest {
+  string biz = 1;
+  int64 biz_id = 2;
+}
+message IncrReadCountResponse {}
+
+// BatchIncrReadCount 批量阅读数累加：webook-worker 消费 read 事件后按 (biz,biz_id) 聚合，一批一次提交。
+// 取代逐条 IncrReadCount 的 N+1 over-the-wire；整批一次 RPC，避免「批内前几条成功、后一条失败
+// → 整批重投 → 已成功的重复计数」的虚高。
+message ReadCountItem {
+  string biz = 1;
+  int64 biz_id = 2;
+  int64 count = 3; // 该 (biz,biz_id) 在本批聚合的浏览次数
+}
+message BatchIncrReadCountRequest {
+  repeated ReadCountItem items = 1;
+}
+message BatchIncrReadCountResponse {}
+
+// GetInteraction 单条互动聚合。uid>0 时回填 liked/collected；uid<=0 仅返回计数。
+message GetInteractionRequest {
+  int64 uid = 1;
+  string biz = 2;
+  int64 biz_id = 3;
+}
+message GetInteractionResponse {
+  Interaction interaction = 1;
+}
+
+// GetUserState 只查用户的 liked/collected，不查聚合计数。
+message GetUserStateRequest {
+  int64 uid = 1;
+  string biz = 2;
+  int64 biz_id = 3;
+}
+message GetUserStateResponse {
+  bool liked = 1;
+  bool collected = 2;
+}
+
+// BatchGetInteractions 按 biz_ids 批量取聚合计数（不含用户状态），key=biz_id。
+message BatchGetInteractionsRequest {
+  string biz = 1;
+  repeated int64 biz_ids = 2;
+}
+message BatchGetInteractionsResponse {
+  map<int64, Interaction> interactions = 1;
+}
+
+// GetUserLiked 批量查用户对 biz_ids 的点赞状态，只回已赞的 biz_id（未赞者 core 端缺省取 false）。
+message GetUserLikedRequest {
+  int64 uid = 1;
+  string biz = 2;
+  repeated int64 biz_ids = 3;
+}
+message GetUserLikedResponse {
+  repeated int64 liked_biz_ids = 1;
 }
 
 message GetHotBizIdsRequest {
   string biz = 1;
   int32 limit = 2;
 }
-
 message GetHotBizIdsResponse {
   repeated int64 biz_ids = 1;
 }
@@ -33,7 +139,6 @@ message GetCollectedBizIdsRequest {
   string biz = 2;
   int32 limit = 3;
 }
-
 message GetCollectedBizIdsResponse {
   repeated int64 biz_ids = 1;
 }

@@ -10,6 +10,7 @@ import * as interactionApi from '@/api/interaction';
 import * as userApi from '@/api/user';
 import { BIZ } from '@/constants/biz';
 import type { Comment, CommentSort } from '@/types';
+import { getErrorMessage } from '@/utils/apiError';
 import { tokenUtil } from '@/utils/token';
 
 import { CommentEditor } from './CommentEditor';
@@ -22,13 +23,6 @@ const SORTS: { key: CommentSort; label: string }[] = [
   { key: 'hot', label: '最热' },
   { key: 'new', label: '最新' },
 ];
-
-// errMsg 优先取后端 *errs.Error 的 msg（如敏感词 422），否则回退
-function errMsg(e: unknown, fallback: string): string {
-  const msg = (e as { response?: { data?: { msg?: string } } })?.response?.data
-    ?.msg;
-  return msg || fallback;
-}
 
 interface CommentSectionProps {
   articleId: number;
@@ -72,15 +66,13 @@ export function CommentSection({ articleId }: CommentSectionProps) {
         offset: 0,
         limit: PAGE_SIZE,
       });
-      if (r.data.code === 0) {
-        const list = r.data.data.list ?? [];
-        setComments(list);
-        setTotal(r.data.data.total ?? 0);
-        // 一级评论拉满一页才可能有更多；hot 为 P0 首屏 top-N，不分页
-        setHasMore(sort === 'new' && list.length >= PAGE_SIZE);
-      }
+      const list = r.data.data.list ?? [];
+      setComments(list);
+      setTotal(r.data.data.total ?? 0);
+      // 一级评论拉满一页才可能有更多；hot 为 P0 首屏 top-N，不分页
+      setHasMore(sort === 'new' && list.length >= PAGE_SIZE);
     } catch (e) {
-      message.error(errMsg(e, '评论加载失败'));
+      message.error(getErrorMessage(e, '评论加载失败'));
     } finally {
       setLoading(false);
     }
@@ -109,13 +101,11 @@ export function CommentSection({ articleId }: CommentSectionProps) {
         offset: comments.length,
         limit: PAGE_SIZE,
       });
-      if (r.data.code === 0) {
-        const list = r.data.data.list ?? [];
-        setComments((prev) => [...prev, ...list]);
-        setHasMore(list.length >= PAGE_SIZE);
-      }
+      const list = r.data.data.list ?? [];
+      setComments((prev) => [...prev, ...list]);
+      setHasMore(list.length >= PAGE_SIZE);
     } catch (e) {
-      message.error(errMsg(e, '加载失败'));
+      message.error(getErrorMessage(e, '加载失败'));
     } finally {
       setLoading(false);
     }
@@ -128,35 +118,29 @@ export function CommentSection({ articleId }: CommentSectionProps) {
         offset: 0,
         limit: REPLIES_LIMIT,
       });
-      if (r.data.code === 0) {
-        const list = r.data.data.list ?? [];
-        setRepliesMap((prev) => ({ ...prev, [rootId]: list }));
-        setExpanded((prev) => ({ ...prev, [rootId]: true }));
-        // 同步楼主「展开 N 条回复」计数为实际加载数，防 reply_cnt 漂移（如删唯一回复后仍显 1 条）
-        setComments((prev) =>
-          prev.map((x) =>
-            x.id === rootId ? { ...x, replyCnt: list.length } : x,
-          ),
-        );
-      }
+      const list = r.data.data.list ?? [];
+      setRepliesMap((prev) => ({ ...prev, [rootId]: list }));
+      setExpanded((prev) => ({ ...prev, [rootId]: true }));
+      // 同步楼主「展开 N 条回复」计数为实际加载数，防 reply_cnt 漂移（如删唯一回复后仍显 1 条）
+      setComments((prev) =>
+        prev.map((x) =>
+          x.id === rootId ? { ...x, replyCnt: list.length } : x,
+        ),
+      );
     } catch (e) {
-      message.error(errMsg(e, '加载回复失败'));
+      message.error(getErrorMessage(e, '加载回复失败'));
     }
   };
 
   const submitTop = async (content: string): Promise<boolean> => {
     try {
       const r = await commentApi.createComment({ articleId, content });
-      if (r.data.code === 0) {
-        setComments((prev) => [r.data.data.comment, ...prev]);
-        setTotal((t) => t + 1);
-        message.success('评论成功');
-        return true;
-      }
-      message.error(r.data.msg || '评论失败');
-      return false;
+      setComments((prev) => [r.data.data.comment, ...prev]);
+      setTotal((t) => t + 1);
+      message.success('评论成功');
+      return true;
     } catch (e) {
-      message.error(errMsg(e, '请先登录后再评论'));
+      message.error(getErrorMessage(e, '请先登录后再评论'));
       return false;
     }
   };
@@ -167,23 +151,19 @@ export function CommentSection({ articleId }: CommentSectionProps) {
     content: string,
   ): Promise<boolean> => {
     try {
-      const r = await commentApi.createComment({ articleId, content, pid });
-      if (r.data.code === 0) {
-        setComments((prev) =>
-          prev.map((x) =>
-            x.id === rootId ? { ...x, replyCnt: x.replyCnt + 1 } : x,
-          ),
-        );
-        setReplyingTo(null);
-        message.success('回复成功');
-        // 重拉整楼：保证原有回复 + 新回复都在（直接 append 会隐藏未加载的旧回复）
-        await loadReplies(rootId);
-        return true;
-      }
-      message.error(r.data.msg || '回复失败');
-      return false;
+      await commentApi.createComment({ articleId, content, pid });
+      setComments((prev) =>
+        prev.map((x) =>
+          x.id === rootId ? { ...x, replyCnt: x.replyCnt + 1 } : x,
+        ),
+      );
+      setReplyingTo(null);
+      message.success('回复成功');
+      // 重拉整楼：保证原有回复 + 新回复都在（直接 append 会隐藏未加载的旧回复）
+      await loadReplies(rootId);
+      return true;
     } catch (e) {
-      message.error(errMsg(e, '回复失败'));
+      message.error(getErrorMessage(e, '回复失败'));
       return false;
     }
   };
@@ -208,28 +188,20 @@ export function CommentSection({ articleId }: CommentSectionProps) {
     const newLiked = !c.liked;
     applyLike(c.id, newLiked); // 乐观更新
     try {
-      const r = await interactionApi.like({
+      await interactionApi.like({
         biz: BIZ.COMMENT,
         bizId: c.id,
         liked: newLiked,
       });
-      if (r.data.code !== 0) {
-        applyLike(c.id, !newLiked);
-        message.error(r.data.msg || '操作失败');
-      }
     } catch (e) {
       applyLike(c.id, !newLiked); // 回滚
-      message.error(errMsg(e, '请先登录后再操作'));
+      message.error(getErrorMessage(e, '请先登录后再操作'));
     }
   };
 
   const remove = async (c: Comment) => {
     try {
-      const r = await commentApi.deleteComment(c.id);
-      if (r.data.code !== 0) {
-        message.error(r.data.msg || '删除失败');
-        return;
-      }
+      await commentApi.deleteComment(c.id);
       message.success('已删除');
       // 后端决定：有子回复→占位保留，无子→真删。刷新对应数据拿准确结果（避免前端臆测）
       if (c.rootId === 0) {
@@ -238,7 +210,7 @@ export function CommentSection({ articleId }: CommentSectionProps) {
         await loadReplies(c.rootId);
       }
     } catch (e) {
-      message.error(errMsg(e, '删除失败'));
+      message.error(getErrorMessage(e, '删除失败'));
     }
   };
 

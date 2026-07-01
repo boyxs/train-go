@@ -18,9 +18,9 @@ var ErrRecordNotFound = gorm.ErrRecordNotFound
 //	400 — 请求体校验失败
 //	429 — 触发限流
 var (
-	ErrConversationNotFound = errs.New(404, "对话不存在")
-	ErrMessageTooLong       = errs.New(400, "消息内容过长")
-	ErrFeedbackInvalid      = errs.New(400, "无效的反馈值")
-	ErrChatInvalidArgs      = errs.New(400, "参数错误")
-	ErrChatRateLimit        = errs.New(429, "发送过于频繁，请稍后再试")
+	ErrConversationNotFound = errs.New(404, "对话不存在").WithReason("CHAT_CONVERSATION_NOT_FOUND")
+	ErrMessageTooLong       = errs.New(400, "消息内容过长").WithReason("CHAT_MESSAGE_TOO_LONG")
+	ErrFeedbackInvalid      = errs.New(400, "无效的反馈值").WithReason("CHAT_FEEDBACK_INVALID")
+	ErrChatInvalidArgs      = errs.New(400, "参数错误").WithReason("CHAT_INVALID_ARGUMENT")
+	ErrChatRateLimit        = errs.New(429, "发送过于频繁，请稍后再试").WithReason("CHAT_RATE_LIMITED")
 )

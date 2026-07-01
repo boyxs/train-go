@@ -1,0 +1,47 @@
+# worker staging 环境配置。差异点：otel.env=staging / sampleRatio=0.5 / logger info。
+
+etcd:
+  endpoints:
+    - "http://webook-etcd:2379"
+  # 无 path/type：worker 静态配置（LoadLocal），etcd 仅供 gRPC 服务发现，不接 viperx.WatchRemote 热更
+
+http:
+  addr: ":8050"
+
+grpc:
+  client:
+    webook-core:
+      target: "etcd:///service/webook-core"
+      balancer: "breaker_swrr"
+    webook-interaction:
+      target: "etcd:///service/webook-interaction"
+      balancer: "breaker_swrr"
+
+redis:
+  addr: 'webook-redis:6379'
+  password: '13520'
+
+kafka:
+  addrs:
+    - 'webook-kafka:9092'
+  dialTimeout: 10
+  readTimeout: 10
+  writeTimeout: 10
+  consumerGroup: "interaction-consumer"
+  consumerBackoffInitial: 5
+  consumerBackoffMax: 60
+
+logger:
+  level:
+    l: 0
+  development: false
+  encoding: 'json'
+  outputPaths: [ 'stdout' ]
+  errorOutputPaths: [ 'stderr' ]
+
+otel:
+  endpoint: "otel-collector:4317"
+  serviceName: "webook-worker"
+  serviceVersion: "0.1.0"
+  env: "staging"
+  sampleRatio: 0.5

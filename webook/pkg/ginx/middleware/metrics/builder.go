@@ -6,6 +6,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/webook/pkg/ginx"
 )
 
 // Builder 指标中间件构造器接口
@@ -16,7 +18,8 @@ type Builder interface {
 // PrometheusBuilder Prometheus 实现的 HTTP 指标中间件构造器
 //
 // 按需启用：
-//   - WithCounter()   → {name}_total (Counter, 标签: method/pattern/status)
+//   - WithCounter()   → {name}_total (Counter, 标签: method/pattern/status/reason)
+//     reason = 业务原因码（ginx.CtxBizReason，仅错误路径非空），供按业务原因聚合/告警；成功路径为空串
 //   - WithHistogram() → {name}_duration_seconds (Histogram, 标签: method/pattern)
 //   - WithSummary()   → {name}_duration_seconds_summary (Summary, 标签: method/pattern)
 //   - WithInFlight()  → {name}_in_flight (Gauge, 标签: method/pattern)
@@ -117,7 +120,7 @@ func (b *PrometheusBuilder) Build() gin.HandlerFunc {
 			Subsystem: b.subsystem,
 			Name:      b.name + "_total",
 			Help:      b.help,
-		}, []string{"method", "pattern", "status"})
+		}, []string{"method", "pattern", "status", "reason"})
 		b.registry.MustRegister(counter)
 	}
 
@@ -165,7 +168,8 @@ func (b *PrometheusBuilder) Build() gin.HandlerFunc {
 			duration := time.Since(start).Seconds()
 
 			if counter != nil {
-				counter.WithLabelValues(method, pattern, strconv.Itoa(ctx.Writer.Status())).Inc()
+				// reason 由 ginx.WriteError 写进 ctx（仅业务错误路径），成功/非业务错误为空串
+				counter.WithLabelValues(method, pattern, strconv.Itoa(ctx.Writer.Status()), ctx.GetString(ginx.CtxBizReason)).Inc()
 			}
 			if histogram != nil {
 				histogram.WithLabelValues(method, pattern).Observe(duration)

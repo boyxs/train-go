@@ -159,6 +159,15 @@
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
       "targets": [{ "expr": "process_open_fds{job=~\"$service\"}", "legendFormat": "{{job}} open fds" }],
       "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] }
+    },
+    {
+      "title": "业务错误（按 reason）",
+      "description": "按 reason 聚合的业务错误速率，看哪类业务错误在涨。",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 44 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "targets": [{ "expr": "topk(10, sum(webook:http_biz_errors:rate5m{job=~\"$service\"}) by (reason))", "legendFormat": "{{reason}}" }],
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "drawStyle": "bars", "fillOpacity": 80, "stacking": { "mode": "normal" } } }, "overrides": [] }
     }
   ],
   "schemaVersion": 39,

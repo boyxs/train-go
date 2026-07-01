@@ -30,11 +30,11 @@ import (
 
 // ErrApprovalSameActor 双人复核的 propose 与 approve 是同一 actor。
 // HTTP 409 — 状态冲突（流程要求两个不同 actor）。
-var ErrApprovalSameActor = errs.New(409, "propose 和 approve 必须是不同用户")
+var ErrApprovalSameActor = errs.New(409, "propose 和 approve 必须是不同用户").WithReason("MIGRATOR_APPROVAL_SAME_ACTOR")
 
 // ErrProposeNotFound approve 时没有找到 active 的 propose（未提议或已过期）。
 // HTTP 412 — 前置条件未满足（需先 propose 再 approve）。
-var ErrProposeNotFound = errs.New(412, "未提议或提议已过期，请先 propose")
+var ErrProposeNotFound = errs.New(412, "未提议或提议已过期，请先 propose").WithReason("MIGRATOR_PROPOSE_NOT_FOUND")
 
 // SwitchService 切流引擎接口。
 type SwitchService interface {

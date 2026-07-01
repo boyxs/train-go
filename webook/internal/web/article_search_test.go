@@ -41,7 +41,7 @@ func TestSearchHandler_Search(t *testing.T) {
 				return svc
 			},
 			wantCode:   http.StatusOK,
-			wantResult: Result{Code: 0, Data: map[string]any{"list": articles, "total": float64(1)}},
+			wantResult: Result{Code: 200, Msg: "OK", Data: map[string]any{"list": articles, "total": float64(1)}},
 		},
 		{
 			name:    "query 为空",
@@ -62,7 +62,7 @@ func TestSearchHandler_Search(t *testing.T) {
 				return svc
 			},
 			wantCode:   http.StatusOK,
-			wantResult: Result{Code: 0, Data: map[string]any{"list": nil, "total": float64(0)}},
+			wantResult: Result{Code: 200, Msg: "OK", Data: map[string]any{"list": nil, "total": float64(0)}},
 		},
 		{
 			name:    "SearchService 失败",

@@ -1,0 +1,125 @@
+apiVersion: 1
+
+# webook-worker（调度器）服务级告警。worker 无对外 gRPC server、无自定义业务指标，
+# 关注：服务存活 / goroutine 泄漏 / 分布式锁中途丢失（多副本 split-brain 信号）。
+# cron 业务失败本身靠 webook-jobs 看板 + core 侧告警观测。
+groups:
+  - orgId: 1
+    name: webook-worker
+    folder: Webook
+    interval: 1m
+    rules:
+
+      # ── ① 服务存活 ────────────────────────────────────────
+      - uid: webook-worker-up
+        title: Webook Worker 服务不可达
+        condition: C
+        for: 1m
+        noDataState: NoData
+        execErrState: Error
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "Webook Worker 实例 {{ $labels.instance }} 不可达（cron + 消费者停摆）"
+          runbook_url: "https://wiki.internal/runbook/webook-worker-down"
+        data:
+          - refId: A
+            relativeTimeRange: { from: 60, to: 0 }
+            datasourceUid: prometheus
+            model:
+              expr: 'up{job="webook-worker"}'
+              refId: A
+              instant: true
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: lt, params: [1] }
+              refId: C
+
+      # ── ② Goroutine 暴涨 ────────────────────────────────
+      - uid: webook-worker-goroutines
+        title: Worker Goroutine 数 > 10000
+        condition: C
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: high
+          team: backend
+        annotations:
+          summary: "Worker Goroutine 数 {{ $values.B.Value }}（疑似泄漏）"
+          runbook_url: "https://wiki.internal/runbook/goroutine-leak"
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              expr: 'go_goroutines{job="webook-worker"}'
+              refId: A
+              instant: true
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [10000] }
+              refId: C
+
+      # ── ③ 分布式锁中途丢失（多副本 split-brain 信号）─────────
+      # cron 锁 TTL=30s + watchdog 续约；续约失败 = 锁可能已被另一副本抢走，
+      # 本副本却仍在跑 → 同一榜单任务并发重算/归档。webook_lock_watchdog_lost_total
+      # 由 redislockx prometheus 装饰器自动埋（见 pkg/redislockx/prometheus/builder.go）。
+      - uid: webook-worker-lock-lost
+        title: Worker 分布式锁中途丢失
+        condition: C
+        for: 0m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "Worker cron 锁 watchdog 续约失败（5m 内丢锁，多副本可能并发跑同一任务）"
+          runbook_url: "https://wiki.internal/runbook/webook-worker-lock-lost"
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              expr: 'increase(webook_lock_watchdog_lost_total{job="webook-worker"}[5m])'
+              refId: A
+              instant: true
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+              refId: C

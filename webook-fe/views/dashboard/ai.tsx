@@ -15,6 +15,7 @@ import React, { useEffect, useState } from 'react';
 
 import { fetchAIDashboard } from '@/api/ai';
 import type { AIClickDashboard, TopArticle } from '@/types';
+import { getErrorMessage } from '@/utils/apiError';
 
 const statCards = [
   {
@@ -102,14 +103,8 @@ export default function AIDashboardPage() {
 
   useEffect(() => {
     fetchAIDashboard()
-      .then((res) => {
-        if (res.data.code === 0) {
-          setData(res.data.data);
-        } else {
-          message.error(res.data.msg || '加载失败');
-        }
-      })
-      .catch(() => message.error('网络错误'))
+      .then((res) => setData(res.data.data))
+      .catch((e) => message.error(getErrorMessage(e, '加载失败')))
       .finally(() => setLoading(false));
   }, [message]);
 

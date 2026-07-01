@@ -10,6 +10,7 @@ import (
 
 	"github.com/webook/migrator/consts"
 	"github.com/webook/migrator/domain"
+	migratorerrs "github.com/webook/migrator/errs"
 	"github.com/webook/migrator/pipeline/sink"
 	"github.com/webook/migrator/pipeline/source"
 	"github.com/webook/migrator/pipeline/transform"
@@ -294,9 +295,9 @@ func TestVerifyEngine_Full(t *testing.T) {
 func TestVerifyEngine_Sample_InvalidRate(t *testing.T) {
 	eng := newEngine(t, &stubTaskService{}, &stubValidateLogRepository{}, &stubSource{}, &stubSource{}, Config{})
 	_, err := eng.Sample(context.Background(), 1, 0)
-	assert.ErrorIs(t, err, ErrInvalidSampleRate)
+	assert.ErrorIs(t, err, migratorerrs.ErrInvalidSampleRate)
 	_, err = eng.Sample(context.Background(), 1, 1.5)
-	assert.ErrorIs(t, err, ErrInvalidSampleRate)
+	assert.ErrorIs(t, err, migratorerrs.ErrInvalidSampleRate)
 }
 
 func TestVerifyEngine_Repair(t *testing.T) {

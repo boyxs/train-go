@@ -27,7 +27,8 @@ type ArticleAuthorHandlerSuite struct {
 }
 
 func (h *ArticleAuthorHandlerSuite) TearDownTest() {
-	h.truncate("article", "published_article", "interaction")
+	// 不 truncate interaction：core 用 fake 不写它，跨包 truncate 会冲掉 interaction 测试
+	h.truncate("article", "published_article")
 }
 
 func (h *ArticleAuthorHandlerSuite) truncate(tables ...string) {
@@ -238,7 +239,7 @@ func (h *ArticleAuthorHandlerSuite) TestArticleAuthorHandler_Edit() {
 			var result Result[int64]
 			err = json.NewDecoder(recorder.Body).Decode(&result)
 			assert.NoError(t, err)
-			assert.Equal(t, tc.wantResult, result)
+			assertResult(t, tc.wantCode, tc.wantResult, result)
 		})
 	}
 }
@@ -401,7 +402,7 @@ func (h *ArticleAuthorHandlerSuite) TestArticleAuthorHandler_Publish() {
 			var result Result[any]
 			err = json.NewDecoder(recorder.Body).Decode(&result)
 			assert.NoError(t, err)
-			assert.Equal(t, tc.wantResult, result)
+			assertResult(t, tc.wantCode, tc.wantResult, result)
 		})
 	}
 }
@@ -579,7 +580,7 @@ func (h *ArticleAuthorHandlerSuite) TestArticleAuthorHandler_Withdraw() {
 			var result Result[any]
 			err = json.NewDecoder(recorder.Body).Decode(&result)
 			assert.NoError(t, err)
-			assert.Equal(t, tc.wantResult, result)
+			assertResult(t, tc.wantCode, tc.wantResult, result)
 		})
 	}
 }
@@ -588,6 +589,18 @@ type Result[T any] struct {
 	Code int    `json:"code"`
 	Msg  string `json:"msg"`
 	Data T      `json:"data"`
+}
+
+// assertResult 比较响应体：成功路径框架统一填 code=200 / msg 空补 "OK"，
+// 故 want 只需写关心的 Data（成功）或 Code+Msg（错误），无需每处写 200/OK。
+func assertResult[T any](t *testing.T, wantCode int, want, got Result[T]) {
+	if wantCode == http.StatusOK {
+		want.Code = http.StatusOK
+		if want.Msg == "" {
+			want.Msg = "OK"
+		}
+	}
+	assert.Equal(t, want, got)
 }
 
 // TestArticleAuthorHandler_RepublishAfterWithdraw_ResetsDeletedAt
@@ -743,7 +756,7 @@ func (h *ArticleAuthorHandlerSuite) TestArticleAuthorHandler_Detail() {
 			// 忽略时间字段
 			result.Data.CreatedAt = 0
 			result.Data.UpdatedAt = 0
-			assert.Equal(t, tc.wantResult, result)
+			assertResult(t, tc.wantCode, tc.wantResult, result)
 		})
 	}
 }
@@ -861,7 +874,7 @@ func (h *ArticleAuthorHandlerSuite) TestArticleAuthorHandler_Page() {
 			for i := range result.Data.List {
 				result.Data.List[i].UpdatedAt = 0
 			}
-			assert.Equal(t, tc.wantResult, result)
+			assertResult(t, tc.wantCode, tc.wantResult, result)
 		})
 	}
 }
@@ -958,7 +971,7 @@ func (h *ArticleAuthorHandlerSuite) TestArticleAuthorHandler_List() {
 			for i := range result.Data {
 				result.Data[i].UpdatedAt = 0
 			}
-			assert.Equal(t, tc.wantResult, result)
+			assertResult(t, tc.wantCode, tc.wantResult, result)
 		})
 	}
 }
@@ -1093,7 +1106,7 @@ func (h *ArticleAuthorHandlerSuite) TestArticleAuthorHandler_Delete() {
 			var result Result[any]
 			err = json.NewDecoder(recorder.Body).Decode(&result)
 			assert.NoError(t, err)
-			assert.Equal(t, tc.wantResult, result)
+			assertResult(t, tc.wantCode, tc.wantResult, result)
 		})
 	}
 }

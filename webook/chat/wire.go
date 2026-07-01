@@ -31,7 +31,9 @@ func InitApp() (App, func(), error) {
 		ioc.InitRedis,
 		// gRPC
 		ioc.InitEtcdClient,
+		ioc.InitGRPCMetrics,
 		ioc.InitCoreConn,
+		ioc.InitInteractionConn,
 		ioc.InitSearchClient,
 		ioc.InitArticleReaderClient,
 		ioc.InitInteractionClient,

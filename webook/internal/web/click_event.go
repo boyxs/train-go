@@ -5,7 +5,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/webook/internal/consts"
 	"github.com/webook/internal/errs"
 	"github.com/webook/internal/service"
 	"github.com/webook/pkg/ginx"
@@ -27,7 +26,7 @@ func NewAIClickEventHandler(svc service.ClickEventService, l logger.LoggerX) Cli
 
 func (h *AIClickEventHandler) RegisterRoutes(server *gin.Engine) {
 	g := server.Group("/ai")
-	g.POST("/click", ginx.WrapReqClaims[clickReq, UserClaims](consts.UserKey, h.Click))
+	g.POST("/click", ginx.WrapReq[clickReq](h.Click))
 	// dashboard 是运营/调试接口（聚合点击数据 + Top 文章），生产环境禁用避免外泄；
 	// 同 ranking.Archive 模式：DEPLOY_ENV=prod 时不注册路由，本地/dev/staging 保留以便调试
 	if os.Getenv("DEPLOY_ENV") != "prod" {
@@ -40,7 +39,8 @@ type clickReq struct {
 	ConversationId int64 `json:"conversation_id"`
 }
 
-func (h *AIClickEventHandler) Click(ctx *gin.Context, req clickReq, uc UserClaims) (ginx.Result, error) {
+func (h *AIClickEventHandler) Click(ctx *gin.Context, req clickReq) (ginx.Result, error) {
+	uc := ginx.MustClaims[UserClaims](ctx)
 	if req.ArticleId <= 0 || req.ConversationId <= 0 {
 		return ginx.Result{}, errs.ErrClickInvalidArgs
 	}

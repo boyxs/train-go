@@ -20,25 +20,42 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	InteractionService_GetHotBizIds_FullMethodName       = "/webook.interaction.v1.InteractionService/GetHotBizIds"
-	InteractionService_GetCollectedBizIds_FullMethodName = "/webook.interaction.v1.InteractionService/GetCollectedBizIds"
+	InteractionService_Like_FullMethodName                 = "/webook.interaction.v1.InteractionService/Like"
+	InteractionService_CancelLike_FullMethodName           = "/webook.interaction.v1.InteractionService/CancelLike"
+	InteractionService_Collect_FullMethodName              = "/webook.interaction.v1.InteractionService/Collect"
+	InteractionService_CancelCollect_FullMethodName        = "/webook.interaction.v1.InteractionService/CancelCollect"
+	InteractionService_IncrReadCount_FullMethodName        = "/webook.interaction.v1.InteractionService/IncrReadCount"
+	InteractionService_BatchIncrReadCount_FullMethodName   = "/webook.interaction.v1.InteractionService/BatchIncrReadCount"
+	InteractionService_GetInteraction_FullMethodName       = "/webook.interaction.v1.InteractionService/GetInteraction"
+	InteractionService_GetUserState_FullMethodName         = "/webook.interaction.v1.InteractionService/GetUserState"
+	InteractionService_BatchGetInteractions_FullMethodName = "/webook.interaction.v1.InteractionService/BatchGetInteractions"
+	InteractionService_GetUserLiked_FullMethodName         = "/webook.interaction.v1.InteractionService/GetUserLiked"
+	InteractionService_GetHotBizIds_FullMethodName         = "/webook.interaction.v1.InteractionService/GetHotBizIds"
+	InteractionService_GetCollectedBizIds_FullMethodName   = "/webook.interaction.v1.InteractionService/GetCollectedBizIds"
 )
 
 // InteractionServiceClient is the client API for InteractionService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// InteractionService 暴露互动数据的批量查询能力。
-// 当前仅提供 chat 工具调用所需的两个方法，后续 ranking-service 拆分时复用同一 proto。
+// InteractionService 暴露互动（点赞/收藏/浏览/计数）的读写。core 经 gRPC 调用，鉴权后注入 uid。
+// 按 (biz, biz_id) 的通用限界上下文：新增可互动实体 = 新 biz 值，零代码改动。
 //
-// 命名规范（Google AIP）：
-//   - 标准 Get：单资源查询（AIP-131）
-//   - 标准 BatchGet：按 id 批量查询（AIP-231）
-//   - 标准 Search：全文/复杂查询（AIP-136 已知动词）
-//   - 其它"按某种维度取多条"的查询统一用 Get 前缀作为 AIP-136 自定义动词，
-//     避免与 AIP-132 标准 List（带 page_token 分页）混淆。
-//   - 每个 RPC 拥有独立的 Request 与 Response message，即便 shape 一致也不复用。
+// 命名（Google AIP）：查询用 Get/BatchGet（避免与带分页的 List 混淆），写操作用业务动作动词
+// （Like/Collect/IncrReadCount，与 service 方法同名）；每个 RPC 独立 Request/Response。
 type InteractionServiceClient interface {
+	// ── 写 ────────────────────────────────────────────────
+	Like(ctx context.Context, in *LikeRequest, opts ...grpc.CallOption) (*LikeResponse, error)
+	CancelLike(ctx context.Context, in *CancelLikeRequest, opts ...grpc.CallOption) (*CancelLikeResponse, error)
+	Collect(ctx context.Context, in *CollectRequest, opts ...grpc.CallOption) (*CollectResponse, error)
+	CancelCollect(ctx context.Context, in *CancelCollectRequest, opts ...grpc.CallOption) (*CancelCollectResponse, error)
+	IncrReadCount(ctx context.Context, in *IncrReadCountRequest, opts ...grpc.CallOption) (*IncrReadCountResponse, error)
+	BatchIncrReadCount(ctx context.Context, in *BatchIncrReadCountRequest, opts ...grpc.CallOption) (*BatchIncrReadCountResponse, error)
+	// ── 读 ────────────────────────────────────────────────
+	GetInteraction(ctx context.Context, in *GetInteractionRequest, opts ...grpc.CallOption) (*GetInteractionResponse, error)
+	GetUserState(ctx context.Context, in *GetUserStateRequest, opts ...grpc.CallOption) (*GetUserStateResponse, error)
+	BatchGetInteractions(ctx context.Context, in *BatchGetInteractionsRequest, opts ...grpc.CallOption) (*BatchGetInteractionsResponse, error)
+	GetUserLiked(ctx context.Context, in *GetUserLikedRequest, opts ...grpc.CallOption) (*GetUserLikedResponse, error)
 	GetHotBizIds(ctx context.Context, in *GetHotBizIdsRequest, opts ...grpc.CallOption) (*GetHotBizIdsResponse, error)
 	GetCollectedBizIds(ctx context.Context, in *GetCollectedBizIdsRequest, opts ...grpc.CallOption) (*GetCollectedBizIdsResponse, error)
 }
@@ -49,6 +66,106 @@ type interactionServiceClient struct {
 
 func NewInteractionServiceClient(cc grpc.ClientConnInterface) InteractionServiceClient {
 	return &interactionServiceClient{cc}
+}
+
+func (c *interactionServiceClient) Like(ctx context.Context, in *LikeRequest, opts ...grpc.CallOption) (*LikeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(LikeResponse)
+	err := c.cc.Invoke(ctx, InteractionService_Like_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *interactionServiceClient) CancelLike(ctx context.Context, in *CancelLikeRequest, opts ...grpc.CallOption) (*CancelLikeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CancelLikeResponse)
+	err := c.cc.Invoke(ctx, InteractionService_CancelLike_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *interactionServiceClient) Collect(ctx context.Context, in *CollectRequest, opts ...grpc.CallOption) (*CollectResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CollectResponse)
+	err := c.cc.Invoke(ctx, InteractionService_Collect_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *interactionServiceClient) CancelCollect(ctx context.Context, in *CancelCollectRequest, opts ...grpc.CallOption) (*CancelCollectResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CancelCollectResponse)
+	err := c.cc.Invoke(ctx, InteractionService_CancelCollect_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *interactionServiceClient) IncrReadCount(ctx context.Context, in *IncrReadCountRequest, opts ...grpc.CallOption) (*IncrReadCountResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(IncrReadCountResponse)
+	err := c.cc.Invoke(ctx, InteractionService_IncrReadCount_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *interactionServiceClient) BatchIncrReadCount(ctx context.Context, in *BatchIncrReadCountRequest, opts ...grpc.CallOption) (*BatchIncrReadCountResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(BatchIncrReadCountResponse)
+	err := c.cc.Invoke(ctx, InteractionService_BatchIncrReadCount_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *interactionServiceClient) GetInteraction(ctx context.Context, in *GetInteractionRequest, opts ...grpc.CallOption) (*GetInteractionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetInteractionResponse)
+	err := c.cc.Invoke(ctx, InteractionService_GetInteraction_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *interactionServiceClient) GetUserState(ctx context.Context, in *GetUserStateRequest, opts ...grpc.CallOption) (*GetUserStateResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetUserStateResponse)
+	err := c.cc.Invoke(ctx, InteractionService_GetUserState_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *interactionServiceClient) BatchGetInteractions(ctx context.Context, in *BatchGetInteractionsRequest, opts ...grpc.CallOption) (*BatchGetInteractionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(BatchGetInteractionsResponse)
+	err := c.cc.Invoke(ctx, InteractionService_BatchGetInteractions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *interactionServiceClient) GetUserLiked(ctx context.Context, in *GetUserLikedRequest, opts ...grpc.CallOption) (*GetUserLikedResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetUserLikedResponse)
+	err := c.cc.Invoke(ctx, InteractionService_GetUserLiked_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *interactionServiceClient) GetHotBizIds(ctx context.Context, in *GetHotBizIdsRequest, opts ...grpc.CallOption) (*GetHotBizIdsResponse, error) {
@@ -75,17 +192,24 @@ func (c *interactionServiceClient) GetCollectedBizIds(ctx context.Context, in *G
 // All implementations must embed UnimplementedInteractionServiceServer
 // for forward compatibility.
 //
-// InteractionService 暴露互动数据的批量查询能力。
-// 当前仅提供 chat 工具调用所需的两个方法，后续 ranking-service 拆分时复用同一 proto。
+// InteractionService 暴露互动（点赞/收藏/浏览/计数）的读写。core 经 gRPC 调用，鉴权后注入 uid。
+// 按 (biz, biz_id) 的通用限界上下文：新增可互动实体 = 新 biz 值，零代码改动。
 //
-// 命名规范（Google AIP）：
-//   - 标准 Get：单资源查询（AIP-131）
-//   - 标准 BatchGet：按 id 批量查询（AIP-231）
-//   - 标准 Search：全文/复杂查询（AIP-136 已知动词）
-//   - 其它"按某种维度取多条"的查询统一用 Get 前缀作为 AIP-136 自定义动词，
-//     避免与 AIP-132 标准 List（带 page_token 分页）混淆。
-//   - 每个 RPC 拥有独立的 Request 与 Response message，即便 shape 一致也不复用。
+// 命名（Google AIP）：查询用 Get/BatchGet（避免与带分页的 List 混淆），写操作用业务动作动词
+// （Like/Collect/IncrReadCount，与 service 方法同名）；每个 RPC 独立 Request/Response。
 type InteractionServiceServer interface {
+	// ── 写 ────────────────────────────────────────────────
+	Like(context.Context, *LikeRequest) (*LikeResponse, error)
+	CancelLike(context.Context, *CancelLikeRequest) (*CancelLikeResponse, error)
+	Collect(context.Context, *CollectRequest) (*CollectResponse, error)
+	CancelCollect(context.Context, *CancelCollectRequest) (*CancelCollectResponse, error)
+	IncrReadCount(context.Context, *IncrReadCountRequest) (*IncrReadCountResponse, error)
+	BatchIncrReadCount(context.Context, *BatchIncrReadCountRequest) (*BatchIncrReadCountResponse, error)
+	// ── 读 ────────────────────────────────────────────────
+	GetInteraction(context.Context, *GetInteractionRequest) (*GetInteractionResponse, error)
+	GetUserState(context.Context, *GetUserStateRequest) (*GetUserStateResponse, error)
+	BatchGetInteractions(context.Context, *BatchGetInteractionsRequest) (*BatchGetInteractionsResponse, error)
+	GetUserLiked(context.Context, *GetUserLikedRequest) (*GetUserLikedResponse, error)
 	GetHotBizIds(context.Context, *GetHotBizIdsRequest) (*GetHotBizIdsResponse, error)
 	GetCollectedBizIds(context.Context, *GetCollectedBizIdsRequest) (*GetCollectedBizIdsResponse, error)
 	mustEmbedUnimplementedInteractionServiceServer()
@@ -98,6 +222,36 @@ type InteractionServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedInteractionServiceServer struct{}
 
+func (UnimplementedInteractionServiceServer) Like(context.Context, *LikeRequest) (*LikeResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Like not implemented")
+}
+func (UnimplementedInteractionServiceServer) CancelLike(context.Context, *CancelLikeRequest) (*CancelLikeResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CancelLike not implemented")
+}
+func (UnimplementedInteractionServiceServer) Collect(context.Context, *CollectRequest) (*CollectResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Collect not implemented")
+}
+func (UnimplementedInteractionServiceServer) CancelCollect(context.Context, *CancelCollectRequest) (*CancelCollectResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CancelCollect not implemented")
+}
+func (UnimplementedInteractionServiceServer) IncrReadCount(context.Context, *IncrReadCountRequest) (*IncrReadCountResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method IncrReadCount not implemented")
+}
+func (UnimplementedInteractionServiceServer) BatchIncrReadCount(context.Context, *BatchIncrReadCountRequest) (*BatchIncrReadCountResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method BatchIncrReadCount not implemented")
+}
+func (UnimplementedInteractionServiceServer) GetInteraction(context.Context, *GetInteractionRequest) (*GetInteractionResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetInteraction not implemented")
+}
+func (UnimplementedInteractionServiceServer) GetUserState(context.Context, *GetUserStateRequest) (*GetUserStateResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetUserState not implemented")
+}
+func (UnimplementedInteractionServiceServer) BatchGetInteractions(context.Context, *BatchGetInteractionsRequest) (*BatchGetInteractionsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method BatchGetInteractions not implemented")
+}
+func (UnimplementedInteractionServiceServer) GetUserLiked(context.Context, *GetUserLikedRequest) (*GetUserLikedResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetUserLiked not implemented")
+}
 func (UnimplementedInteractionServiceServer) GetHotBizIds(context.Context, *GetHotBizIdsRequest) (*GetHotBizIdsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetHotBizIds not implemented")
 }
@@ -123,6 +277,186 @@ func RegisterInteractionServiceServer(s grpc.ServiceRegistrar, srv InteractionSe
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&InteractionService_ServiceDesc, srv)
+}
+
+func _InteractionService_Like_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(LikeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InteractionServiceServer).Like(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InteractionService_Like_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InteractionServiceServer).Like(ctx, req.(*LikeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InteractionService_CancelLike_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CancelLikeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InteractionServiceServer).CancelLike(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InteractionService_CancelLike_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InteractionServiceServer).CancelLike(ctx, req.(*CancelLikeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InteractionService_Collect_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CollectRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InteractionServiceServer).Collect(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InteractionService_Collect_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InteractionServiceServer).Collect(ctx, req.(*CollectRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InteractionService_CancelCollect_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CancelCollectRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InteractionServiceServer).CancelCollect(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InteractionService_CancelCollect_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InteractionServiceServer).CancelCollect(ctx, req.(*CancelCollectRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InteractionService_IncrReadCount_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(IncrReadCountRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InteractionServiceServer).IncrReadCount(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InteractionService_IncrReadCount_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InteractionServiceServer).IncrReadCount(ctx, req.(*IncrReadCountRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InteractionService_BatchIncrReadCount_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BatchIncrReadCountRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InteractionServiceServer).BatchIncrReadCount(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InteractionService_BatchIncrReadCount_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InteractionServiceServer).BatchIncrReadCount(ctx, req.(*BatchIncrReadCountRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InteractionService_GetInteraction_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetInteractionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InteractionServiceServer).GetInteraction(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InteractionService_GetInteraction_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InteractionServiceServer).GetInteraction(ctx, req.(*GetInteractionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InteractionService_GetUserState_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetUserStateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InteractionServiceServer).GetUserState(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InteractionService_GetUserState_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InteractionServiceServer).GetUserState(ctx, req.(*GetUserStateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InteractionService_BatchGetInteractions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BatchGetInteractionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InteractionServiceServer).BatchGetInteractions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InteractionService_BatchGetInteractions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InteractionServiceServer).BatchGetInteractions(ctx, req.(*BatchGetInteractionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InteractionService_GetUserLiked_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetUserLikedRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InteractionServiceServer).GetUserLiked(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InteractionService_GetUserLiked_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InteractionServiceServer).GetUserLiked(ctx, req.(*GetUserLikedRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _InteractionService_GetHotBizIds_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -168,6 +502,46 @@ var InteractionService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "webook.interaction.v1.InteractionService",
 	HandlerType: (*InteractionServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "Like",
+			Handler:    _InteractionService_Like_Handler,
+		},
+		{
+			MethodName: "CancelLike",
+			Handler:    _InteractionService_CancelLike_Handler,
+		},
+		{
+			MethodName: "Collect",
+			Handler:    _InteractionService_Collect_Handler,
+		},
+		{
+			MethodName: "CancelCollect",
+			Handler:    _InteractionService_CancelCollect_Handler,
+		},
+		{
+			MethodName: "IncrReadCount",
+			Handler:    _InteractionService_IncrReadCount_Handler,
+		},
+		{
+			MethodName: "BatchIncrReadCount",
+			Handler:    _InteractionService_BatchIncrReadCount_Handler,
+		},
+		{
+			MethodName: "GetInteraction",
+			Handler:    _InteractionService_GetInteraction_Handler,
+		},
+		{
+			MethodName: "GetUserState",
+			Handler:    _InteractionService_GetUserState_Handler,
+		},
+		{
+			MethodName: "BatchGetInteractions",
+			Handler:    _InteractionService_BatchGetInteractions_Handler,
+		},
+		{
+			MethodName: "GetUserLiked",
+			Handler:    _InteractionService_GetUserLiked_Handler,
+		},
 		{
 			MethodName: "GetHotBizIds",
 			Handler:    _InteractionService_GetHotBizIds_Handler,

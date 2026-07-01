@@ -8,7 +8,6 @@ import (
 	"github.com/gin-gonic/gin"
 
 	commentv1 "github.com/webook/api/gen/comment/v1"
-	"github.com/webook/internal/consts"
 	"github.com/webook/internal/domain"
 	"github.com/webook/internal/service"
 	"github.com/webook/pkg/ginx"
@@ -45,31 +44,31 @@ func (h *InternalCommentHandler) RegisterRoutes(server *gin.Engine) {
 	// list/replies 公开可读，登录态可选（OptionalPaths）→ 有 uid 才聚合 liked
 	g.POST("/list", ginx.WrapReq[commentListReq](h.List))
 	g.POST("/replies", ginx.WrapReq[commentRepliesReq](h.Replies))
-	g.POST("/create", ginx.WrapReqClaims[commentCreateReq, UserClaims](consts.UserKey, h.Create))
-	g.POST("/delete", ginx.WrapReqClaims[commentDeleteReq, UserClaims](consts.UserKey, h.Delete))
+	g.POST("/create", ginx.WrapReq[commentCreateReq](h.Create))
+	g.POST("/delete", ginx.WrapReq[commentDeleteReq](h.Delete))
 }
 
 type commentListReq struct {
-	ArticleId int64  `json:"articleId"`
-	Sort      string `json:"sort"` // "hot" | "new"(默认)
+	ArticleId int64  `json:"articleId" binding:"required,gt=0"`
+	Sort      string `json:"sort"` // "hot" | "new"(默认)；非 hot 一律按 new，故不约束
 	Offset    int32  `json:"offset"`
 	Limit     int32  `json:"limit"`
 }
 
 type commentRepliesReq struct {
-	RootId int64 `json:"rootId"`
+	RootId int64 `json:"rootId" binding:"required,gt=0"`
 	Offset int32 `json:"offset"`
 	Limit  int32 `json:"limit"`
 }
 
 type commentCreateReq struct {
-	ArticleId int64  `json:"articleId"`
-	Content   string `json:"content"`
-	Pid       int64  `json:"pid"` // 回复目标父评论；0=一级评论
+	ArticleId int64  `json:"articleId" binding:"required,gt=0"`
+	Content   string `json:"content" binding:"required"`
+	Pid       int64  `json:"pid"` // 回复目标父评论；0=一级评论，故不约束
 }
 
 type commentDeleteReq struct {
-	Id int64 `json:"id"`
+	Id int64 `json:"id" binding:"required,gt=0"`
 }
 
 // CommentVO 对外评论视图，比 proto Comment 多 likeCnt/liked（core 聚合 interaction 填入）
@@ -143,7 +142,8 @@ func (h *InternalCommentHandler) Replies(ctx *gin.Context, req commentRepliesReq
 	return ginx.Result{Data: ginx.PageResult{List: vos, Total: int64(len(vos))}}, nil
 }
 
-func (h *InternalCommentHandler) Create(ctx *gin.Context, req commentCreateReq, uc UserClaims) (ginx.Result, error) {
+func (h *InternalCommentHandler) Create(ctx *gin.Context, req commentCreateReq) (ginx.Result, error) {
+	uc := ginx.MustClaims[UserClaims](ctx)
 	resp, err := h.client.CreateComment(ctx.Request.Context(), &commentv1.CreateCommentRequest{
 		Biz: h.biz, BizId: req.ArticleId, UserId: uc.Userid, Content: req.Content, Pid: req.Pid,
 	})
@@ -155,7 +155,8 @@ func (h *InternalCommentHandler) Create(ctx *gin.Context, req commentCreateReq, 
 	return ginx.Result{Data: gin.H{"comment": toCommentVO(resp.Comment, nil, nil, nameMap)}}, nil
 }
 
-func (h *InternalCommentHandler) Delete(ctx *gin.Context, req commentDeleteReq, uc UserClaims) (ginx.Result, error) {
+func (h *InternalCommentHandler) Delete(ctx *gin.Context, req commentDeleteReq) (ginx.Result, error) {
+	uc := ginx.MustClaims[UserClaims](ctx)
 	// 鉴权（仅本人）由 comment server 校验，失败经 errconv 拦截器转 *errs.Error
 	_, err := h.client.DeleteComment(ctx.Request.Context(), &commentv1.DeleteCommentRequest{
 		Id: req.Id, UserId: uc.Userid,
@@ -280,15 +281,10 @@ func (h *InternalCommentHandler) resolveNames(ctx context.Context, comments []*c
 	return names
 }
 
-// optionalUid 从 ctx 取可选登录态（OptionalPaths 命中时中间件已写入），未登录返回 0
+// optionalUid 取可选登录态（OptionalPaths 命中时中间件已写入），未登录返回 0
 func optionalUid(ctx *gin.Context) int64 {
-	val, ok := ctx.Get(consts.UserKey)
-	if !ok {
-		return 0
+	if uc, ok := ginx.Claims[UserClaims](ctx); ok {
+		return uc.Userid
 	}
-	uc, ok := val.(UserClaims)
-	if !ok {
-		return 0
-	}
-	return uc.Userid
+	return 0
 }

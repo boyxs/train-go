@@ -8,6 +8,7 @@ import React from 'react';
 
 import * as userApi from '@/api/user';
 import type { SmsLoginReq } from '@/types';
+import { getErrorMessage } from '@/utils/apiError';
 
 const { Title, Text } = Typography;
 
@@ -23,28 +24,20 @@ const LoginSmsForm: React.FC = () => {
       return;
     }
     try {
-      const res = await userApi.sendSmsCode({ phone });
-      if (res.data.code === 0 || !res.data.code) {
-        message.success(res.data.msg || '发送成功');
-      } else {
-        message.error(res.data.msg);
-      }
-    } catch {
-      message.error('发送失败');
+      await userApi.sendSmsCode({ phone });
+      message.success('发送成功');
+    } catch (e) {
+      message.error(getErrorMessage(e, '发送失败'));
     }
   };
 
   const onFinish = async (values: SmsLoginReq) => {
     try {
-      const res = await userApi.loginSms(values);
-      if (res.data.code === 0 || !res.data.code) {
-        message.success(res.data.msg || '登录成功');
-        router.replace('/');
-      } else {
-        message.error(res.data.msg);
-      }
-    } catch {
-      message.error('登录失败');
+      await userApi.loginSms(values);
+      message.success('登录成功');
+      router.replace('/');
+    } catch (e) {
+      message.error(getErrorMessage(e, '登录失败'));
     }
   };
 

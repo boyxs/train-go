@@ -63,3 +63,10 @@
   - 两者可组合，不同业务各自有独立的全链路实现
   - 例：`AIClickEventService`、`CacheAIClickEventRepository`、`GormAIClickEventDAO`、`RedisAIClickEventCache`
 - 领域命名要通用化，不要绑定单一来源。例如点击追踪不叫 `AIClick`（只有 AI 场景），叫 `ClickEvent`（通用） + `Source` 字段区分来源
+
+## 9. 测试文件组织
+
+- **一个源文件的测试集中在一个 `_test.go`**：`foo.go` 的测试全写 `foo_test.go`，禁止拆成 `foo_a_test.go`/`foo_b_test.go` 等多份。
+- 已拆的要合并（如 `pkg/ginx` 的 `wrapper.go` 应只有 `wrapper_test.go`，不留 `wrapper_errs_test.go`/`wrapper_variants_test.go`）。
+- 包级共享测试工具（helper/mock/fixture）放 `<pkg>_test.go` 或 `export_test.go`，不为单个测试单开文件。
+- 新增测试优先加进对应已有 `_test.go`，不新建文件。

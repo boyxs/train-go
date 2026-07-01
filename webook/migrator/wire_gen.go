@@ -18,8 +18,6 @@ import (
 	"github.com/webook/migrator/service/switching"
 	"github.com/webook/migrator/web"
 	"github.com/webook/migrator/web/middleware"
-
-	_ "github.com/spf13/viper/remote"
 )
 
 // Injectors from wire.go:

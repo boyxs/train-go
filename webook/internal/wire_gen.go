@@ -9,13 +9,10 @@ package main
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
-	"github.com/robfig/cron/v3"
 
-	"github.com/webook/internal/events"
 	"github.com/webook/internal/events/interaction"
 	"github.com/webook/internal/grpc"
 	"github.com/webook/internal/ioc"
-	"github.com/webook/internal/job"
 	"github.com/webook/internal/repository"
 	"github.com/webook/internal/repository/cache"
 	"github.com/webook/internal/repository/dao"
@@ -63,18 +60,28 @@ func InitWebServer() (App, func(), error) {
 	client := ioc.InitEmbeddingClient(ollamaConfig, config, cmdable, loggerX)
 	articleSearchService := service.NewArticleSearchService(articleSearchRepository, client, loggerX)
 	articleAuthorService := service.NewInternalArticleAuthorService(articleAuthorRepository, articleReaderRepository, articleSearchService, loggerX)
-	interactionDAO := dao.NewGormInteractionDAO(db)
-	interactionCache := cache.NewRedisInteractionCache(cmdable)
-	interactionRepository := repository.NewCacheInteractionRepository(interactionDAO, interactionCache, loggerX)
+	clientv3Client, cleanup2, err := ioc.InitEtcdClient()
+	if err != nil {
+		cleanup()
+		return App{}, nil, err
+	}
+	prometheusBuilder := ioc.InitGRPCMetrics()
+	interactionConn, cleanup3, err := ioc.InitInteractionConn(clientv3Client, prometheusBuilder)
+	if err != nil {
+		cleanup2()
+		cleanup()
+		return App{}, nil, err
+	}
+	interactionServiceClient := ioc.InitInteractionClient(interactionConn)
 	rankingCache := cache.NewRedisArticleRankingCache(cmdable, loggerX)
 	rankingDAO := dao.NewGormArticleRankingDAO(db)
 	rankingRepository := repository.NewCacheArticleRankingRepository(rankingCache, rankingDAO, loggerX)
+	pool, cleanup4 := ioc.InitRankingBoostPool(loggerX)
 	kafkaConfig := ioc.InitKafkaConfig()
 	saramaConfig := ioc.InitSaramaConfig(kafkaConfig)
-	syncProducer := ioc.InitSaramaSyncProducer(kafkaConfig, saramaConfig)
-	producer := ioc.InitEventProducer(syncProducer, loggerX)
+	producer := ioc.InitEventProducer(kafkaConfig, saramaConfig, loggerX)
 	interactionEventProducer := interaction.NewSaramaInteractionEventProducer(producer)
-	interactionService := ioc.InitInteractionService(interactionRepository, rankingRepository, interactionEventProducer, loggerX)
+	interactionService := ioc.InitInteractionService(interactionServiceClient, rankingRepository, pool, interactionEventProducer, loggerX)
 	articleAuthorHandler := web.NewInternalArticleAuthorHandler(articleAuthorService, interactionService, loggerX)
 	articleReaderService := service.NewInternalArticleReaderService(articleReaderRepository)
 	articleReaderHandler := web.NewInternalArticleReaderHandler(articleReaderService, interactionService, loggerX)
@@ -91,16 +98,12 @@ func InitWebServer() (App, func(), error) {
 	llmClient := ioc.InitLLMClient(llmConfig, loggerX)
 	articlePolishService := service.NewAIArticlePolishService(llmClient)
 	articlePolishHandler := web.NewAIArticlePolishHandler(articlePolishService, cmdable, loggerX)
-	rankingService := service.NewArticleRankingService(rankingRepository, articleReaderRepository, interactionRepository, clickEventService, loggerX)
+	rankingService := service.NewArticleRankingService(rankingRepository, articleReaderRepository, interactionService, clickEventService, loggerX)
 	rankingHandler := web.NewArticleRankingHandler(rankingService, loggerX)
-	clientv3Client, cleanup2, err := ioc.InitEtcdClient()
+	commentConn, cleanup5, err := ioc.InitCommentConn(clientv3Client, prometheusBuilder)
 	if err != nil {
-		cleanup()
-		return App{}, nil, err
-	}
-	prometheusBuilder := ioc.InitGRPCMetrics()
-	commentConn, cleanup3, err := ioc.InitCommentConn(clientv3Client, prometheusBuilder)
-	if err != nil {
+		cleanup4()
+		cleanup3()
 		cleanup2()
 		cleanup()
 		return App{}, nil, err
@@ -110,23 +113,14 @@ func InitWebServer() (App, func(), error) {
 	engine := ioc.InitWebServer(v, userHandler, articleAuthorHandler, articleReaderHandler, interactionHandler, oAuth2Handler, articleSearchHandler, clickEventHandler, articlePolishHandler, rankingHandler, commentHandler)
 	searchServer := grpc.NewSearchServer(articleSearchService)
 	articleReaderServer := grpc.NewArticleReaderServer(articleReaderService)
-	interactionServer := grpc.NewInteractionServer(interactionService)
-	server := ioc.InitGRPCServer(searchServer, articleReaderServer, interactionServer, clientv3Client, prometheusBuilder, loggerX)
-	saramaClient := ioc.InitSaramaClient(kafkaConfig, saramaConfig)
-	consumerConfig := ioc.InitInteractionConsumerConfig(kafkaConfig)
-	consumer := interaction.NewSaramaInteractionEventConsumer(saramaClient, interactionRepository, consumerConfig, loggerX)
-	redislockxClient := ioc.InitLockClient(cmdable)
-	metrics := ioc.InitCronMetrics()
-	wrapper := ioc.InitCronWrapper(redislockxClient, metrics, loggerX)
-	rankingJob := job.NewRankingJob(rankingService, wrapper)
-	cron, cleanup4 := ioc.InitCron(rankingJob, loggerX)
+	rankingJobServer := grpc.NewRankingJobServer(rankingService)
+	server := ioc.InitGRPCServer(searchServer, articleReaderServer, rankingJobServer, clientv3Client, prometheusBuilder, loggerX)
 	app := App{
-		Server:      engine,
-		GRPCServer:  server,
-		Consumer:    consumer,
-		RankingCron: cron,
+		Server:     engine,
+		GRPCServer: server,
 	}
 	return app, func() {
+		cleanup5()
 		cleanup4()
 		cleanup3()
 		cleanup2()
@@ -145,19 +139,17 @@ var clickEventProviderSet = wire.NewSet(dao.NewGormAIClickEventDAO, cache.NewRed
 // polishProviderSet 文章润色模块（含 LLM 配置/客户端 — 之前在 chatProviderSet 里）
 var polishProviderSet = wire.NewSet(ioc.InitLLMConfig, ioc.InitLLMClient, service.NewAIArticlePolishService)
 
-// articleRankingProviderSet 文章榜单模块
-var articleRankingProviderSet = wire.NewSet(dao.NewGormArticleRankingDAO, cache.NewRedisArticleRankingCache, repository.NewCacheArticleRankingRepository, service.NewArticleRankingService, job.NewRankingJob, web.NewArticleRankingHandler)
+// articleRankingProviderSet 文章榜单模块（数据 + 重算逻辑留 core；定时调度由 webook-worker 经 RankingJobService gRPC 触发）
+var articleRankingProviderSet = wire.NewSet(dao.NewGormArticleRankingDAO, cache.NewRedisArticleRankingCache, repository.NewCacheArticleRankingRepository, service.NewArticleRankingService, web.NewArticleRankingHandler, grpc.NewRankingJobServer)
 
 // migratorSDKProviderSet 业务侧迁移 SDK（默认 NoOp 零开销，yaml migrator.sdk.enabled=true 切 Redis 实现）
 var migratorSDKProviderSet = wire.NewSet(ioc.InitMigratorSDKSwitchReader, ioc.InitMigratorSDKDualWriter, ioc.InitMigratorSDKTaskName, dao.NewGormArticleReaderNewDAO)
 
-// kafkaProviderSet Kafka 基础设施 + 互动事件
-var kafkaProviderSet = wire.NewSet(ioc.InitKafkaConfig, ioc.InitSaramaConfig, ioc.InitSaramaSyncProducer, ioc.InitSaramaClient, ioc.InitEventProducer, ioc.InitInteractionConsumerConfig, interaction.NewSaramaInteractionEventProducer, interaction.NewSaramaInteractionEventConsumer)
+// kafkaProviderSet Kafka 生产侧：core 只产 read 事件，消费由 webook-worker（调度器）负责。
+var kafkaProviderSet = wire.NewSet(ioc.InitKafkaConfig, ioc.InitSaramaConfig, ioc.InitEventProducer, interaction.NewSaramaInteractionEventProducer)
 
-// App 应用入口，包含 Web 服务、后台消费者、gRPC 服务。
+// App 应用入口：Web 服务 + gRPC 服务（消费者/定时任务已抽到 webook-worker）。
 type App struct {
-	Server      *gin.Engine
-	GRPCServer  *grpcx.Server
-	Consumer    events.Consumer
-	RankingCron *cron.Cron
+	Server     *gin.Engine
+	GRPCServer *grpcx.Server
 }

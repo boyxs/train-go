@@ -8,7 +8,6 @@ import (
 	"github.com/google/wire"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/redis/go-redis/v9"
-	"github.com/robfig/cron/v3"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"go.opentelemetry.io/otel/trace"
 	"go.opentelemetry.io/otel/trace/noop"
@@ -16,18 +15,14 @@ import (
 	commentv1 "github.com/webook/api/gen/comment/v1"
 	"github.com/webook/internal/consts"
 	"github.com/webook/internal/ioc"
-	"github.com/webook/internal/job"
 	"github.com/webook/internal/repository"
 	"github.com/webook/internal/repository/cache"
 	"github.com/webook/internal/repository/dao"
 	"github.com/webook/internal/service"
 	"github.com/webook/internal/web"
-	cronprom "github.com/webook/pkg/cronx/prometheus"
 	"github.com/webook/pkg/ginx/middleware/metrics"
 	"github.com/webook/pkg/jwtx"
 	"github.com/webook/pkg/logger"
-	"github.com/webook/pkg/redislockx"
-	lockprom "github.com/webook/pkg/redislockx/prometheus"
 )
 
 // 集成测试不连真实 OTel Collector，注入 Noop TracerProvider 满足依赖
@@ -40,19 +35,6 @@ func provideNoopTracerProvider() trace.TracerProvider {
 // 如后续要集成测评论网关，改为拨号真实 comment server。
 func provideNilCommentClient() commentv1.CommentServiceClient {
 	return nil
-}
-
-// 集成测试每次调用都给独立 prometheus Registry，避免 MustRegister 重复 panic。
-// 生产 ioc.InitLockClient / InitCronMetrics 走 DefaultRegisterer，跨测试调用会撞名。
-func provideTestLockClient(cmd redis.Cmdable) redislockx.Client {
-	return lockprom.NewPrometheusBuilder("test", "lock", "test").
-		Registry(prometheus.NewRegistry()).
-		Build(redislockx.NewClient(cmd))
-}
-
-func provideTestCronMetrics() *cronprom.Metrics {
-	return cronprom.NewPrometheusBuilder("test", "cron", "test").
-		Registry(prometheus.NewRegistry()).Build()
 }
 
 // provideTestMiddlewares 与 ioc.InitMiddlewares 同结构，但 metrics 走独立 Registry，
@@ -173,23 +155,6 @@ func InitClickEventHandler() web.ClickEventHandler {
 	return &web.AIClickEventHandler{}
 }
 
-// InitRankingCron 集成测试用：拉起完整 cron + lock + wrapper + RankingJob 链路，
-// 返回 cleanup 验证 graceful shutdown。每次独立 prometheus Registry。
-func InitRankingCron() (*cron.Cron, func()) {
-	wire.Build(
-		infraSvcProvider,
-		articleSvcProvider, // 依赖：interaction + article reader
-		articleRankingSvcProvider,
-		provideTestLockClient,
-		provideTestCronMetrics,
-		ioc.InitCronWrapper,
-		clickEventSvcProvider, // ranking service 依赖 ClickEventService
-		job.NewRankingJob,
-		ioc.InitCron,
-	)
-	return nil, nil
-}
-
 var infraSvcProvider = wire.NewSet(
 	InitRedis,
 	InitDB,
@@ -241,11 +206,9 @@ var articleReaderSvcProvider = wire.NewSet(
 	interactionSvcProvider,
 )
 
+// 互动已拆 webook-interaction 独立服务；集成测试注入桩 InteractionService（见 fake_interaction.go）。
 var interactionSvcProvider = wire.NewSet(
-	dao.NewGormInteractionDAO,
-	cache.NewRedisInteractionCache,
-	repository.NewCacheInteractionRepository,
-	service.NewInternalInteractionService,
+	newFakeInteractionService,
 )
 
 var clickEventSvcProvider = wire.NewSet(

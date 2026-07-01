@@ -34,6 +34,39 @@ services:
     ports:
       - "${CHAT_HOST_PORT:-8020}:8020"
 
+  webook-comment:
+    image: webook-comment:local
+    pull_policy: never
+    build:
+      context: ../webook
+      dockerfile: comment/Dockerfile
+      args:
+        VERSION: local
+    ports:
+      - "${COMMENT_HOST_PORT:-8030}:8030"
+
+  webook-interaction:
+    image: webook-interaction:local
+    pull_policy: never
+    build:
+      context: ../webook
+      dockerfile: interaction/Dockerfile
+      args:
+        VERSION: local
+    ports:
+      - "${INTERACTION_HOST_PORT:-8040}:8040"
+
+  webook-worker:
+    image: webook-worker:local
+    pull_policy: never
+    build:
+      context: ../webook
+      dockerfile: worker/Dockerfile
+      args:
+        VERSION: local
+    ports:
+      - "${WORKER_HOST_PORT:-8050}:8050"
+
   webook-migrator:
     image: webook-migrator:local
     pull_policy: never

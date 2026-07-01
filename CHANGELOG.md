@@ -2,6 +2,81 @@
 
 <!-- 新功能前插在此，日期降序 -->
 
+## [2026-07-01] ginx 响应/错误层重设计：code≡HTTP status + wrapper 精简
+
+**变更内容**: 重设计 `pkg/ginx` 响应契约与 wrapper 一族，让响应一致、易排查、handler 更简单（完整标准版，不兼容旧写法）。
+**影响范围**:
+- **契约**: `body.code ≡ HTTP status` 全链路——成功框架填 `code=200` + `msg` 空补 "OK"（此前成功 `code=0` 与错误 `code=4xx/5xx` 不一致）；错误经 `WriteError` 单点出口带 code/reason/msg/metadata；bind 失败也走 WriteError（400 + `reason=BAD_REQUEST` + 日志）。
+- **wrapper 从 4 变 2**: 只留 `Wrap`（无请求体）/ `WrapReq[Req]`（绑 JSON）；鉴权解耦为访问器 `MustClaims[C](ctx)`（受保护路由，缺失 panic→500 fail-loud）/ `Claims[C](ctx)`（可选登录），删掉 `WrapClaims`/`WrapReqClaims` 组合变体 + `claimsOf`/`bindBadRequest`。包级 `ginx.UserKey` 各服务启动设一次（core/chat `ioc/web.go`）。
+- **命名构造器**: `ginx.Ok(data)`/`OkWith(msg,data)`/`BadRequest`/`Unauthorized`/`Forbidden`/`NotFound`/`Conflict`/`TooManyRequests`/`Internal`——状态码由函数名写进 `Result.Code`，调用方只给 msg/data，`respond` 按 `Result.Code` 作 HTTP status（`return ginx.NotFound("x"), nil`）。无 reason（需 reason 监控/分支的业务错误仍用 errs sentinel）。
+- **迁移**: core + chat 共 24 个 claims handler 去掉 `uc` 参数、体内 `MustClaims` 取登录态、路由改 `Wrap`/`WrapReq`；SSE handler（chat SendMessage/ResumeStream）也改用 `MustClaims/Claims`。
+- **前端**: 一律 HTTP status 驱动——`await` resolve 即成功、错误进 `catch`（`getErrorMessage`/`getErrorReason`）；删 12 文件 ~30 处 `res.data.code === 0` in-band 判断，折成 happy-path + catch（含 useConversations/useChat 哨兵改 throw、article/list modal onOk 补 catch）。
+- **测试**: `pkg/ginx/wrapper_test.go` 合并原 `wrapper_errs_test.go`+`wrapper_variants_test.go` 为单文件（遵守新规则「一源一测试」）；web 单测加 `ginx.UserKey` init + 成功断言 `code:0→200`；integration 加泛型 `assertResult`（成功自动补 200/OK）。
+**技术决策**: 保留类型化 wrapper（handler 零样板）但把鉴权（横切）解耦成 ctx 访问器 → wrapper 面永远 2 个、按「为什么」而非「在哪」组合，新增输入轴只加访问器不炸变体（前瞻）。成功 code 由框架填而非 handler，杜绝 `code=0`。
+**待办**: 无（后端 `go test ./...` 全绿、前端 tsc/eslint 净）。
+**会话**: 260630-前端-错误处理对齐
+**发布**: （随 core / chat / fe 下次发版）
+
+## [2026-06-30] 错误模型重构：Kratos 风格 reason 双级标识 + 前后端对齐
+
+**变更内容**: 引入业务原因码 `reason`，把「错误身份」从 HTTP `code`/`msg` 解耦——`code` 仍=HTTP status（粗分类 + 前端 catch 触发），`reason` 给业务精确分支 + 监控，`msg` 回归纯展示。前端 catch 块对齐成展示后端真实 `msg`。
+**影响范围**:
+- `pkg/errs.Error`: +`Reason` 字段 + `WithReason` builder；`Is` 改**优先按 reason**（双方有 reason 比 reason，否则回退 Code+Message → 迁移期新旧 sentinel 混用都正确）。
+- `pkg/ginx.Result`: +`Reason`(omitempty) + `Metadata`(omitempty)；`WriteError` 业务错误带出 reason+metadata。
+- 跨 gRPC: `GRPCStatus`/`FromError` 用 `errdetails.ErrorInfo` 带 reason+metadata（顺带修跨服务丢 Metadata），worker/core/chat → interaction 业务错误保真；`FromError` 对**无 ErrorInfo 的传输层错误**（`Unavailable`/`DeadlineExceeded`/`Canceled`，如下游未启动→`name resolver error: produced zero addresses`）换友好文案 + reason（`SERVICE_UNAVAILABLE`/`SERVICE_TIMEOUT`/`REQUEST_CANCELED`），原始内部细节留 `cause` 不外泄；**修 HTTP code 跨 gRPC 有损退化**——`GRPCStatus` 把原始 HTTP code 塞进 details metadata（`_http`），`FromError` 读回精确还原并剥掉内部 key，任意码（如 comment 敏感词 `422`）不再退化成 `500`（此前会污染 5xx 监控）。
+- sentinel: 7 个 `*/errs` 共 **55 个 reason**（SCREAMING_SNAKE），双 guard 测试（唯一性 + 全 sentinel 必须有 reason）。
+- 监控: `webook_http_requests_total` +`reason` label（仅错误路径打、低基数）；录制规则 `webook:http_biz_errors:rate5m`(`sum by job,reason`) + `webook-overview` 看板「业务错误（按 reason）」面板（`topk(10) by reason`）；告警按 reason 多序列精确触发——core 加「限流家族 `*_RATE_LIMITED`」+「登录失败激增（撞库）`USER_OR_PASSWORD_INVALID`」，chat 加「限流 `*_RATE_LIMITED`」（migrator 的 5xx 类 reason 已被现有 5xx 告警覆盖，不重复）。
+- 前端: `types/common.ts` `Result` +`reason/metadata`；`utils/apiError.ts` `getErrorMessage`/`getErrorReason`；user/article/search/chat 等 view/组件的 catch 块由「吞后端错误弹通用文案」改为 `getErrorMessage(e, 兜底)` 展示后端 `msg`。
+- **401 刷新判定改为 reason 驱动**（修「登录密码错误显示『系统错误』」bug）：原拦截器对所有 401 都走 token 刷新，把登录的业务 401 也当过期吞掉（refresh 失败 Error 盖原始 401 → 显示「系统错误」+ 误重定向）。改为：后端 `pkg/jwtx` 中间件 401 带 reason（`ACCESS_TOKEN_EXPIRED` 可刷新 / `TOKEN_INVALID` 去登录，`Parse`→`parseWithReason` 区分过期）；前端 `api/request.ts` 拦截器据 reason 三分支——过期才静默刷新、无效去登录、业务 401（如 `USER_OR_PASSWORD_INVALID`）原样透传给 handler 显示后端 msg。按「为什么」而非「在哪/状态码」决策，对新端点天然健壮。
+- 测试同步: `internal/web` + `internal/integration` 的 user/wechat handler 断言补 reason（sentinel 带 reason 后的陈旧断言修复）。
+- 设计文档: `prd/error-model/error-model-design.md`。
+**技术决策**: 不全量上 Kratos，只增量扩 `errs`/`ginx`/`grpcx`；reason 各服务 `*/errs` 自治但自动化 guard 强约束（不靠人肉 review）；HTTP/gRPC 共用同一套 reason 枚举；`msg` 绝不当 metrics label（高基数炸 Prometheus）。Phase 6（收紧 `Is` 去 Code+Message 回退）暂缓——回退是无害安全网。前端 `views/chat/index.tsx` 3 个 `.catch(()=>哨兵)` 布尔流 handler 暂留（重构控制流有风险、对话 CRUD 失败业务价值低）。
+**待办**: Phase 6 收紧 `Is`（待全量 reason 覆盖稳定后）；前端 chat/index 哨兵流 handler 视需对齐；reason 告警阈值（限流 0.5/s·10m、撞库 2/s·5m）是起步值，按真实流量调。
+**会话**: 260630-错误模型-reason 双级标识
+**发布**: （随 core / interaction / chat / worker / fe 下次发版）
+
+## [2026-06-30] 多服务架构审查收尾：并发/锁/契约/批量 RPC 硬化
+
+**变更内容**: 对 interaction 拆分 + webook-worker 抽离的全部改动做架构审查，修复 2 Critical + 9 Important + 多个 Suggestion。
+**影响范围**:
+- **interaction**: ① UpsertLike/UpsertCollect 事务内读旧状态加 `FOR UPDATE` 行锁（修并发同用户点赞/收藏计数翻倍）；② 建表 `created_at/updated_at` 改 `NOT NULL DEFAULT 0`（soft_delete 一度加了又**撤回**——见技术决策/事故）；③ `FindByBizIds` 去 fire-and-forget goroutine，改同步回填（复用 caller ctx）；④ 新增 `BatchIncrReadCount` RPC（proto + 4 层实现）；⑤ 抽 `errs` sentinel 包；⑥ 去 `FindUserInteraction` 多余 `Order`。
+- **worker**: ① cron 锁显式 `WithLockTTL(30s)`（原吃 2s 默认值，分钟级任务有 split-brain 风险）+ grafana 加 `watchdog_lost` 告警；② 消费者关停有界排空再 `cleanup`；③ 消费 read 事件按 `(biz,bizId)` 聚合走 `BatchIncrReadCount`（取代逐条 N+1，并修批内部分失败整批重投的重复计数）；④ 删死 `etcd.path/type` 配置（worker 静态配置不接热更）。
+- **契约/共享**: ① ranking `dimension` 由两端字符串字面量改 proto `enum`（编译期防漂移）；② 新增 `worker/event/contract_test.go` 守护 `InteractionEvent` 跨服务不漂移；③ `pkg/cronx` 默认锁 TTL `2s→30s`（对齐自身文档）；④ `pkg/pool` 补「为何不用 x/sync」说明。
+- **core 瘦身**: 删残留消费者侧 kafka 配置（`KafkaConfig` 字段 + 5 份 yaml）+ 死 producer 导出（NoopProducer/Async/未用构造器）。
+- **文档/CI**: 补 `interaction/CLAUDE.md` + `worker/CLAUDE.md`，更新多服务布局约定；修 chat/migrator CI `paths` 缺 `.github/workflows/` 前缀。
+**技术决策**: 事件契约维持「两端各自定义」但补契约测试兜底（不回头建 eventbus）；worker 维持静态配置；dimension 走 proto enum（gRPC 契约即共享真相，区别于 Kafka 事件的 topic+JSON）。幂等修复选悲观行锁（最小改动且贴合现有「读-比-翻」结构）。interaction **不加 gorm soft_delete**：无删除路径，且软删会给所有 SELECT 注入 `deleted_at=0`，把 AutoMigrate 加列后未回填的既有 NULL 行全部过滤掉（实测导致点赞/收藏/计数查出全 0），故撤回审查「补 soft_delete」那条 + 加 integration 回归测试守护。
+**待办**: `services-overview.json` 的 `$service` 模板变量未定义（pre-existing，面板靠 match-all 仍渲染，需在 Grafana 内预览后补）；`pkg/pool` `TestPool_Introspection` 在本机 flaky（in-flight 计数竞态，与本次改动无关，doc-only 改动不影响）。
+**会话**: 260630-多服务-架构审查修复
+**发布**: （随 core / interaction / worker 下次发版）
+
+## [2026-06-29] webook-worker 调度器服务抽离（cron + 消费者）
+
+**变更内容**：新增独立调度器服务 `webook/worker/`（端口 8050，无 DB），收拢所有异步/定时：cron 定时任务 + Kafka 消费者，**全部经 gRPC 派发给业务服务，自身零业务数据/逻辑**（参考 `bolee-task` 的 XxlJob+StreamListener 模式）。
+**影响范围**：
+- **proto**：新增 `ranking/v1` = `RankingJobService`(Recompute{dim,date}/Archive{date})——core 实现、worker 触发。
+- **webook/worker/**：`job/`(cron specs → 调 core RankingJobService gRPC)、`consumer/`(read 事件 → 调 interaction gRPC，自管连接无限重连)、`event/`(自有 InteractionEvent；契约=topic+JSON，不共享代码)、`ioc/`(redis 仅 cron 锁 / kafka 消费 / etcd 发现 / gRPC client core+interaction / cron) + main/wire + 5 config + Dockerfile/Makefile。
+- **core 瘦身**：加 `internal/grpc/ranking_job.go`(RankingJobServer → 转调 in-process RankingService)；**删进程内 cron**（ioc/cron.go、lock.go + wire cron 全套）；**删 read 消费者**（App.Consumer + kafka 只剩生产侧）；删 `internal/worker/`、cron 集成测试。ranking repo/dao/cache/service/Page/Click **全留 core**（数据/逻辑不迁）。
+- **部署**：prometheus job `webook-worker:8050`、grafana 告警 `webook-worker.yml`(up/cron 失败/goroutines)、docker-compose 服务 + healthcheck、8 份 `.env*` 加 `WORKER_IMAGE_TAG/APP_ENV`、CI `webook-worker-ci.yml` + 5 兄弟 paths-ignore 互斥。
+**技术决策**：调度器 ≠ 业务服务——worker 只调度/派发不持数据，业务逻辑留各 owner 服务（ranking 留 core）；不建 `pkg/eventbus` 共享抽象，通用 plumbing 复用 `pkg/saramax`，事件契约靠 topic+JSON（broker 即边界，两端各自定义）。cron 锁用 redislockx（多副本单跑）。
+**待办**：worker job/consumer 单测（mock gRPC client）+ core RankingJobServer 单测；启动解耦 producer 侧（core InitSaramaSyncProducer 仍阻塞 ~63s）。
+**会话**：260629-worker-异步任务收拢
+**发布**：（随 core / worker 下次发版）
+
+## [2026-06-29] interaction 拆分为独立 gRPC 微服务
+
+**变更内容**：互动（点赞/收藏/浏览/计数）从 core 进程内 service 抽成独立后端微服务 `webook/interaction/`（纯 gRPC，HTTP :8040 仅 metrics/health、gRPC :8041），与 comment 同构；core 转薄 gRPC 客户端经 etcd 调用，chat 的互动调用从 core 重指 webook-interaction。
+**影响范围**：
+- 契约：`api/proto/interaction/v1/interaction.proto` 补 9 个 RPC（Like/CancelLike/Collect/CancelCollect/IncrViewCount + GetInteraction/GetUserState/BatchGetInteractions/GetUserLiked），全 `(biz, bizId)`；既有 GetHotBizIds/GetCollectedBizIds 不变。
+- 新服务 `webook/interaction/`：domain/consts/dao(+init_table)/cache(+lua)/repository/service/grpc/ioc/main/wire + 5 份 config + Dockerfile/Makefile/scripts/interaction.sql + bufconn 集成测试（覆盖全 11 RPC）。
+- core：`internal/service/interaction.go` 加 `GRPCInteractionService` 适配器（生产路径）；ranking 装饰器留 core、Kafka 读计数 producer/consumer 留 `internal/`（路 A：同库直写，待 worker 收拢）；删 `internal/grpc/interaction_server.go`。
+- chat：`chat/ioc/grpc.go` 抽共享 metrics builder + 加 `InteractionConn`；5 份 config 加 `grpc.client.webook-interaction`。
+- 部署：prometheus job（+local）、grafana 告警 `webook-interaction.yml`、docker-compose 服务 + healthcheck、8 份 `.env*` 加 `INTERACTION_IMAGE_TAG/APP_ENV`、CI `webook-interaction-ci.yml`（+ 4 个兄弟 workflow paths-ignore 互斥）。
+- 修复既有幂等 bug：`UpsertLike`/`UpsertCollect` 改「读旧状态比对翻转」（原 `RowsAffected==0` 判幂等因 `updated_at` 恒变失效 → 重复点赞/收藏计数虚高），interaction + core 两份 dao 同步修。
+**技术决策**：与 comment 同库不分库 → 无数据迁移；ranking 依赖 core `RankingRepository` 故装饰器留 core；异步/消息统一方向是独立 `webook-worker` 服务（本次不拆，read 计数消费者暂留 `internal/`，gRPC 边界靠真拆进程时收口）；`allowedBiz` 白名单留 core 网关侧，interaction gRPC 只做非空校验。
+**待办**：worker 结构收拢（`internal/job` + `internal/events` → 干净的 `internal/worker/`）；core 自身集成测试预存失败（webook_test 数据隔离，与本次无关）待单独清理。
+**会话**：260629-interaction-拆分独立服务
+**发布**：（随 core / interaction 下次发版）
+
 ## [2026-06-29] interaction 点赞/互动端点泛化为 (biz, bizId)
 
 **变更内容**：interaction HTTP 端点（like/collect/detail/state/view）从写死 article 改为通用 `(biz, bizId)` + biz 白名单（article/comment）；评论点赞回归 interaction——删 core `/comment/like`，前端评论点赞改调 `/interaction/like {biz:"comment"}`。

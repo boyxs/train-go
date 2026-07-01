@@ -28,11 +28,11 @@ type ArticleReaderHandlerSuite struct {
 }
 
 func (h *ArticleReaderHandlerSuite) SetupTest() {
-	h.truncate("article", "published_article", "interaction")
+	h.truncate("article", "published_article")
 }
 
 func (h *ArticleReaderHandlerSuite) TearDownTest() {
-	h.truncate("article", "published_article", "interaction")
+	h.truncate("article", "published_article")
 }
 
 func (h *ArticleReaderHandlerSuite) truncate(tables ...string) {
@@ -40,9 +40,9 @@ func (h *ArticleReaderHandlerSuite) truncate(tables ...string) {
 		err := h.db.Exec("TRUNCATE TABLE " + table).Error
 		assert.NoError(h.T(), err)
 	}
-	// 清理 Redis 文章 + 互动缓存（避免跨 case ReadCnt 残留）
+	// 只清 core 自己的 article:* 缓存，不跨包清 interaction:*
 	ctx := context.Background()
-	for _, pattern := range []string{"article:*", "interaction:*"} {
+	for _, pattern := range []string{"article:*"} {
 		keys, _ := h.cmd.Keys(ctx, pattern).Result()
 		if len(keys) > 0 {
 			h.cmd.Del(ctx, keys...)
@@ -178,7 +178,7 @@ func (h *ArticleReaderHandlerSuite) TestArticleReaderHandler_Page() {
 				result.Data.List[i].CreatedAt = 0
 				result.Data.List[i].UpdatedAt = 0
 			}
-			assert.Equal(t, tc.wantResult, result)
+			assertResult(t, tc.wantCode, tc.wantResult, result)
 		})
 	}
 }
@@ -240,7 +240,7 @@ func (h *ArticleReaderHandlerSuite) TestArticleReaderHandler_Detail() {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			h.truncate("published_article", "interaction")
+			h.truncate("published_article")
 			tc.before(t)
 
 			req, err := http.NewRequest(http.MethodPost, "/article/reader/detail",
@@ -257,7 +257,7 @@ func (h *ArticleReaderHandlerSuite) TestArticleReaderHandler_Detail() {
 			assert.NoError(t, err)
 			result.Data.CreatedAt = 0
 			result.Data.UpdatedAt = 0
-			assert.Equal(t, tc.wantResult, result)
+			assertResult(t, tc.wantCode, tc.wantResult, result)
 		})
 	}
 }

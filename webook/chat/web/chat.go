@@ -36,22 +36,23 @@ func NewInternalChatHandler(svc service.ChatService, l logger.LoggerX, limiter r
 
 func (h *InternalChatHandler) RegisterRoutes(server *gin.Engine) {
 	g := server.Group("/chat")
-	g.POST("/conversation/create", ginx.WrapClaims[jwtx.UserClaims](consts.UserKey, h.CreateConversation))
-	g.POST("/conversation/list", ginx.WrapClaims[jwtx.UserClaims](consts.UserKey, h.ListConversations))
-	g.POST("/conversation/delete", ginx.WrapReqClaims[conversationIdReq, jwtx.UserClaims](consts.UserKey, h.DeleteConversation))
-	g.POST("/message/list", ginx.WrapReqClaims[listMessagesReq, jwtx.UserClaims](consts.UserKey, h.ListMessages))
+	g.POST("/conversation/create", ginx.Wrap(h.CreateConversation))
+	g.POST("/conversation/list", ginx.Wrap(h.ListConversations))
+	g.POST("/conversation/delete", ginx.WrapReq[conversationIdReq](h.DeleteConversation))
+	g.POST("/message/list", ginx.WrapReq[listMessagesReq](h.ListMessages))
 	g.POST("/message/send", h.SendMessage) // SSE 不能 wrap
-	g.POST("/stop", ginx.WrapReqClaims[conversationIdReq, jwtx.UserClaims](consts.UserKey, h.StopGeneration))
-	g.POST("/conversation/generating", ginx.WrapReqClaims[conversationIdReq, jwtx.UserClaims](consts.UserKey, h.IsGenerating))
+	g.POST("/stop", ginx.WrapReq[conversationIdReq](h.StopGeneration))
+	g.POST("/conversation/generating", ginx.WrapReq[conversationIdReq](h.IsGenerating))
 	g.GET("/message/stream", h.ResumeStream) // SSE 不能 wrap
-	g.POST("/message/feedback", ginx.WrapReqClaims[setFeedbackReq, jwtx.UserClaims](consts.UserKey, h.SetFeedback))
+	g.POST("/message/feedback", ginx.WrapReq[setFeedbackReq](h.SetFeedback))
 }
 
 type conversationIdReq struct {
 	ConversationId int64 `json:"conversationId"`
 }
 
-func (h *InternalChatHandler) IsGenerating(ctx *gin.Context, req conversationIdReq, uc jwtx.UserClaims) (ginx.Result, error) {
+func (h *InternalChatHandler) IsGenerating(ctx *gin.Context, req conversationIdReq) (ginx.Result, error) {
+	uc := ginx.MustClaims[jwtx.UserClaims](ctx)
 	// 校验 convId 归属当前用户：复用 ListMessages 触发 convRepo.Find(uid, convId)，
 	// limit=1 + beforeId=0 是最廉价的探测，不存在/越权 → ErrConversationNotFound (404)
 	if _, err := h.svc.ListMessages(ctx.Request.Context(), uc.Userid, req.ConversationId, 0, 1); err != nil {
@@ -72,7 +73,8 @@ type sendMessageReq struct {
 	Content        string `json:"content"`
 }
 
-func (h *InternalChatHandler) CreateConversation(ctx *gin.Context, uc jwtx.UserClaims) (ginx.Result, error) {
+func (h *InternalChatHandler) CreateConversation(ctx *gin.Context) (ginx.Result, error) {
+	uc := ginx.MustClaims[jwtx.UserClaims](ctx)
 	conv, err := h.svc.CreateConversation(ctx.Request.Context(), uc.Userid)
 	if err != nil {
 		return ginx.Result{}, err
@@ -80,7 +82,8 @@ func (h *InternalChatHandler) CreateConversation(ctx *gin.Context, uc jwtx.UserC
 	return ginx.Result{Data: conv}, nil
 }
 
-func (h *InternalChatHandler) ListConversations(ctx *gin.Context, uc jwtx.UserClaims) (ginx.Result, error) {
+func (h *InternalChatHandler) ListConversations(ctx *gin.Context) (ginx.Result, error) {
+	uc := ginx.MustClaims[jwtx.UserClaims](ctx)
 	convs, err := h.svc.ListConversations(ctx.Request.Context(), uc.Userid)
 	if err != nil {
 		return ginx.Result{}, err
@@ -88,14 +91,16 @@ func (h *InternalChatHandler) ListConversations(ctx *gin.Context, uc jwtx.UserCl
 	return ginx.Result{Data: convs}, nil
 }
 
-func (h *InternalChatHandler) DeleteConversation(ctx *gin.Context, req conversationIdReq, uc jwtx.UserClaims) (ginx.Result, error) {
+func (h *InternalChatHandler) DeleteConversation(ctx *gin.Context, req conversationIdReq) (ginx.Result, error) {
+	uc := ginx.MustClaims[jwtx.UserClaims](ctx)
 	if err := h.svc.DeleteConversation(ctx.Request.Context(), uc.Userid, req.ConversationId); err != nil {
 		return ginx.Result{}, err
 	}
 	return ginx.Result{Msg: "OK"}, nil
 }
 
-func (h *InternalChatHandler) ListMessages(ctx *gin.Context, req listMessagesReq, uc jwtx.UserClaims) (ginx.Result, error) {
+func (h *InternalChatHandler) ListMessages(ctx *gin.Context, req listMessagesReq) (ginx.Result, error) {
+	uc := ginx.MustClaims[jwtx.UserClaims](ctx)
 	msgs, err := h.svc.ListMessages(ctx.Request.Context(), uc.Userid, req.ConversationId, req.BeforeId, req.Limit)
 	if err != nil {
 		return ginx.Result{}, err // ErrConversationNotFound 自带 404，其他自动 500
@@ -109,7 +114,7 @@ func (h *InternalChatHandler) SendMessage(ctx *gin.Context) {
 		ginx.WriteError(ctx, errs.ErrChatInvalidArgs)
 		return
 	}
-	uc := ctx.MustGet(consts.UserKey).(jwtx.UserClaims)
+	uc := ginx.MustClaims[jwtx.UserClaims](ctx)
 
 	// 限流检查：复用 pkg/ratelimit.Limiter
 	key := fmt.Sprintf(consts.ChatRateLimitPattern, uc.Userid)
@@ -146,7 +151,8 @@ func (h *InternalChatHandler) SendMessage(ctx *gin.Context) {
 	})
 }
 
-func (h *InternalChatHandler) StopGeneration(ctx *gin.Context, req conversationIdReq, uc jwtx.UserClaims) (ginx.Result, error) {
+func (h *InternalChatHandler) StopGeneration(ctx *gin.Context, req conversationIdReq) (ginx.Result, error) {
+	uc := ginx.MustClaims[jwtx.UserClaims](ctx)
 	if err := h.svc.StopGeneration(ctx.Request.Context(), uc.Userid, req.ConversationId); err != nil {
 		return ginx.Result{}, err
 	}
@@ -162,12 +168,7 @@ func (h *InternalChatHandler) ResumeStream(ctx *gin.Context) {
 		ginx.WriteError(ctx, errs.ErrChatInvalidArgs)
 		return
 	}
-	uc, ok := ctx.Get(consts.UserKey)
-	if !ok {
-		ctx.AbortWithStatus(http.StatusUnauthorized)
-		return
-	}
-	claims, ok := uc.(jwtx.UserClaims)
+	claims, ok := ginx.Claims[jwtx.UserClaims](ctx)
 	if !ok {
 		ctx.AbortWithStatus(http.StatusUnauthorized)
 		return
@@ -257,7 +258,8 @@ type setFeedbackReq struct {
 	Feedback       int8  `json:"feedback"`
 }
 
-func (h *InternalChatHandler) SetFeedback(ctx *gin.Context, req setFeedbackReq, uc jwtx.UserClaims) (ginx.Result, error) {
+func (h *InternalChatHandler) SetFeedback(ctx *gin.Context, req setFeedbackReq) (ginx.Result, error) {
+	uc := ginx.MustClaims[jwtx.UserClaims](ctx)
 	if req.MessageId <= 0 || req.ConversationId <= 0 {
 		return ginx.Result{}, errs.ErrChatInvalidArgs
 	}
