@@ -10,26 +10,77 @@ import (
 	"github.com/webook/pkg/logger"
 )
 
-// L 全局 Logger，由 ioc 在启动时注入。默认 NopLogger 防 nil panic。
+// L 全局 Logger，由 ioc 启动时注入。默认 Nop 防 nil panic。
 var L logger.LoggerX = logger.NewNopLogger()
+
+// UserKey 登录态在 gin.Context 里的 key，各服务启动时设为自己的 consts.UserKey。
+var UserKey = "user"
+
+// CtxBizReason 业务原因码在 ctx 的 key：WriteError 写入，metrics 中间件读出作 reason label。
+const CtxBizReason = "biz_reason"
 
 // HandlerFunc 业务 handler 签名。约定：
 //
-//	成功     → return ginx.Result{Data: ...}, nil
-//	业务错误 → return ginx.Result{}, errs.ErrXxx     （自动转对应 HTTP code）
-//	系统错误 → return ginx.Result{}, err             （任意 err，自动 500）
+//	成功     → return Result{Data: ...}, nil    （框架填 code=200）
+//	业务错误 → return Result{}, errs.ErrXxx      （自动转对应 HTTP code）
+//	系统错误 → return Result{}, err              （自动 500）
+//
+// 登录态用 MustClaims/Claims 从 ctx 取，不再由 wrapper 注入。
 type (
-	HandlerFunc                          func(ctx *gin.Context) (Result, error)
-	HandlerFuncReq[Req any]              func(ctx *gin.Context, req Req) (Result, error)
-	HandlerFuncClaims[C any]             func(ctx *gin.Context, uc C) (Result, error)
-	HandlerFuncReqClaims[Req any, C any] func(ctx *gin.Context, req Req, uc C) (Result, error)
+	HandlerFunc             func(ctx *gin.Context) (Result, error)
+	HandlerFuncReq[Req any] func(ctx *gin.Context, req Req) (Result, error)
 )
 
-// WriteError 翻译 error 为 HTTP 响应。给非 wrap 路径（SSE / 自定义流式）直接调用；
-// wrap 内部也走这个。规则：
+// Wrap 包装无请求体 handler。
+func Wrap(fn HandlerFunc) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		res, err := fn(ctx)
+		respond(ctx, res, err)
+	}
+}
+
+// WrapReq 反序列化 JSON 请求体后调 handler；绑定失败 → 400 BAD_REQUEST。
+func WrapReq[Req any](fn HandlerFuncReq[Req]) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		var req Req
+		if err := ctx.ShouldBindJSON(&req); err != nil {
+			WriteError(ctx, errs.New(http.StatusBadRequest, "参数错误").
+				WithReason("BAD_REQUEST").WithCause(err))
+			return
+		}
+		res, err := fn(ctx, req)
+		respond(ctx, res, err)
+	}
+}
+
+// MustClaims 取登录态（受保护路由用，鉴权中间件已保证存在）。
+// 缺失 = 该路由漏挂鉴权中间件的 bug → panic（gin Recovery 转 500，fail-loud）。
+func MustClaims[C any](ctx *gin.Context) C {
+	uc, ok := Claims[C](ctx)
+	if !ok {
+		panic("ginx: 未找到登录态（key=" + UserKey + "，是否漏挂鉴权中间件？）")
+	}
+	return uc
+}
+
+// Claims 取登录态，返回是否存在；OptionalPaths（登录可选）路由用。
+func Claims[C any](ctx *gin.Context) (C, bool) {
+	var zero C
+	val, exists := ctx.Get(UserKey)
+	if !exists {
+		return zero, false
+	}
+	uc, ok := val.(C)
+	if !ok {
+		return zero, false
+	}
+	return uc, true
+}
+
+// WriteError 翻译 error 为 HTTP 响应（wrap 内部 + SSE/流式外部都用）：
 //
-//	*errs.Error → HTTP e.Code + Result{Code, Msg, Metadata}（业务错误 Warn 日志）
-//	其他 error  → HTTP 500 + Result{Code:500, Msg:"系统错误"}（系统错误 Error 日志，原 err 不出网）
+//	*errs.Error → HTTP e.Code + Result{Code,Reason,Msg,Metadata}（Warn 日志）
+//	其他 error  → HTTP 500 + Result{Code:500, Msg:"系统错误"}（Error 日志，原 err 不出网）
 func WriteError(ctx *gin.Context, err error) {
 	if err == nil {
 		return
@@ -38,95 +89,25 @@ func WriteError(ctx *gin.Context, err error) {
 	var be *errs.Error
 	if errors.As(err, &be) {
 		L.Warn("业务错误", logger.String("path", path), logger.Error(err))
-		ctx.JSON(be.Code, Result{Code: be.Code, Msg: be.Message, Metadata: be.Metadata})
+		ctx.Set(CtxBizReason, be.Reason) // 供 metrics 中间件读出作 reason label
+		ctx.JSON(be.Code, Result{Code: be.Code, Reason: be.Reason, Msg: be.Message, Metadata: be.Metadata})
 		return
 	}
 	L.Error("业务处理失败", logger.String("path", path), logger.Error(err))
-	ctx.JSON(http.StatusInternalServerError, Result{
-		Code: http.StatusInternalServerError,
-		Msg:  "系统错误",
-	})
+	ctx.JSON(http.StatusInternalServerError, Result{Code: http.StatusInternalServerError, Msg: "系统错误"})
 }
 
-// respond 内部 helper：err==nil 写 200+res；否则走 WriteError。
+// respond：HTTP status = res.Code（默认 200，200 且 msg 空补 "OK"）；有 err 走 WriteError。
 func respond(ctx *gin.Context, res Result, err error) {
 	if err != nil {
 		WriteError(ctx, err)
 		return
 	}
-	ctx.JSON(http.StatusOK, res)
-}
-
-// bindBadRequest ShouldBindJSON 失败统一响应：HTTP 400 + 参数错误。
-func bindBadRequest(ctx *gin.Context) {
-	ctx.JSON(http.StatusBadRequest, Result{
-		Code: http.StatusBadRequest,
-		Msg:  "参数错误",
-	})
-}
-
-// claimsOf 从 ctx 取 UserClaims；缺失或类型不匹配 → 401 abort，第二个返回值标识是否成功。
-func claimsOf[C any](ctx *gin.Context, key string) (C, bool) {
-	var zero C
-	val, exists := ctx.Get(key)
-	if !exists {
-		ctx.AbortWithStatus(http.StatusUnauthorized)
-		return zero, false
+	if res.Code == 0 {
+		res.Code = http.StatusOK
 	}
-	uc, ok := val.(C)
-	if !ok {
-		ctx.AbortWithStatus(http.StatusUnauthorized)
-		return zero, false
+	if res.Msg == "" && res.Code == http.StatusOK {
+		res.Msg = "OK"
 	}
-	return uc, true
-}
-
-// Wrap 包装最简单的 handler。
-func Wrap(fn HandlerFunc) gin.HandlerFunc {
-	return func(ctx *gin.Context) {
-		res, err := fn(ctx)
-		respond(ctx, res, err)
-	}
-}
-
-// WrapReq 反序列化请求体。失败 → 400。
-func WrapReq[Req any](fn HandlerFuncReq[Req]) gin.HandlerFunc {
-	return func(ctx *gin.Context) {
-		var req Req
-		if err := ctx.ShouldBindJSON(&req); err != nil {
-			bindBadRequest(ctx)
-			return
-		}
-		res, err := fn(ctx, req)
-		respond(ctx, res, err)
-	}
-}
-
-// WrapClaims 取 UserClaims。缺失/类型错 → 401。
-func WrapClaims[C any](userKey string, fn HandlerFuncClaims[C]) gin.HandlerFunc {
-	return func(ctx *gin.Context) {
-		uc, ok := claimsOf[C](ctx, userKey)
-		if !ok {
-			return
-		}
-		res, err := fn(ctx, uc)
-		respond(ctx, res, err)
-	}
-}
-
-// WrapReqClaims 反序列化 + 取 Claims；前者失败 400 短路，后者失败 401。
-func WrapReqClaims[Req any, C any](userKey string, fn HandlerFuncReqClaims[Req, C]) gin.HandlerFunc {
-	return func(ctx *gin.Context) {
-		var req Req
-		if err := ctx.ShouldBindJSON(&req); err != nil {
-			bindBadRequest(ctx)
-			return
-		}
-		uc, ok := claimsOf[C](ctx, userKey)
-		if !ok {
-			return
-		}
-		res, err := fn(ctx, req, uc)
-		respond(ctx, res, err)
-	}
+	ctx.JSON(res.Code, res)
 }

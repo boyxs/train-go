@@ -198,3 +198,77 @@ groups:
               conditions:
                 - evaluator: { type: gt, params: [0.8] }
               refId: C
+
+      # ── ⑥ 业务限流激增（按 reason）─────────────────────────
+      # reason=~".*_RATE_LIMITED" 多序列各自触发，summary 点名是哪类限流。阈值 0.5/s·10m 起步。
+      - uid: webook-core-biz-rate-limit
+        title: 业务限流激增（按 reason）
+        condition: C
+        for: 10m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: high
+          team: backend
+        annotations:
+          summary: "限流 {{ $labels.reason }} 速率 {{ $values.B.Value }}/s（滥用/容量信号）"
+          runbook_url: "https://wiki.internal/runbook/webook-biz-rate-limit"
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              expr: 'webook:http_biz_errors:rate5m{job="webook-core", reason=~".*_RATE_LIMITED"}'
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [0.5] }
+              refId: C
+
+      # ── ⑦ 登录失败激增（疑似撞库）──────────────────────────
+      # USER_OR_PASSWORD_INVALID 速率异常 = 撞库信号。阈值 2/s·5m 起步。
+      - uid: webook-core-auth-bruteforce
+        title: 登录失败激增（疑似撞库）
+        condition: C
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: high
+          team: backend
+        annotations:
+          summary: "登录失败速率 {{ $values.B.Value }}/s（疑似撞库 / 暴破）"
+          runbook_url: "https://wiki.internal/runbook/webook-auth-bruteforce"
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              expr: 'webook:http_biz_errors:rate5m{job="webook-core", reason="USER_OR_PASSWORD_INVALID"}'
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [2] }
+              refId: C

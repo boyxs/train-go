@@ -10,6 +10,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/webook/pkg/ginx"
 )
 
 func newTestBuilder(reg *prometheus.Registry) *PrometheusBuilder {
@@ -56,6 +58,25 @@ func TestBuildCounter_StatusLabel(t *testing.T) {
 	metrics := gatherMetricsText(t, reg)
 	assert.Contains(t, metrics, `value:"200"`)
 	assert.Contains(t, metrics, `value:"400"`)
+}
+
+// reason label：业务错误把 reason 写进 ctx（WriteError 行为），中间件应作 label 记录（Phase 4）
+func TestBuildCounter_ReasonLabel(t *testing.T) {
+	reg := prometheus.NewRegistry()
+	server := gin.New()
+	server.Use(newTestBuilder(reg).WithCounter().Build())
+	server.GET("/limited", func(c *gin.Context) {
+		c.Set(ginx.CtxBizReason, "POLISH_RATE_LIMITED")
+		c.Status(http.StatusTooManyRequests)
+	})
+	server.GET("/ok", func(c *gin.Context) { c.Status(http.StatusOK) })
+
+	server.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/limited", nil))
+	server.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/ok", nil))
+
+	metrics := gatherMetricsText(t, reg)
+	assert.Contains(t, metrics, `value:"POLISH_RATE_LIMITED"`, "错误路径应带 reason label")
+	assert.Contains(t, metrics, `name:"reason"`, "counter 应有 reason label 维度")
 }
 
 func TestBuildHistogram(t *testing.T) {

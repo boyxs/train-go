@@ -96,7 +96,7 @@ func (h *InternalTaskHandler) RegisterRoutes(r *gin.Engine) {
 }
 
 // errEngineNotConfigured 引擎未通过 wire 装配。
-var errEngineNotConfigured = errs.New(501, "engine not configured (wire 未注入引擎实现)")
+var errEngineNotConfigured = errs.New(501, "engine not configured (wire 未注入引擎实现)").WithReason("MIGRATOR_ENGINE_NOT_CONFIGURED")
 
 // taskIdFromPath 从 path :id 提取 taskId。
 func taskIdFromPath(ctx *gin.Context) (int64, error) {

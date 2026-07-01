@@ -14,6 +14,7 @@ import (
 
 	"github.com/webook/internal/consts"
 	"github.com/webook/internal/web"
+	"github.com/webook/pkg/ginx"
 	"github.com/webook/pkg/ginx/middleware/accesslog"
 	"github.com/webook/pkg/ginx/middleware/metrics"
 	"github.com/webook/pkg/ginx/middleware/ratelimit"
@@ -35,6 +36,7 @@ func InitWebServer(
 	commentHandler web.CommentHandler,
 ) *gin.Engine {
 	server := gin.Default()
+	ginx.UserKey = consts.UserKey // 登录态 ctx key，供 ginx.MustClaims/Claims 读取
 	// 开启后 *gin.Context.Value() 会 fallback 到 c.Request.Context().Value()；
 	// 否则 trace.SpanFromContext(*gin.Context) 拿不到 otelgin 写进 Request.Context 的 span，
 	// 导致 DB/Redis 子 span 断链成独立 trace（详见 ioc/web_ctx_propagation_test.go）
@@ -95,7 +97,7 @@ func InitMiddlewares(
 			MaxAge: 12 * time.Hour,
 		}),
 		//限流
-		ratelimit.NewBuilder(cmd, time.Second, 20, l).Prefix("ip_limiter").Build(),
+		ratelimit.NewBuilder(cmd, time.Second, 120, l).Prefix("ip_limiter").Build(),
 		//jwt
 		loginJwtMiddleware(cmd),
 		// logger
@@ -141,8 +143,7 @@ func loginJwtMiddleware(cmd redis.Cmdable) gin.HandlerFunc {
 			"/article/ranking/archive/dates",
 			"/metrics", // Prometheus 抓取端点，由 nginx /metrics 的 IP 白名单层把关
 		).
-		// 评论 list/replies 公开可读，但登录态可选：有 token 才填 liked，无 token 不抛 401
-		// 路径无 /api 前缀（dev rewrite + nginx 已剥），与 IgnoredPaths 的 /interaction/* 同形
+		// 评论 list/replies 公开可读，但登录态可选
 		OptionalPaths("/comment/list", "/comment/replies").
 		Build()
 }

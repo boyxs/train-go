@@ -24,11 +24,11 @@ func (m *mockProducer) ProduceEvent(_ context.Context, topic string, key string,
 	return m.err
 }
 
-func TestProduceReadEvent(t *testing.T) {
+func TestProduce(t *testing.T) {
 	mock := &mockProducer{}
 	p := NewSaramaInteractionEventProducer(mock)
 
-	err := p.ProduceReadEvent(context.Background(), "article", 123)
+	err := p.Produce(context.Background(), InteractionEvent{Type: TypeRead, Biz: "article", BizId: 123})
 	require.NoError(t, err)
 
 	assert.Equal(t, TopicInteractionEvents, mock.lastTopic)
@@ -37,7 +37,7 @@ func TestProduceReadEvent(t *testing.T) {
 	var evt InteractionEvent
 	err = json.Unmarshal(mock.lastValue, &evt)
 	require.NoError(t, err)
-	assert.Equal(t, "read", evt.Type)
+	assert.Equal(t, TypeRead, evt.Type)
 	assert.Equal(t, "article", evt.Biz)
 	assert.Equal(t, int64(123), evt.BizId)
 }
@@ -46,6 +46,6 @@ func TestProduceEvent_Error(t *testing.T) {
 	mock := &mockProducer{err: errors.New("kafka unavailable")}
 	p := NewSaramaInteractionEventProducer(mock)
 
-	err := p.ProduceReadEvent(context.Background(), "article", 123)
+	err := p.Produce(context.Background(), InteractionEvent{Type: TypeRead, Biz: "article", BizId: 123})
 	assert.ErrorContains(t, err, "kafka unavailable")
 }

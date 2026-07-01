@@ -1,6 +1,6 @@
 apiVersion: 1
 
-# 后台任务 (cron + 分布式锁) 6 条核心告警
+# 后台任务 (cron + 分布式锁 + ranking boost 协程池) 7 条核心告警
 # 评估周期 1m；触发条件持续 1-10m 才正式 firing（避免抖动）
 # 评估链路：Query (A) → Reduce (B) → Threshold (C) — 必须 reduced 才能 alert
 groups:
@@ -219,4 +219,40 @@ groups:
               type: threshold
               expression: B
               conditions: [{ evaluator: { type: gt, params: [1] } }]
+              refId: C
+
+      # ── ⑦ Ranking 实时 boost 丢弃（协程池队列满）──────────────
+      - uid: webook-ranking-boost-dropped
+        title: Ranking Boost 丢弃（协程池队列满）
+        condition: C
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: medium
+          team: backend
+          component: ranking
+        annotations:
+          summary: "ranking boost 持续被丢弃 {{ $values.B.Value }}/s"
+          description: |
+            协程池队列满，实时榜单加分被丢弃（cron 全量重算兜底，不丢正确性，但实时性下降）。
+            处置：调大 rankingBoostQueueSize / rankingBoostWorkers，或排查 Redis ZINCRBY 是否变慢。
+          runbook_url: "https://wiki.internal/runbook/ranking-boost-dropped"
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              expr: 'rate(webook_ranking_boost_dropped_total[5m])'
+              refId: A
+              instant: true
+          - refId: B
+            datasourceUid: __expr__
+            model: { type: reduce, expression: A, reducer: last, refId: B }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions: [{ evaluator: { type: gt, params: [0] } }]
               refId: C

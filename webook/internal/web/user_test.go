@@ -114,7 +114,7 @@ func TestInternalUserHandler_Register(t *testing.T) {
 				return req
 			},
 			wantCode: http.StatusOK,
-			wantBody: `{"code":0,"msg":"注册成功","data":null}`,
+			wantBody: `{"code":200,"msg":"注册成功","data":null}`,
 		},
 		{
 			name: "ShouldBindJSON 出错",
@@ -132,7 +132,7 @@ func TestInternalUserHandler_Register(t *testing.T) {
 				return req
 			},
 			wantCode: http.StatusBadRequest,
-			wantBody: `{"code":400,"msg":"参数错误","data":null}`,
+			wantBody: `{"code":400,"reason":"BAD_REQUEST","msg":"参数错误","data":null}`,
 		},
 		{
 			name: "非法邮箱格式",
@@ -151,7 +151,7 @@ func TestInternalUserHandler_Register(t *testing.T) {
 				return req
 			},
 			wantCode: http.StatusBadRequest,
-			wantBody: `{"code":400,"msg":"非法邮箱格式","data":null}`,
+			wantBody: `{"code":400,"reason":"EMAIL_FORMAT_INVALID","msg":"非法邮箱格式","data":null}`,
 		},
 		{
 			name: "两次输入密码不匹配",
@@ -170,7 +170,7 @@ func TestInternalUserHandler_Register(t *testing.T) {
 				return req
 			},
 			wantCode: http.StatusBadRequest,
-			wantBody: `{"code":400,"msg":"两次输入密码不匹配","data":null}`,
+			wantBody: `{"code":400,"reason":"PASSWORD_MISMATCH","msg":"两次输入密码不匹配","data":null}`,
 		},
 		{
 			name: "密码格式不对",
@@ -189,7 +189,7 @@ func TestInternalUserHandler_Register(t *testing.T) {
 				return req
 			},
 			wantCode: http.StatusBadRequest,
-			wantBody: `{"code":400,"msg":"密码必须包含字母、数字、特殊字符，并且不少于八位","data":null}`,
+			wantBody: `{"code":400,"reason":"PASSWORD_WEAK","msg":"密码必须包含字母、数字、特殊字符，并且不少于八位","data":null}`,
 		},
 		{
 			name: "邮箱已被注册",
@@ -213,7 +213,7 @@ func TestInternalUserHandler_Register(t *testing.T) {
 				return req
 			},
 			wantCode: http.StatusConflict,
-			wantBody: `{"code":409,"msg":"邮箱已被注册","data":null}`,
+			wantBody: `{"code":409,"reason":"EMAIL_DUPLICATE","msg":"邮箱已被注册","data":null}`,
 		},
 		{
 			name: "系统异常",
@@ -304,7 +304,7 @@ func TestInternalUserHandler_LoginSMS(t *testing.T) {
 				return req
 			},
 			wantCode:   http.StatusOK,
-			wantResult: Result{Msg: "登录成功"},
+			wantResult: Result{Code: 200, Msg: "登录成功"},
 		},
 		{
 			name: "ShouldBindJSON 错误",
@@ -323,7 +323,7 @@ func TestInternalUserHandler_LoginSMS(t *testing.T) {
 				return req
 			},
 			wantCode:   http.StatusBadRequest,
-			wantResult: Result{Code: 400, Msg: "参数错误"},
+			wantResult: Result{Code: 400, Reason: "BAD_REQUEST", Msg: "参数错误"},
 		},
 		{
 			name: "验证码验证太频繁",
@@ -344,7 +344,7 @@ func TestInternalUserHandler_LoginSMS(t *testing.T) {
 				return req
 			},
 			wantCode:   http.StatusTooManyRequests,
-			wantResult: Result{Code: 429, Msg: "验证码校验太频繁"},
+			wantResult: Result{Code: 429, Reason: "CODE_VERIFY_RATE_LIMITED", Msg: "验证码校验太频繁"},
 		},
 		{
 			name: "验证码错误，请重新输入",
@@ -365,7 +365,7 @@ func TestInternalUserHandler_LoginSMS(t *testing.T) {
 				return req
 			},
 			wantCode:   http.StatusBadRequest,
-			wantResult: Result{Code: 400, Msg: "验证码错误，请重新输入"},
+			wantResult: Result{Code: 400, Reason: "SMS_CODE_WRONG", Msg: "验证码错误，请重新输入"},
 		},
 		{
 			name: "用户未找到",
@@ -411,7 +411,7 @@ func TestInternalUserHandler_LoginSMS(t *testing.T) {
 				return req
 			},
 			wantCode:   http.StatusConflict,
-			wantResult: Result{Code: 409, Msg: "此用户已被注册"},
+			wantResult: Result{Code: 409, Reason: "USER_DUPLICATE", Msg: "此用户已被注册"},
 		},
 		{
 			name: "系统异常",

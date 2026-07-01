@@ -23,6 +23,7 @@ import { Loading } from '@/components/common/Loading';
 import { useRequest } from '@/hooks/useRequest';
 import type { Article } from '@/types';
 import { ArticleStatus } from '@/types';
+import { getErrorMessage } from '@/utils/apiError';
 
 const { Text } = Typography;
 
@@ -72,12 +73,12 @@ function ArticleListPage() {
       cancelText: '取消',
       okButtonProps: { danger: true },
       async onOk() {
-        const res = await articleApi.withdrawArticle({ id });
-        if (res.data.code === 0 || !res.data.code) {
+        try {
+          await articleApi.withdrawArticle({ id });
           message.success('撤回成功');
           refresh();
-        } else {
-          message.error(res.data.msg || '撤回失败');
+        } catch (e) {
+          message.error(getErrorMessage(e, '撤回失败'));
         }
       },
     });
@@ -92,12 +93,12 @@ function ArticleListPage() {
       cancelText: '取消',
       okButtonProps: { danger: true },
       async onOk() {
-        const res = await articleApi.deleteArticle(id);
-        if (res.data.code === 0 || !res.data.code) {
+        try {
+          await articleApi.deleteArticle(id);
           message.success('删除成功');
           refreshAfterRemove();
-        } else {
-          message.error(res.data.msg || '删除失败');
+        } catch (e) {
+          message.error(getErrorMessage(e, '删除失败'));
         }
       },
     });

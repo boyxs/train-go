@@ -4,7 +4,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/webook/internal/consts"
 	"github.com/webook/internal/domain"
 	"github.com/webook/internal/errs"
 	"github.com/webook/internal/service"
@@ -48,16 +47,17 @@ type pageReq struct {
 
 func (h *InternalArticleAuthorHandler) RegisterRoutes(server *gin.Engine) {
 	g := server.Group("/article")
-	g.POST("/edit", ginx.WrapReqClaims[editReq, UserClaims](consts.UserKey, h.Edit))
-	g.POST("/publish", ginx.WrapReqClaims[editReq, UserClaims](consts.UserKey, h.Publish))
-	g.POST("/withdraw", ginx.WrapReqClaims[idReq, UserClaims](consts.UserKey, h.Withdraw))
-	g.POST("/detail", ginx.WrapReqClaims[idReq, UserClaims](consts.UserKey, h.Detail))
-	g.POST("/page", ginx.WrapReqClaims[pageReq, UserClaims](consts.UserKey, h.Page))
-	g.POST("/list", ginx.WrapClaims[UserClaims](consts.UserKey, h.List))
-	g.POST("/delete", ginx.WrapReqClaims[idReq, UserClaims](consts.UserKey, h.Delete))
+	g.POST("/edit", ginx.WrapReq[editReq](h.Edit))
+	g.POST("/publish", ginx.WrapReq[editReq](h.Publish))
+	g.POST("/withdraw", ginx.WrapReq[idReq](h.Withdraw))
+	g.POST("/detail", ginx.WrapReq[idReq](h.Detail))
+	g.POST("/page", ginx.WrapReq[pageReq](h.Page))
+	g.POST("/list", ginx.Wrap(h.List))
+	g.POST("/delete", ginx.WrapReq[idReq](h.Delete))
 }
 
-func (h *InternalArticleAuthorHandler) Edit(ctx *gin.Context, req editReq, uc UserClaims) (ginx.Result, error) {
+func (h *InternalArticleAuthorHandler) Edit(ctx *gin.Context, req editReq) (ginx.Result, error) {
+	uc := ginx.MustClaims[UserClaims](ctx)
 	if req.Title == "" || req.Content == "" {
 		return ginx.Result{}, errs.ErrArticleEmptyTitleOrContent
 	}
@@ -74,7 +74,8 @@ func (h *InternalArticleAuthorHandler) Edit(ctx *gin.Context, req editReq, uc Us
 	return ginx.Result{Data: id}, nil
 }
 
-func (h *InternalArticleAuthorHandler) Publish(ctx *gin.Context, req editReq, uc UserClaims) (ginx.Result, error) {
+func (h *InternalArticleAuthorHandler) Publish(ctx *gin.Context, req editReq) (ginx.Result, error) {
+	uc := ginx.MustClaims[UserClaims](ctx)
 	if req.Title == "" || req.Content == "" {
 		return ginx.Result{}, errs.ErrArticleEmptyTitleOrContent
 	}
@@ -91,14 +92,16 @@ func (h *InternalArticleAuthorHandler) Publish(ctx *gin.Context, req editReq, uc
 	return ginx.Result{Msg: "OK"}, nil
 }
 
-func (h *InternalArticleAuthorHandler) Withdraw(ctx *gin.Context, req idReq, uc UserClaims) (ginx.Result, error) {
+func (h *InternalArticleAuthorHandler) Withdraw(ctx *gin.Context, req idReq) (ginx.Result, error) {
+	uc := ginx.MustClaims[UserClaims](ctx)
 	if err := h.svc.Withdraw(ctx, req.Id, uc.Userid); err != nil {
 		return ginx.Result{}, err
 	}
 	return ginx.Result{Msg: "OK"}, nil
 }
 
-func (h *InternalArticleAuthorHandler) Detail(ctx *gin.Context, req idReq, uc UserClaims) (ginx.Result, error) {
+func (h *InternalArticleAuthorHandler) Detail(ctx *gin.Context, req idReq) (ginx.Result, error) {
+	uc := ginx.MustClaims[UserClaims](ctx)
 	var article domain.Article
 	var intr domain.Interaction
 	var eg errgroup.Group
@@ -165,7 +168,8 @@ type ReaderDetailVO struct {
 	UpdatedAt int64  `json:"updatedAt"`
 }
 
-func (h *InternalArticleAuthorHandler) Page(ctx *gin.Context, req pageReq, uc UserClaims) (ginx.Result, error) {
+func (h *InternalArticleAuthorHandler) Page(ctx *gin.Context, req pageReq) (ginx.Result, error) {
+	uc := ginx.MustClaims[UserClaims](ctx)
 	articles, total, err := h.svc.Page(ctx, uc.Userid, req.Page, req.PageSize)
 	if err != nil {
 		return ginx.Result{}, err
@@ -193,7 +197,8 @@ func (h *InternalArticleAuthorHandler) Page(ctx *gin.Context, req pageReq, uc Us
 	return ginx.Result{Data: ginx.PageResult{List: list, Total: total}}, nil
 }
 
-func (h *InternalArticleAuthorHandler) List(ctx *gin.Context, uc UserClaims) (ginx.Result, error) {
+func (h *InternalArticleAuthorHandler) List(ctx *gin.Context) (ginx.Result, error) {
+	uc := ginx.MustClaims[UserClaims](ctx)
 	articles, err := h.svc.List(ctx, uc.Userid)
 	if err != nil {
 		return ginx.Result{}, err
@@ -211,7 +216,8 @@ func (h *InternalArticleAuthorHandler) List(ctx *gin.Context, uc UserClaims) (gi
 	return ginx.Result{Data: list}, nil
 }
 
-func (h *InternalArticleAuthorHandler) Delete(ctx *gin.Context, req idReq, uc UserClaims) (ginx.Result, error) {
+func (h *InternalArticleAuthorHandler) Delete(ctx *gin.Context, req idReq) (ginx.Result, error) {
+	uc := ginx.MustClaims[UserClaims](ctx)
 	if err := h.svc.Delete(ctx, req.Id, uc.Userid); err != nil {
 		return ginx.Result{}, err
 	}

@@ -47,7 +47,7 @@ func TestAIClickEventHandler_Click(t *testing.T) {
 				return svc
 			},
 			wantCode: http.StatusOK,
-			wantBody: Result{Code: 0, Msg: "ok"},
+			wantBody: Result{Code: 200, Msg: "ok"},
 		},
 		{
 			name: "参数缺失",
@@ -143,7 +143,7 @@ func TestAIClickEventHandler_Dashboard(t *testing.T) {
 				return svc
 			},
 			wantCode: http.StatusOK,
-			wantBody: Result{Code: 0, Msg: "ok"},
+			wantBody: Result{Code: 200, Msg: "ok"},
 		},
 		{
 			name: "service返回错误",

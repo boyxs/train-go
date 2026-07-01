@@ -16,8 +16,6 @@ import (
 	"github.com/webook/chat/service"
 	"github.com/webook/chat/web"
 	"github.com/webook/pkg/streamer"
-
-	_ "github.com/spf13/viper/remote"
 )
 
 // Injectors from wire.go:
@@ -45,7 +43,8 @@ func InitApp() (App, func(), error) {
 		cleanup()
 		return App{}, nil, err
 	}
-	coreConn, cleanup3, err := ioc.InitCoreConn(clientv3Client)
+	prometheusBuilder := ioc.InitGRPCMetrics()
+	coreConn, cleanup3, err := ioc.InitCoreConn(clientv3Client, prometheusBuilder)
 	if err != nil {
 		cleanup2()
 		cleanup()
@@ -53,7 +52,14 @@ func InitApp() (App, func(), error) {
 	}
 	searchServiceClient := ioc.InitSearchClient(coreConn)
 	articleReaderServiceClient := ioc.InitArticleReaderClient(coreConn)
-	interactionServiceClient := ioc.InitInteractionClient(coreConn)
+	interactionConn, cleanup4, err := ioc.InitInteractionConn(clientv3Client, prometheusBuilder)
+	if err != nil {
+		cleanup3()
+		cleanup2()
+		cleanup()
+		return App{}, nil, err
+	}
+	interactionServiceClient := ioc.InitInteractionClient(interactionConn)
 	toolExecutor := service.NewAIChatToolExecutor(searchServiceClient, articleReaderServiceClient, interactionServiceClient, loggerX)
 	eventStreamer := streamer.NewRedisStreamer(cmdable)
 	chatService := service.NewAIChatService(conversationRepository, messageRepository, client, searchServiceClient, toolExecutor, loggerX, eventStreamer)
@@ -65,6 +71,7 @@ func InitApp() (App, func(), error) {
 		Conn:   coreConn,
 	}
 	return app, func() {
+		cleanup4()
 		cleanup3()
 		cleanup2()
 		cleanup()

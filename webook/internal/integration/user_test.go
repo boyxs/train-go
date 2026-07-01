@@ -53,7 +53,8 @@ func TestInternalUserHandler_SendSMSCode(t *testing.T) {
 			},
 			wantCode: http.StatusOK,
 			wantBody: web.Result{
-				Msg: "发送成功",
+				Code: 200,
+				Msg:  "发送成功",
 			},
 		},
 		{
@@ -62,8 +63,9 @@ func TestInternalUserHandler_SendSMSCode(t *testing.T) {
 			after:    func(t *testing.T) {},
 			wantCode: http.StatusBadRequest,
 			wantBody: web.Result{
-				Code: 400,
-				Msg:  "请输入手机号码",
+				Code:   400,
+				Reason: "PHONE_EMPTY",
+				Msg:    "请输入手机号码",
 			},
 		},
 		{
@@ -91,8 +93,9 @@ func TestInternalUserHandler_SendSMSCode(t *testing.T) {
 			},
 			wantCode: http.StatusTooManyRequests,
 			wantBody: web.Result{
-				Code: 429,
-				Msg:  "验证码发送太频繁",
+				Code:   429,
+				Reason: "CODE_SEND_RATE_LIMITED",
+				Msg:    "验证码发送太频繁",
 			},
 		},
 		{
@@ -119,8 +122,9 @@ func TestInternalUserHandler_SendSMSCode(t *testing.T) {
 			// case 名叫"系统错误"但实际逻辑：注入了 code key 但无 TTL → cache.Store 返 ErrCodeInvalid (400)
 			wantCode: http.StatusBadRequest,
 			wantBody: web.Result{
-				Code: 400,
-				Msg:  "验证码错误或已过期",
+				Code:   400,
+				Reason: "CODE_INVALID",
+				Msg:    "验证码错误或已过期",
 			},
 		},
 	}
@@ -195,7 +199,8 @@ func TestInternalUserHandler_LoginSMS(t *testing.T) {
 				assert.NoError(t, err)
 			},
 			wantBody: web.Result{
-				Msg: "登录成功",
+				Code: 200,
+				Msg:  "登录成功",
 			},
 		},
 	}

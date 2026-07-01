@@ -11,6 +11,7 @@ import { PolishModal } from '@/components/article/PolishModal';
 import { Loading } from '@/components/common/Loading';
 import { useRequest } from '@/hooks/useRequest';
 import type { EditArticleReq } from '@/types';
+import { getErrorMessage } from '@/utils/apiError';
 
 const { TextArea } = Input;
 
@@ -68,15 +69,13 @@ function ArticleEditPage({ articleId }: ArticleEditProps) {
     });
     setPolishing(true);
     try {
+      // 后端契约 HTTP status = 业务 code（ginx.Wrap）：2xx 必为成功；业务错误（含 429 润色超限）
+      // 一律走 4xx/5xx → axios reject → 错误只在 catch 处理一次，无需再判 res.data.code。
       const res = await articleApi.polishArticle({ title, content });
-      if (res.data.code === 0 && res.data.data) {
-        setPolishResult(res.data.data);
-        setPolishModalOpen(true);
-      } else {
-        message.error(res.data.msg || '润色失败');
-      }
-    } catch {
-      message.error('网络错误');
+      setPolishResult(res.data.data);
+      setPolishModalOpen(true);
+    } catch (e) {
+      message.error(getErrorMessage(e, '润色失败'));
     } finally {
       setPolishing(false);
     }
@@ -106,15 +105,11 @@ function ArticleEditPage({ articleId }: ArticleEditProps) {
         ...values,
         id: isEdit ? Number(articleId) : undefined,
       };
-      const res = await apiFn(data);
-      if (res.data.code === 0 || !res.data.code) {
-        message.success(successMsg);
-        router.push('/article/list');
-      } else {
-        message.error(res.data.msg || '操作失败');
-      }
-    } catch {
-      message.error('系统错误');
+      await apiFn(data);
+      message.success(successMsg);
+      router.push('/article/list');
+    } catch (e) {
+      message.error(getErrorMessage(e, '操作失败'));
     }
   };
 

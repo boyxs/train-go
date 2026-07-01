@@ -8,6 +8,7 @@ import React, { useEffect, useState } from 'react';
 
 import { useChat } from '@/hooks/useChat';
 import { useConversations } from '@/hooks/useConversations';
+import { getErrorMessage } from '@/utils/apiError';
 
 import { ChatInput } from './ChatInput';
 import { ChatMessages } from './ChatMessages';
@@ -41,7 +42,9 @@ function ChatPage() {
   } = useChat(activeId);
 
   useEffect(() => {
-    fetchList().catch(() => message.error('加载对话列表失败'));
+    fetchList().catch((e) =>
+      message.error(getErrorMessage(e, '加载对话列表失败')),
+    );
   }, [fetchList, message]);
 
   useEffect(() => {

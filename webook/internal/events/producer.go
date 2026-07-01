@@ -3,6 +3,8 @@ package events
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
+	"time"
 
 	"github.com/IBM/sarama"
 
@@ -14,10 +16,6 @@ import (
 type SaramaSyncProducer struct {
 	producer sarama.SyncProducer
 	l        logger.LoggerX
-}
-
-func NewSaramaSyncProducer(producer sarama.SyncProducer, l logger.LoggerX) Producer {
-	return &SaramaSyncProducer{producer: producer, l: l}
 }
 
 func (p *SaramaSyncProducer) ProduceEvent(ctx context.Context, topic string, key string, value []byte) error {
@@ -44,41 +42,73 @@ func (p *SaramaSyncProducer) ProduceEvent(ctx context.Context, topic string, key
 	return nil
 }
 
-// NoopProducer Kafka 不可用时的空实现，每次返回 error 触发降级
-type NoopProducer struct{}
-
-func (p *NoopProducer) ProduceEvent(ctx context.Context, topic string, key string, value []byte) error {
-	return fmt.Errorf("kafka unavailable: noop producer")
+// LazyProducer 懒连接生产者：构造不阻塞，后台无限退避连 Kafka，启动不依赖 Kafka 就绪。
+// 连上前 ProduceEvent 返回 error（触发上层熔断降级为同步兜底），连上后委托 SaramaSyncProducer。
+type LazyProducer struct {
+	connect     func() (Producer, error) // 可注入，默认 sarama dial；单测换桩
+	l           logger.LoggerX
+	backoffInit time.Duration
+	backoffMax  time.Duration
+	delegate    atomic.Pointer[producerBox]
 }
 
-// SaramaAsyncProducer 异步生产者，发送后立即返回，高吞吐
-type SaramaAsyncProducer struct {
-	producer sarama.AsyncProducer
+// producerBox 包一层让 atomic.Pointer 能存接口值。
+type producerBox struct{ p Producer }
+
+// NewLazyProducer 立即返回，连接在后台进行。
+func NewLazyProducer(addrs []string, cfg *sarama.Config, l logger.LoggerX,
+	backoffInit, backoffMax time.Duration) Producer {
+	return newLazyProducer(l, backoffInit, backoffMax, func() (Producer, error) {
+		sp, err := sarama.NewSyncProducer(addrs, cfg)
+		if err != nil {
+			return nil, err
+		}
+		return &SaramaSyncProducer{producer: sp, l: l}, nil
+	})
 }
 
-func NewSaramaAsyncProducer(producer sarama.AsyncProducer) Producer {
-	return &SaramaAsyncProducer{
-		producer: producer,
+// newLazyProducer connect 可注入，便于单测不真实拨号。
+func newLazyProducer(l logger.LoggerX, backoffInit, backoffMax time.Duration,
+	connect func() (Producer, error)) *LazyProducer {
+	p := &LazyProducer{
+		connect:     connect,
+		l:           l,
+		backoffInit: backoffInit,
+		backoffMax:  backoffMax,
+	}
+	go p.run()
+	return p
+}
+
+// run 后台无限退避连接，成功即退出（之后由 sarama 内部维护重连）。
+func (p *LazyProducer) run() {
+	backoff, backoffMax := p.backoffInit, p.backoffMax
+	if backoff <= 0 {
+		backoff = time.Second
+	}
+	if backoffMax < backoff {
+		backoffMax = 30 * time.Second
+	}
+	for {
+		d, err := p.connect()
+		if err == nil {
+			p.delegate.Store(&producerBox{p: d})
+			p.l.Info("kafka producer 连接成功")
+			return
+		}
+		p.l.Warn("kafka producer 连接失败，后台重试",
+			logger.String("backoff", backoff.String()), logger.Error(err))
+		time.Sleep(backoff)
+		if backoff *= 2; backoff > backoffMax {
+			backoff = backoffMax
+		}
 	}
 }
 
-func (p *SaramaAsyncProducer) ProduceEvent(ctx context.Context, topic string, key string, value []byte) error {
-	msg := &sarama.ProducerMessage{
-		Topic: topic,
-		Key:   sarama.StringEncoder(key),
-		Value: sarama.ByteEncoder(value),
+func (p *LazyProducer) ProduceEvent(ctx context.Context, topic string, key string, value []byte) error {
+	box := p.delegate.Load()
+	if box == nil {
+		return fmt.Errorf("kafka producer 连接中，暂不可用")
 	}
-	// OTel：注入 trace context 到 Kafka header，与 SyncProducer 保持一致
-	// 注意：此处 span 只覆盖"入队"耗时，不含 broker ack 时间——异步路径想准确覆盖需要
-	// 在 producer.Successes() / Errors() 通道里关联消息元数据延迟 End，代价更高；当前按入队耗时处理
-	_, span := saramax.StartProducerSpan(ctx, msg)
-	defer span.End()
-
-	select {
-	case p.producer.Input() <- msg:
-		return nil
-	case <-ctx.Done():
-		saramax.RecordSpanError(span, ctx.Err())
-		return ctx.Err()
-	}
+	return box.p.ProduceEvent(ctx, topic, key, value)
 }

@@ -16,10 +16,17 @@ import (
 	"github.com/webook/internal/domain"
 	"github.com/webook/internal/errs"
 	svcmocks "github.com/webook/internal/service/mocks"
+	"github.com/webook/pkg/ginx"
 	jwt "github.com/webook/pkg/jwtx"
 	"github.com/webook/pkg/logger"
 	limitmocks "github.com/webook/pkg/ratelimit/mocks"
 )
+
+// 单测里 InitWebServer 不跑，手动对齐 ginx.UserKey 与生产（= consts.UserKey），
+// 供各 handler 的 ginx.MustClaims/Claims 从 ctx 取到测试注入的登录态。
+func init() {
+	ginx.UserKey = consts.UserKey
+}
 
 func setupPolishRouter(handler ArticlePolishHandler) *gin.Engine {
 	gin.SetMode(gin.TestMode)
@@ -55,7 +62,7 @@ func TestAIArticlePolishHandler_Polish(t *testing.T) {
 				return svc, lim
 			},
 			wantCode: http.StatusOK,
-			wantBody: Result{Code: 0, Msg: "ok"},
+			wantBody: Result{Code: 200, Msg: "ok"},
 		},
 		{
 			name: "JSON绑定失败",
@@ -143,7 +150,7 @@ func TestAIArticlePolishHandler_Polish(t *testing.T) {
 				return svc, lim
 			},
 			wantCode: http.StatusOK,
-			wantBody: Result{Code: 0, Msg: "ok"},
+			wantBody: Result{Code: 200, Msg: "ok"},
 		},
 	}
 	for _, tc := range testCases {

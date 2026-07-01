@@ -1,6 +1,8 @@
 import type { AxiosResponse } from 'axios';
 import { useEffect, useState } from 'react';
 
+import { getErrorMessage } from '@/utils/apiError';
+
 /**
  * 通用异步请求 hook
  * 适用于页面加载时自动发起的 GET 请求
@@ -29,7 +31,7 @@ export function useRequest<T>(
       })
       .catch((err) => {
         if (!cancelled) {
-          setError(err?.message || '请求失败');
+          setError(getErrorMessage(err, '请求失败'));
         }
       })
       .finally(() => {

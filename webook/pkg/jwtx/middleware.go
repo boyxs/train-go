@@ -1,11 +1,18 @@
 package jwtx
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 	stdjwt "github.com/golang-jwt/jwt/v5"
+)
+
+// 验签失败原因码，写进 401 响应 reason 供前端区分处理。
+const (
+	ReasonAccessTokenExpired = "ACCESS_TOKEN_EXPIRED" // 过期，可刷新
+	ReasonTokenInvalid       = "TOKEN_INVALID"        // 无效/登出，去登录
 )
 
 // MiddlewareBuilder 验签中间件构造器。
@@ -46,40 +53,59 @@ func (b *MiddlewareBuilder) Build() gin.HandlerFunc {
 		if _, ok := b.ignoredPaths[path]; ok {
 			return
 		}
-		uc, ok := b.Parse(ctx)
+		uc, reason := b.parseWithReason(ctx)
 		if _, optional := b.optionalPaths[path]; optional {
-			if ok {
+			if reason == "" {
 				ctx.Set(b.cfg.UserKey, uc)
 			}
 			return
 		}
-		if !ok {
-			ctx.AbortWithStatus(http.StatusUnauthorized)
+		if reason != "" {
+			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
+				"code":   http.StatusUnauthorized,
+				"reason": reason,
+				"msg":    "登录已过期或无效，请重新登录",
+				"data":   nil,
+			})
 			return
 		}
 		ctx.Set(b.cfg.UserKey, uc)
 	}
 }
 
+// Parse 验签，成功返回 (claims, true)。
 func (b *MiddlewareBuilder) Parse(ctx *gin.Context) (UserClaims, bool) {
+	uc, reason := b.parseWithReason(ctx)
+	return uc, reason == ""
+}
+
+// parseWithReason 验签，返回失败原因码（"" = 成功）。
+func (b *MiddlewareBuilder) parseWithReason(ctx *gin.Context) (UserClaims, string) {
 	tokenStr := ExtractBearer(ctx)
 	if tokenStr == "" {
-		return UserClaims{}, false
+		return UserClaims{}, ReasonTokenInvalid
 	}
 	var uc UserClaims
 	token, err := stdjwt.ParseWithClaims(tokenStr, &uc, func(_ *stdjwt.Token) (any, error) {
 		return b.cfg.AccessKey, nil
 	})
-	if err != nil || token == nil || !token.Valid {
-		return UserClaims{}, false
+	if err != nil {
+		// 过期可刷新，与其他失败区分
+		if errors.Is(err, stdjwt.ErrTokenExpired) {
+			return UserClaims{}, ReasonAccessTokenExpired
+		}
+		return UserClaims{}, ReasonTokenInvalid
+	}
+	if token == nil || !token.Valid {
+		return UserClaims{}, ReasonTokenInvalid
 	}
 	if uc.UserAgent != ctx.GetHeader(HeaderUserAgent) {
-		return UserClaims{}, false
+		return UserClaims{}, ReasonTokenInvalid
 	}
 	if b.cfg.Cmd != nil && ssidLoggedOut(ctx, b.cfg.Cmd, b.cfg.SsidKeyPattern, uc.Ssid) {
-		return UserClaims{}, false
+		return UserClaims{}, ReasonTokenInvalid
 	}
-	return uc, true
+	return uc, ""
 }
 
 // ExtractBearer 从 Authorization: Bearer <token> 头解析 access token。

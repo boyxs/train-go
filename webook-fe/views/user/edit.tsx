@@ -9,6 +9,7 @@ import React, { useEffect } from 'react';
 import * as userApi from '@/api/user';
 import { Loading } from '@/components/common/Loading';
 import { useRequest } from '@/hooks/useRequest';
+import { getErrorMessage } from '@/utils/apiError';
 
 const { TextArea } = Input;
 
@@ -38,19 +39,15 @@ function EditProfilePage() {
 
   const onFinish = async (values: FormValues) => {
     try {
-      const res = await userApi.updateProfile({
+      await userApi.updateProfile({
         nickname: values.nickname,
         birthday: values.birthday ? values.birthday.valueOf() : 0,
         aboutMe: values.aboutMe,
       });
-      if (res.data.code === 0) {
-        message.success('修改成功');
-        router.push('/user/profile');
-      } else {
-        message.error(res.data.msg || '修改失败');
-      }
-    } catch {
-      message.error('系统错误');
+      message.success('修改成功');
+      router.push('/user/profile');
+    } catch (e) {
+      message.error(getErrorMessage(e, '修改失败'));
     }
   };
 

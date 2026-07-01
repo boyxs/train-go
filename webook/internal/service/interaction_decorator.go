@@ -38,7 +38,8 @@ func (s *KafkaInteractionService) IncrReadCount(ctx context.Context, biz string,
 	if !s.breaker.Allow() {
 		return s.InteractionService.IncrReadCount(ctx, biz, bizId)
 	}
-	if err := s.producer.ProduceReadEvent(ctx, biz, bizId); err != nil {
+	evt := intrevt.InteractionEvent{Type: intrevt.TypeRead, Biz: biz, BizId: bizId}
+	if err := s.producer.Produce(ctx, evt); err != nil {
 		s.breaker.Fail()
 		s.l.Error("kafka 发送阅读事件失败，降级同步", logger.Error(err))
 		return s.InteractionService.IncrReadCount(ctx, biz, bizId)

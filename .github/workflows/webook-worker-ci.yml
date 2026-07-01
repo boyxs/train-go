@@ -1,0 +1,125 @@
+name: Webook Worker Service CI
+
+on:
+  push:
+    branches: [main, 'feature/**']
+    tags: ['webook-worker-v*.*.*']
+    paths-ignore:
+      - 'webook-fe/**'
+      - 'webook/internal/**'    # core 服务有独立 CI
+      - 'webook/chat/**'        # chat 服务有独立 CI
+      - 'webook/comment/**'     # comment 服务有独立 CI
+      - 'webook/interaction/**' # interaction 服务有独立 CI
+      - 'webook/migrator/**'    # migrator 服务有独立 CI
+      - 'deploy/**'
+      - 'docs/**'
+      - 'sandbox/**'
+      - 'prd/**'
+      - '**.md'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'webook/worker/**'
+      - 'webook/api/**'
+      - 'webook/pkg/**'
+      - '.github/workflows/webook-worker-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/webook-worker
+  MODULE: github.com/webook
+  GOFLAGS: "-mod=readonly"
+
+defaults:
+  run:
+    working-directory: webook
+
+jobs:
+  lint-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: 设置 Go 环境
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.25.6'
+          cache: true
+          cache-dependency-path: webook/go.sum
+
+      - name: 安装 goimports
+        run: test -x "$(go env GOPATH)/bin/goimports" || go install golang.org/x/tools/cmd/goimports@v0.26.0
+
+      - name: 检查 import 顺序（worker + 共享）
+        run: |
+          DIFF=$(goimports -local "$MODULE" -l ./worker ./api ./pkg)
+          if [ -n "$DIFF" ]; then
+            echo "❌ 以下文件 import 未按规范排序，请本地执行：goimports -local $MODULE -w ."
+            echo "$DIFF"
+            exit 1
+          fi
+          echo "✅ import 顺序规范"
+
+      - name: go vet
+        run: go vet ./worker/... ./api/... ./pkg/...
+
+      - name: 单元测试
+        run: |
+          PKGS=$(go list ./worker/... ./api/... ./pkg/... | grep -v /integration)
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]] || [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            go test -race $PKGS
+          else
+            go test $PKGS
+          fi
+
+  build-push:
+    needs: lint-test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: 提取镜像元数据
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=main-latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=main-${{ github.sha }},enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=feature-${{ github.sha }},enable=${{ startsWith(github.ref, 'refs/heads/feature/') }}
+            # tag webook-worker-v1.2.3 → 1.2.3
+            type=match,pattern=webook-worker-v(.*),group=1
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & Push
+        uses: docker/build-push-action@v5
+        with:
+          context: webook
+          file: webook/worker/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          build-args: |
+            VERSION=${{ github.sha }}
+          provenance: false
+          sbom: false
+          cache-from: type=gha,scope=webook-worker
+          cache-to: type=gha,mode=max,scope=webook-worker

@@ -14,6 +14,7 @@ import (
 
 	"github.com/webook/chat/consts"
 	"github.com/webook/chat/web"
+	"github.com/webook/pkg/ginx"
 	"github.com/webook/pkg/ginx/middleware/accesslog"
 	"github.com/webook/pkg/ginx/middleware/metrics"
 	"github.com/webook/pkg/jwtx"
@@ -23,6 +24,7 @@ import (
 // InitWebServer 与主仓 internal/ioc/web.go 同结构：middlewares 由 InitMiddlewares 装配后注入。
 func InitWebServer(middlewares []gin.HandlerFunc, handler web.ChatHandler) *gin.Engine {
 	server := gin.Default()
+	ginx.UserKey = consts.UserKey // 登录态 ctx key，供 ginx.MustClaims/Claims 读取
 	// otelgin 把 span 写在 Request.Context()，开启 ContextWithFallback 让 *gin.Context.Value() 也能取到，
 	// 否则 DB/Redis 子 span 会断链。
 	server.ContextWithFallback = true

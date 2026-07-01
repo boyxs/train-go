@@ -35,7 +35,7 @@ type RankingService interface {
 type ArticleRankingService struct {
 	repo       repository.RankingRepository
 	artRepo    repository.ArticleReaderRepository
-	interRepo  repository.InteractionRepository
+	interSvc   InteractionService // 经网关读远端 interaction 计数（core 无互动业务逻辑）
 	clickEvent ClickEventService
 	l          logger.LoggerX
 	now        func() time.Time // 可注入 clock，便于测试
@@ -44,12 +44,12 @@ type ArticleRankingService struct {
 func NewArticleRankingService(
 	repo repository.RankingRepository,
 	artRepo repository.ArticleReaderRepository,
-	interRepo repository.InteractionRepository,
+	interSvc InteractionService,
 	clickEvent ClickEventService,
 	l logger.LoggerX,
 ) RankingService {
 	return &ArticleRankingService{
-		repo: repo, artRepo: artRepo, interRepo: interRepo,
+		repo: repo, artRepo: artRepo, interSvc: interSvc,
 		clickEvent: clickEvent, l: l,
 		now: time.Now,
 	}
@@ -201,13 +201,9 @@ func (s *ArticleRankingService) loadCandidates(ctx context.Context) ([]candidate
 	for _, a := range articleList {
 		bizIds = append(bizIds, a.Id)
 	}
-	interList, err := s.interRepo.FindByBizIds(ctx, domain.BizArticle, bizIds)
+	interMap, err := s.interSvc.FindByBizIds(ctx, domain.BizArticle, bizIds)
 	if err != nil {
 		return nil, err
-	}
-	interMap := make(map[int64]domain.Interaction, len(interList))
-	for _, it := range interList {
-		interMap[it.BizId] = it
 	}
 	out := make([]candidate, 0, len(articleList))
 	for _, a := range articleList {

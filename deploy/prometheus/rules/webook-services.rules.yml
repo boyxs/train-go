@@ -7,9 +7,10 @@ groups:
     interval: 30s
     rules:
 
-      # QPS
+      # QPS（保留 status + pattern：状态码分布 / 按路径 QPS / Top10 面板要按这两维拆，故不能只 by job；
+      #       method/instance 仍聚合掉；总量类面板对它再 sum() 即可。pattern 是路由模板，基数=路由数，可控。）
       - record: webook:http_qps:rate5m
-        expr: sum by (job) (rate(webook_http_requests_total[5m]))
+        expr: sum by (job, status, pattern) (rate(webook_http_requests_total[5m]))
 
       # 5xx 错误率（分母 >0 守卫）
       - record: webook:http_5xx_rate:rate5m
@@ -17,6 +18,11 @@ groups:
           sum by (job) (rate(webook_http_requests_total{status=~"5.."}[5m]))
           /
           (sum by (job) (rate(webook_http_requests_total[5m])) > 0)
+
+      # 业务错误率（按 reason；仅错误路径 reason!="" → 低基数）。
+      # reason label 由 ginx.WriteError 写入（仅 *errs.Error 业务错误路径），供看板/告警下钻"哪类业务错误在涨"。
+      - record: webook:http_biz_errors:rate5m
+        expr: sum by (job, reason) (rate(webook_http_requests_total{reason!=""}[5m]))
 
       # P50/P95/P99 延迟（尾部 and 守卫空数据 NaN）
       - record: webook:http_duration_p50:rate5m

@@ -3,7 +3,6 @@ package web
 import (
 	"github.com/gin-gonic/gin"
 
-	"github.com/webook/internal/consts"
 	"github.com/webook/internal/domain"
 	"github.com/webook/internal/service"
 	"github.com/webook/pkg/errs"
@@ -26,10 +25,10 @@ func NewInternalInteractionHandler(svc service.InteractionService, l logger.Logg
 
 func (h *InternalInteractionHandler) RegisterRoutes(server *gin.Engine) {
 	g := server.Group("/interaction")
-	g.POST("/like", ginx.WrapReqClaims[likeReq, UserClaims](consts.UserKey, h.Like))
-	g.POST("/collect", ginx.WrapReqClaims[collectReq, UserClaims](consts.UserKey, h.Collect))
+	g.POST("/like", ginx.WrapReq[likeReq](h.Like))
+	g.POST("/collect", ginx.WrapReq[collectReq](h.Collect))
 	g.POST("/detail", ginx.WrapReq[bizReq](h.Detail))
-	g.POST("/state", ginx.WrapReqClaims[bizReq, UserClaims](consts.UserKey, h.State))
+	g.POST("/state", ginx.WrapReq[bizReq](h.State))
 	g.POST("/view", ginx.WrapReq[bizReq](h.View))
 }
 
@@ -41,7 +40,7 @@ var allowedBiz = map[string]struct{}{
 }
 
 // ErrInvalidBiz biz 不在白名单。
-var ErrInvalidBiz = errs.New(400, "biz 不合法")
+var ErrInvalidBiz = errs.New(400, "biz 不合法").WithReason("INTERACTION_BIZ_INVALID")
 
 func checkBiz(biz string) error {
 	if _, ok := allowedBiz[biz]; !ok {
@@ -51,24 +50,26 @@ func checkBiz(biz string) error {
 }
 
 // bizReq 通用互动目标：biz 业务类型 + bizId 业务内主键（article→articleId、comment→commentId）。
+// 基础字段校验走 binding tag（WrapReq 绑定时自动 400）；biz 白名单是业务规则，仍由 handler checkBiz 管。
 type bizReq struct {
-	Biz   string `json:"biz"`
-	BizId int64  `json:"bizId"`
+	Biz   string `json:"biz" binding:"required"`
+	BizId int64  `json:"bizId" binding:"required,gt=0"`
 }
 
 type likeReq struct {
-	Biz   string `json:"biz"`
-	BizId int64  `json:"bizId"`
+	Biz   string `json:"biz" binding:"required"`
+	BizId int64  `json:"bizId" binding:"required,gt=0"`
 	Liked bool   `json:"liked"`
 }
 
 type collectReq struct {
-	Biz       string `json:"biz"`
-	BizId     int64  `json:"bizId"`
+	Biz       string `json:"biz" binding:"required"`
+	BizId     int64  `json:"bizId" binding:"required,gt=0"`
 	Collected bool   `json:"collected"`
 }
 
-func (h *InternalInteractionHandler) Like(ctx *gin.Context, req likeReq, uc UserClaims) (ginx.Result, error) {
+func (h *InternalInteractionHandler) Like(ctx *gin.Context, req likeReq) (ginx.Result, error) {
+	uc := ginx.MustClaims[UserClaims](ctx)
 	if err := checkBiz(req.Biz); err != nil {
 		return ginx.Result{}, err
 	}
@@ -84,7 +85,8 @@ func (h *InternalInteractionHandler) Like(ctx *gin.Context, req likeReq, uc User
 	return ginx.Result{Msg: "OK"}, nil
 }
 
-func (h *InternalInteractionHandler) Collect(ctx *gin.Context, req collectReq, uc UserClaims) (ginx.Result, error) {
+func (h *InternalInteractionHandler) Collect(ctx *gin.Context, req collectReq) (ginx.Result, error) {
+	uc := ginx.MustClaims[UserClaims](ctx)
 	if err := checkBiz(req.Biz); err != nil {
 		return ginx.Result{}, err
 	}
@@ -113,7 +115,8 @@ func (h *InternalInteractionHandler) Detail(ctx *gin.Context, req bizReq) (ginx.
 }
 
 // State 获取当前用户的互动状态（liked/collected），需登录
-func (h *InternalInteractionHandler) State(ctx *gin.Context, req bizReq, uc UserClaims) (ginx.Result, error) {
+func (h *InternalInteractionHandler) State(ctx *gin.Context, req bizReq) (ginx.Result, error) {
+	uc := ginx.MustClaims[UserClaims](ctx)
 	if err := checkBiz(req.Biz); err != nil {
 		return ginx.Result{}, err
 	}

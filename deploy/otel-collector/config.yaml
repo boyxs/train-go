@@ -20,6 +20,26 @@ processors:
     timeout: 5s
     send_batch_size: 512
     send_batch_max_size: 1024
+  # ── 中间件依赖节点：派生 peer.service ─────────────────────────────
+  # Zipkin Dependencies 靠 client span 的 remoteEndpoint.serviceName 画外部节点，该字段由
+  # OTel→Zipkin exporter 从 peer.service 填。中间件 client span 只带 db.system / messaging.system，
+  # 没人打 peer.service，这里按语义约定通配键补上——未来新接 DB/MQ/HTTP 自动覆盖。
+  # 局限：只提升「已有 span」为节点；未埋点的 client（当前 ES/etcd/LLM 不发 span）需先在应用侧加 otel。
+  transform/peer_service:
+    error_mode: ignore
+    trace_statements:
+      - context: span
+        statements:
+          # DB/缓存：db.system.name 是 semconv≥1.30 新约定（gorm→mysql/pg/clickhouse），
+          #          db.system 是旧约定（redisotel→redis、老 es/mongo 库）——两套并存，都覆盖。
+          - set(attributes["peer.service"], attributes["db.system.name"]) where attributes["db.system.name"] != nil
+          - set(attributes["peer.service"], attributes["db.system"]) where attributes["peer.service"] == nil and attributes["db.system"] != nil
+          # MQ：messaging.system 是标准 key（kafka/rabbitmq/nats…）；messaging 未像 db 改名，无 .name 变体。
+          - set(attributes["peer.service"], attributes["messaging.system"]) where attributes["peer.service"] == nil and attributes["messaging.system"] != nil
+          # 兜底：纯外部 HTTP（无 db/mq/rpc system，如未来 LLM），按主机名建节点；
+          #       rpc.system 守卫排除服务间 gRPC（两端都发 span 已成图，勿重复建节点）。
+          - set(attributes["peer.service"], attributes["server.address"]) where attributes["peer.service"] == nil and attributes["rpc.system"] == nil and attributes["server.address"] != nil
+          - set(attributes["peer.service"], attributes["net.peer.name"]) where attributes["peer.service"] == nil and attributes["rpc.system"] == nil and attributes["net.peer.name"] != nil
 
 exporters:
   zipkin:
@@ -63,7 +83,7 @@ service:
   pipelines:
     traces:
       receivers: [otlp]
-      processors: [memory_limiter, batch]
+      processors: [memory_limiter, transform/peer_service, batch]
       exporters: [zipkin, debug]
   telemetry:
     logs:

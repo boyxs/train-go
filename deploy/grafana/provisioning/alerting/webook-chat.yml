@@ -155,3 +155,40 @@ groups:
               conditions:
                 - evaluator: { type: gt, params: [10000] }
               refId: C
+
+      # ── ⑤ 业务限流激增（按 reason）─────────────────────────
+      # reason=~".*_RATE_LIMITED"（CHAT_RATE_LIMITED）。阈值 0.5/s·10m 起步。镜像 core ⑥。
+      - uid: webook-chat-biz-rate-limit
+        title: Chat 业务限流激增（按 reason）
+        condition: C
+        for: 10m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: high
+          team: backend
+        annotations:
+          summary: "限流 {{ $labels.reason }} 速率 {{ $values.B.Value }}/s（滥用/容量信号）"
+          runbook_url: "https://wiki.internal/runbook/webook-biz-rate-limit"
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              expr: 'webook:http_biz_errors:rate5m{job="webook-chat", reason=~".*_RATE_LIMITED"}'
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [0.5] }
+              refId: C

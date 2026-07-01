@@ -6,6 +6,7 @@ import type {
   Message,
   MessageToolState,
 } from '@/types/chat';
+import { getErrorMessage } from '@/utils/apiError';
 
 /** 扩展 Message，附带工具调用状态（仅 pending 阶段使用） */
 interface PendingMessage extends Message {
@@ -119,10 +120,8 @@ export function useChat(conversationId: number | null) {
         if (isStale()) {
           return;
         }
-        if (msgRes.data.code === 0) {
-          setServerMessages(msgRes.data.data ?? []);
-          setHasMore((msgRes.data.data ?? []).length >= PAGE_SIZE);
-        }
+        setServerMessages(msgRes.data.data ?? []);
+        setHasMore((msgRes.data.data ?? []).length >= PAGE_SIZE);
         setLoading(false);
 
         const generating = genRes.data.data === true;
@@ -152,29 +151,39 @@ export function useChat(conversationId: number | null) {
                 return;
               }
               setStreaming(false);
-              chatApi.listMessages(convId, 0, PAGE_SIZE).then((res) => {
-                if (!isStale() && res.data.code === 0) {
-                  setServerMessages(res.data.data ?? []);
-                }
-              });
+              chatApi
+                .listMessages(convId, 0, PAGE_SIZE)
+                .then((res) => {
+                  if (!isStale()) {
+                    setServerMessages(res.data.data ?? []);
+                  }
+                })
+                .catch(() => {
+                  // 后台固化失败不阻断：流式内容已在 serverMessages 中，静默降级，下次进入会话再拉取
+                });
             },
             onStreamEnd: () => {
               if (isStale()) {
                 return;
               }
               setStreaming(false);
-              chatApi.listMessages(convId, 0, PAGE_SIZE).then((res) => {
-                if (!isStale() && res.data.code === 0) {
-                  setServerMessages(res.data.data ?? []);
-                }
-              });
+              chatApi
+                .listMessages(convId, 0, PAGE_SIZE)
+                .then((res) => {
+                  if (!isStale()) {
+                    setServerMessages(res.data.data ?? []);
+                  }
+                })
+                .catch(() => {
+                  // 后台固化失败不阻断：流式内容已在 serverMessages 中，静默降级，下次进入会话再拉取
+                });
             },
           });
         }
       })
-      .catch(() => {
+      .catch((e) => {
         if (!isStale()) {
-          setError('加载消息失败');
+          setError(getErrorMessage(e, '加载消息失败'));
           setLoading(false);
         }
       });
@@ -326,7 +335,7 @@ export function useChat(conversationId: number | null) {
           chatApi
             .listMessages(convId, 0, PAGE_SIZE)
             .then((res) => {
-              if (res.data.code === 0 && activeIdRef.current === convId) {
+              if (activeIdRef.current === convId) {
                 const list = res.data.data ?? [];
                 setServerMessages(list);
                 setHasMore(list.length >= PAGE_SIZE);
@@ -386,13 +395,11 @@ export function useChat(conversationId: number | null) {
         firstId,
         PAGE_SIZE,
       );
-      if (res.data.code === 0) {
-        const older = res.data.data ?? [];
-        setServerMessages((prev) => [...older, ...prev]);
-        setHasMore(older.length >= PAGE_SIZE);
-      }
-    } catch {
-      setError('加载更多失败');
+      const older = res.data.data ?? [];
+      setServerMessages((prev) => [...older, ...prev]);
+      setHasMore(older.length >= PAGE_SIZE);
+    } catch (e) {
+      setError(getErrorMessage(e, '加载更多失败'));
     }
   }, [conversationId, hasMore, loading, serverMessages]);
 
@@ -430,15 +437,7 @@ export function useChat(conversationId: number | null) {
       });
 
       try {
-        const res = await chatApi.setMessageFeedback(
-          convId,
-          messageId,
-          feedback,
-        );
-        if (res.data.code !== 0) {
-          setServerMessages((prev) => applyFeedback(prev, oldFeedback));
-          setPendingMessages((prev) => applyFeedback(prev, oldFeedback));
-        }
+        await chatApi.setMessageFeedback(convId, messageId, feedback);
       } catch {
         setServerMessages((prev) => applyFeedback(prev, oldFeedback));
         setPendingMessages((prev) => applyFeedback(prev, oldFeedback));

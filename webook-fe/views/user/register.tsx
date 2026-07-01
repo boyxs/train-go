@@ -8,6 +8,7 @@ import React from 'react';
 
 import * as userApi from '@/api/user';
 import type { RegisterReq } from '@/types';
+import { getErrorMessage } from '@/utils/apiError';
 
 const { Title, Text } = Typography;
 
@@ -17,15 +18,11 @@ const RegisterForm: React.FC = () => {
 
   const onFinish = async (values: RegisterReq) => {
     try {
-      const res = await userApi.register(values);
-      if (res.data.code === 0 || !res.data.code) {
-        message.success(res.data.msg || '注册成功');
-        router.push('/login');
-      } else {
-        message.error(res.data.msg || '注册失败');
-      }
-    } catch {
-      message.error('系统错误');
+      await userApi.register(values);
+      message.success('注册成功');
+      router.push('/login');
+    } catch (e) {
+      message.error(getErrorMessage(e, '注册失败'));
     }
   };
 

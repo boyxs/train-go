@@ -17,9 +17,6 @@ export function useConversations() {
     setLoading(true);
     try {
       const res = await chatApi.listConversations();
-      if (res.data.code !== 0) {
-        return;
-      }
       const list = res.data.data ?? [];
       setConversations(list);
 
@@ -28,11 +25,9 @@ export function useConversations() {
       } else {
         // 无对话自动创建
         const createRes = await chatApi.createConversation();
-        if (createRes.data.code === 0) {
-          const conv = createRes.data.data;
-          setConversations([conv]);
-          setActiveId(conv.id);
-        }
+        const conv = createRes.data.data;
+        setConversations([conv]);
+        setActiveId(conv.id);
       }
     } finally {
       setLoading(false);
@@ -42,24 +37,18 @@ export function useConversations() {
   // 新建对话
   const create = useCallback(async (): Promise<number> => {
     const res = await chatApi.createConversation();
-    if (res.data.code === 0) {
-      const conv = res.data.data;
-      setConversations((prev) => [conv, ...prev]);
-      setActiveId(conv.id);
-      return conv.id;
-    }
-    return -1;
+    const conv = res.data.data;
+    setConversations((prev) => [conv, ...prev]);
+    setActiveId(conv.id);
+    return conv.id;
   }, []);
 
   // 删除对话
   const remove = useCallback(async (id: number): Promise<boolean> => {
-    const res = await chatApi.deleteConversation(id);
-    if (res.data.code === 0) {
-      setConversations((prev) => prev.filter((c) => c.id !== id));
-      setActiveId((prev) => (prev === id ? null : prev));
-      return true;
-    }
-    return false;
+    await chatApi.deleteConversation(id);
+    setConversations((prev) => prev.filter((c) => c.id !== id));
+    setActiveId((prev) => (prev === id ? null : prev));
+    return true;
   }, []);
 
   // 选中对话

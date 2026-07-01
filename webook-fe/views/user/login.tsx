@@ -8,6 +8,7 @@ import React from 'react';
 
 import * as userApi from '@/api/user';
 import type { LoginReq } from '@/types';
+import { getErrorMessage } from '@/utils/apiError';
 
 const { Title, Text } = Typography;
 
@@ -18,16 +19,12 @@ const LoginForm: React.FC = () => {
 
   const onFinish = async (values: LoginReq) => {
     try {
-      const res = await userApi.login(values);
-      if (res.data.code === 0 || !res.data.code) {
-        message.success(res.data.msg || '登录成功');
-        const redirect = searchParams.get('redirect') || '/';
-        router.replace(redirect);
-      } else {
-        message.error(res.data.msg || '登录失败');
-      }
-    } catch {
-      message.error('系统错误');
+      await userApi.login(values);
+      message.success('登录成功');
+      const redirect = searchParams.get('redirect') || '/';
+      router.replace(redirect);
+    } catch (e) {
+      message.error(getErrorMessage(e, '登录失败'));
     }
   };
 

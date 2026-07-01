@@ -39,12 +39,6 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	// 后台启动 Kafka 消费者
-	go func() {
-		if err := app.Consumer.Start(context.Background()); err != nil {
-			log.Printf("[Kafka] consumer exited: %v", err)
-		}
-	}()
 	// 后台启动 gRPC server,供下游 RPC 调用
 	go func() {
 		if err := app.GRPCServer.Register(); err != nil {

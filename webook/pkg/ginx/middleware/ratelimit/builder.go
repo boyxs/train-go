@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
 
+	"github.com/webook/pkg/ginx"
 	"github.com/webook/pkg/logger"
 )
 
@@ -44,16 +45,15 @@ func (b *Builder) Build() gin.HandlerFunc {
 		limited, err := b.limit(ctx)
 		if err != nil {
 			b.l.Error("限流器异常", logger.Error(err))
-			// 这一步很有意思，就是如果这边出错了
-			// 保守做法：因为借助于 Redis 来做限流，那么 Redis 崩溃了，为了防止系统崩溃，直接限流
-			ctx.AbortWithStatus(http.StatusInternalServerError)
+			// 保守做法：借助 Redis 做限流，Redis 崩溃时为防系统被打垮，直接限流
+			ctx.AbortWithStatusJSON(http.StatusInternalServerError, ginx.Internal("服务繁忙，请稍后重试"))
 			// 激进做法：虽然 Redis 崩溃了，但是这个时候还是要尽量服务正常的用户，所以不限流
 			// ctx.Next()
 			return
 		}
 		if limited {
 			b.l.Warn("触发限流", logger.String("ip", ctx.ClientIP()))
-			ctx.AbortWithStatus(http.StatusTooManyRequests)
+			ctx.AbortWithStatusJSON(http.StatusTooManyRequests, ginx.TooManyRequests("请求过于频繁，请稍后重试"))
 			return
 		}
 		ctx.Next()

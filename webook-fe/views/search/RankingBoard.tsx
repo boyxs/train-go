@@ -26,6 +26,7 @@ import React from 'react';
 import * as rankingApi from '@/api/ranking';
 import { useRequest } from '@/hooks/useRequest';
 import type { ArticleRanking, Dimension } from '@/types/ranking';
+import { getErrorMessage } from '@/utils/apiError';
 
 const DIMENSIONS: { key: Dimension; label: string; icon: React.ReactNode }[] = [
   { key: 'hot', label: '热度', icon: <ThunderboltOutlined /> },
@@ -400,8 +401,8 @@ export default function RankingBoard() {
     try {
       const resp = await rankingApi.listArticleRankingArchiveDates();
       setArchiveDates(resp.data?.data ?? []);
-    } catch {
-      message.error('归档列表加载失败');
+    } catch (e) {
+      message.error(getErrorMessage(e, '归档列表加载失败'));
     } finally {
       setArchiveLoading(false);
     }
@@ -418,8 +419,8 @@ export default function RankingBoard() {
       // 刷新归档列表
       const resp = await rankingApi.listArticleRankingArchiveDates();
       setArchiveDates(resp.data?.data ?? []);
-    } catch {
-      message.error('归档失败');
+    } catch (e) {
+      message.error(getErrorMessage(e, '归档失败'));
     }
   };
 

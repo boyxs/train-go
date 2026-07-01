@@ -26,8 +26,6 @@ mockgen:
 	@mockgen -package=redismocks -destination=./internal/repository/cache/redismocks/cmdable_mock.go github.com/redis/go-redis/v9 Cmdable
 	#sms
 	@mockgen -source=./internal/service/sms/types.go -package=smsmocks -destination=./internal/service/sms/mocks/sms_mock.go
-	#interaction repository（chat 已拆出独立服务，主仓只剩 interaction repo mock）
-	@mockgen -source=./internal/repository/interaction.go -package=repomocks -destination=./internal/repository/mocks/interaction_mock.go
 	#click event
 	@mockgen -source=./internal/repository/dao/click_event.go -package=daomocks -destination=./internal/repository/dao/mocks/click_event_mock.go
 	@mockgen -source=./internal/repository/cache/click_event.go -package=cachemocks -destination=./internal/repository/cache/mocks/click_event_mock.go

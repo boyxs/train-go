@@ -1,0 +1,50 @@
+# worker 调度器本地配置：cron 定时任务 + Kafka 消费者，全部经 gRPC 派发给业务服务。
+# 无 mysql（不持业务数据）；redis 仅用于 cron 分布式锁。
+
+etcd:
+  endpoints:
+    - "http://127.0.0.1:2379"
+  # 无 path/type：worker 静态配置（LoadLocal），etcd 仅供 gRPC 服务发现，不接 viperx.WatchRemote 热更
+
+http:
+  addr: ":8050"
+
+# 下游 gRPC：ranking 重算触发 → webook-core；read 计数 → webook-interaction
+grpc:
+  client:
+    webook-core:
+      target: "etcd:///service/webook-core"
+      balancer: "breaker_swrr"
+    webook-interaction:
+      target: "etcd:///service/webook-interaction"
+      balancer: "breaker_swrr"
+
+# cron 分布式锁用（多副本只让一个实例跑同名任务）
+redis:
+  addr: 127.0.0.1:6379
+  password: "13520"
+
+kafka:
+  addrs:
+    - "localhost:9094"
+  dialTimeout: 10
+  readTimeout: 10
+  writeTimeout: 10
+  consumerGroup: "interaction-consumer"
+  consumerBackoffInitial: 5
+  consumerBackoffMax: 60
+
+logger:
+  level:
+    l: -1
+  development: true
+  encoding: 'json'
+  outputPaths: [ 'stdout' ]
+  errorOutputPaths: [ 'stderr' ]
+
+otel:
+  endpoint: "localhost:4317"
+  serviceName: "webook-worker"
+  serviceVersion: "0.1.0"
+  env: "local"
+  sampleRatio: 1.0

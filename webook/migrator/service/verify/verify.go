@@ -22,6 +22,7 @@ import (
 
 	"github.com/webook/migrator/consts"
 	"github.com/webook/migrator/domain"
+	migratorerrs "github.com/webook/migrator/errs"
 	"github.com/webook/migrator/pipeline/sink"
 	"github.com/webook/migrator/pipeline/source"
 	"github.com/webook/migrator/pipeline/transform"
@@ -44,11 +45,9 @@ const (
 )
 
 // ErrInvalidValidateLog mismatch 记录的 diff_detail 字段缺失或损坏。
-var ErrInvalidValidateLog = errs.New(500, "validate_log diff_detail 字段缺失或损坏")
+var ErrInvalidValidateLog = errs.New(500, "validate_log diff_detail 字段缺失或损坏").WithReason("MIGRATOR_VALIDATE_LOG_INVALID")
 
-// ErrInvalidSampleRate sampleRate 必须 (0, 1]。
-// HTTP 400 — 参数校验错。
-var ErrInvalidSampleRate = errs.New(400, "采样率必须在 (0, 1] 之间")
+// 采样率非法复用 migrator/errs.ErrInvalidSampleRate（同一错误，去重）。
 
 // VerifyEngine 对账引擎接口。
 type VerifyEngine interface {
@@ -131,7 +130,7 @@ func (e *InternalVerifyEngine) buildPipes(ctx context.Context, task domain.Task,
 
 func (e *InternalVerifyEngine) Sample(ctx context.Context, taskId int64, rate float64) (int64, error) {
 	if rate <= 0 || rate > 1 {
-		return 0, ErrInvalidSampleRate
+		return 0, migratorerrs.ErrInvalidSampleRate
 	}
 	task, err := e.taskSvc.Get(ctx, taskId)
 	if err != nil {
