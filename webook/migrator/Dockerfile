@@ -10,6 +10,7 @@ WORKDIR /src
 
 # 先 mod download，利用 docker layer cache
 COPY go.mod go.sum ./
+ENV GOPROXY=https://goproxy.cn,direct
 RUN go mod download
 
 # 整仓 COPY，go build 能解析所有 webook/pkg 等子包

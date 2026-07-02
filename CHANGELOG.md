@@ -2,6 +2,14 @@
 
 <!-- 新功能前插在此，日期降序 -->
 
+## [2026-07-02] Go Dockerfile 统一 GOPROXY，修国内构建拉包失败
+
+**变更内容**: 6 个 Go 服务 Dockerfile 的 `go mod download` 前置 `ENV GOPROXY=https://goproxy.cn,direct`——VM 上 `./deploy.sh local` 构建直连 proxy.golang.org 被拒（1044s 超时）。
+**影响范围**: `webook/{internal,chat,comment,interaction,worker,migrator}/Dockerfile` 各一行。
+**技术决策**: 对齐 fe Dockerfile 写死 npmmirror 的先例；goproxy.cn 全球 CDN，CI 同源（顺带消除 proxy.golang.org 偶发抖动）。
+**会话**: 260702-deploy-cron告警NoData拆分
+**发布**: （随各服务下次镜像构建生效）
+
 ## [2026-07-02] Cron 告警 NoData 语义拆分：absent 哨兵接管指标缺失
 
 **变更内容**: `webook-cron-stale` 告警在 DatasourceNoData 状态下 summary 模板（`$values.B.Value`）展开失败、通知输出模板原文；将其 `noDataState` 改为 OK，新增 ①b `webook-cron-metrics-absent`（`absent(webook:cron_last_success_age:seconds{task=~"ranking_.*"})`，静态文案不依赖 `$labels/$values`）单独建模"指标缺失"。
