@@ -1,8 +1,10 @@
 apiVersion: 1
 
-# 后台任务 (cron + 分布式锁 + ranking boost 协程池) 7 条核心告警
+# 后台任务 (cron + 分布式锁 + ranking boost 协程池) 8 条核心告警
+# 指标来源：cron / 锁 = webook-worker，boost 池 = webook-core
 # 评估周期 1m；触发条件持续 1-10m 才正式 firing（避免抖动）
 # 评估链路：Query (A) → Reduce (B) → Threshold (C) — 必须 reduced 才能 alert
+# NoData：指标缺失归 ①b absent 哨兵（NoData 实例 $values 为空，动态模板会展开失败输出原文）
 groups:
   - orgId: 1
     name: webook-jobs
@@ -15,7 +17,7 @@ groups:
         title: Cron 任务 10 分钟没成功
         condition: C
         for: 1m
-        noDataState: NoData
+        noDataState: OK          # 指标缺失归 ①b
         execErrState: Error
         labels:
           severity: high
@@ -25,7 +27,7 @@ groups:
           summary: "任务 {{ $labels.task }} 已 {{ $values.B.Value | humanizeDuration }} 没成功执行"
           description: |
             webook:cron_last_success_age:seconds{task="{{ $labels.task }}"} 超过 600s。
-            可能原因：业务 panic / 锁一直被占 / Redis 故障。
+            可能原因：worker→core gRPC 派发失败 / 业务 panic / 锁一直被占 / Redis 故障。
           runbook_url: "https://wiki.internal/runbook/cron-task-stale"
         data:
           - refId: A
@@ -46,6 +48,44 @@ groups:
               conditions: [{ evaluator: { type: gt, params: [600] } }]
               refId: C
 
+      # ── ①b 任务指标整体缺失（absent 哨兵）─────────────────────
+      # summary 静态文案：absent() 无 task label、NoData 路径 $values 为空，动态模板渲染不出
+      # absent 对 regex 整体判断：单任务缺失不触发，由 ①（需序列存在过）覆盖
+      - uid: webook-cron-metrics-absent
+        title: Cron 指标缺失（worker 未上报或从未成功）
+        condition: C
+        for: 5m                  # 容忍冷启动（任务 30s 节奏）
+        noDataState: OK          # 指标存在 → absent() 空向量 → NoData 即正常
+        execErrState: Error
+        labels:
+          severity: high
+          team: backend
+          component: cron
+        annotations:
+          summary: "ranking_* cron 成功指标缺失超 5 分钟（worker 未启动 / 从未成功 / 未被抓取）"
+          description: |
+            absent(webook:cron_last_success_age:seconds{task=~"ranking_.*"}) 命中。
+            排查：up{job="webook-worker"} → webook_cron_runs_total 的 error/panic → prometheus /rules 是否加载 webook-jobs.rules.yml。
+          runbook_url: "https://wiki.internal/runbook/cron-task-stale"
+        data:
+          - refId: A
+            relativeTimeRange: { from: 60, to: 0 }
+            datasourceUid: prometheus
+            model:
+              expr: 'absent(webook:cron_last_success_age:seconds{task=~"ranking_.*"})'
+              refId: A
+              instant: true
+          - refId: B
+            datasourceUid: __expr__
+            model: { type: reduce, expression: A, reducer: last, refId: B }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions: [{ evaluator: { type: gt, params: [0] } }]
+              refId: C
+
       # ── ② 任务 panic（业务代码 bug）──────────────────────────
       - uid: webook-cron-panic
         title: Cron 任务出现 panic
@@ -59,7 +99,7 @@ groups:
           component: cron
         annotations:
           summary: "任务 {{ $labels.task }} 5 分钟内出现 panic"
-          description: "查 webook_cron_runs_total{task,result=panic}，并对照应用日志的 stack 字段。"
+          description: "查 webook_cron_runs_total{task,result=panic}，并对照 webook-worker 日志的 stack 字段。"
           runbook_url: "https://wiki.internal/runbook/cron-panic"
         data:
           - refId: A

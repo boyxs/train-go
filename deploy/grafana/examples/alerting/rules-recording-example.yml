@@ -31,7 +31,9 @@ groups:
         title: Cron 任务长时间没成功
         condition: C                      # 哪个 refId 是触发条件
         for: 1m                           # 持续多久才 firing
-        noDataState: NoData               # NoData / OK / Alerting
+        # 勿配 NoData：NoData 实例 $values 为空，引用 $values 的模板展开失败输出原文；
+        # 指标缺失用 absent() 哨兵单独建模（见 provisioning/alerting/webook-jobs.yml ①b）
+        noDataState: OK                   # OK / NoData / Alerting
         execErrState: Error               # Error / OK / Alerting
         labels:                           # 供 policies.yml 路由匹配
           severity: high
@@ -41,7 +43,7 @@ groups:
           summary: "任务 {{ $labels.task }} 已 {{ $values.B.Value | humanizeDuration }} 没成功"
           description: |
             webook:cron_last_success_age:seconds 超过 600s。
-            可能原因：业务 panic / 锁一直被占 / Redis 故障。
+            可能原因：worker→core gRPC 派发失败 / 业务 panic / 锁一直被占 / Redis 故障。
           runbook_url: "https://wiki.internal/runbook/cron-task-stale"
         data:
           - refId: A                       # ── Query A：从 Prometheus 查 ──
