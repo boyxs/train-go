@@ -2,6 +2,13 @@
 
 <!-- 新功能前插在此，日期降序 -->
 
+## [2026-07-02] deploy.sh 支持按单服务操作
+
+**变更内容**: `up`/`build`/`pull`/`status`/`logs` 接受可选 `[service...]` 参数（可传多个，`"${@:3}"` 全量透传；指定服务 up 自动带 depends_on 链，local 先 build）；新增 `stop [service...]`（停容器保留）与 `rm <service...>`（`compose rm -sf`，停+移除容器、volume 保留）；`down`/`nuke` 拦截误传服务名（防"想停一个停掉全站"）。
+**影响范围**: `deploy/deploy.sh`（用法注释 / ACTION 白名单 / case 分支）。
+**会话**: 260702-deploy-cron告警NoData拆分
+**发布**: （脚本同步到服务器即生效）
+
 ## [2026-07-02] Go Dockerfile 统一 GOPROXY，修国内构建拉包失败
 
 **变更内容**: 6 个 Go 服务 Dockerfile 的 `go mod download` 前置 `ENV GOPROXY=https://goproxy.cn,direct`——VM 上 `./deploy.sh local` 构建直连 proxy.golang.org 被拒（1044s 超时）。

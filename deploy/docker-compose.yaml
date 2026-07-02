@@ -291,6 +291,10 @@ services:
       timeout: 5s
       retries: 10
 
+  # 当前仅做 embedding：core 配置 ollama.model=bge-m3（1024 维，对齐 ES article_v1 mapping）；chat 对话走外部 API 不经此
+  # 首次启用需手动拉模型：docker exec webook-ollama ollama pull bge-m3
+  #   bge-m3 权重 1.2GB → OLLAMA_MEM 需 ≥2048m（.env.dev 的 1024m 装不下）
+  # 冷启动加载 5-15s 超 core ollama.timeout(5s)：首个请求 failover 到 dashscope 属预期，之后毫秒级
   webook-ollama:
     image: ollama/ollama:0.6.2
     container_name: webook-ollama
@@ -298,6 +302,8 @@ services:
     pull_policy: missing
     mem_limit: ${OLLAMA_MEM:-2048m}
     profiles: ["llm"]                    # COMPOSE_PROFILES=llm ./deploy.sh <env> 启用
+    # environment:
+    #   OLLAMA_KEEP_ALIVE: "-1"          # 模型常驻内存免冷启动（默认闲置 5min 卸载）；8G 小机常驻 1.2GB 需权衡
     volumes:
       - ollama-data:/root/.ollama
 
