@@ -2,13 +2,16 @@
 # ===================================================
 # 文件：deploy/deploy.sh（也是服务器 ~/webook-deploy/deploy.sh）
 # 用法：
-#   ./deploy.sh <local|dev|staging|prod>     # 起（会自动 stop 别的 env）
-#   ./deploy.sh <env> down                    # 停（volume 保留）
+#   ./deploy.sh <local|dev|staging|prod> [up] [service...]  # 起（指定服务含依赖链；local 先 build；自动 stop 别的 env）
+#   ./deploy.sh <env> down                    # 停整个 env（volume 保留，不接服务名，按服务用 stop/rm）
+#   ./deploy.sh <env> stop [service...]       # 停全部或指定服务（容器保留）
+#   ./deploy.sh <env> rm <service...>         # 停并移除指定服务容器（volume 保留）
 #   ./deploy.sh <env> nuke                    # 停 + 清 volume（prod 需确认）
-#   ./deploy.sh <env> logs [service]          # 日志（默认 webook-core）
-#   ./deploy.sh <env> status                  # docker compose ps
-#   ./deploy.sh <env> pull                    # 只拉镜像（local 模式是 build）
-#   ./deploy.sh <env> restart <service>       # 重启某服务
+#   ./deploy.sh <env> logs [service...]       # 日志（默认 webook-core）
+#   ./deploy.sh <env> status [service...]     # docker compose ps
+#   ./deploy.sh <env> pull [service...]       # 拉镜像
+#   ./deploy.sh <env> build [service...]      # 构建镜像（local 用）
+#   ./deploy.sh <env> restart <service...>    # 重启指定服务
 #   ./deploy.sh list                          # 看所有 env 残留
 # 可选 flag：
 #   --ghcr <host>   覆盖 .env.<env> 的 GHCR_REGISTRY（仅本次生效，不改文件）
@@ -57,6 +60,7 @@ fi
 
 ENV=$1
 ACTION=${2:-up}
+SVCS=("${@:3}")   # 第 3 位起都是服务名，可传多个
 
 # list 不需要 env
 if [ "$ENV" = "list" ]; then
@@ -67,7 +71,7 @@ if [ "$ENV" = "list" ]; then
 fi
 
 if [[ ! "$ENV" =~ ^(local|dev|staging|prod)$ ]]; then
-  echo "用法：./deploy.sh <local|dev|staging|prod> [down|nuke|logs|status|pull|restart]"
+  echo "用法：./deploy.sh <local|dev|staging|prod> [up|down|stop|rm|nuke|logs|status|pull|build|restart] [service...]"
   echo "     ./deploy.sh list"
   echo "     可选: --ghcr <host>   覆盖 ghcr 源（如 ghcr.nju.edu.cn），单次生效不改 env 文件"
   exit 1
@@ -86,9 +90,9 @@ else
 fi
 
 # 裸操作子命令拦截（防止 `./deploy.sh dev down` 被当 tag 或 unknown）
-if ! [[ "$ACTION" =~ ^(up|down|nuke|logs|status|ps|pull|restart|build)$ ]]; then
+if ! [[ "$ACTION" =~ ^(up|down|stop|rm|nuke|logs|status|ps|pull|restart|build)$ ]]; then
   echo "❌ 未知操作：$ACTION"
-  echo "   支持：up / down / nuke / logs / status / pull / build / restart"
+  echo "   支持：up / down / stop / rm / nuke / logs / status / pull / build / restart"
   exit 1
 fi
 
@@ -102,21 +106,33 @@ case "$ACTION" in
         $local_compose stop 2>/dev/null || true
       fi
     done
-    echo "📦 启动 $ENV (project=$PROJECT, APP_ENV=$(grep ^APP_ENV= $ENV_FILE | cut -d= -f2))"
+    echo "📦 启动 $ENV${SVCS[*]:+ / ${SVCS[*]}} (project=$PROJECT, APP_ENV=$(grep ^APP_ENV= $ENV_FILE | cut -d= -f2))"
     # local 必须 build；非 local 依赖 compose 里 pull_policy
     # （镜像缺失才拉）。想显式刷新走 ./deploy.sh <env> pull
     if [ "$ENV" = "local" ]; then
-      $COMPOSE build
+      $COMPOSE build "${SVCS[@]}"
     fi
-    $COMPOSE up -d
+    # 指定服务时 compose 会把各自 depends_on 链一并起
+    $COMPOSE up -d "${SVCS[@]}"
     sleep 3
-    $COMPOSE ps
+    $COMPOSE ps "${SVCS[@]}"
     ;;
   down)
+    [ -n "$3" ] && { echo "❌ down 停整个 env，不接服务名；停单个用 stop，移除用 rm"; exit 1; }
     $COMPOSE down
     echo "✅ $ENV 已停止（volume 保留在 ${PROJECT}_*）"
     ;;
+  stop)
+    $COMPOSE stop "${SVCS[@]}"
+    echo "✅ 已停止 ${SVCS[*]:-$ENV 全部服务}（容器保留，up 即恢复）"
+    ;;
+  rm)
+    [ ${#SVCS[@]} -eq 0 ] && { echo "用法：./deploy.sh $ENV rm <service...>"; exit 1; }
+    $COMPOSE rm -sf "${SVCS[@]}"
+    echo "✅ ${SVCS[*]} 容器已移除（volume 保留，up 会重建）"
+    ;;
   nuke)
+    [ -n "$3" ] && { echo "❌ nuke 清整个 env 的 volume，不接服务名"; exit 1; }
     if [ "$ENV" = "prod" ]; then
       read -p "⚠️  即将删除 PROD 所有数据 volume，输入 yes 确认：" ans
       [ "$ans" != "yes" ] && { echo "已取消"; exit 1; }
@@ -125,19 +141,20 @@ case "$ACTION" in
     [ "$ans" = "yes" ] && $COMPOSE down -v && echo "✅ $ENV 全部清理"
     ;;
   logs)
-    $COMPOSE logs -f --tail=100 "${3:-webook-core}"
+    [ ${#SVCS[@]} -eq 0 ] && SVCS=(webook-core)
+    $COMPOSE logs -f --tail=100 "${SVCS[@]}"
     ;;
   status|ps)
-    $COMPOSE ps
+    $COMPOSE ps "${SVCS[@]}"
     ;;
   pull)
-    $COMPOSE pull
+    $COMPOSE pull "${SVCS[@]}"
     ;;
   build)
-    $COMPOSE build
+    $COMPOSE build "${SVCS[@]}"
     ;;
   restart)
-    [ -z "$3" ] && { echo "用法：./deploy.sh $ENV restart <service>"; exit 1; }
-    $COMPOSE restart "$3"
+    [ ${#SVCS[@]} -eq 0 ] && { echo "用法：./deploy.sh $ENV restart <service...>"; exit 1; }
+    $COMPOSE restart "${SVCS[@]}"
     ;;
 esac

@@ -331,22 +331,73 @@ CI 没跑起来？按顺序检查：
 ### 基本命令
 
 ```bash
-./deploy.sh <env>                   # up（自动 stop 其他 env）
-./deploy.sh <env> down              # 停（volume 保留）
-./deploy.sh <env> nuke              # 停 + 清 volume（prod 需二次确认）
-./deploy.sh <env> logs [service]    # 跟日志（默认 webook-core）
-./deploy.sh <env> status            # docker compose ps
-./deploy.sh <env> pull              # 只拉镜像（local 用 build）
-./deploy.sh <env> build             # 只 build（local）
-./deploy.sh <env> restart <service> # 重启某服务
-./deploy.sh list                    # 所有 env 残留总览
+./deploy.sh <env> [up] [service...]     # up（自动 stop 其他 env；指定服务含各自依赖链，可传多个）
+./deploy.sh <env> down                  # 停整个 env（volume 保留；不接服务名，按服务用 stop/rm）
+./deploy.sh <env> stop [service...]     # 停全部或指定服务（容器保留，up 即恢复）
+./deploy.sh <env> rm <service...>       # 停并移除指定服务容器（volume 保留，up 会重建）
+./deploy.sh <env> nuke                  # 停 + 清 volume（prod 需二次确认）
+./deploy.sh <env> logs [service...]     # 跟日志（默认 webook-core，可多个混合跟踪）
+./deploy.sh <env> status [service...]   # docker compose ps
+./deploy.sh <env> pull [service...]     # 拉镜像
+./deploy.sh <env> build [service...]    # 构建镜像（local 用）
+./deploy.sh <env> restart <service...>  # 重启指定服务
+./deploy.sh list                        # 所有 env 残留总览
+```
+
+单服务/多服务示例：
+
+```bash
+./deploy.sh local up webook-core webook-chat   # 只构建+启动这两个（mysql 等依赖自动带起）
+./deploy.sh dev stop webook-worker             # 单停调度器
+./deploy.sh dev rm webook-worker webook-migrator
 ```
 
 ### 启用 LLM（ollama，默认关）
 
 ```bash
-COMPOSE_PROFILES=llm ./deploy.sh dev
+COMPOSE_PROFILES=llm ./deploy.sh <env>
 ```
+
+**角色定位**：当前 Ollama 只服务 **embedding**（文章向量化 → ES kNN 搜索）。core 配置 `ollama.model: bge-m3`（`webook/internal/config/*.yaml`），嵌入链路 Ollama 优先 → dashscope（阿里，计费）兜底；**chat 对话走外部 API，不经 Ollama**。
+
+**首次启用必须手动拉模型**（模型不随镜像分发，落 `ollama-data` volume，重建容器不用重拉）：
+
+```bash
+docker exec webook-ollama ollama pull bge-m3    # 1.2GB
+docker exec webook-ollama ollama list           # 确认模型已就位
+# local 模式宿主可直连验证；server 模式端口未暴露且容器内无 curl，用上面 list + 业务日志确认
+curl http://localhost:11434/api/embeddings -d '{"model":"bge-m3","prompt":"测试"}'
+```
+
+**嵌入模型选型**——硬约束：**必须 1024 维**对齐 ES `article_v1` mapping（`dims: 1024`），换维度 = 改 mapping + 重建索引：
+
+| 模型 | 大小 | 维度 | 场景/特点 | 本项目价值 |
+|------|------|------|----------|-----------|
+| **bge-m3** ⭐ | 1.2GB | 1024 | 中文/多语言首选，支持长文本，RAG 常用 | 唯一零改动可用（配置已指定）；替代 dashscope 计费 API，断网可用 |
+| snowflake-arctic-embed2 | 1.2GB | 1024 | 多语言检索（arctic 二代） | 质量相当但需改配置，无增量收益 |
+| snowflake-arctic-embed:335m | ~670MB | 1024 | 英文检索强（一代 `l` 档；另有 xs/s/m 档，384/768 维） | 维度可用但中文弱 |
+| mxbai-embed-large | 670MB | 1024 | 英文检索 | 省 500MB 内存，中文明显弱 |
+| nomic-embed-text | ~274MB | 768 | 英文性价比最优，效果超 OpenAI ada-002，8192 长上下文 | 维度不匹配¹ |
+| shaw/dmeta-embedding-zh | ~400MB | 768 | 社区中文模型，中文小体积之选 | 维度不匹配¹ |
+| all-minilm | ~46MB | 384 | 最小最快，英文场景够用 | 维度不匹配¹ |
+
+> ¹ 非 1024 维 = 改 ES mapping `dims` + 重建 `article_v1` 索引 + 全量重嵌入，除非有硬需求否则不划算。
+
+**对话模型**（当前代码未接入，仅供将来给 chat 加本地 provider 参考；约束：`OLLAMA_MEM=2048m` + CPU 推理 ≈5-15 tokens/s）：
+
+| 模型 | 大小 | 场景 | 价值 |
+|------|------|------|------|
+| qwen2.5:1.5b | ~1.0GB | 中文对话/摘要 | 2G 限额内中文性价比最高 |
+| deepseek-r1:1.5b | ~1.1GB | 推理/思维链 | 学习 R1 蒸馏行为，实用弱 |
+| llama3.2:1b / gemma3:1b | ~0.8GB | 英文轻对话 | 中文弱 |
+| gemma2:2b | ~1.6GB | 通用小模型 | 质量最好但 +KV cache 贴 2048m 限额，易 OOM |
+
+> 8G CPU-only 机器上：对话模型 = 学习价值 > 实用价值；嵌入是真实用（bge-m3 CPU 单条毫秒级）。3B 及以上超限额不列。
+
+**两个坑**：
+
+- `.env.dev` 的 `OLLAMA_MEM=1024m` **装不下 bge-m3**（权重 1.2GB），dev 启用 llm profile 前先调 ≥2048m
+- **冷启动超时属预期**：模型加载 5-15s > core `ollama.timeout`(5s)，且闲置 5min 自动卸载——冷请求 failover 到 dashscope，后续毫秒级。想常驻内存打开 compose 里注释的 `OLLAMA_KEEP_ALIVE: "-1"`（代价：常驻 1.2GB，小内存机自行权衡）
 
 ### 发版
 
