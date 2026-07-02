@@ -2,6 +2,15 @@
 
 <!-- 新功能前插在此，日期降序 -->
 
+## [2026-07-02] Cron 告警 NoData 语义拆分：absent 哨兵接管指标缺失
+
+**变更内容**: `webook-cron-stale` 告警在 DatasourceNoData 状态下 summary 模板（`$values.B.Value`）展开失败、通知输出模板原文；将其 `noDataState` 改为 OK，新增 ①b `webook-cron-metrics-absent`（`absent(webook:cron_last_success_age:seconds{task=~"ranking_.*"})`，静态文案不依赖 `$labels/$values`）单独建模"指标缺失"。
+**影响范围**: `deploy/grafana/provisioning/alerting/webook-jobs.yml`（7→8 条规则，① ② 文案随 worker 拆分矫正：可能原因补 gRPC 派发失败、panic 排查指向 worker 日志）；`deploy/grafana/examples/alerting/rules-recording-example.yml`（教学示例移除 NoData+$values 地雷写法并加警示注释）。全仓扫描确认无其余同款硬伤（6 条 up 告警 NoData 时仅 $labels 渲染空串、不炸模板，维持现状）。
+**技术决策**: NoData 不是噪音——对应"worker 任务从未成功/未被抓取"的真实故障态（本次由旧 core 镜像不实现 RankingJobService、worker 调用持续 Unimplemented 触发），拆独立告警比在模板里判空补丁语义更清晰；`for: 5m` 容忍冷启动（任务 30s 节奏，首成功后序列即出现）。其余 6 个服务的 up 告警 NoData 模板只引用 `$labels`（缺失渲染空串不报错），不在本次范围。
+**待办**: 服务器同步该文件 + reload Grafana alerting provisioning 后实机验证（停 worker ≥5min 应触发 ①b 且文案可读）。
+**会话**: 260702-deploy-cron告警NoData拆分
+**发布**: （随下次部署同步 deploy/ 目录生效，不依赖服务发版）
+
 ## [2026-07-01] ginx 响应/错误层重设计：code≡HTTP status + wrapper 精简
 
 **变更内容**: 重设计 `pkg/ginx` 响应契约与 wrapper 一族，让响应一致、易排查、handler 更简单（完整标准版，不兼容旧写法）。
