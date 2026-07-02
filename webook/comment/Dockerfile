@@ -10,6 +10,7 @@ WORKDIR /src
 
 # 先 mod download，利用 docker layer cache
 COPY go.mod go.sum ./
+ENV GOPROXY=https://goproxy.cn,direct
 RUN go mod download
 
 # 整仓 COPY，go build 能解析所有 webook/pkg、webook/api/gen 等子包
@@ -23,7 +24,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
 FROM alpine:3.20
 
 ARG VERSION=dev
-ENV CHAT_VERSION=${VERSION}
+ENV COMMENT_VERSION=${VERSION}
 LABEL org.opencontainers.image.version=${VERSION}
 
 COPY --from=builder /out/comment /app/comment
