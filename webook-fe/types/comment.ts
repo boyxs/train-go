@@ -5,10 +5,9 @@ export interface Comment {
   content: string;
   rootId: number; // 根评论 id（一级评论=0）
   pid: number; // 直接父评论 id（一级=0）
-  replyCnt: number; // 直接回复数
+  replyCnt: number; // 回复数：一级评论=整楼回复数；楼内回复恒 0
   likeCnt: number;
   liked: boolean; // 当前用户是否已点赞
-  deleted: boolean; // 已删除占位（有子回复时保留，渲染「该评论已删除」）
   createdAt: number; // Unix 毫秒
   children?: Comment[]; // 一级评论携带的前 N 条回复预览（P0 走懒加载，通常为空）
 }

@@ -2,6 +2,15 @@
 
 <!-- 新功能前插在此，日期降序 -->
 
+## [2026-07-03] 评论删除改整楼级联 + 移除占位机制
+
+**变更内容**: 删一级评论 → 整楼级联软删（自身 + 全部 root_id 命中回复，一条 UPDATE）；删楼内回复 → 只删自身 + 楼根 reply_cnt−1（子回复保留，楼内扁平不级联）。前端确认框对有回复的一级评论提示「删除后，N 条回复也将一并删除」。占位机制（`deleted` 列 / pb 字段 / domain / VO / 前端「该评论已删除」渲染分支）整体移除。
+**影响范围**: `comment/repository/dao/comment.go`（Delete 重写 + Comment 模型删 Deleted + Count 去 deleted 过滤）、`comment/repository/comment.go`（Delete 复用 DAO 返回行清缓存，删前置 FindById）、`comment/domain`、`comment/grpc`、`api/proto/comment/v1` + 重生成 pb、`internal/web/comment.go`（VO）、`comment/scripts/comment.sql`、前端 `types/comment.ts`、`CommentItem.tsx`、`CommentSection.tsx`（删楼后清 repliesMap/expanded）、集成测试 2 个新用例替换占位用例；`prd/comment/` 同步（PRD.md / ARCHITECTURE.md 删除语义 + `comment.pen` 移除占位楼、新增删除确认 frame + 重导出 desktop / requirements / delete-confirm PNG）。
+**技术决策**: ①删除前置提示优于删除后留占位尸体，讨论串完整性靠提示让用户知情，不靠保留空壳；②DAO Delete 返回命中行，删除链路 SELECT 5→3 次（去掉 repo 前置 FindById 与子回复 COUNT）；③学习项目无存量兼容负担，占位机制整体拆除不留双模式。
+**待办**: 已有环境 comment 表需先清占位行再删列：`DELETE FROM comment WHERE deleted = 1` + `ALTER TABLE comment DROP COLUMN deleted`（AutoMigrate 不删列，占位行不清会变成空内容评论展示）；级联删除后 interaction(biz="comment") 点赞数据成孤儿（既有问题，后续统一清理）。
+**会话**: 260703-comment-删除级联优化
+**发布**: 
+
 ## [2026-07-02] deploy.sh 支持按单服务操作
 
 **变更内容**: `up`/`build`/`pull`/`status`/`logs` 接受可选 `[service...]` 参数（可传多个，`"${@:3}"` 全量透传；指定服务 up 自动带 depends_on 链，local 先 build）；新增 `stop [service...]`（停容器保留）与 `rm <service...>`（`compose rm -sf`，停+移除容器、volume 保留）；`down`/`nuke` 拦截误传服务名（防"想停一个停掉全站"）。

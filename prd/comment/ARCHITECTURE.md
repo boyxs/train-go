@@ -32,7 +32,7 @@ CREATE TABLE `comment` (
   `root_id`    bigint        NOT NULL DEFAULT 0      COMMENT '根评论 ID（一级评论=0；回复继承祖先 root_id）',
   `pid`        bigint                 DEFAULT NULL   COMMENT '父评论 ID（一级评论为 NULL；自关联外键）',
   `content`    varchar(1000) NOT NULL DEFAULT ''     COMMENT '评论内容（业务限 ≤500 字）',
-  `reply_cnt`  bigint        NOT NULL DEFAULT 0      COMMENT '直接回复数',
+  `reply_cnt`  bigint        NOT NULL DEFAULT 0      COMMENT '回复数：一级评论=整楼回复数（写/删回复增减楼根）；楼内回复恒 0',
   `created_at` bigint        NOT NULL DEFAULT 0      COMMENT '创建时间（Unix 毫秒）',
   `updated_at` bigint        NOT NULL DEFAULT 0      COMMENT '更新时间（Unix 毫秒）',
   `deleted_at` bigint        NOT NULL DEFAULT 0      COMMENT '软删除时间（0=未删）',
@@ -45,7 +45,7 @@ CREATE TABLE `comment` (
 ) ENGINE=InnoDB CHARACTER SET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci ROW_FORMAT=Dynamic COMMENT='评论（盖楼无限嵌套：root_id 标记楼，pid 直接父+自关联外键）';
 ```
 
-- `Pid` 用 `sql.NullInt64`（一级评论 NULL），`ParentComment` 自关联外键 `ON DELETE CASCADE`（对齐原设计）。**删除走软删**（UPDATE deleted_at）不触发 CASCADE，子回复树保留；CASCADE 仅物理 DELETE 时级联。
+- `Pid` 用 `sql.NullInt64`（一级评论 NULL），`ParentComment` 自关联外键 `ON DELETE CASCADE`（对齐原设计）。**删除走软删**（UPDATE deleted_at）不触发 CASCADE；级联由 DAO 显式实现——删一级评论整楼软删（`root_id` 命中），删楼内回复仅自身、子回复保留。
 - DAO struct 同步 `TableName()` + `autoCreateTime/UpdateTime:milli` + `softDelete:milli`；DDL 同步 `comment/scripts/comment.sql`。
 
 ### 1.2 核心查询
@@ -110,7 +110,7 @@ service CommentService {
 | **最热聚合** | core 内部聚合：`comment.ListComments` 拿该文章一级评论一批 → core 调 **interaction service（同进程）批量取 like_count** → 内存排序 top N | comment 不存 like_cnt 就无法本库排序；core 是 interaction 宿主 + comment client，聚合天然。P0 最热取首屏 top N（评论量可控）；超大文章深分页留 P1 |
 | **无限嵌套存储** | `root_id`（标记楼，一级=0）+`pid`（直接父，自关联 FK） | 一索引查整楼（`root_id`）、一索引查一级（`root_id=0`）；无需递归 CTE。可视缩进 ≤3 层是前端逻辑 |
 | **敏感词** | 本地 **DFA 字典树** `pkg/sensitive`（词库加载，热更挂 `ConfigChangeCallbacks`） | 无外部依赖、O(n) 匹配。已实现 ✅ |
-| **删除** | **双模式**：有子回复→`deleted=1` 占位（保留行、清空内容，查询仍返回，前端渲染「该评论已删除」）；无子回复→`deleted_at` 软删消失。**不级联删子树** | 保住讨论串（PRD 要求）。占位不能用 `deleted_at`（会被软删查询排除），故另置 `deleted` 标记列；`Count` 不计占位。自关联 FK CASCADE 仅物理 DELETE 触发 |
+| **删除** | **整楼级联软删**：删一级评论 → 自身 + 全部 `root_id` 命中回复一条 UPDATE 软删；删楼内回复 → 仅自身软删 + 楼根 `reply_cnt`−1，子回复保留。前端删除确认框对有回复的一级评论提示「N 条回复将一并删除」 | 删除前置提示优于删后留占位尸体。曾用「占位双模式」（`deleted` 标记列保留空壳行），已移除——占位行永久挤占讨论串且需额外标记列/Count 过滤 |
 | **点赞接口** | 不复用 `/interaction/like`（其硬编码 biz="article"、收 `{articleId}`），core 另开 **`/comment/like {commentId,liked}`** 内部调 interaction `Like/CancelLike(biz="comment")` | 复用 interaction **数据层**而非 endpoint，不动 article 点赞契约；落点仍在 interaction（biz="comment"） |
 | **回复展示** | 后端 `GetReplies` 返回整楼**扁平**回复（带 `pid`）；**P0 前端扁平单层展示**（树形递归缩进 + @提及降级 P1） | 扁平实现简单、移动端不溢出；`pid` 已存，P1 可前端重建树 |
 
@@ -130,7 +130,7 @@ service CommentService {
 | 性能 | 单楼回复过多 | 楼内回复独立分页（GetReplies offset） |
 | 安全 | 敏感词漏判 / XSS | DFA 词库热更；content 前端转义、后端不存 HTML |
 | 回归 | core 新增 comment client 影响启动 | comment 挂掉时 core 评论接口降级返空，不拖垮文章详情主流程 |
-| 合规 | 删除占位泄露原内容 | 软删后查询层用占位文案覆盖 content |
+| 误删 | 整楼级联删除误操作波及全部回复 | 删除前置确认提示（含子回复数）；软删可人工恢复 |
 
 ## 6. 任务拆分（含已完成）
 

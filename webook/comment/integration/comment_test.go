@@ -198,26 +198,42 @@ func (s *CommentServerSuite) TestDelete_OnlyOwner() {
 	require.NoError(s.T(), err, "作者删除成功")
 }
 
-// 删「有子回复」的评论 → 占位保留：列表仍在、deleted=true、内容清空、Count 不计；子回复仍可查
-func (s *CommentServerSuite) TestDelete_TombstoneKeepsChildren() {
+// 删一级评论 → 整楼级联软删：一级列表消失、整楼回复消失、Count 归零
+func (s *CommentServerSuite) TestDelete_RootCascadesReplies() {
 	ctx := context.Background()
 	root := s.create(1, 100, "楼主", 0)
-	s.create(1, 200, "子回复", root.GetId())
+	r1 := s.create(1, 200, "子回复", root.GetId())
+	s.create(1, 300, "回复回复", r1.GetId())
 
 	_, err := s.client.DeleteComment(ctx, &commentv1.DeleteCommentRequest{Id: root.GetId(), UserId: 100})
 	require.NoError(s.T(), err)
 
-	ph := s.findRoot(1, root.GetId())
-	assert.True(s.T(), ph.GetDeleted(), "占位 deleted=true")
-	assert.Empty(s.T(), ph.GetContent(), "占位内容清空")
+	assert.Empty(s.T(), s.listRoots(1), "一级列表不再有该楼")
 
 	replies, err := s.client.GetReplies(ctx, &commentv1.GetRepliesRequest{RootId: root.GetId(), Offset: 0, Limit: 10})
 	require.NoError(s.T(), err)
-	require.Len(s.T(), replies.GetReplies(), 1, "子回复保留")
+	assert.Empty(s.T(), replies.GetReplies(), "整楼回复级联删除")
 
 	cnt, err := s.client.CountComment(ctx, &commentv1.CountCommentRequest{Biz: biz, BizId: 1})
 	require.NoError(s.T(), err)
-	assert.Equal(s.T(), int64(1), cnt.GetCount(), "占位不计入评论数")
+	assert.Equal(s.T(), int64(0), cnt.GetCount(), "整楼删除后计数归零")
+}
+
+// 删「有子回复的楼内回复」→ 只删自身，子回复保留，楼根 reply_cnt 只减 1
+func (s *CommentServerSuite) TestDelete_ReplyKeepsItsChildren() {
+	ctx := context.Background()
+	root := s.create(1, 100, "楼主", 0)
+	mid := s.create(1, 200, "中层回复", root.GetId())
+	s.create(1, 300, "回复中层", mid.GetId())
+
+	_, err := s.client.DeleteComment(ctx, &commentv1.DeleteCommentRequest{Id: mid.GetId(), UserId: 200})
+	require.NoError(s.T(), err)
+
+	replies, err := s.client.GetReplies(ctx, &commentv1.GetRepliesRequest{RootId: root.GetId(), Offset: 0, Limit: 10})
+	require.NoError(s.T(), err)
+	require.Len(s.T(), replies.GetReplies(), 1, "中层删除，其子回复保留")
+	assert.Equal(s.T(), mid.GetId(), replies.GetReplies()[0].GetPid(), "子回复 pid 仍指向已删中层")
+	assert.Equal(s.T(), int64(1), s.findRoot(1, root.GetId()).GetReplyCnt(), "reply_cnt 只减中层这 1 条")
 }
 
 // 删「无子回复的回复」→ 递减直接父 reply_cnt（对称 Insert 的 +1）

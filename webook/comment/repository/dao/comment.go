@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"time"
 
 	"gorm.io/gorm"
 	"gorm.io/plugin/soft_delete"
@@ -21,14 +20,11 @@ type Comment struct {
 	Uid    int64         `gorm:"index:idx_comment_uid"`
 	RootId int64         `gorm:"index:idx_comment_biz_root,priority:3;index:idx_comment_root"`
 	Pid    sql.NullInt64 `gorm:"index"` // 直接父评论 ID；一级评论为 NULL
-	// ParentComment 自关联外键。注意：删除走软删（Delete 在 soft_delete 模型上是 UPDATE deleted_at），
-	// OnDelete:CASCADE 仅在物理 DELETE 时触发，软删场景不级联，子回复树得以保留（与原型"保留子树"一致）。
+	// ParentComment 自关联外键。软删（UPDATE deleted_at）不触发 OnDelete:CASCADE，
+	// 级联由 DAO 显式实现：删一级评论整楼软删，删楼内回复保留其子回复。
 	ParentComment *Comment `gorm:"foreignKey:Pid;references:Id;constraint:OnDelete:CASCADE"`
 	Content       string   `gorm:"type:varchar(1000)"`
 	ReplyCnt      int64    // 回复数：一级评论=整楼回复数（写/删回复时增减楼根，对齐扁平展开条数）；楼内回复恒 0
-	// Deleted 软删除占位标记：删除「有子回复」的评论时不真删，置 true 并清空 Content，
-	// 行保留让查询返回占位（前端渲染「该评论已删除」），子回复树得以挂在其下（保住讨论串）。
-	Deleted bool `gorm:"not null;default:0"`
 
 	CreatedAt int64                 `gorm:"autoCreateTime:milli"`
 	UpdatedAt int64                 `gorm:"autoUpdateTime:milli"`
@@ -50,8 +46,10 @@ type CommentDAO interface {
 	PageRoots(ctx context.Context, biz string, bizId int64, offset, limit int) ([]Comment, error)
 	// ListReplies 查整楼回复（RootId=rootId），按时间正序。
 	ListReplies(ctx context.Context, rootId int64, offset, limit int) ([]Comment, error)
-	// Delete 删除评论，仅当 uid 为评论作者本人；实现为软删（置 deleted_at，保留子回复树）。返回是否实际删除。
-	Delete(ctx context.Context, id, uid int64) (bool, error)
+	// Delete 删除评论，仅当 uid 为评论作者本人；实现为软删。
+	// 一级评论整楼级联；楼内回复只删自身并递减楼根 reply_cnt，子回复保留。
+	// 返回命中的评论（供调用方清缓存）与是否实际删除。
+	Delete(ctx context.Context, id, uid int64) (Comment, bool, error)
 	Count(ctx context.Context, biz string, bizId int64) (int64, error)
 }
 
@@ -125,55 +123,50 @@ func (d *GormCommentDAO) ListReplies(ctx context.Context, rootId int64, offset, 
 	return list, err
 }
 
-func (d *GormCommentDAO) Delete(ctx context.Context, id, uid int64) (bool, error) {
-	var deleted bool
+func (d *GormCommentDAO) Delete(ctx context.Context, id, uid int64) (Comment, bool, error) {
+	var (
+		c       Comment
+		deleted bool
+	)
 	err := d.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// WHERE 限定 uid 实现鉴权：非作者本人或评论不存在 → 匹配不到，deleted 保持 false
-		var c Comment
 		if err := tx.Where("id = ? AND uid = ?", id, uid).First(&c).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return nil
 			}
 			return err
 		}
-		// 是否有子回复（任何 pid=id 的行，含已是占位的）
-		var childCount int64
-		if err := tx.Model(&Comment{}).Where("pid = ?", id).Count(&childCount).Error; err != nil {
-			return err
-		}
-		if childCount > 0 {
-			// 有子回复：占位保留——标记删除 + 清空内容，行不删，子树仍可查（占位仍显示，不减父 reply_cnt）
-			if err := tx.Model(&Comment{}).Where("id = ?", id).Updates(map[string]any{
-				"deleted":    true,
-				"content":    "",
-				"updated_at": time.Now().UnixMilli(),
-			}).Error; err != nil {
+		if c.RootId == 0 {
+			// 一级评论：整楼软删（自身 + root_id 命中的全部回复）
+			if err := tx.Where("id = ? OR root_id = ?", id, id).Delete(&Comment{}).Error; err != nil {
 				return err
 			}
 		} else {
-			// 无子回复：软删（置 deleted_at）从视图消失
-			if err := tx.Where("id = ?", id).Delete(&Comment{}).Error; err != nil {
-				return err
+			// 楼内回复：只软删自身，子回复保留
+			res := tx.Where("id = ?", id).Delete(&Comment{})
+			if res.Error != nil {
+				return res.Error
 			}
-			// 若删的是回复（RootId!=0），递减其楼根的 reply_cnt（与 Insert 的 +1 楼根对称，防"展开 N 条"虚高）
-			if c.RootId != 0 {
-				if err := tx.Model(&Comment{}).Where("id = ?", c.RootId).
-					Update("reply_cnt", gorm.Expr("GREATEST(0, reply_cnt - 1)")).Error; err != nil {
-					return err
-				}
+			// 软删 0 行 = 已被并发删除；跳过递减防 reply_cnt 多扣
+			if res.RowsAffected == 0 {
+				return nil
+			}
+			// 递减楼根 reply_cnt（与 Insert 的 +1 楼根对称，防"展开 N 条"虚高）
+			if err := tx.Model(&Comment{}).Where("id = ?", c.RootId).
+				Update("reply_cnt", gorm.Expr("GREATEST(0, reply_cnt - 1)")).Error; err != nil {
+				return err
 			}
 		}
 		deleted = true
 		return nil
 	})
-	return deleted, err
+	return c, deleted, err
 }
 
 func (d *GormCommentDAO) Count(ctx context.Context, biz string, bizId int64) (int64, error) {
 	var n int64
-	// 占位（deleted=true）不计入"N 条评论"
 	err := d.db.WithContext(ctx).Model(&Comment{}).
-		Where("biz = ? AND biz_id = ? AND deleted = ?", biz, bizId, false).
+		Where("biz = ? AND biz_id = ?", biz, bizId).
 		Count(&n).Error
 	return n, err
 }

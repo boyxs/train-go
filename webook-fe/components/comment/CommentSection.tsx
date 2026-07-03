@@ -203,8 +203,18 @@ export function CommentSection({ articleId }: CommentSectionProps) {
     try {
       await commentApi.deleteComment(c.id);
       message.success('已删除');
-      // 后端决定：有子回复→占位保留，无子→真删。刷新对应数据拿准确结果（避免前端臆测）
+      // 删一级评论整楼级联：清掉该楼回复缓存与展开态再重拉
       if (c.rootId === 0) {
+        setRepliesMap((prev) => {
+          const next = { ...prev };
+          delete next[c.id];
+          return next;
+        });
+        setExpanded((prev) => {
+          const next = { ...prev };
+          delete next[c.id];
+          return next;
+        });
         await load();
       } else {
         await loadReplies(c.rootId);

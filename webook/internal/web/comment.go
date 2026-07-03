@@ -81,7 +81,6 @@ type CommentVO struct {
 	ReplyCnt  int64         `json:"replyCnt"`
 	LikeCnt   int64         `json:"likeCnt"`
 	Liked     bool          `json:"liked"`
-	Deleted   bool          `json:"deleted"` // 已删除占位（前端渲染「该评论已删除」，子回复仍在）
 	CreatedAt int64         `json:"createdAt"`
 	Children  []CommentVO   `json:"children,omitempty"`
 }
@@ -108,10 +107,7 @@ func (h *InternalCommentHandler) List(ctx *gin.Context, req commentListReq) (gin
 	if err != nil {
 		return ginx.Result{}, err
 	}
-	vos, err := h.aggregate(c, uid, resp.Comments)
-	if err != nil {
-		return ginx.Result{}, err
-	}
+	vos := h.aggregate(c, uid, resp.Comments)
 	if hot {
 		sortByHot(vos)
 		if int(limit) < len(vos) {
@@ -134,10 +130,7 @@ func (h *InternalCommentHandler) Replies(ctx *gin.Context, req commentRepliesReq
 	if err != nil {
 		return ginx.Result{}, err
 	}
-	vos, err := h.aggregate(c, uid, resp.Replies)
-	if err != nil {
-		return ginx.Result{}, err
-	}
+	vos := h.aggregate(c, uid, resp.Replies)
 	// 楼内回复总数 = 父评论 reply_cnt（前端已知），此处 Total 返回本页条数
 	return ginx.Result{Data: ginx.PageResult{List: vos, Total: int64(len(vos))}}, nil
 }
@@ -191,25 +184,28 @@ func (h *InternalCommentHandler) count(ctx context.Context, articleId int64) (in
 	return resp.Count, nil
 }
 
-// aggregate 把 pb 评论树转 VO，并批量填 interaction(biz="comment") 的 likeCnt/liked（避免 N+1）
-func (h *InternalCommentHandler) aggregate(ctx context.Context, uid int64, comments []*commentv1.Comment) ([]CommentVO, error) {
+// aggregate 把 pb 评论树转 VO，并批量填 interaction(biz="comment") 的 likeCnt/liked（避免 N+1）。
+// 互动聚合失败降级填零，不拖垮评论列表主流程。
+func (h *InternalCommentHandler) aggregate(ctx context.Context, uid int64, comments []*commentv1.Comment) []CommentVO {
 	ids := collectCommentIds(comments)
 	if len(ids) == 0 {
-		return []CommentVO{}, nil
+		return []CommentVO{}
 	}
 	cntMap, err := h.intrSvc.FindByBizIds(ctx, domain.BizComment, ids)
 	if err != nil {
-		return nil, err
+		h.l.Error("批量获取评论互动数据失败，降级填零", logger.Error(err))
+		cntMap = nil
 	}
 	var likedMap map[int64]bool
 	if uid > 0 {
 		likedMap, err = h.intrSvc.FindUserLiked(ctx, uid, domain.BizComment, ids)
 		if err != nil {
-			return nil, err
+			h.l.Error("批量获取评论点赞状态失败，降级填零", logger.Error(err))
+			likedMap = nil
 		}
 	}
 	nameMap := h.resolveNames(ctx, comments)
-	return toCommentVOs(comments, cntMap, likedMap, nameMap), nil
+	return toCommentVOs(comments, cntMap, likedMap, nameMap)
 }
 
 // collectCommentIds 递归收集评论树（含 children）的全部 id，供批量聚合
@@ -240,7 +236,6 @@ func toCommentVO(c *commentv1.Comment, cntMap map[int64]domain.Interaction, like
 		ReplyCnt:  c.ReplyCnt,
 		LikeCnt:   cntMap[c.Id].LikeCount,
 		Liked:     likedMap[c.Id],
-		Deleted:   c.Deleted,
 		CreatedAt: c.CreatedAt,
 	}
 	// 昵称由 core 按 uid 解析填入（comment 只回 uid；nil map 取值返回零值）

@@ -29,10 +29,9 @@ message Comment {
   string content = 5;
   int64 root_id = 6;          // 根评论 ID（一级评论=0）
   int64 pid = 7;              // 直接父评论 ID（一级=0）
-  int64 reply_cnt = 8;        // 直接回复数
+  int64 reply_cnt = 8;        // 回复数：一级评论=整楼回复数；楼内回复恒 0
   int64 created_at = 9;       // Unix 毫秒
   repeated Comment children = 10; // 一级评论携带的前 N 条回复预览
-  bool deleted = 11;          // 已删除占位：有子回复时保留该节点（内容清空），子树仍可见
   // like_cnt / liked 不在此，由 core 聚合 interaction(biz="comment") 后填入对外 VO
 }
 

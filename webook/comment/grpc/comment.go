@@ -110,7 +110,6 @@ func toPb(c domain.Comment) *commentv1.Comment {
 		RootId:    c.RootId,
 		Pid:       c.Pid,
 		ReplyCnt:  c.ReplyCnt,
-		Deleted:   c.Deleted,
 		CreatedAt: c.CreatedAt,
 	}
 }
