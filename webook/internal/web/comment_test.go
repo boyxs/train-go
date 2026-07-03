@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -95,6 +96,35 @@ func TestCommentHandler_List_New(t *testing.T) {
 	assert.False(t, r.Data.List[1].Liked)
 	assert.Equal(t, int64(101), r.Data.List[0].User.Id)
 	assert.Equal(t, "张三", r.Data.List[0].User.Name, "core 解析 uid→昵称")
+}
+
+// 列表：interaction 聚合失败 → 降级填零（likeCnt=0/liked=false），列表照常返回不 500
+func TestCommentHandler_List_InteractionDown_Degrades(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	client := grpcmocks.NewMockCommentServiceClient(ctrl)
+	client.EXPECT().ListComments(gomock.Any(), gomock.Any()).
+		Return(&commentv1.ListCommentsResponse{Comments: []*commentv1.Comment{pbComment(1), pbComment(2)}}, nil)
+	client.EXPECT().CountComment(gomock.Any(), gomock.Any()).Return(&commentv1.CountCommentResponse{Count: 2}, nil)
+
+	intrSvc := svcmocks.NewMockInteractionService(ctrl)
+	intrSvc.EXPECT().FindByBizIds(gomock.Any(), domain.BizComment, []int64{1, 2}).
+		Return(nil, errors.New("interaction 不可用"))
+	intrSvc.EXPECT().FindUserLiked(gomock.Any(), int64(42), domain.BizComment, []int64{1, 2}).
+		Return(nil, errors.New("interaction 不可用"))
+
+	userSvc := svcmocks.NewMockUserService(ctrl)
+	userSvc.EXPECT().FindByIds(gomock.Any(), gomock.Any()).Return(map[int64]domain.User{}, nil)
+
+	rec := serveComment(42, client, intrSvc, userSvc, "/comment/list", `{"articleId":7,"sort":"new","limit":2}`)
+	assert.Equal(t, http.StatusOK, rec.Code, "互动聚合失败应降级不 500")
+
+	var r pageResult
+	assert.NoError(t, json.NewDecoder(rec.Body).Decode(&r))
+	assert.Len(t, r.Data.List, 2)
+	assert.Equal(t, int64(0), r.Data.List[0].LikeCnt, "降级填零")
+	assert.False(t, r.Data.List[0].Liked, "降级填零")
 }
 
 // 列表(hot)：core 内存按 likeCnt 降序排，未登录 liked 全 false 且不调 FindUserLiked

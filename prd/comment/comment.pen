@@ -990,201 +990,6 @@
                 },
                 {
                   "type": "frame",
-                  "id": "aatuS",
-                  "name": "已删除占位",
-                  "width": "fill_container",
-                  "layout": "vertical",
-                  "gap": 12,
-                  "padding": [
-                    0,
-                    16
-                  ],
-                  "children": [
-                    {
-                      "type": "text",
-                      "id": "a1Q5I",
-                      "fill": "$faint",
-                      "content": "该评论已删除",
-                      "fontFamily": "Inter",
-                      "fontSize": 13,
-                      "fontWeight": "normal",
-                      "fontStyle": "italic"
-                    },
-                    {
-                      "type": "frame",
-                      "id": "fkXEG",
-                      "name": "thread-保留子回复",
-                      "width": "fill_container",
-                      "stroke": {
-                        "align": "inside",
-                        "thickness": {
-                          "left": 2
-                        },
-                        "fill": "$border"
-                      },
-                      "layout": "vertical",
-                      "gap": 10,
-                      "padding": [
-                        14,
-                        4
-                      ],
-                      "children": [
-                        {
-                          "type": "frame",
-                          "id": "bqeCE",
-                          "name": "item6",
-                          "width": "fill_container",
-                          "gap": 10,
-                          "children": [
-                            {
-                              "type": "frame",
-                              "id": "MyMZT",
-                              "name": "av6",
-                              "width": 30,
-                              "height": 30,
-                              "fill": "$faint",
-                              "cornerRadius": 15,
-                              "justifyContent": "center",
-                              "alignItems": "center",
-                              "children": [
-                                {
-                                  "type": "text",
-                                  "id": "HX986",
-                                  "fill": "$card",
-                                  "content": "孙",
-                                  "fontFamily": "Inter",
-                                  "fontSize": 12,
-                                  "fontWeight": "600"
-                                }
-                              ]
-                            },
-                            {
-                              "type": "frame",
-                              "id": "W1R0Vk",
-                              "name": "body6",
-                              "width": "fill_container",
-                              "layout": "vertical",
-                              "gap": 6,
-                              "children": [
-                                {
-                                  "type": "frame",
-                                  "id": "g6BtCB",
-                                  "name": "meta6",
-                                  "gap": 8,
-                                  "alignItems": "center",
-                                  "children": [
-                                    {
-                                      "type": "text",
-                                      "id": "AttHN",
-                                      "fill": "$ink",
-                                      "content": "孙八",
-                                      "fontFamily": "Inter",
-                                      "fontSize": 13,
-                                      "fontWeight": "600"
-                                    },
-                                    {
-                                      "type": "text",
-                                      "id": "lod8b",
-                                      "fill": "$faint",
-                                      "content": "· 5 小时前",
-                                      "fontFamily": "Inter",
-                                      "fontSize": 12,
-                                      "fontWeight": "normal"
-                                    }
-                                  ]
-                                },
-                                {
-                                  "type": "text",
-                                  "id": "JujXk",
-                                  "fill": "$ink",
-                                  "textGrowth": "fixed-width",
-                                  "width": "fill_container",
-                                  "content": "虽然父评论删了，但讨论串还在，赞这个保留子树的设计。",
-                                  "lineHeight": 1.6,
-                                  "fontFamily": "Inter",
-                                  "fontSize": 14,
-                                  "fontWeight": "normal"
-                                },
-                                {
-                                  "type": "frame",
-                                  "id": "vBF7y",
-                                  "name": "a6",
-                                  "gap": 18,
-                                  "alignItems": "center",
-                                  "children": [
-                                    {
-                                      "type": "frame",
-                                      "id": "p7zWd",
-                                      "name": "a6l",
-                                      "gap": 6,
-                                      "alignItems": "center",
-                                      "children": [
-                                        {
-                                          "type": "icon_font",
-                                          "id": "IPkIR",
-                                          "width": 15,
-                                          "height": 15,
-                                          "iconFontName": "heart",
-                                          "iconFontFamily": "lucide",
-                                          "fill": "$sub"
-                                        },
-                                        {
-                                          "type": "text",
-                                          "id": "Le32E",
-                                          "fill": "$sub",
-                                          "content": "0",
-                                          "fontFamily": "Inter",
-                                          "fontSize": 13,
-                                          "fontWeight": "normal"
-                                        }
-                                      ]
-                                    },
-                                    {
-                                      "type": "frame",
-                                      "id": "N9zLu",
-                                      "name": "a6r",
-                                      "gap": 6,
-                                      "alignItems": "center",
-                                      "children": [
-                                        {
-                                          "type": "icon_font",
-                                          "id": "Q31AM",
-                                          "width": 15,
-                                          "height": 15,
-                                          "iconFontName": "reply",
-                                          "iconFontFamily": "lucide",
-                                          "fill": "$sub"
-                                        },
-                                        {
-                                          "type": "text",
-                                          "id": "g9GJa",
-                                          "fill": "$sub",
-                                          "content": "回复",
-                                          "fontFamily": "Inter",
-                                          "fontSize": 13,
-                                          "fontWeight": "normal"
-                                        }
-                                      ]
-                                    }
-                                  ]
-                                }
-                              ]
-                            }
-                          ]
-                        }
-                      ]
-                    }
-                  ]
-                },
-                {
-                  "type": "rectangle",
-                  "id": "N26EB2",
-                  "fill": "$line",
-                  "width": "fill_container",
-                  "height": 1
-                },
-                {
-                  "type": "frame",
                   "id": "vs8yg",
                   "name": "加载更多",
                   "width": "fill_container",
@@ -1720,7 +1525,7 @@
           "fill": "$warn-ink",
           "textGrowth": "fixed-width",
           "width": "fill_container",
-          "content": "• 软删除占位，保留子回复树（不塌楼）；@提及高亮可跳转",
+          "content": "• 删除：一级评论整楼级联删除（确认框提示「N 条回复将一并删除」）；楼内回复仅删自身，子回复保留；@提及高亮可跳转",
           "lineHeight": 1.6,
           "fontFamily": "Inter",
           "fontSize": 13,
@@ -2345,6 +2150,187 @@
               "fontFamily": "Inter",
               "fontSize": 12,
               "fontWeight": "normal"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "MrDLp",
+      "x": 0,
+      "y": 1076,
+      "name": "原型-删除确认",
+      "width": 520,
+      "fill": "$bg",
+      "layout": "vertical",
+      "gap": 10,
+      "children": [
+        {
+          "type": "text",
+          "id": "zHxpn",
+          "name": "caption",
+          "fill": "$sub",
+          "textGrowth": "fixed-width",
+          "width": "fill_container",
+          "content": "删除确认 · 一级评论有回复时提示整楼级联",
+          "fontFamily": "Inter",
+          "fontSize": 12,
+          "fontWeight": "600"
+        },
+        {
+          "type": "frame",
+          "id": "Oe4ej",
+          "name": "mask",
+          "width": "fill_container",
+          "height": 340,
+          "fill": "#00000073",
+          "cornerRadius": 12,
+          "layout": "vertical",
+          "justifyContent": "center",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "ZQQJo",
+              "name": "modal",
+              "width": 416,
+              "fill": "$card",
+              "cornerRadius": 12,
+              "effect": {
+                "type": "shadow",
+                "shadowType": "outer",
+                "color": "#00000026",
+                "offset": {
+                  "x": 0,
+                  "y": 6
+                },
+                "blur": 16
+              },
+              "layout": "vertical",
+              "gap": 20,
+              "padding": 24,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "AswfZ",
+                  "name": "titleRow",
+                  "width": "fill_container",
+                  "gap": 10,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon_font",
+                      "id": "j8DtFR",
+                      "name": "icon",
+                      "width": 22,
+                      "height": 22,
+                      "iconFontName": "circle-alert",
+                      "iconFontFamily": "lucide",
+                      "fill": "$av-amber"
+                    },
+                    {
+                      "type": "text",
+                      "id": "fNohz",
+                      "name": "title",
+                      "fill": "$ink",
+                      "content": "删除这条评论？",
+                      "fontFamily": "Inter",
+                      "fontSize": 16,
+                      "fontWeight": "600"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "ICoYB",
+                  "name": "body",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "padding": [
+                    0,
+                    0,
+                    0,
+                    32
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "YRJY4",
+                      "name": "bodyText",
+                      "fill": "$sub",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "删除后，该评论下的 3 条回复也将一并删除",
+                      "lineHeight": 1.6,
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "vW9Pv",
+                  "name": "footer",
+                  "width": "fill_container",
+                  "gap": 8,
+                  "justifyContent": "end",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "S1kuGT",
+                      "name": "cancelBtn",
+                      "fill": "$card",
+                      "cornerRadius": 8,
+                      "stroke": {
+                        "align": "inside",
+                        "thickness": 1,
+                        "fill": "$border"
+                      },
+                      "padding": [
+                        6,
+                        15
+                      ],
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "m5gm7",
+                          "name": "cancelTxt",
+                          "fill": "$ink",
+                          "content": "取消",
+                          "fontFamily": "Inter",
+                          "fontSize": 14,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "Mkkww",
+                      "name": "delBtn",
+                      "fill": "$like",
+                      "cornerRadius": 8,
+                      "padding": [
+                        6,
+                        15
+                      ],
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "ybyef",
+                          "name": "delTxt",
+                          "fill": "#FFFFFF",
+                          "content": "删除",
+                          "fontFamily": "Inter",
+                          "fontSize": 14,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
             }
           ]
         }

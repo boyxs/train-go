@@ -3,9 +3,6 @@ package repository
 import (
 	"context"
 	"database/sql"
-	"errors"
-
-	"gorm.io/gorm"
 
 	"github.com/webook/comment/domain"
 	"github.com/webook/comment/repository/cache"
@@ -80,15 +77,7 @@ func (r *CacheCommentRepository) GetReplies(ctx context.Context, rootId int64, o
 }
 
 func (r *CacheCommentRepository) Delete(ctx context.Context, id, uid int64) (bool, error) {
-	// 先取 biz/bizId 用于删除后清计数缓存
-	c, err := r.dao.FindById(ctx, id)
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return false, nil
-	}
-	if err != nil {
-		return false, err
-	}
-	ok, err := r.dao.Delete(ctx, id, uid)
+	c, ok, err := r.dao.Delete(ctx, id, uid)
 	if err != nil {
 		return false, err
 	}
@@ -150,7 +139,6 @@ func (r *CacheCommentRepository) toDomain(c dao.Comment) domain.Comment {
 		RootId:    c.RootId,
 		Pid:       c.Pid.Int64, // NULL → 0
 		ReplyCnt:  c.ReplyCnt,
-		Deleted:   c.Deleted,
 		CreatedAt: c.CreatedAt,
 		UpdatedAt: c.UpdatedAt,
 	}

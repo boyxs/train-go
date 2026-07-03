@@ -69,20 +69,15 @@ export function CommentItem({
   const confirmDelete = () =>
     modal.confirm({
       title: '删除这条评论？',
+      content:
+        !isReply && comment.replyCnt > 0
+          ? `删除后，该评论下的 ${comment.replyCnt} 条回复也将一并删除`
+          : undefined,
       okText: '删除',
       cancelText: '取消',
       okButtonProps: { danger: true },
       onOk: () => onDelete(comment),
     });
-
-  // 已删除占位：仅斜体「该评论已删除」（对齐原型：无头像圈/操作）；子回复仍由 CommentSection 展示
-  if (comment.deleted) {
-    return (
-      <span style={{ fontSize: 14, color: '#9CA3AF', fontStyle: 'italic' }}>
-        该评论已删除
-      </span>
-    );
-  }
 
   return (
     <div className='flex gap-2.5'>

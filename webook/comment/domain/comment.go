@@ -15,7 +15,6 @@ type Comment struct {
 	ParentComment *Comment  `json:"parentComment,omitempty"`
 	Children      []Comment `json:"children,omitempty"`
 	ReplyCnt      int64     `json:"replyCnt"` // 一级评论=整楼回复数（对齐展开条数）；楼内回复恒 0
-	Deleted       bool      `json:"deleted"`  // 已删除占位（有子回复时保留，内容清空）
 	CreatedAt     int64     `json:"createdAt"`
 	UpdatedAt     int64     `json:"updatedAt"`
 }
