@@ -26,9 +26,9 @@ services:
       APP_ENV: "${CORE_APP_ENV}"         # .env.<env> 指定 config/<env>.yaml
       MYSQL_PASS: "${MYSQL_PASS}"
       REDIS_PASS: "${REDIS_PASS}"
-      LLM_DEEPSEEK_API_KEY: "${LLM_DEEPSEEK_API_KEY}"
-      LLM_KIMI_API_KEY: "${LLM_KIMI_API_KEY}"
-      EMBEDDING_API_KEY: "${EMBEDDING_API_KEY}"
+      DEEPSEEK_API_KEY: "${DEEPSEEK_API_KEY}"
+      KIMI_API_KEY: "${KIMI_API_KEY}"
+      QIANFAN_API_KEY: "${QIANFAN_API_KEY}"
       DEPLOY_ENV: "${DEPLOY_ENV}"
       TZ: "Asia/Shanghai"
       # GOMEMLIMIT 比 mem_limit 留 ~12% buffer（堆外：goroutine 栈/cgo/mmap/网络栈），不够会被 cgroup OOM
@@ -58,8 +58,8 @@ services:
       APP_ENV: "${CHAT_APP_ENV}"         # .env.<env> 指定 config/<env>.yaml
       MYSQL_PASS: "${MYSQL_PASS}"
       REDIS_PASS: "${REDIS_PASS}"
-      LLM_DEEPSEEK_API_KEY: "${LLM_DEEPSEEK_API_KEY}"
-      LLM_KIMI_API_KEY: "${LLM_KIMI_API_KEY}"
+      DEEPSEEK_API_KEY: "${DEEPSEEK_API_KEY}"
+      KIMI_API_KEY: "${KIMI_API_KEY}"
       DEPLOY_ENV: "${DEPLOY_ENV}"
       TZ: "Asia/Shanghai"
       GOMEMLIMIT: "${CHAT_GOMEMLIMIT:-320MiB}"

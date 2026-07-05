@@ -1190,7 +1190,7 @@ mysql -uroot -p13520 -e "DROP DATABASE webook_migrator; DROP DATABASE webook_mig
 | 启动报 `failed to connect mysql` | 检查 `.deploy/.env.local` 密码与 `config/local.yaml` 是否一致 |
 | 启动报 `failed to connect redis` | 同上，密码 |
 | 启动报 `init table` | 控制库表已存在但结构不匹配（task / checkpoint 等） — TRUNCATE 或 DROP 重建 |
-| curl 返 401 | JWT middleware 启用中。本地 `config/local.yaml` 已默认 `web.jwt.disabled: true` 跳过 JWT；如果你改回 `false` 或部署到 staging/prod，需要 webook-core 起着并签发 token，请求带 `Authorization: Bearer <token>` |
+| curl 返 401 | JWT middleware 启用中。本地 `config/local.yaml` 已默认 `server.http.jwt.disabled: true` 跳过 JWT；如果你改回 `false` 或部署到 staging/prod，需要 webook-core 起着并签发 token，请求带 `Authorization: Bearer <token>` |
 | `traces export: context deadline exceeded: dial tcp 127.0.0.1:4317` | 本地没起 OTel collector。`config/local.yaml` 已默认 `otel.disabled: true` 用 noop tracer 跳过；如果你改回 `false` 又没起 collector，会看到这条 log 刷屏（不影响业务） |
 | curl 返 ConnRefused | migrator 没起来或端口被占（默认 :8030，看启动日志） |
 | audit_log 看不到行 | 异步落表，等 100ms 再查；或检查服务日志有无 `audit insert failed` |

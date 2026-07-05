@@ -551,7 +551,7 @@ switched           DST_ONLY       100 ──────────────
 | POST | `/tasks/:id/repair` | `{strategy: src_overwrite_dst\|dst_overwrite_src\|mark_only, ids[]}` | `{code, msg}` | **RBAC `migrator:repair` + DBA 审批** |
 | POST | `/tasks/:id/replay-dl` | `{limit?: int}` | `{code, msg, data:{replayed, failed}}` | RBAC `migrator:write` **批量重放死信队列（默认每次 1000 条）；replay_failed=1 的需人工处理** |
 
-> **v1 认证现状**：仅强制 JWT（`web.jwt.disabled` 可关）+ IP 限流；上表 `RBAC migrator:*` scope 为权限设计意图，v1 未挂 scope 校验中间件（接入 webook-core SSO 后挂回，见 §11）。
+> **v1 认证现状**：仅强制 JWT（`server.http.jwt.disabled` 可关）+ IP 限流；上表 `RBAC migrator:*` scope 为权限设计意图，v1 未挂 scope 校验中间件（接入 webook-core SSO 后挂回，见 §11）。
 
 **repair `strategy` 取值定义**：
 - `src_overwrite_dst`：用源数据覆盖目标（常用，源是真值时）
@@ -1185,7 +1185,7 @@ func ProvideRedisSwitchReader(cmd redis.Cmdable) migratorsdk.SwitchReader {
 
 | # | 维度 | 文件 | 落地内容 |
 |---|------|------|---------|
-| 1 | 应用配置 | `webook/migrator/config/{local,dev,staging,prod,test}.yaml` | 5 份同构 + `serviceName=webook-migrator` + `sampleRatio` 差异 |
+| 1 | 应用配置 | `webook/migrator/config/{local,dev,staging,prod,test}.yaml` | 5 份同构 + `otel.service_name=webook-migrator` + `otel.sample_ratio` 差异 |
 | 2 | Wire DI | `webook/migrator/wire.go` + `cd webook && wire ./migrator/...` | 三个 Provider Set + InitWebServer |
 | 3 | Prometheus 抓取 | `deploy/prometheus/prometheus.yml` | `job_name: webook-migrator` + targets |
 | 4 | Recording rules | `deploy/prometheus/rules/migrator.rules.yml` | full_progress / lag P95 / mismatch_rate |

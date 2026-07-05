@@ -29,7 +29,7 @@ data:
 llm:
   providers:
     - name: deepseek
-      api_key: ${LLM_DEEPSEEK_API_KEY}
+      api_key: ${DEEPSEEK_API_KEY}
       base_url: "https://api.deepseek.com"
       model: "deepseek-chat"
       max_tokens: 2048

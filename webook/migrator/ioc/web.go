@@ -56,7 +56,7 @@ func InitWebServer(
 //
 // yaml 开关：
 //
-//	web.jwt.disabled: true   跳过 JWT middleware（本地无 webook-core 签发 token 时用）
+//	server.http.jwt.disabled: true   跳过 JWT middleware（本地无 webook-core 签发 token 时用）
 func InitMiddlewares(
 	l logger.LoggerX,
 	cmd redis.Cmdable,

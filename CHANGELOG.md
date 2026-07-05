@@ -2,6 +2,14 @@
 
 <!-- 新功能前插在此，日期降序 -->
 
+## [2026-07-05] 外部凭据 env 变量改纯厂商命名（DEEPSEEK/KIMI/QIANFAN）
+
+**变更内容**: `LLM_DEEPSEEK_API_KEY`/`LLM_KIMI_API_KEY`/`EMBEDDING_API_KEY` → `DEEPSEEK_API_KEY`/`KIMI_API_KEY`/`QIANFAN_API_KEY`。按「厂商凭据」命名（与能力无关，业界 `OPENAI_API_KEY` 风格），补掉 `EMBEDDING_API_KEY` 看不出厂商（百度千帆）的一致性缺口。
+**影响范围**: core 5 份 + chat 4 份 yaml 的 `${ENV}` 占位；`deploy/docker-compose.yaml` 转发键；4 份 `deploy/.env.*.example` + `internal/config/.env.example` + `chat/config/.env.example`；`webook/CLAUDE.md` + `prd/config/config-architecture.md` §5/§9/§13/§14。无 `.go` 改动（应用读 yaml 键、不引用 env 名）。
+**技术决策**: 纯厂商（vs 能力+厂商 `EMBEDDING_QIANFAN`）——key 属厂商、能力无关（deepseek 若出 embedding 同 key 通用），对齐 OpenAI/Anthropic SDK；厂商 token 用平台产品名（`QIANFAN` 对齐 base_url、非公司名 `BAIDU`，同 `KIMI` 非 `MOONSHOT`）。
+**待办**: 部署者同步各环境真实 `.env`（`deploy/.env.<env>` + 本地 `<svc>/config/.env`）的键名，趁 key 轮换一并换。
+**会话**: 260704-config-配置架构落地
+
 ## [2026-07-04] viperx `${ENV}` 展开改为解析后注入（消除 yaml 注入隐患）
 
 **变更内容**: 原 `expandEnv` 在 **yaml 解析前**对原始字节做 `${NAME}` 文本替换——密钥值含 yaml 特殊字符（`#` / `: ` / 换行 / 引号 / `{[`）会破坏结构、静默取错值、甚至注入伪键。改为**解析后展开**：`yaml.Unmarshal` 出配置树 → `expandTree` 递归只对**已解析的字符串叶子**做 `${NAME}` 替换（map / slice 全走到，覆盖 `providers[]` 列表元素）→ `viper.MergeConfigMap` 塞回。展开值不再经 yaml 解析器 → **结构上无法注入**，密钥可含任意字符。保留：仅 `${NAME}`（裸 `$` 不碰）、未设置→空、单遍不二次展开。

@@ -28,23 +28,23 @@ APP_ENV=config/local.yaml go run main.go
 | 文件 | 角色 | 谁用 | 特征 |
 |------|------|------|------|
 | `config/local.yaml` | 本地开发 | 你 Windows `go run`、IDE 调试 | 明文密码连本机 docker compose |
-| `config/dev.yaml` | 团队共享 dev / CI 集成测试 | 部署 `webook-dev` project | `otel.env=dev`, `sampleRatio=1.0`, logger debug |
-| `config/staging.yaml` | 预发布 | 部署 `webook-staging` project | `otel.env=staging`, `sampleRatio=0.5` |
-| `config/prod.yaml` | 生产 | 部署 `webook-prod` project | `otel.env=prod`, `sampleRatio=0.1`, logger info |
+| `config/dev.yaml` | 团队共享 dev / CI 集成测试 | 部署 `webook-dev` project | `otel.env=dev`, `sample_ratio=1.0`, logger debug |
+| `config/staging.yaml` | 预发布 | 部署 `webook-staging` project | `otel.env=staging`, `sample_ratio=0.5` |
+| `config/prod.yaml` | 生产 | 部署 `webook-prod` project | `otel.env=prod`, `sample_ratio=0.1`, logger info |
 
 **配置方案**（详见 `prd/config/config-architecture.md`）：
 - 5 份 yaml（local/dev/staging/prod/test）同构，域分组 `server`/`client`/`data`，叶子键 snake_case，时间值 duration 字符串
-- **密钥不进 git**：外部凭据（LLM/embedding apiKey）+ 自建中间件密码全走 `${ENV}` 占位（`${MYSQL_PASS}`/`${REDIS_PASS}`/`${LLM_DEEPSEEK_API_KEY}`/`${LLM_KIMI_API_KEY}`/`${EMBEDDING_API_KEY}`），viperx 加载时**解析 yaml 后在配置值上展开**（仅 `${NAME}` 形式，展开发生在已解析的字符串值上、不经 yaml 解析器 → 密钥含特殊字符也无法注入结构）；local/test 的自建中间件密码可明文
+- **密钥不进 git**：外部凭据（LLM/embedding apiKey）+ 自建中间件密码全走 `${ENV}` 占位（`${MYSQL_PASS}`/`${REDIS_PASS}`/`${DEEPSEEK_API_KEY}`/`${KIMI_API_KEY}`/`${QIANFAN_API_KEY}`），viperx 加载时**解析 yaml 后在配置值上展开**（仅 `${NAME}` 形式，展开发生在已解析的字符串值上、不经 yaml 解析器 → 密钥含特殊字符也无法注入结构）；local/test 的自建中间件密码可明文
 - **本地跑起来（裸 `go run` / `go test`）**：这些 `${ENV}` 外部凭据不在 yaml，需自己给值。`viperx.LoadLocal` **自读「配置文件同目录」的 `.env`**（`config/local.yaml`→`config/.env`；与 yaml 同目录、不依赖 CWD；godotenv 解析，仅填未设置的键，优先级 真实环境变量 > `.env`）——拷 `<svc>/config/.env.example` 为同目录 `.env` 填真实值即可（如 `webook/internal/config/.env`）。也可直接设 shell / IDE 环境变量。MySQL/Redis 在 local.yaml 是明文无需设。**`.env` 持密钥必须 gitignore，只 track `.env.example`**
 - **读取**：各 ioc `viper.UnmarshalKey("<段>", &cfg)` 就地读并直接用，**无中央 Bootstrap、无 Validate 校验层**，缺配置在消费点自然失败（空 target→dial 失败 / 坏 dsn→连库失败）
 - 段类型各归其位：grpcx 自带 `ServerConfig`/`ClientConfig`（+ 就地默认），其余叶子段在消费它的 ioc 内联定义，不建 config 包
 - 调参键（ttl/timeout/kafka 超时等）yaml 显式写、可逐环境改；代码默认仅 fallback
 - 全叶子键 snake_case，**无业务段例外**：`llm.providers[]` / `embedding` / `ollama` / `migrator.*` pipeline 的 config struct 已补 `mapstructure:"snake_case"` tag（与 infra 段同款），yaml 一律 snake（`api_key` / `base_url` / `max_tokens` / `batch_size` / `task_name`…）。注：viper 大小写不敏感匹配下，snake_case 带下划线必须有 tag 才绑得上
-- docker 部署：`.env.<env>` 的 `APP_ENV` 决定加载哪份 yaml；`MYSQL_PASS`/`REDIS_PASS`/`LLM_*`/`EMBEDDING_API_KEY` 经 docker-compose `environment` 转发进容器供 `${ENV}` 展开
+- docker 部署：`.env.<env>` 的 `APP_ENV` 决定加载哪份 yaml；`MYSQL_PASS`/`REDIS_PASS`/`DEEPSEEK_API_KEY`/`KIMI_API_KEY`/`QIANFAN_API_KEY` 经 docker-compose `environment` 转发进容器供 `${ENV}` 展开
 
 **docker-compose 动态选 yaml**：`APP_ENV: "${APP_ENV}"`，`.env.<env>` 里填 `config/<env>.yaml`。
 
-**L2 K8s 演进**：yaml 进 ConfigMap，密码剥到 K8s Secret，`envFrom.secretRef` 注入容器环境变量，应用侧加 `viper.BindEnv("mysql.dsn", "MYSQL_DSN")` 显式绑定 env key → yaml 字段（纯 AutomaticEnv 对嵌套 key 不生效已实测验证）。
+**L2 K8s 演进**：yaml 进 ConfigMap，密码剥到 K8s Secret，`envFrom.secretRef` 注入容器环境变量，应用侧加 `viper.BindEnv("data.mysql.dsn", "MYSQL_DSN")` 显式绑定 env key → yaml 字段（纯 AutomaticEnv 对嵌套 key 不生效已实测验证）。
 
 **L1 部署层**（`deploy/` 目录，项目部署唯一真相源）：
 - `docker-compose.yaml` + 四份 `.env.<env>`（local/dev/staging/prod）

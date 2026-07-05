@@ -831,7 +831,7 @@ curl POST /tasks/:id/repair {strategy:"src_overwrite_dst", ids:[1,2,3]}
 1. **Canal binlog 真订阅** ✅：`GoMySQLCanalClient` 基于 go-mysql-org/go-mysql/canal 实现 `BinlogClient` 接口；`SourceFactory` 按 `task.Mode == cdc` 自动切到 `CanalSource`；上线时需要 master my.cnf 配 `server-id` + `binlog_format=ROW` + `binlog_row_image=FULL`
 2. **按 task 动态调度多表** ✅：`domain.Task.Tables()` / `PickTable(idx)` 暴露多张表；factory `BuildSrc/BuildDst(ctx, task, tableIdx)`；引擎按 task 内 tables 迭代；checkpoint shard_no 编码 `tableIdx * ShardStride + shardNo` 区分
 3. **异构 Sink** ✅：MySQL / ES / ClickHouse / Mongo / Kafka 五套实现；按 `task.SinkType` 在 `InternalSinkFactory.heteroBuilder` 内分发
-4. **认证 + 限流** ✅：JWT 装配（`web.jwt.disabled` 可关）+ IP 级 rate-limit；RBAC scope 中间件 v1 未挂（端点 scope 标注为设计意图，接入 SSO 后挂回，见 `02-architecture.md` §11）
+4. **认证 + 限流** ✅：JWT 装配（`server.http.jwt.disabled` 可关）+ IP 级 rate-limit；RBAC scope 中间件 v1 未挂（端点 scope 标注为设计意图，接入 SSO 后挂回，见 `02-architecture.md` §11）
 5. **业务侧 SDK 接入** ✅：`internal/migratorsdk` SDK 接口 + Redis 实现；webook-core `CacheArticleReaderRepository` 已集成（Upsert/Delete 双写、FindById/FindByIds 切读、Page 不切）；yaml `migrator.sdk.enabled: false` 默认零开销
 
 接口契约 / 状态机 / 错误码 / 表结构以 [architecture.md](./02-architecture.md) 为权威；与本指南冲突时回退到 architecture.md。
@@ -1359,7 +1359,7 @@ metrics → otelgin → cors → jwt → ratelimit → accesslog → audit
 - **metrics**：Prometheus（最外层，覆盖所有路径含 cors preflight）
 - **otelgin**：trace 注入（紧跟 metrics，配 ContextWithFallback=true）
 - **cors**：跨域（jwt 之前，OPTIONS 预检不带 token）
-- **jwt**：认证（yaml `web.jwt.disabled: true` 跳过用于本地）
+- **jwt**：认证（yaml `server.http.jwt.disabled: true` 跳过用于本地）
 - **ratelimit**：IP 级 sliding-window，yaml 可覆盖（默认 100 req/s/IP）
 - **accesslog**：访问日志（记录原始请求）
 - **audit**：操作落 audit_log（异步，不阻塞业务路径）
@@ -1421,7 +1421,7 @@ docker compose -f deploy/docker-compose.yaml ps
 # 0. 准备数据
 mysql -h localhost -u root -p13520 webook < webook/scripts/webook.sql
 
-# 1. 设默认 JWT 签发（本地跳 JWT 校验，yaml web.jwt.disabled=true）
+# 1. 设默认 JWT 签发（本地跳 JWT 校验，yaml server.http.jwt.disabled=true）
 TOKEN=$(curl -s -X POST http://localhost:8010/users/login \
   -d '{"email":"test@test.com","password":"test"}' \
   | jq -r '.token')

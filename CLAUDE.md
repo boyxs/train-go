@@ -114,7 +114,7 @@ type(scope): description
 
 | 维度 | 文件 | 改什么 |
 |------|------|--------|
-| 应用配置 | `<service>/config/{local,dev,staging,prod,test}.yaml` | 5 份同构 + 服务差异点（otel.serviceName / sampleRatio / http.addr） |
+| 应用配置 | `<service>/config/{local,dev,staging,prod,test}.yaml` | 5 份同构 + 服务差异点（otel.service_name / otel.sample_ratio / server.http.addr） |
 | Wire DI | `<service>/wire.go` + `wire ./...` 重生成 | Provider Set + InitWebServer |
 | Prometheus 抓取 | `deploy/prometheus/prometheus.yml` | 加 `job_name: <service>` + targets |
 | Prometheus 录制规则 | `deploy/prometheus/rules/*.rules.yml` | 新服务若有 cron / lock 等模式同步 |

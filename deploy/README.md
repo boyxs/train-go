@@ -430,7 +430,7 @@ sed -i "s|^FE_IMAGE_TAG=.*|FE_IMAGE_TAG=1.2.1|" .env.prod
 |------|------|
 | 镜像 | `GH_USER`、`CORE_IMAGE_TAG`、`CHAT_IMAGE_TAG`、`FE_IMAGE_TAG`、`GHCR_REGISTRY`（默认 `ghcr.io`；私有 package 必须走官方源 + docker login） |
 | webook 配置 | `CORE_APP_ENV`、`CHAT_APP_ENV`（各服务选哪份 yaml）、`DEPLOY_ENV` |
-| 凭证 | `MYSQL_PASS` / `REDIS_PASS`（**必须和 `webook/config/<env>.yaml` 里 `mysql.dsn` / `redis.password` 一致**） |
+| 凭证 | `MYSQL_PASS` / `REDIS_PASS`（dev/staging/prod 的 yaml 用 `${MYSQL_PASS}` / `${REDIS_PASS}` 占位注入，与本变量**单一来源自动一致**、无需手工同步；local/test yaml 明文） |
 | Kafka EXTERNAL | `KAFKA_EXTERNAL_HOST`（主机访问 kafka 的 advertised 地址，local=`localhost`，server=服务器 IP）、`KAFKA_EXTERNAL_PORT` |
 | etcd | `ETCD_ALLOW_NONE`（yes=无认证，no=带 `ETCD_PASS`）、`ETCD_PASS`、`ETCD_MEM` |
 | 业务/中间件内存 | `MYSQL_MEM`、`REDIS_MEM`、`KAFKA_MEM`、`KAFKA_HEAP`、`ES_MEM`、`ES_HEAP`、`FE_MEM`、`OLLAMA_MEM` |
@@ -550,8 +550,8 @@ docker logs webook-core --tail 30
 ```
 
 **最常见原因**：
-- `webook/internal/config/<env>.yaml` 或 `webook/chat/config/<env>.yaml` 的 `mysql.dsn` 密码和 `.env.<env>` 的 `MYSQL_PASS` 不一致
-- → 改 yaml 或改 env 让两者一致，然后 `./deploy.sh <env> build && ./deploy.sh <env>`
+- `.env.<env>` 的 `MYSQL_PASS` 没设，或与 mysql 容器 volume 里的实际密码不符（yaml 已走 `${MYSQL_PASS}` 占位、与容器同源，不再需要手工改 yaml 密码；容器 volume 会保留首次初始化的密码）
+- → 对齐 `.env.<env>` 的 `MYSQL_PASS`（换密码需重建 mysql volume），然后 `./deploy.sh <env> build && ./deploy.sh <env>`
 
 ### 问 2：docker pull 报 manifest unknown
 
