@@ -1,15 +1,15 @@
 # worker 集成测试配置（连本机测试中间件）。
-
 etcd:
   endpoints:
     - "http://127.0.0.1:2379"
-  # 无 path/type：worker 静态配置（LoadLocal），etcd 仅供 gRPC 服务发现，不接 viperx.WatchRemote 热更
+  # 无 path/type：worker 静态配置，etcd 仅供 gRPC 服务发现，不接热更
 
-http:
-  addr: ":8050"
+server:
+  http:
+    addr: ":8050" # 仅 /metrics+/health（非 gin，不挂超时中间件）
 
-grpc:
-  client:
+client:
+  grpc:
     webook-core:
       target: "etcd:///service/webook-core"
       balancer: "breaker_swrr"
@@ -17,31 +17,30 @@ grpc:
       target: "etcd:///service/webook-interaction"
       balancer: "breaker_swrr"
 
-redis:
-  addr: 127.0.0.1:6379
-  password: "13520"
-
-kafka:
-  addrs:
-    - "localhost:9094"
-  dialTimeout: 10
-  readTimeout: 10
-  writeTimeout: 10
-  consumerGroup: "interaction-consumer-test"
-  consumerBackoffInitial: 1
-  consumerBackoffMax: 10
+data:
+  redis:
+    addr: "127.0.0.1:6379"
+    password: "13520"
+  kafka:
+    addrs:
+      - "localhost:9094"
+    dial_timeout: 10s
+    read_timeout: 10s
+    write_timeout: 10s
+    consumer_group: "interaction-consumer-test"
+    consumer_backoff_initial: 1s
+    consumer_backoff_max: 10s
 
 logger:
-  level:
-    l: -1
+  level: debug
   development: true
-  encoding: 'json'
-  outputPaths: [ 'stdout' ]
-  errorOutputPaths: [ 'stderr' ]
+  encoding: json
+  output_paths: [ stdout ]
+  error_output_paths: [ stderr ]
 
 otel:
   endpoint: "localhost:4317"
-  serviceName: "webook-worker-test"
-  serviceVersion: "0.1.0"
+  service_name: "webook-worker-test"
+  service_version: "0.1.0"
   env: "test"
-  sampleRatio: 0.0
+  sample_ratio: 0.0

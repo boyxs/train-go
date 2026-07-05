@@ -59,14 +59,11 @@ func InitInteractionConn(client *etcdv3.Client, grpcMetrics *metrics.PrometheusB
 	return InteractionConn{conn}, cleanup, nil
 }
 
-// clientConfig 读 grpc.client.<name>（target/secure/caFile），target 缺省按 etcd:///service/<name> 推导。
+// clientConfig 读 client.grpc.<name>（target/balancer/…）;target 必填,缺失 → dial 失败,代码不派生。
 func clientConfig(name string) (grpcx.ClientConfig, error) {
 	var cfg grpcx.ClientConfig
-	if err := viper.UnmarshalKey("grpc.client."+name, &cfg); err != nil {
+	if err := viper.UnmarshalKey("client.grpc."+name, &cfg); err != nil {
 		return grpcx.ClientConfig{}, err
-	}
-	if cfg.Target == "" {
-		cfg.Target = "etcd:///service/" + name
 	}
 	return cfg, nil
 }

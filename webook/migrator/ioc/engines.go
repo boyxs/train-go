@@ -73,13 +73,13 @@ func buildCanalClient(l logger.LoggerX) func(task domain.Task) (source.BinlogCli
 		addr := viper.GetString("migrator.canal.addr")
 		user := viper.GetString("migrator.canal.user")
 		password := viper.GetString("migrator.canal.password")
-		serverIDBase := viper.GetUint32("migrator.canal.serverIdBase")
+		serverIdBase := viper.GetUint32("migrator.canal.server_id_base")
 		flavor := viper.GetString("migrator.canal.flavor")
 		if addr == "" {
 			return nil, fmt.Errorf("migrator.canal.addr 未配置")
 		}
-		if serverIDBase == 0 {
-			serverIDBase = 1001
+		if serverIdBase == 0 {
+			serverIdBase = 1001
 		}
 		// 按 task.Tables() 构造 includeTableRegex
 		tables, err := task.Tables()
@@ -87,7 +87,7 @@ func buildCanalClient(l logger.LoggerX) func(task domain.Task) (source.BinlogCli
 			return nil, err
 		}
 		regex := make([]string, 0, len(tables))
-		dbName := extractDBName(viper.GetString("mysql.dsn"))
+		dbName := extractDBName(viper.GetString("data.mysql.dsn"))
 		for _, tm := range tables {
 			// 严格匹配 dbName.tableName
 			regex = append(regex, fmt.Sprintf(`%s\.%s`, dbName, tm.Src))
@@ -96,10 +96,10 @@ func buildCanalClient(l logger.LoggerX) func(task domain.Task) (source.BinlogCli
 			Addr:              addr,
 			User:              user,
 			Password:          password,
-			ServerID:          serverIDBase + uint32(task.Id),
+			ServerID:          serverIdBase + uint32(task.Id),
 			Flavor:            flavor,
 			IncludeTableRegex: regex,
-			BufSize:           viper.GetInt("migrator.incr.channelBuf"),
+			BufSize:           viper.GetInt("migrator.incr.channel_buf"),
 		}, l)
 	}
 }
@@ -273,8 +273,8 @@ func InitFullEngine(
 	l logger.LoggerX,
 ) full.FullEngine {
 	return full.NewFullEngine(ts, ckptRepo, srcFactory, sinkFactory, l, buildTransformRegistry(), full.Config{
-		BatchSize:  viper.GetInt("migrator.full.batchSize"),
-		ChannelBuf: viper.GetInt("migrator.full.channelBuf"),
+		BatchSize:  viper.GetInt("migrator.full.batch_size"),
+		ChannelBuf: viper.GetInt("migrator.full.channel_buf"),
 	})
 }
 
@@ -300,10 +300,10 @@ func InitIncrEngine(
 	l logger.LoggerX,
 ) incr.IncrEngine {
 	return incr.NewIncrEngine(ts, ckptRepo, srcFactory, sinkFactory, l, buildTransformRegistry(), incr.Config{
-		BatchSize:      viper.GetInt("migrator.incr.batchSize"),
-		ChannelBuf:     viper.GetInt("migrator.incr.channelBuf"),
-		PartitionCount: viper.GetInt("migrator.incr.partitionCount"),
-		FlushInterval:  viper.GetDuration("migrator.incr.flushInterval"),
+		BatchSize:      viper.GetInt("migrator.incr.batch_size"),
+		ChannelBuf:     viper.GetInt("migrator.incr.channel_buf"),
+		PartitionCount: viper.GetInt("migrator.incr.partition_count"),
+		FlushInterval:  viper.GetDuration("migrator.incr.flush_interval"),
 	})
 }
 
@@ -320,8 +320,8 @@ func InitVerifyEngine(
 		srcFactory, sinkFactory,
 		l, buildTransformRegistry(),
 		verify.Config{
-			BatchSize:  viper.GetInt("migrator.verify.batchSize"),
-			ChannelBuf: viper.GetInt("migrator.verify.channelBuf"),
+			BatchSize:  viper.GetInt("migrator.verify.batch_size"),
+			ChannelBuf: viper.GetInt("migrator.verify.channel_buf"),
 		},
 	)
 }

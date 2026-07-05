@@ -13,11 +13,11 @@ import (
 
 // Config OpenAI 协议的 embedding 客户端配置
 type Config struct {
-	BaseUrl string
-	ApiKey  string
-	Model   string
-	Dims    int
-	Timeout int // 秒
+	BaseUrl string `mapstructure:"base_url"`
+	ApiKey  string `mapstructure:"api_key"`
+	Model   string `mapstructure:"model"`
+	Dims    int    `mapstructure:"dims"`
+	Timeout int    `mapstructure:"timeout"` // 秒
 }
 
 // OpenAIClient 兼容 OpenAI Embedding 协议（阿里百炼、SiliconFlow 等）
@@ -30,7 +30,7 @@ type OpenAIClient struct {
 
 func NewOpenAIClient(cfg Config) *OpenAIClient {
 	timeout := time.Duration(cfg.Timeout) * time.Second
-	if timeout == 0 {
+	if timeout <= 0 {
 		timeout = 30 * time.Second
 	}
 	return &OpenAIClient{

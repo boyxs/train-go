@@ -45,13 +45,13 @@ func main() {
 			log.Printf("[gRPC] etcd 注册失败: %v", err)
 			return
 		}
-		log.Printf("[gRPC] serving on :%d", app.GRPCServer.Port)
+		log.Printf("[gRPC] serving on %s", app.GRPCServer.Addr)
 		if err := app.GRPCServer.Serve(); err != nil {
 			log.Printf("[gRPC] server exited: %v", err)
 		}
 	}()
 	// HTTP server 用 http.Server(而非 engine.Run)以支持优雅关闭
-	httpAddr := viper.GetString("http.addr")
+	httpAddr := viper.GetString("server.http.addr")
 	if httpAddr == "" {
 		httpAddr = ":8010"
 	}
@@ -69,8 +69,8 @@ func main() {
 	if err := app.GRPCServer.Close(); err != nil {
 		log.Printf("[gRPC] 关闭: %v", err)
 	}
-	// HTTP:等在途请求处理完,最多 10s
-	sctx, scancel := context.WithTimeout(context.Background(), 10*time.Second)
+	// HTTP:等在途请求处理完,最多 20s
+	sctx, scancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer scancel()
 	if err := httpSrv.Shutdown(sctx); err != nil {
 		log.Printf("[HTTP] 关闭: %v", err)

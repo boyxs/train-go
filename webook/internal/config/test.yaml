@@ -1,99 +1,99 @@
+# core 集成测试配置（连本机测试库 webook_test，etcd path /webook-core-test）。
 etcd:
   endpoints:
     - "http://127.0.0.1:2379"
-  path: /webook-core-test
-  type: yaml
+  path: "/webook-core-test"
+  type: "yaml"
 
-http:
-  addr: ":8010"
-
-grpc:
-  server:
-    port: 8011
+server:
+  http:
+    addr: ":8010"
+    timeout: 15s
+    access_log:
+      allow_req_body: true
+      allow_res_body: true
+      max_req_len: 2048
+      max_res_len: 2048
+      max_path_len: 256
+  grpc:
+    addr: ":8011"
     name: "webook-core"
-    ttl: 30
+    ttl: 30s
     weight: 10
+    host: "" # 空=自动探测出口 IP，k8s 填 POD_IP
+    timeout: 5s
 
-mysql:
-  dsn: root:13520@tcp(localhost:3306)/webook_test?parseTime=true&loc=UTC
+client:
+  grpc:
+    webook-comment:
+      target: "etcd:///service/webook-comment"
+      balancer: "breaker_swrr"
+    webook-interaction:
+      target: "etcd:///service/webook-interaction"
+      balancer: "breaker_swrr"
 
-redis:
-  addr: 127.0.0.1:6379
-  password: "13520"
-
-#web:
-#  logger:
-#    allowReqBody: true
-#    allowResBody: true
-#    maxReqLen: 2048
-#    maxResLen: 2048
-#    maxPathLen: 1024
+data:
+  mysql:
+    dsn: root:13520@tcp(localhost:3306)/webook_test?parseTime=true&loc=UTC
+  redis:
+    addr: "127.0.0.1:6379"
+    password: "13520"
+  kafka:
+    addrs:
+      - "localhost:9094"
+    dial_timeout: 10s
+    read_timeout: 10s
+    write_timeout: 10s
+    producer_timeout: 10s
+    producer_retry_max: 0
+    metadata_retry_max: 1
+    metadata_retry_backoff: 250ms
+    metadata_timeout: 5s
+  es:
+    addr: "http://localhost:9200"
 
 llm:
   providers:
     - name: deepseek
-      apiKey: "sk-405db05b37ac418b91268403d32a55aa"
-      baseUrl: "https://api.deepseek.com"
+      api_key: ${LLM_DEEPSEEK_API_KEY}
+      base_url: "https://api.deepseek.com"
       model: "deepseek-chat"
-      maxTokens: 2048
+      max_tokens: 2048
       timeout: 60
     - name: kimi
-      apiKey: "sk-KURYxBodidmpQmZsL1SGrEiDoWcETmKDkgr70qsfmEDleS6d"
-      baseUrl: "https://api.moonshot.cn/v1"
+      api_key: ${LLM_KIMI_API_KEY}
+      base_url: "https://api.moonshot.cn/v1"
       model: "kimi-k2.5"
-      maxTokens: 2048
+      max_tokens: 2048
       timeout: 60
 
-kafka:
-  addrs:
-    - "localhost:9094"
-  # 网络超时（秒）
-  dialTimeout: 10
-  readTimeout: 10
-  writeTimeout: 10
-  # Producer
-  producerTimeout: 10  # broker ack 超时（秒）
-  producerRetryMax: 0  # 失败不重试，直接降级同步
-  # Metadata
-  metadataRetryMax: 1
-  metadataRetryBackoff: 250  # 毫秒
-  metadataTimeout: 5
-
-es:
-  addr: "http://localhost:9200"
-
-ollama:
-  baseUrl: "http://localhost:11434"
-  model: "bge-m3"
-  timeout: 5
-
 embedding:
-  baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1"
-  apiKey: "sk-ef23911b061943b681584ac467c4cd28"
-  model: "text-embedding-v3"
+  base_url: "https://qianfan.baidubce.com/v2"
+  api_key: ${EMBEDDING_API_KEY}
+  model: "qwen3-embedding-0.6b"
   dims: 1024
   timeout: 30
 
-otel:
-  # 本地开发：要 docker compose up -d otel-collector 把 4317 暴露到宿主机
-  endpoint: "localhost:4317"
-  serviceName: "webook-core-test"
-  serviceVersion: "0.1.0"
-  env: "local"
-  # 采样率公式详见 config/prod.yaml 注释或 docs/opentelemetry/06-best-practices.md。
-  sampleRatio: 1.0          # local 全采样（本机调试全量看）
+ollama:
+  base_url: "http://localhost:11434"
+  model: "bge-m3"
+  timeout: 5
 
-# 数据迁移 SDK（enabled:true → 集成测试走 RedisSwitchReader + RedisDualWriter 真实切流路径；无 stage key 时降级 SideOld=只写旧表，详见 local.yaml 注释）
 migrator:
   sdk:
     enabled: true
-    taskName: "published_article_v1"
+    task_name: "published_article_v1"
 
-#etcdctl --endpoints=127.0.0.1:2379 put /webook-core < config/local.yaml
+logger:
+  level: debug
+  development: true
+  encoding: json
+  output_paths: [ stdout ]
+  error_output_paths: [ stderr ]
 
-# 应用配置命名标准（详见 webook/CLAUDE.md「环境说明」）：
-#   local.yaml   本地 go run 调试（明文密码连本机 docker）
-#   dev.yaml     团队共享 dev / CI 集成测试（otel.env=dev, sampleRatio=1.0, logger debug）
-#   staging.yaml 预发布（贴近 prod, sampleRatio=0.5）
-#   prod.yaml    生产（sampleRatio=0.1, logger info）
-#   test.yaml    集成测试（本机 docker，独立 webook_test 库 + /webook-core-test etcd path）
+otel:
+  endpoint: "localhost:4317"
+  service_name: "webook-core-test"
+  service_version: "0.1.0"
+  env: "test"
+  sample_ratio: 1.0

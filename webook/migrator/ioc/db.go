@@ -30,7 +30,7 @@ func InitDB(_ TimezoneReady, l loggerx.LoggerX) *gorm.DB {
 			LogLevel:                  gormlogger.Info,
 		}),
 	}
-	db, err := gorm.Open(mysql.Open(viper.GetString("mysql.dsn")), &gormConfig)
+	db, err := gorm.Open(mysql.Open(viper.GetString("data.mysql.dsn")), &gormConfig)
 	if err != nil {
 		panic("[migrator] failed to connect mysql: " + err.Error())
 	}

@@ -14,7 +14,7 @@ func InitRedis() redis.Cmdable {
 		Password string `yaml:"password" mapstructure:"password"`
 	}
 	var cfg Config
-	if err := viper.UnmarshalKey("redis", &cfg); err != nil {
+	if err := viper.UnmarshalKey("data.redis", &cfg); err != nil {
 		panic(err)
 	}
 	client := redis.NewClient(&redis.Options{

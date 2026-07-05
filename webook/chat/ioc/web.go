@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/redis/go-redis/v9"
+	"github.com/spf13/viper"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"go.opentelemetry.io/otel/trace"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/webook/pkg/ginx"
 	"github.com/webook/pkg/ginx/middleware/accesslog"
 	"github.com/webook/pkg/ginx/middleware/metrics"
+	"github.com/webook/pkg/ginx/middleware/timeout"
 	"github.com/webook/pkg/jwtx"
 	"github.com/webook/pkg/logger"
 )
@@ -49,7 +51,9 @@ func InitMiddlewares(l logger.LoggerX, cmd redis.Cmdable, tp trace.TracerProvide
 			Build(),
 		// 2. OTel root span
 		otelgin.Middleware("webook-chat", otelgin.WithTracerProvider(tp)),
-		// 3. CORS
+		// 3. HTTP 软超时（默认 15s）；SSE /chat 前缀豁免，长连不被切断
+		timeout.NewMiddlewareBuilder(viper.GetDuration("server.http.timeout")).ExemptPrefix("/chat").Build(),
+		// 4. CORS
 		cors.New(cors.Config{
 			AllowMethods:     []string{"PUT", "PATCH", "POST", "GET", "DELETE", "OPTIONS"},
 			AllowHeaders:     []string{"Content-Type", jwtx.HeaderAuthorization, consts.AccessHeader, consts.RefreshHeader, consts.LastEventIDHeader},

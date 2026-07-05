@@ -2,6 +2,39 @@
 
 <!-- 新功能前插在此，日期降序 -->
 
+## [2026-07-04] viperx `${ENV}` 展开改为解析后注入（消除 yaml 注入隐患）
+
+**变更内容**: 原 `expandEnv` 在 **yaml 解析前**对原始字节做 `${NAME}` 文本替换——密钥值含 yaml 特殊字符（`#` / `: ` / 换行 / 引号 / `{[`）会破坏结构、静默取错值、甚至注入伪键。改为**解析后展开**：`yaml.Unmarshal` 出配置树 → `expandTree` 递归只对**已解析的字符串叶子**做 `${NAME}` 替换（map / slice 全走到，覆盖 `providers[]` 列表元素）→ `viper.MergeConfigMap` 塞回。展开值不再经 yaml 解析器 → **结构上无法注入**，密钥可含任意字符。保留：仅 `${NAME}`（裸 `$` 不碰）、未设置→空、单遍不二次展开。
+**影响范围**: `pkg/viperx/viperx.go`（`expandEnv([]byte)`→`expandEnvValue(string)`+`expandTree(any)`，`LoadLocal` 走 `yaml.Unmarshal`+`MergeConfigMap`；`go.mod` 提升 `gopkg.in/yaml.v3` 为直接依赖）；`viperx_test.go` 加 `TestExpandTreeInjectionSafe`（恶意值含冒号/井号/换行/引号/伪键，验证原样落地、slice 展开、不注入结构）；`prd/config/config-architecture.md` §9 + `webook/CLAUDE.md` 同步。
+**技术决策**: ①**解析后注入**是结构上免疫（vs 加引号只是打补丁、仍挡不住值内引号/换行）；②不用 viper 官方 `BindEnv`（整值覆盖、免疫更彻底）因它做不了嵌入式 `root:${MYSQL_PASS}@tcp` 且要逐键 boilerplate——留 L2 与 K8s Secret 一起上；③`os.ExpandEnv` 官方但连裸 `$var` 也展开会误伤含 `$` 的值，故仍用自造 `${NAME}`-only 正则（本就是它的更安全子集）。**残留**：DSN 内嵌密码含 `@`/`:` 坏 DSN 格式是正交语法约束（密码需 url-safe），非展开层能解。
+**会话**: 260704-config-配置架构落地
+
+## [2026-07-04] viperx 本地 `.env` 自读（补密钥出 git 后的本地运行体验）
+
+**变更内容**: 密钥全走 `${ENV}` 出 git 后，裸 `go run` / `go test` 拿不到 LLM/embedding 凭据。给 `viperx.LoadLocal` 加 `loadDotEnv`（godotenv 解析）**自读「配置文件同目录」的 `.env`**（`config/local.yaml`→`config/.env`）——与 yaml 同目录、不依赖 CWD；**只填未设置的键**,优先级 真实环境变量（含 IDE Run Config）> `.env`；文件不存在直接跳过（prod/CI 无 `.env` 属正常）。**不做 per-env `.env.<env>` 选择**（KISS/YAGNI：本地基本只跑 local.yaml，dev/staging/prod 跑 docker 走 compose 转发密钥，本地按环境分密钥的需求不存在）。
+**影响范围**: `pkg/viperx/viperx.go`（+ `viperx_test.go`：`TestLoadDotEnv` 3 组、注入安全）；`go.mod` 加 `github.com/joho/godotenv v1.5.1`；`.gitignore` 忽略 `.env` / `.env.*`（track `.env.example` / `.env.*.example` 模板）；新增 `webook/internal/config/.env.example` 模板；`prd/config/config-architecture.md` §9 + `webook/CLAUDE.md` 环境说明同步。
+**技术决策**: ①**用 godotenv 而非自造解析**（初版手写 ~30 行，复盘：`#` 行内注释 / 引号 / 转义等边角自造易出 bug——如未加引号值的行内注释会被当成值，客观不如 godotenv 可靠；godotenv 零传递依赖、MIT、事实标准，仅本地启动跑一次，破例引它换掉自造解析器值得）；②`godotenv.Load` 不覆盖已存在 env → 真实 env 优先，prod 天然安全（无 `.env` 文件 + 有也不覆盖）；③精确名 `.env` gitignore（deploy 那套叫 `.env.dev` 等，互不干扰）。
+**会话**: 260704-config-配置架构落地
+
+## [2026-07-04] 配置架构标准化落地（全仓迁移 + 设计重定稿）
+
+**变更内容**: 按重定稿的 `prd/config/config-architecture.md` 全仓迁移：域分组 `server`/`client`/`data` + 叶子键 snake_case + 时间值 duration；`grpcx.ServerConfig` Port→Addr（破坏性）+ `ClientConfig` 扩展（keep_alive/retry/timeout/msg size，从类型化键组 grpc service config）；超时治理落地（gRPC unary 拦截器 5s + HTTP 软超时中间件 15s，chat SSE `/chat` 豁免、**core `/article/polish`（LLM 60s）+ `/search/article`（embedding）豁免**避免慢 AI 调用被 15s 切、streaming 天然豁免、client timeout opt-in）；viperx `${ENV}` 占位展开 + 热更 override（远程子集 `viper.Set` 绕开 file>kvstore）+ `webook_config_reload_total` 指标；六服务 ioc 按段 `UnmarshalKey`、logger 改 yaml 驱动（`development` 选 base + `level` 字符串枚举）、删 grpcClientConfig 隐式 target 推导（每下游一 Provider 显式读）；密钥全环境 `${ENV}` 出 git（MYSQL_PASS/REDIS_PASS/LLM_*/EMBEDDING）+ docker-compose 转发 + `.env.*.example` 登记；Grafana 加远程配置热更失败告警（`webook_config_reload_total{status="error"}` 跨服务多序列，`increase[10m]>3` 降级告警 severity=high）。
+**影响范围**: `pkg/{viperx,grpcx,ginx/middleware/timeout,ginx/middleware/accesslog}`（含单测）；业务段 config struct `pkg/llm.ProviderConfig` + `internal/service/embedding/{openai,ollama}.go` 补 snake tag、`migrator/ioc/engines.go` + `internal/ioc/migrator_sdk.go` + migrator 集成测试改取键；六服务 `*/ioc/*.go` + `*/main.go` + `*/config/*.yaml`（30 份，业务段键一并 snake）；**集成测试 DI 同步迁移**（`{comment,interaction,internal}/integration/setup/{db,redis}.go`、chat/migrator integration 及 `article_reader_v1_test.go` 共 15 文件，`mysql.dsn`→`data.mysql.dsn`、`redis`→`data.redis`——上轮域分组漏改，ship review 补齐）；`deploy/docker-compose.yaml` + `deploy/.env.*.example` + `deploy/grafana/provisioning/alerting/webook-config.yml`（新增）；`prd/config/config-architecture.md` 重定稿。
+**ship review 修复**: accesslog builder 去 `_ = err`（改 log，热更回调不 panic）+ 修陈旧 godoc（`web.logger`→`server.http.access_log`）；grpcx client 补 `_ "grpc/health"` blank import（`health_check:true` 才真生效）+ `GRPCRetry.policy()` 对缺省字段就地兜底（部分 retry 配置不再让 service config 非法拨号失败）；grpcx server 亚秒 TTL 向上取 1s（避免 `Grant(0)` 永不过期）；otel struct `Endpoint` 死 `yaml` tag 统一 `mapstructure`（4 服务）。**遗留 Suggestion（未改）**：otel 默认值三服务设满/三服务全空——设计取舍（wiring 键该不该有代码默认），无功能影响待定。
+**技术决策**: ①**去 Kratos 化**（设计以 grpc-go 语义自证）；②**彻底不校验**（用户定）：无 Bootstrap/MustLoad/Validate，配置错误靠消费点自然失败；③**显式配置 + 代码兜底**（用户二次确认）：yaml 显式写调参键、代码默认仅 fallback；④**类型各归其位**（grpcx 自带 Server/ClientConfig，叶子段 ioc 内联，不建 configx）；⑤**全叶子键 snake_case,无业务段例外**（复盘：起初图省事让 `llm`/`embedding`/`ollama`/`migrator.*` 留 camelCase,后统一收口——给 `pkg/llm.ProviderConfig`、`embedding.Config`/`OllamaConfig` 补 `mapstructure:"snake_case"` tag,migrator pipeline 直接取键改 snake;因 viper 大小写不敏感匹配下 snake 带下划线**必须有 tag** 才绑得上,无 tag 只能绑 camelCase）；⑥client timeout opt-in（非幂等写不能在服务端提交前放弃）；⑦顺带修 task-1 埋的 `ConfigFileUsed` 回归。
+**待办**: **上线前每环境实际启动跑通关键路径**（gRPC 拨号/连库/发 kafka/SSE 不误杀）——本机无 etcd/mysql 未真跑，仅 build + yaml 冒烟通过；泄露的 LLM/embedding key 供应商侧轮换（deepseek `sk-405db…` / kimi `sk-KURYx…` / 百度千帆 `bce-v3/ALTAK-WN6t…`）；viper override 的 etcd 集成测试；`.env.<env>` 实际值部署者按 example 同步。
+**会话**: 260704-config-配置架构落地
+**发布**: 
+
+## [2026-07-03] 配置架构设计文档（标准版定稿）
+
+**变更内容**: 参考 Kratos 设计全仓配置架构：`server`/`client`/`data` 域分组、叶子键 snake_case、时间值 duration 字符串、每服务集中 Bootstrap struct + 启动 Validate()（fail-fast）、密钥 `${ENV}` 占位出 git、config reload 指标、yaml 注释规范；gRPC client 删除隐式 target 推导改显式必填 + 依赖清单双向校验；含存量迁移映射（P1 结构迁移 / P2 超时治理）。
+**影响范围**: 新增 `prd/config/config-architecture.md`（纯设计文档，未动代码）。
+**技术决策**: ①取 Kratos 层级与 fail-fast，不取 conf.proto（脱离其 config loader 生态形似神不似）；②显式优于隐式：禁止代码为缺失配置静默兜底，仅允许登记过的功能开关式缺省；③密钥两级策略（外部真实凭据全环境 env 化、本机 docker 自建密码 local 可明文）；④发现 viper config file 层级高于 remote kvstore，现行「etcd put 全量 yaml」热更思路可能同名键不生效，待 P1 实测。
+**待办**: P1 六服务结构迁移（worker→interaction→comment→chat→migrator→core）；git 历史已泄露的 LLM/embedding apiKey 供应商侧轮换；viper 本地/远程优先级实测回填；P2 超时治理另开会话评审阈值。
+**会话**: 260703-config-配置架构设计
+**发布**: 
+
 ## [2026-07-03] 评论删除改整楼级联 + 移除占位机制
 
 **变更内容**: 删一级评论 → 整楼级联软删（自身 + 全部 root_id 命中回复，一条 UPDATE）；删楼内回复 → 只删自身 + 楼根 reply_cnt−1（子回复保留，楼内扁平不级联）。前端确认框对有回复的一级评论提示「删除后，N 条回复也将一并删除」。占位机制（`deleted` 列 / pb 字段 / domain / VO / 前端「该评论已删除」渲染分支）整体移除。

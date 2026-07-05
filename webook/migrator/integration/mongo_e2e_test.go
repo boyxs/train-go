@@ -31,7 +31,7 @@ import (
 func TestMongo_E2E_FullToMySQL(t *testing.T) {
 	mongoURI := viper.GetString("migrator.mongo.uri")
 	mongoDB := viper.GetString("migrator.mongo.database")
-	dsnStr := viper.GetString("mysql.dsn")
+	dsnStr := viper.GetString("data.mysql.dsn")
 	if mongoURI == "" || mongoDB == "" {
 		t.Skip("migrator.mongo.{uri,database} 未配置，跳过 mongo e2e")
 	}

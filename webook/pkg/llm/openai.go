@@ -14,17 +14,17 @@ import (
 
 // Config 多 provider 列表配置（ioc 层从 yaml 读出后传给 InitLLMClient）
 type Config struct {
-	Providers []ProviderConfig
+	Providers []ProviderConfig `mapstructure:"providers"`
 }
 
 // ProviderConfig 单个 OpenAI 兼容 provider 的连接参数
 type ProviderConfig struct {
-	Name      string
-	ApiKey    string
-	BaseUrl   string
-	Model     string
-	MaxTokens int
-	Timeout   int // 秒
+	Name      string `mapstructure:"name"`
+	ApiKey    string `mapstructure:"api_key"`
+	BaseUrl   string `mapstructure:"base_url"`
+	Model     string `mapstructure:"model"`
+	MaxTokens int    `mapstructure:"max_tokens"`
+	Timeout   int    `mapstructure:"timeout"` // 秒
 }
 
 // OpenAIClient 兼容 OpenAI 协议的通用客户端（DeepSeek、Kimi 等）
@@ -37,8 +37,11 @@ type OpenAIClient struct {
 
 func NewOpenAIClient(cfg ProviderConfig) *OpenAIClient {
 	timeout := time.Duration(cfg.Timeout) * time.Second
-	if timeout == 0 {
+	if timeout <= 0 {
 		timeout = 60 * time.Second
+	}
+	if cfg.MaxTokens <= 0 {
+		cfg.MaxTokens = 2048
 	}
 	return &OpenAIClient{
 		name: cfg.Name,

@@ -20,9 +20,15 @@ services:
     image: ${GHCR_REGISTRY:-ghcr.io}/${GH_USER}/webook-core:${CORE_IMAGE_TAG}
     container_name: webook-core
     restart: always
+    stop_grace_period: 30s   # > 应用优雅停机 drain(20s)
     mem_limit: ${CORE_MEM:-512m}
     environment:
       APP_ENV: "${CORE_APP_ENV}"         # .env.<env> 指定 config/<env>.yaml
+      MYSQL_PASS: "${MYSQL_PASS}"
+      REDIS_PASS: "${REDIS_PASS}"
+      LLM_DEEPSEEK_API_KEY: "${LLM_DEEPSEEK_API_KEY}"
+      LLM_KIMI_API_KEY: "${LLM_KIMI_API_KEY}"
+      EMBEDDING_API_KEY: "${EMBEDDING_API_KEY}"
       DEPLOY_ENV: "${DEPLOY_ENV}"
       TZ: "Asia/Shanghai"
       # GOMEMLIMIT 比 mem_limit 留 ~12% buffer（堆外：goroutine 栈/cgo/mmap/网络栈），不够会被 cgroup OOM
@@ -46,9 +52,14 @@ services:
     image: ${GHCR_REGISTRY:-ghcr.io}/${GH_USER}/webook-chat:${CHAT_IMAGE_TAG}
     container_name: webook-chat
     restart: always
+    stop_grace_period: 30s   # > 应用优雅停机 drain(20s)
     mem_limit: ${CHAT_MEM:-384m}
     environment:
       APP_ENV: "${CHAT_APP_ENV}"         # .env.<env> 指定 config/<env>.yaml
+      MYSQL_PASS: "${MYSQL_PASS}"
+      REDIS_PASS: "${REDIS_PASS}"
+      LLM_DEEPSEEK_API_KEY: "${LLM_DEEPSEEK_API_KEY}"
+      LLM_KIMI_API_KEY: "${LLM_KIMI_API_KEY}"
       DEPLOY_ENV: "${DEPLOY_ENV}"
       TZ: "Asia/Shanghai"
       GOMEMLIMIT: "${CHAT_GOMEMLIMIT:-320MiB}"
@@ -70,9 +81,12 @@ services:
     image: ${GHCR_REGISTRY:-ghcr.io}/${GH_USER}/webook-comment:${COMMENT_IMAGE_TAG}
     container_name: webook-comment
     restart: always
+    stop_grace_period: 30s   # > 应用优雅停机 drain(20s)
     mem_limit: ${COMMENT_MEM:-384m}
     environment:
       APP_ENV: "${COMMENT_APP_ENV}"      # .env.<env> 指定 config/<env>.yaml
+      MYSQL_PASS: "${MYSQL_PASS}"
+      REDIS_PASS: "${REDIS_PASS}"
       DEPLOY_ENV: "${DEPLOY_ENV}"
       TZ: "Asia/Shanghai"
       GOMEMLIMIT: "${COMMENT_GOMEMLIMIT:-320MiB}"
@@ -94,9 +108,12 @@ services:
     image: ${GHCR_REGISTRY:-ghcr.io}/${GH_USER}/webook-interaction:${INTERACTION_IMAGE_TAG}
     container_name: webook-interaction
     restart: always
+    stop_grace_period: 30s   # > 应用优雅停机 drain(20s)
     mem_limit: ${INTERACTION_MEM:-384m}
     environment:
       APP_ENV: "${INTERACTION_APP_ENV}"  # .env.<env> 指定 config/<env>.yaml
+      MYSQL_PASS: "${MYSQL_PASS}"
+      REDIS_PASS: "${REDIS_PASS}"
       DEPLOY_ENV: "${DEPLOY_ENV}"
       TZ: "Asia/Shanghai"
       GOMEMLIMIT: "${INTERACTION_GOMEMLIMIT:-320MiB}"
@@ -118,9 +135,11 @@ services:
     image: ${GHCR_REGISTRY:-ghcr.io}/${GH_USER}/webook-worker:${WORKER_IMAGE_TAG}
     container_name: webook-worker
     restart: always
+    stop_grace_period: 30s   # > 应用停机全程；cron 长任务可调大
     mem_limit: ${WORKER_MEM:-256m}
     environment:
       APP_ENV: "${WORKER_APP_ENV}"  # .env.<env> 指定 config/<env>.yaml
+      REDIS_PASS: "${REDIS_PASS}"
       DEPLOY_ENV: "${DEPLOY_ENV}"
       TZ: "Asia/Shanghai"
       GOMEMLIMIT: "${WORKER_GOMEMLIMIT:-200MiB}"
@@ -142,9 +161,13 @@ services:
     image: ${GHCR_REGISTRY:-ghcr.io}/${GH_USER}/webook-migrator:${MIGRATOR_IMAGE_TAG}
     container_name: webook-migrator
     restart: always
+    stop_grace_period: 30s   # > 应用优雅停机 drain(20s)
     mem_limit: ${MIGRATOR_MEM:-384m}
     environment:
       APP_ENV: "${MIGRATOR_APP_ENV}"     # .env.<env> 指定 config/<env>.yaml
+      MYSQL_PASS: "${MYSQL_PASS}"
+      REDIS_PASS: "${REDIS_PASS}"
+      CANAL_PASS: "${CANAL_PASS}"        # canal binlog 订阅密码（dev/staging/prod 走 ${ENV}）
       DEPLOY_ENV: "${DEPLOY_ENV}"
       TZ: "Asia/Shanghai"
       GOMEMLIMIT: "${MIGRATOR_GOMEMLIMIT:-320MiB}"

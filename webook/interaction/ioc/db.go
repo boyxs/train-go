@@ -24,7 +24,7 @@ func InitDB(_ TimezoneReady, l loggerx.LoggerX) *gorm.DB {
 			LogLevel:                  logger.Info,
 		}),
 	}
-	db, err := gorm.Open(mysql.Open(viper.GetString("mysql.dsn")), &gormConfig)
+	db, err := gorm.Open(mysql.Open(viper.GetString("data.mysql.dsn")), &gormConfig)
 	if err != nil {
 		// 数据库都连接不上，就不要启动服务了
 		panic("failed to connect database")

@@ -25,11 +25,11 @@ import (
 //
 // 缺任一前置 → t.Skipf 跳过(避免污染 go test ./... 全量回归)。
 func TestCanal_E2E(t *testing.T) {
-	dsnStr := viper.GetString("mysql.dsn")
+	dsnStr := viper.GetString("data.mysql.dsn")
 	canalAddr := viper.GetString("migrator.canal.addr")
 	canalUser := viper.GetString("migrator.canal.user")
 	canalPwd := viper.GetString("migrator.canal.password")
-	serverIDBase := viper.GetUint32("migrator.canal.serverIdBase")
+	serverIDBase := viper.GetUint32("migrator.canal.server_id_base")
 	if canalAddr == "" || canalUser == "" {
 		t.Skip("migrator.canal.* 未配置,跳过 canal e2e")
 	}

@@ -41,7 +41,7 @@ func main() {
 
 	// HTTP server 用 http.Server（而非 engine.Run）以支持优雅关闭
 	// http.addr 由 yaml 提供；fallback 仅在漏配时兜底（migrator 走运维段 :8200，与业务 80xx 段错开）
-	httpAddr := viper.GetString("http.addr")
+	httpAddr := viper.GetString("server.http.addr")
 	if httpAddr == "" {
 		httpAddr = ":8200"
 	}
@@ -55,8 +55,8 @@ func main() {
 
 	<-ctx.Done()
 	log.Println("[migrator][shutdown] 收到信号，开始优雅停机…")
-	// HTTP：等在途请求处理完，最多 10s（运行中的迁移任务有 checkpoint，crash-safe，由 cleanup 收尾）
-	sctx, scancel := context.WithTimeout(context.Background(), 10*time.Second)
+	// HTTP：等在途请求处理完，最多 20s（运行中的迁移任务有 checkpoint，crash-safe，由 cleanup 收尾）
+	sctx, scancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer scancel()
 	if err := httpSrv.Shutdown(sctx); err != nil {
 		log.Printf("[migrator][HTTP] 关闭: %v", err)

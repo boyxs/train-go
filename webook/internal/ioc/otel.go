@@ -24,11 +24,11 @@ import (
 // 返回 cleanup 由 wire 收集、main 退出时调用，确保 BatchSpanProcessor flush。
 func InitOTel() (trace.TracerProvider, func(), error) {
 	type Config struct {
-		Endpoint       string  `yaml:"endpoint"`
-		ServiceName    string  `yaml:"serviceName"`
-		ServiceVersion string  `yaml:"serviceVersion"`
-		Env            string  `yaml:"env"`
-		SampleRatio    float64 `yaml:"sampleRatio"`
+		Endpoint       string  `mapstructure:"endpoint"`
+		ServiceName    string  `mapstructure:"service_name"`
+		ServiceVersion string  `mapstructure:"service_version"`
+		Env            string  `mapstructure:"env"`
+		SampleRatio    float64 `mapstructure:"sample_ratio"`
 	}
 	cfg := Config{
 		Endpoint:       "localhost:4317",

@@ -41,7 +41,7 @@ func main() {
 
 	// HTTP server 用 http.Server（而非 engine.Run）以支持优雅关闭：SSE 长连在超时内排空
 	// http.addr 由 yaml 提供；fallback 仅在 yaml 漏配时兜底，避免 nil 监听
-	httpAddr := viper.GetString("http.addr")
+	httpAddr := viper.GetString("server.http.addr")
 	if httpAddr == "" {
 		httpAddr = ":8020"
 	}
@@ -55,8 +55,8 @@ func main() {
 
 	<-ctx.Done()
 	log.Println("[chat][shutdown] 收到信号，开始优雅停机…")
-	// HTTP：等在途请求处理完，最多 10s
-	sctx, scancel := context.WithTimeout(context.Background(), 10*time.Second)
+	// HTTP：等在途请求处理完（含 SSE 长连排空），最多 20s
+	sctx, scancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer scancel()
 	if err := httpSrv.Shutdown(sctx); err != nil {
 		log.Printf("[chat][HTTP] 关闭: %v", err)

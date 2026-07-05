@@ -19,6 +19,7 @@ import (
 	"github.com/webook/pkg/ginx/middleware/accesslog"
 	"github.com/webook/pkg/ginx/middleware/metrics"
 	"github.com/webook/pkg/ginx/middleware/ratelimit"
+	"github.com/webook/pkg/ginx/middleware/timeout"
 	"github.com/webook/pkg/jwtx"
 	"github.com/webook/pkg/logger"
 )
@@ -70,6 +71,8 @@ func InitMiddlewares(
 			WithInFlight().
 			Build(),
 		otelgin.Middleware("webook-migrator", otelgin.WithTracerProvider(tp)),
+		// HTTP 软超时（默认 15s）；migrator 无 SSE，不豁免
+		timeout.NewMiddlewareBuilder(viper.GetDuration("server.http.timeout")).Build(),
 		cors.New(cors.Config{
 			AllowMethods:     []string{"PUT", "PATCH", "POST", "GET", "DELETE", "OPTIONS"},
 			AllowHeaders:     []string{"Content-Type", jwtx.HeaderAuthorization, consts.AccessHeader, consts.RefreshHeader},
@@ -88,7 +91,7 @@ func InitMiddlewares(
 			MaxAge: 12 * time.Hour,
 		}),
 	}
-	if !viper.GetBool("web.jwt.disabled") {
+	if !viper.GetBool("server.http.jwt.disabled") {
 		mws = append(mws, jwtx.NewMiddlewareBuilder(jwtx.MiddlewareConfig{
 			AccessKey:      consts.AccessKey,
 			UserKey:        consts.UserKey,
@@ -97,11 +100,11 @@ func InitMiddlewares(
 		}).Build())
 	}
 	// Rate limit：默认 IP 级，1 秒 100 请求；yaml `web.ratelimit.{interval,rate}` 可覆盖。
-	rlInterval := viper.GetDuration("web.ratelimit.interval")
+	rlInterval := viper.GetDuration("server.http.ratelimit.interval")
 	if rlInterval <= 0 {
 		rlInterval = time.Second
 	}
-	rlRate := viper.GetInt("web.ratelimit.rate")
+	rlRate := viper.GetInt("server.http.ratelimit.rate")
 	if rlRate <= 0 {
 		rlRate = 100
 	}

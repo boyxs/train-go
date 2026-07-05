@@ -22,7 +22,7 @@ func TestRepublishAfterWithdraw_ResetsDeletedAt_OnV1Table(t *testing.T) {
 	if err := viper.ReadInConfig(); err != nil {
 		t.Skipf("test.yaml 不可用：%v", err)
 	}
-	dsn := viper.GetString("mysql.dsn")
+	dsn := viper.GetString("data.mysql.dsn")
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
 		t.Skipf("mysql 不可达：%v", err)

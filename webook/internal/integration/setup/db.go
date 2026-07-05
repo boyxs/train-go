@@ -9,7 +9,7 @@ import (
 )
 
 func InitDB() *gorm.DB {
-	db, err := gorm.Open(mysql.Open(viper.GetString("mysql.dsn")), &gorm.Config{})
+	db, err := gorm.Open(mysql.Open(viper.GetString("data.mysql.dsn")), &gorm.Config{})
 	if err != nil {
 		// 数据库都连接不上，就不要启动服务了
 		panic("failed to connect database")

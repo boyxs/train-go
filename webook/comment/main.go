@@ -45,14 +45,14 @@ func main() {
 			log.Printf("[comment][gRPC] etcd 注册失败: %v", err)
 			return
 		}
-		log.Printf("[comment][gRPC] serving on :%d", app.GRPCServer.Port)
+		log.Printf("[comment][gRPC] serving on %s", app.GRPCServer.Addr)
 		if err := app.GRPCServer.Serve(); err != nil {
 			log.Printf("[comment][gRPC] server exited: %v", err)
 		}
 	}()
 
 	// 最小 HTTP：仅 /metrics（Prometheus 抓取）+ /health（comment 不直接对前端，业务走 gRPC）
-	httpAddr := viper.GetString("http.addr")
+	httpAddr := viper.GetString("server.http.addr")
 	if httpAddr == "" {
 		httpAddr = ":8030"
 	}
@@ -77,7 +77,7 @@ func main() {
 	if err := app.GRPCServer.Close(); err != nil {
 		log.Printf("[comment][gRPC] 关闭: %v", err)
 	}
-	sctx, scancel := context.WithTimeout(context.Background(), 10*time.Second)
+	sctx, scancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer scancel()
 	if err := httpSrv.Shutdown(sctx); err != nil {
 		log.Printf("[comment][HTTP] 关闭: %v", err)

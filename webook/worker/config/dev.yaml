@@ -1,15 +1,15 @@
-# worker dev 环境配置（容器名连中间件）。差异点：otel.env=dev / sampleRatio=1.0 / logger debug。
-
+# worker dev 环境配置（容器名连中间件）。差异：otel.env=dev / sample_ratio=1.0 / logger debug。
 etcd:
   endpoints:
     - "http://webook-etcd:2379"
-  # 无 path/type：worker 静态配置（LoadLocal），etcd 仅供 gRPC 服务发现，不接 viperx.WatchRemote 热更
+  # 无 path/type：worker 静态配置，etcd 仅供 gRPC 服务发现，不接热更
 
-http:
-  addr: ":8050"
+server:
+  http:
+    addr: ":8050" # 仅 /metrics+/health（非 gin，不挂超时中间件）
 
-grpc:
-  client:
+client:
+  grpc:
     webook-core:
       target: "etcd:///service/webook-core"
       balancer: "breaker_swrr"
@@ -17,31 +17,30 @@ grpc:
       target: "etcd:///service/webook-interaction"
       balancer: "breaker_swrr"
 
-redis:
-  addr: 'webook-redis:6379'
-  password: '13520'
-
-kafka:
-  addrs:
-    - 'webook-kafka:9092'
-  dialTimeout: 10
-  readTimeout: 10
-  writeTimeout: 10
-  consumerGroup: "interaction-consumer"
-  consumerBackoffInitial: 5
-  consumerBackoffMax: 60
+data:
+  redis:
+    addr: "webook-redis:6379"
+    password: ${REDIS_PASS}
+  kafka:
+    addrs:
+      - "webook-kafka:9092"
+    dial_timeout: 10s
+    read_timeout: 10s
+    write_timeout: 10s
+    consumer_group: "interaction-consumer"
+    consumer_backoff_initial: 5s
+    consumer_backoff_max: 60s
 
 logger:
-  level:
-    l: -1
+  level: debug
   development: true
-  encoding: 'json'
-  outputPaths: [ 'stdout' ]
-  errorOutputPaths: [ 'stderr' ]
+  encoding: json
+  output_paths: [ stdout ]
+  error_output_paths: [ stderr ]
 
 otel:
   endpoint: "otel-collector:4317"
-  serviceName: "webook-worker"
-  serviceVersion: "0.1.0"
+  service_name: "webook-worker"
+  service_version: "0.1.0"
   env: "dev"
-  sampleRatio: 1.0
+  sample_ratio: 1.0
