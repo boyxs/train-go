@@ -1,8 +1,6 @@
 package ioc
 
 import (
-	"path/filepath"
-
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -11,27 +9,46 @@ import (
 	"github.com/webook/pkg/logger"
 )
 
-// InitLogger prod/staging 用 production logger，其它用 development；yaml logger.level.l 覆盖等级。
+// InitLogger 由 yaml logger 段驱动:development 选 dev/prod base,再按 level/encoding/output 覆盖。
+// level 非法交 zapcore.ParseLevel 自然报错。
 func InitLogger() logger.LoggerX {
-	var cfg zap.Config
-	base := filepath.Base(viper.ConfigFileUsed())
-	if base == "prod.yaml" || base == "staging.yaml" {
-		cfg = zap.NewProductionConfig()
-	} else {
-		cfg = zap.NewDevelopmentConfig()
+	var lc struct {
+		Level            string   `mapstructure:"level"`
+		Development      bool     `mapstructure:"development"`
+		Encoding         string   `mapstructure:"encoding"`
+		OutputPaths      []string `mapstructure:"output_paths"`
+		ErrorOutputPaths []string `mapstructure:"error_output_paths"`
 	}
-	if err := viper.UnmarshalKey("logger", &cfg); err != nil {
+	if err := viper.UnmarshalKey("logger", &lc); err != nil {
 		panic(err)
 	}
-	if viper.IsSet("logger.level.l") {
-		cfg.Level.SetLevel(zapcore.Level(viper.GetInt("logger.level.l")))
+	var cfg zap.Config
+	if lc.Development {
+		cfg = zap.NewDevelopmentConfig()
+	} else {
+		cfg = zap.NewProductionConfig()
+	}
+	if lc.Level != "" {
+		lvl, err := zapcore.ParseLevel(lc.Level)
+		if err != nil {
+			panic(err)
+		}
+		cfg.Level.SetLevel(lvl)
+	}
+	if lc.Encoding != "" {
+		cfg.Encoding = lc.Encoding
+	}
+	if len(lc.OutputPaths) > 0 {
+		cfg.OutputPaths = lc.OutputPaths
+	}
+	if len(lc.ErrorOutputPaths) > 0 {
+		cfg.ErrorOutputPaths = lc.ErrorOutputPaths
 	}
 	l, err := cfg.Build()
 	if err != nil {
 		panic(err)
 	}
 	zap.ReplaceGlobals(l)
-	l.Sugar().Infof("[interaction] logger config: %+v", cfg)
 	lx := logger.NewZapLogger(l)
 	ginx.L = lx
 	return lx

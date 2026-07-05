@@ -39,16 +39,13 @@ func InitGRPCServer(
 	grpcMetrics *metrics.PrometheusBuilder,
 	l logger.LoggerX,
 ) *grpcx.Server {
-	//var cfg grpcx.ServerConfig
-	//if err := viper.UnmarshalKey("grpc.server", &cfg); err != nil {
-	//	panic(err)
-	//}
 	cfg := grpcx.ServerConfig{
-		Port:   viper.GetInt("grpc.server.port"),
-		Name:   viper.GetString("grpc.server.name"),
-		Host:   viper.GetString("grpc.server.host"),
-		TTL:    viper.GetInt64("grpc.server.ttl"),
-		Weight: viper.GetInt("grpc.server.weight"),
+		Addr:    viper.GetString("server.grpc.addr"),
+		Name:    viper.GetString("server.grpc.name"),
+		Host:    viper.GetString("server.grpc.host"),
+		TTL:     viper.GetDuration("server.grpc.ttl"),
+		Weight:  viper.GetInt("server.grpc.weight"),
+		Timeout: viper.GetDuration("server.grpc.timeout"),
 	}
 	srv := grpcx.NewServer(cfg, client, l,
 		grpc.StatsHandler(otelgrpc.NewServerHandler()),
@@ -112,14 +109,11 @@ func InitInteractionClient(c InteractionConn) interactionv1.InteractionServiceCl
 	return interactionv1.NewInteractionServiceClient(c)
 }
 
-// grpcClientConfig 读 grpc.client.<name>(target/secure/caFile),target 缺省按 etcd:///service/<name> 推导。
+// grpcClientConfig 读 client.grpc.<name>(target/balancer/…);target 必填,缺失 → dial 失败,代码不派生。
 func grpcClientConfig(name string) (grpcx.ClientConfig, error) {
 	var cfg grpcx.ClientConfig
-	if err := viper.UnmarshalKey("grpc.client."+name, &cfg); err != nil {
+	if err := viper.UnmarshalKey("client.grpc."+name, &cfg); err != nil {
 		return grpcx.ClientConfig{}, err
-	}
-	if cfg.Target == "" {
-		cfg.Target = "etcd:///service/" + name
 	}
 	return cfg, nil
 }

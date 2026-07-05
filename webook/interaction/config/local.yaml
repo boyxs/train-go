@@ -1,41 +1,38 @@
-# interaction 服务本地配置（连本机 docker compose 起的中间件）
-# 数据库与主仓共用（不分库），互动表 interaction / user_interaction
-
-# 远程配置中心：与主仓共用同一个 etcd 实例，但 path 独立（/webook-interaction 不踩 /webook）
+# interaction 本地配置（连本机 docker compose 中间件）。数据库与主仓共用（不分库），表 interaction / user_interaction。
 etcd:
   endpoints:
     - "http://127.0.0.1:2379"
   path: "/webook-interaction"
   type: "yaml"
 
-http:
-  addr: ":8040"
-
-grpc:
-  server:
-    port: 8041
+server:
+  http:
+    addr: ":8040" # 仅 /metrics+/health（非 gin，不挂超时中间件）
+  grpc:
+    addr: ":8041"
     name: "webook-interaction"
-    ttl: 30
+    ttl: 30s
     weight: 10
+    host: "" # 空=自动探测出口 IP，k8s 填 POD_IP
+    timeout: 5s
 
-mysql:
-  dsn: root:13520@tcp(localhost:3306)/webook?parseTime=true&loc=UTC
-
-redis:
-  addr: 127.0.0.1:6379
-  password: "13520"
+data:
+  mysql:
+    dsn: root:13520@tcp(localhost:3306)/webook?parseTime=true&loc=UTC
+  redis:
+    addr: "127.0.0.1:6379"
+    password: "13520"
 
 logger:
-  level:
-    l: -1
+  level: debug
   development: true
-  encoding: 'json'
-  outputPaths: [ 'stdout' ]
-  errorOutputPaths: [ 'stderr' ]
+  encoding: json
+  output_paths: [ stdout ]
+  error_output_paths: [ stderr ]
 
 otel:
   endpoint: "localhost:4317"
-  serviceName: "webook-interaction"
-  serviceVersion: "0.1.0"
+  service_name: "webook-interaction"
+  service_version: "0.1.0"
   env: "local"
-  sampleRatio: 1.0
+  sample_ratio: 1.0

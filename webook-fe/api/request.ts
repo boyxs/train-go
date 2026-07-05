@@ -11,7 +11,7 @@ interface RefreshConfig extends InternalAxiosRequestConfig {
 const instance = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_BASE_URL || '/api',
   withCredentials: true,
-  timeout: 10_000,
+  timeout: 20_000, // > 服务端 HTTP 超时(15s)，收得到服务端错误而非前端先超时
 });
 
 const bearer = (token: string | null) => (token ? `Bearer ${token}` : '');

@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/redis/go-redis/v9"
+	"github.com/spf13/viper"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"go.opentelemetry.io/otel/trace"
 
@@ -18,6 +19,7 @@ import (
 	"github.com/webook/pkg/ginx/middleware/accesslog"
 	"github.com/webook/pkg/ginx/middleware/metrics"
 	"github.com/webook/pkg/ginx/middleware/ratelimit"
+	"github.com/webook/pkg/ginx/middleware/timeout"
 	"github.com/webook/pkg/jwtx"
 	"github.com/webook/pkg/logger"
 )
@@ -74,6 +76,10 @@ func InitMiddlewares(
 		otelgin.Middleware("webook-core",
 			otelgin.WithTracerProvider(tp),
 		),
+		// HTTP 软超时（默认 15s）；LLM 润色 / 语义搜索豁免——按各自 client 超时(llm 60s / embedding)跑，不被 15s 切
+		timeout.NewMiddlewareBuilder(viper.GetDuration("server.http.timeout")).
+			ExemptPrefix("/article/polish", "/search/article").
+			Build(),
 		//cors
 		cors.New(cors.Config{
 			AllowOrigins: []string{"http://localhost:3000"},

@@ -51,8 +51,11 @@ export interface PolishResult {
   content: string;
 }
 
+// 后端 /article/polish 被 HTTP 15s 超时豁免（LLM 最长 60s），前端单独放宽，让后端超时先返错
 export function polishArticle(data: { title: string; content: string }) {
-  return axios.post<Result<PolishResult>>('/article/polish', data);
+  return axios.post<Result<PolishResult>>('/article/polish', data, {
+    timeout: 70_000,
+  });
 }
 
 // ===== 读者端（公开，不需要登录）=====

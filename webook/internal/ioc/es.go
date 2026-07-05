@@ -17,7 +17,7 @@ import (
 
 func InitESClient() *elasticsearch.TypedClient {
 	var addr string
-	if err := viper.UnmarshalKey("es.addr", &addr); err != nil || addr == "" {
+	if err := viper.UnmarshalKey("data.es.addr", &addr); err != nil || addr == "" {
 		addr = "http://localhost:9200"
 	}
 	client, err := elasticsearch.NewTypedClient(elasticsearch.Config{

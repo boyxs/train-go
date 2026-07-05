@@ -45,7 +45,7 @@ func main() {
 	}()
 
 	// 最小 HTTP：/metrics + /health
-	httpAddr := viper.GetString("http.addr")
+	httpAddr := viper.GetString("server.http.addr")
 	if httpAddr == "" {
 		httpAddr = ":8050"
 	}
@@ -68,7 +68,7 @@ func main() {
 	case <-time.After(10 * time.Second):
 		log.Println("[worker][shutdown] 消费者退出超时，强制继续")
 	}
-	sctx, scancel := context.WithTimeout(context.Background(), 10*time.Second)
+	sctx, scancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer scancel()
 	if err := httpSrv.Shutdown(sctx); err != nil {
 		log.Printf("[worker][HTTP] 关闭: %v", err)

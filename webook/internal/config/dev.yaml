@@ -1,97 +1,99 @@
-# dev 环境配置 - 部署到团队共享 dev 服务器 / CI 集成测试使用
-# 同构 prod.yaml，差异点：otel.env="dev" / sampleRatio=1.0 / logger debug
-# 敏感字段（mysql.dsn 的密码、redis.password）由 .env.dev 经 AutomaticEnv 覆盖
-
+# core dev 环境配置（容器名连中间件）。差异：otel.env=dev / sample_ratio=1.0 / logger debug。
 etcd:
   endpoints:
     - "http://webook-etcd:2379"
-  path: '/webook-core'
-  type: 'yaml'
+  path: "/webook-core"
+  type: "yaml"
 
-http:
-  addr: ":8010"
-
-grpc:
-  server:
-    port: 8011
+server:
+  http:
+    addr: ":8010"
+    timeout: 15s
+    access_log:
+      allow_req_body: true
+      allow_res_body: true
+      max_req_len: 4096
+      max_res_len: 4096
+      max_path_len: 256
+  grpc:
+    addr: ":8011"
     name: "webook-core"
-    ttl: 30
+    ttl: 30s
     weight: 10
+    host: "" # 空=自动探测出口 IP，k8s 填 POD_IP
+    timeout: 5s
 
-mysql:
-  dsn: 'root:13520@tcp(webook-mysql:3306)/webook?parseTime=true&loc=UTC'
+client:
+  grpc:
+    webook-comment:
+      target: "etcd:///service/webook-comment"
+      balancer: "breaker_swrr"
+    webook-interaction:
+      target: "etcd:///service/webook-interaction"
+      balancer: "breaker_swrr"
 
-redis:
-  addr: 'webook-redis:6379'
-  password: '13520'
-
-kafka:
-  addrs:
-    - 'webook-kafka:9092'
-  dialTimeout: 10
-  readTimeout: 10
-  writeTimeout: 10
-  producerTimeout: 10
-  producerRetryMax: 3
-  metadataRetryMax: 3
-  metadataRetryBackoff: 250
-  metadataTimeout: 5
+data:
+  mysql:
+    dsn: root:${MYSQL_PASS}@tcp(webook-mysql:3306)/webook?parseTime=true&loc=UTC
+  redis:
+    addr: "webook-redis:6379"
+    password: ${REDIS_PASS}
+  kafka:
+    addrs:
+      - "webook-kafka:9092"
+    dial_timeout: 10s
+    read_timeout: 10s
+    write_timeout: 10s
+    producer_timeout: 10s
+    producer_retry_max: 3
+    metadata_retry_max: 3
+    metadata_retry_backoff: 250ms
+    metadata_timeout: 5s
+  es:
+    addr: "http://webook-es:9200"
 
 llm:
   providers:
     - name: deepseek
-      apiKey: "sk-405db05b37ac418b91268403d32a55aa"
-      baseUrl: "https://api.deepseek.com"
+      api_key: ${LLM_DEEPSEEK_API_KEY}
+      base_url: "https://api.deepseek.com"
       model: "deepseek-chat"
-      maxTokens: 2048
+      max_tokens: 2048
       timeout: 60
     - name: kimi
-      apiKey: "sk-KURYxBodidmpQmZsL1SGrEiDoWcETmKDkgr70qsfmEDleS6d"
-      baseUrl: "https://api.moonshot.cn/v1"
+      api_key: ${LLM_KIMI_API_KEY}
+      base_url: "https://api.moonshot.cn/v1"
       model: "kimi-k2.5"
-      maxTokens: 2048
+      max_tokens: 2048
       timeout: 60
 
-es:
-  addr: 'http://webook-es:9200'
-
-ollama:
-  baseUrl: 'http://webook-ollama:11434'
-  model: "bge-m3"
-  timeout: 5
-
 embedding:
-  baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1"
-  apiKey: "sk-ef23911b061943b681584ac467c4cd28"
-  model: "text-embedding-v3"
+  base_url: "https://qianfan.baidubce.com/v2"
+  api_key: ${EMBEDDING_API_KEY}
+  model: "qwen3-embedding-0.6b"
   dims: 1024
   timeout: 30
 
-logger:
-  level:
-    l: -1              # debug 级，dev 看详细日志
-  development: true    # dev 开发模式（zap 打更多字段 / 堆栈）
-  encoding: 'json'
-  outputPaths: [ 'stdout' ]
-  errorOutputPaths: [ 'stderr' ]
+ollama:
+  base_url: "http://webook-ollama:11434"
+  model: "bge-m3"
+  timeout: 5
 
-web:
-  logger:
-    allowReqBody: true   # dev 全抓，便于排查
-    allowResBody: true
-    maxReqLen: 4096
-    maxResLen: 4096
-    maxPathLen: 256
-
-otel:
-  endpoint: "otel-collector:4317"
-  serviceName: "webook-core"
-  serviceVersion: "0.1.0"
-  env: "dev"            # 打到 span attribute deployment.environment
-  sampleRatio: 1.0      # dev 全采样
-
-# 数据迁移 SDK（默认关 → NoOp 零开销；切 true 启用 RedisSwitchReader + RedisDualWriter，详见 local.yaml 注释）
 migrator:
   sdk:
     enabled: true
-    taskName: "published_article_v1"
+    task_name: "published_article_v1"
+
+logger:
+  level: debug
+  development: true
+  encoding: json
+  output_paths: [ stdout ]
+  error_output_paths: [ stderr ]
+
+otel:
+  endpoint: "otel-collector:4317"
+  service_name: "webook-core"
+  service_version: "0.1.0"
+  env: "dev"
+  sample_ratio: 1.0

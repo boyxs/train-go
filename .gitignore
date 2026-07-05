@@ -2,11 +2,6 @@
 test.db
 *.out
 go.work
-/webook/interactive/integration/data.sql
-/webook/payment/config/cert/
-/webook/tag/repository/dao/gorm.db
-
-/webook/im/openim-docker/
 
 # next.js
 /.next/
@@ -14,15 +9,8 @@ go.work
 /out/
 
 # 环境变量（敏感凭证：SMTP 授权码 / API key 等）
-# .env
-# .env.*
+.env
+.env.*
 # !.env.local
-# !.env.example
-# !.env.*.example
-
-# Claude Code 会话中断/续接进度（个人本地状态，不入仓）
-.claude/handover/*.md
-.claude/handover/archive/*
-!.claude/handover/template.md
-!.claude/handover/archive/.gitkeep
-
+!.env.example
+!.env.*.example

@@ -47,7 +47,7 @@ func TestTaskE2E(t *testing.T) {
 
 func (s *TaskE2ESuite) SetupSuite() {
 	// 集成测试在基础设施不可用时自动 skip，避免污染 `go test ./...` 全量回归
-	db, err := gorm.Open(mysql.Open(viper.GetString("mysql.dsn")))
+	db, err := gorm.Open(mysql.Open(viper.GetString("data.mysql.dsn")))
 	if err != nil {
 		s.T().Skipf("mysql not available, skipping integration: %v", err)
 		return
@@ -58,8 +58,8 @@ func (s *TaskE2ESuite) SetupSuite() {
 	}
 
 	cmd := redis.NewClient(&redis.Options{
-		Addr:     viper.GetString("redis.addr"),
-		Password: viper.GetString("redis.password"),
+		Addr:     viper.GetString("data.redis.addr"),
+		Password: viper.GetString("data.redis.password"),
 	})
 	if err := cmd.Ping(context.Background()).Err(); err != nil {
 		s.T().Skipf("redis not available, skipping integration: %v", err)

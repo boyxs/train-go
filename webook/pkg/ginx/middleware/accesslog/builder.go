@@ -1,24 +1,13 @@
-// Package accesslog 提供 HTTP access log 中间件（Apache/nginx 同义术语）。
-//
-// 与已有 pkg/ginx/middleware/{metrics,ratelimit} 同层；接入方法见两个 ioc/web.go。
-//
-// 配置 yaml 段（可选，缺省仅记 path/method/status/duration 基础四元组）：
-//
-//	web:
-//	  logger:
-//	    allowReqBody: true
-//	    allowResBody: false
-//	    maxReqLen: 2048
-//	    maxResLen: 2048
-//	    maxPathLen: 256
-//
-// 通过 viper.OnConfigChange + ioc.ConfigChangeCallbacks 注册 LoadConfig，etcd 推送时热更。
+// Package accesslog 提供 HTTP access log 中间件。配置段 server.http.access_log
+// （allow_req_body / allow_res_body / max_{req,res,path}_len，缺省全关，只记 path/method/status/duration），
+// 经 ioc.ConfigChangeCallbacks 注册 LoadConfig 支持 etcd 热更。
 package accesslog
 
 import (
 	"bytes"
 	"context"
 	"io"
+	"log"
 	"sync/atomic"
 	"time"
 
@@ -57,11 +46,14 @@ func (b *LoggerMiddlewareBuilder) AllowResBody(flag bool) *LoggerMiddlewareBuild
 	return b
 }
 
-// LoadConfig 从 viper.UnmarshalKey("web.logger", ...) 读配置；缺省值全 false/0
-// （只记基础四元组，不抓 req/res body），生产风险低。注册到 ConfigChangeCallbacks 即可热更。
+// LoadConfig 读 server.http.access_log 配置，注册到 ConfigChangeCallbacks 支持热更。
 func (b *LoggerMiddlewareBuilder) LoadConfig() {
 	var cfg LoggerConfig
-	_ = viper.UnmarshalKey("web.logger", &cfg)
+	if err := viper.UnmarshalKey("server.http.access_log", &cfg); err != nil {
+		// 解码失败保持当前值、不覆盖成零值；热更回调不能 panic。
+		log.Printf("[accesslog] 读取 server.http.access_log 配置失败，保持当前值: %v", err)
+		return
+	}
 	b.allowReqBody.Store(cfg.AllowReqBody)
 	b.allowResBody.Store(cfg.AllowResBody)
 	b.maxReqLen.Store(int64(cfg.MaxReqLen))
@@ -151,9 +143,9 @@ type RequestLog struct {
 }
 
 type LoggerConfig struct {
-	AllowReqBody bool `mapstructure:"allowReqBody"`
-	AllowResBody bool `mapstructure:"allowResBody"`
-	MaxReqLen    int  `mapstructure:"maxReqLen"`
-	MaxResLen    int  `mapstructure:"maxResLen"`
-	MaxPathLen   int  `mapstructure:"maxPathLen"`
+	AllowReqBody bool `mapstructure:"allow_req_body"`
+	AllowResBody bool `mapstructure:"allow_res_body"`
+	MaxReqLen    int  `mapstructure:"max_req_len"`
+	MaxResLen    int  `mapstructure:"max_res_len"`
+	MaxPathLen   int  `mapstructure:"max_path_len"`
 }

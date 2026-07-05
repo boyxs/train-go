@@ -36,7 +36,7 @@ func InitMigratorSDKDualWriter(cmd redis.Cmdable, l logger.LoggerX) migratorsdk.
 	return migratorsdk.NewNoOpDualWriter()
 }
 
-// InitMigratorSDKTaskName 读 yaml `migrator.sdk.taskName`，返 migratorsdk.TaskName named type。
+// InitMigratorSDKTaskName 读 yaml `migrator.sdk.task_name`，返 migratorsdk.TaskName named type。
 func InitMigratorSDKTaskName() migratorsdk.TaskName {
-	return migratorsdk.TaskName(viper.GetString("migrator.sdk.taskName"))
+	return migratorsdk.TaskName(viper.GetString("migrator.sdk.task_name"))
 }

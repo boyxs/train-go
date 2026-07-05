@@ -20,13 +20,19 @@ import (
 // 设为全局 TracerProvider（redisotel / sarama 传播用 global），并显式传给 gRPC client handler。
 func InitOTel() (trace.TracerProvider, func(), error) {
 	type Config struct {
-		Endpoint       string  `yaml:"endpoint"`
-		ServiceName    string  `yaml:"serviceName"`
-		ServiceVersion string  `yaml:"serviceVersion"`
-		Env            string  `yaml:"env"`
-		SampleRatio    float64 `yaml:"sampleRatio"`
+		Endpoint       string  `mapstructure:"endpoint"`
+		ServiceName    string  `mapstructure:"service_name"`
+		ServiceVersion string  `mapstructure:"service_version"`
+		Env            string  `mapstructure:"env"`
+		SampleRatio    float64 `mapstructure:"sample_ratio"`
 	}
-	var cfg Config
+	cfg := Config{
+		Endpoint:       "localhost:4317",
+		ServiceName:    "webook-worker",
+		ServiceVersion: "0.1.0",
+		Env:            "dev",
+		SampleRatio:    1.0,
+	}
 	if err := viper.UnmarshalKey("otel", &cfg); err != nil {
 		panic(err)
 	}

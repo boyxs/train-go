@@ -47,7 +47,7 @@ func (s verifyTaskStub) Get(context.Context, int64) (domain.Task, error) { retur
 func TestMySQL_E2E_VerifyMongoDst(t *testing.T) {
 	mongoURI := viper.GetString("migrator.mongo.uri")
 	mongoDB := viper.GetString("migrator.mongo.database")
-	dsnStr := viper.GetString("mysql.dsn")
+	dsnStr := viper.GetString("data.mysql.dsn")
 	if mongoURI == "" || mongoDB == "" {
 		t.Skip("migrator.mongo.{uri,database} 未配置，跳过异构 verify e2e")
 	}

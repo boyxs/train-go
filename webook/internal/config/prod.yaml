@@ -1,116 +1,100 @@
+# core prod 环境配置。差异：otel.env=prod / sample_ratio=0.1 / logger info。
 etcd:
   endpoints:
     - "http://webook-etcd:2379"
-  path: '/webook-core'
-  type: 'yaml'
+  path: "/webook-core"
+  type: "yaml"
 
-http:
-  addr: ":8010"
-
-grpc:
-  server:
-    port: 8011
+server:
+  http:
+    addr: ":8010"
+    timeout: 15s
+    access_log:
+      allow_req_body: true
+      allow_res_body: false # prod 关：响应体大且含敏感数据
+      max_req_len: 1024
+      max_res_len: 0
+      max_path_len: 256
+  grpc:
+    addr: ":8011"
     name: "webook-core"
-    ttl: 30
+    ttl: 30s
     weight: 10
+    host: "" # 空=自动探测出口 IP，k8s 填 POD_IP
+    timeout: 5s
 
-mysql:
-  dsn: 'root:13520@tcp(webook-mysql:3306)/webook?parseTime=true&loc=UTC'
+client:
+  grpc:
+    webook-comment:
+      target: "etcd:///service/webook-comment"
+      balancer: "breaker_swrr"
+    webook-interaction:
+      target: "etcd:///service/webook-interaction"
+      balancer: "breaker_swrr"
 
-redis:
-  addr: 'webook-redis:6379'
-  password: '13520'
+data:
+  mysql:
+    dsn: root:${MYSQL_PASS}@tcp(webook-mysql:3306)/webook?parseTime=true&loc=UTC
+  redis:
+    addr: "webook-redis:6379"
+    password: ${REDIS_PASS}
+  kafka:
+    addrs:
+      - "webook-kafka:9092"
+    dial_timeout: 10s
+    read_timeout: 10s
+    write_timeout: 10s
+    producer_timeout: 10s
+    producer_retry_max: 3
+    metadata_retry_max: 3
+    metadata_retry_backoff: 250ms
+    metadata_timeout: 5s
+  es:
+    addr: "http://webook-es:9200"
 
-kafka:
-  addrs:
-    - 'webook-kafka:9092'
-  dialTimeout: 10
-  readTimeout: 10
-  writeTimeout: 10
-  producerTimeout: 10
-  producerRetryMax: 3
-  metadataRetryMax: 3
-  metadataRetryBackoff: 250
-  metadataTimeout: 5
-
+# llm/embedding/ollama 键 snake_case（绑 pkg struct 的 mapstructure tag）；api_key 走 ${ENV} 不进 git
 llm:
   providers:
     - name: deepseek
-      apiKey: "sk-405db05b37ac418b91268403d32a55aa"
-      baseUrl: "https://api.deepseek.com"
+      api_key: ${LLM_DEEPSEEK_API_KEY}
+      base_url: "https://api.deepseek.com"
       model: "deepseek-chat"
-      maxTokens: 2048
+      max_tokens: 2048
       timeout: 60
     - name: kimi
-      apiKey: "sk-KURYxBodidmpQmZsL1SGrEiDoWcETmKDkgr70qsfmEDleS6d"
-      baseUrl: "https://api.moonshot.cn/v1"
+      api_key: ${LLM_KIMI_API_KEY}
+      base_url: "https://api.moonshot.cn/v1"
       model: "kimi-k2.5"
-      maxTokens: 2048
+      max_tokens: 2048
       timeout: 60
 
-es:
-  addr: 'http://webook-es:9200'
-
-ollama:
-  baseUrl: 'http://webook-ollama:11434'
-  model: "bge-m3"
-  timeout: 5
-
 embedding:
-  baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1"
-  apiKey: "sk-ef23911b061943b681584ac467c4cd28"
-  model: "text-embedding-v3"
+  base_url: "https://qianfan.baidubce.com/v2"
+  api_key: ${EMBEDDING_API_KEY}
+  model: "qwen3-embedding-0.6b"
   dims: 1024
   timeout: 30
 
-logger:
-  level:
-    l: 0
-  development: false
-  encoding: 'json'
-  outputPaths: [ 'stdout' ]
-  errorOutputPaths: [ 'stderr' ]
+ollama:
+  base_url: "http://webook-ollama:11434"
+  model: "bge-m3"
+  timeout: 5
 
-web:
-  logger:
-    allowReqBody: true   # prod 抓 req 帮排查（含 PII 字段需脱敏的话再单独处理）
-    allowResBody: false  # prod 关 res：响应体可能很大且含敏感数据
-    maxReqLen: 1024
-    maxResLen: 0
-    maxPathLen: 256
-
-otel:
-  # 容器网络内地址：webook → otel-collector → zipkin
-  endpoint: "otel-collector:4317"
-  serviceName: "webook-core"
-  serviceVersion: "0.1.0"
-  env: "prod"
-  # ── 采样率计算公式（请勿删除，后续改动请同步）──────────────────────
-  # sampleRatio = min(1.0, TargetTracesPerSec / AvgQPS)
-  #   AvgQPS            当前服务平均 QPS（看 Grafana: rate(webook_http_requests_total[5m])）
-  #   TargetTracesPerSec 后端期望保留的 trace 数/秒（Zipkin/Tempo 存储承受量）
-  #                     学习/调试 = AvgQPS（即 1.0 全采）
-  #                     小规模生产 = 10~50
-  #                     大规模生产 = 100~500
-  # 例：AvgQPS=500, 目标 50 traces/s → ratio=0.1
-  # 例：AvgQPS=10,  想全看                → ratio=1.0
-  # 改完重启应用生效（ioc/otel.go 未注册 viper.OnConfigChange，推 etcd 不热更）。
-  # 错误/慢请求全留要在 Collector 配 tail_sampling processor，应用侧做不到。
-  # 详见 docs/opentelemetry/06-best-practices.md「四、采样策略」。
-  sampleRatio: 0.1          # 生产 10% 采样；学习阶段如需全采可在 etcd 临时覆盖为 1.0
-
-# 数据迁移 SDK（默认关 → NoOp 零开销；切 true 启用 RedisSwitchReader + RedisDualWriter，详见 local.yaml 注释）
 migrator:
   sdk:
     enabled: true
-    taskName: "published_article_v1"
+    task_name: "published_article_v1"
 
-#etcdctl --endpoints=127.0.0.1:2379 put /webook-core < config/k8s.yaml
+logger:
+  level: info
+  development: false
+  encoding: json
+  output_paths: [ stdout ]
+  error_output_paths: [ stderr ]
 
-# 应用配置命名标准（详见 webook/CLAUDE.md「环境说明」）：
-#   local.yaml   本地 go run 调试（明文密码连本机 docker）
-#   dev.yaml     团队共享 dev / CI 集成测试（otel.env=dev, sampleRatio=1.0, logger debug）
-#   staging.yaml 预发布（贴近 prod, sampleRatio=0.5）
-#   prod.yaml    生产（sampleRatio=0.1, logger info）
-# dev/staging/prod 三份：结构同构、非敏感值按环境调整、敏感字段（mysql.dsn/redis.password）
-#   由 .env.<env> 的 MYSQL_DSN / REDIS_PASSWORD 通过 Viper AutomaticEnv 注入覆盖
+otel:
+  endpoint: "otel-collector:4317"
+  service_name: "webook-core"
+  service_version: "0.1.0"
+  env: "prod"
+  sample_ratio: 0.1 # 采样率公式见 docs/opentelemetry/06-best-practices.md；改后重启

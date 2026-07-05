@@ -21,11 +21,12 @@ import (
 // otel StatsHandler + metrics/errconv 拦截器显式传入；消费注入的 TracerProvider。
 func InitGRPCServer(interactionSrv *interactiongrpc.InteractionServer, client *etcdv3.Client, l logger.LoggerX, tp trace.TracerProvider) *grpcx.Server {
 	cfg := grpcx.ServerConfig{
-		Port:   viper.GetInt("grpc.server.port"),
-		Name:   viper.GetString("grpc.server.name"),
-		Host:   viper.GetString("grpc.server.host"),
-		TTL:    viper.GetInt64("grpc.server.ttl"),
-		Weight: viper.GetInt("grpc.server.weight"),
+		Addr:    viper.GetString("server.grpc.addr"),
+		Name:    viper.GetString("server.grpc.name"),
+		Host:    viper.GetString("server.grpc.host"),
+		TTL:     viper.GetDuration("server.grpc.ttl"),
+		Weight:  viper.GetInt("server.grpc.weight"),
+		Timeout: viper.GetDuration("server.grpc.timeout"),
 	}
 	grpcMetrics := metrics.NewPrometheusBuilder("webook", "grpc", "requests", "gRPC 请求").
 		WithCounter().WithHistogram().WithInFlight()

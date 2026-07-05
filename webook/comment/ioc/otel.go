@@ -19,13 +19,19 @@ import (
 // InitOTel 初始化 OpenTelemetry（OTLP/gRPC），与主仓 / chat 同源，默认 service.name="webook-comment"。
 func InitOTel() (trace.TracerProvider, func(), error) {
 	type Config struct {
-		Endpoint       string  `yaml:"endpoint"`
-		ServiceName    string  `yaml:"serviceName"`
-		ServiceVersion string  `yaml:"serviceVersion"`
-		Env            string  `yaml:"env"`
-		SampleRatio    float64 `yaml:"sampleRatio"`
+		Endpoint       string  `mapstructure:"endpoint"`
+		ServiceName    string  `mapstructure:"service_name"`
+		ServiceVersion string  `mapstructure:"service_version"`
+		Env            string  `mapstructure:"env"`
+		SampleRatio    float64 `mapstructure:"sample_ratio"`
 	}
-	cfg := Config{}
+	cfg := Config{
+		Endpoint:       "localhost:4317",
+		ServiceName:    "webook-comment",
+		ServiceVersion: "0.1.0",
+		Env:            "dev",
+		SampleRatio:    1.0,
+	}
 	if err := viper.UnmarshalKey("otel", &cfg); err != nil {
 		return nil, nil, err
 	}

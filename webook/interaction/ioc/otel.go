@@ -16,16 +16,22 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-// InitOTel 初始化 OpenTelemetry（OTLP/gRPC），service.name 取 otel.serviceName。
+// InitOTel 初始化 OpenTelemetry（OTLP/gRPC），service.name 取 otel.service_name。
 func InitOTel() (trace.TracerProvider, func(), error) {
 	type Config struct {
-		Endpoint       string  `yaml:"endpoint"`
-		ServiceName    string  `yaml:"serviceName"`
-		ServiceVersion string  `yaml:"serviceVersion"`
-		Env            string  `yaml:"env"`
-		SampleRatio    float64 `yaml:"sampleRatio"`
+		Endpoint       string  `mapstructure:"endpoint"`
+		ServiceName    string  `mapstructure:"service_name"`
+		ServiceVersion string  `mapstructure:"service_version"`
+		Env            string  `mapstructure:"env"`
+		SampleRatio    float64 `mapstructure:"sample_ratio"`
 	}
-	cfg := Config{}
+	cfg := Config{
+		Endpoint:       "localhost:4317",
+		ServiceName:    "webook-interaction",
+		ServiceVersion: "0.1.0",
+		Env:            "dev",
+		SampleRatio:    1.0,
+	}
 	if err := viper.UnmarshalKey("otel", &cfg); err != nil {
 		return nil, nil, err
 	}

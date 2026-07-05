@@ -1,0 +1,49 @@
+apiVersion: 1
+
+# 远程配置热更告警（跨服务，非按 job 拆——同一 viperx 基础设施指标，六服务共用）
+# 指标来源：pkg/viperx WatchRemote/watchLoop，每 5s 轮询 etcd 一次
+#   status="success" 每次成功 reload +1（正常约 12/min）
+#   status="error"   etcd 不可达 / 远程配置解码失败时 +1；此时代码保留旧配置继续运行
+# 故这是「降级未宕机」信号 → severity high（非 critical）：老配置仍在服务，但热更已失效。
+# 只告 error（可靠高信号）；success 停增（watch 线程死）与进程存活/up 告警高度重叠且易误报，不单列。
+groups:
+  - orgId: 1
+    name: webook-config
+    folder: Webook
+    interval: 1m
+    rules:
+
+      # ── 远程配置热更失败（按 job 多序列，点名是哪个服务）──────────
+      # increase[10m] 平滑瞬时抖动；阈值 3 滤掉单次轮询偶发失败（真故障 10min 内累计 ~120 次）。
+      - uid: webook-config-reload-error
+        title: 远程配置热更失败
+        condition: C
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: high
+          team: backend
+          component: config
+        annotations:
+          summary: "{{ $labels.job }} 远程配置热更失败 {{ $values.B.Value }} 次/10min（etcd 不可达或远程配置解码失败，服务沿用旧配置）"
+          description: "查 etcd 健康度 + 该服务日志的 [config] watch 失败 记录；确认远程 key 内容与格式（yaml）。热更失效期间应用运行在最后一次成功加载的配置上。"
+          runbook_url: "https://wiki.internal/runbook/webook-config-reload"
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              expr: 'increase(webook_config_reload_total{status="error"}[10m])'
+              refId: A
+              instant: true
+          - refId: B
+            datasourceUid: __expr__
+            model: { type: reduce, expression: A, reducer: last, refId: B }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions: [{ evaluator: { type: gt, params: [3] } }]
+              refId: C

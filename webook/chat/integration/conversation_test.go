@@ -36,13 +36,13 @@ func TestConversationRepo(t *testing.T) {
 }
 
 func (s *ConversationRepoSuite) SetupSuite() {
-	db, err := gorm.Open(mysql.Open(viper.GetString("mysql.dsn")))
+	db, err := gorm.Open(mysql.Open(viper.GetString("data.mysql.dsn")))
 	require.NoError(s.T(), err)
 	require.NoError(s.T(), dao.InitTable(db))
 
 	cmd := redis.NewClient(&redis.Options{
-		Addr:     viper.GetString("redis.addr"),
-		Password: viper.GetString("redis.password"),
+		Addr:     viper.GetString("data.redis.addr"),
+		Password: viper.GetString("data.redis.password"),
 	})
 	s.db = db
 	s.cmd = cmd

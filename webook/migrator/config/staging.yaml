@@ -1,62 +1,54 @@
-# migrator staging 环境配置（预发布）
-# 差异点：otel.env=staging / sampleRatio=0.5 / logger info 级 / partitionCount=4 模拟生产并发
-# 控制库独立：webook_migrator（与 webook / webook_chat 不分库共用 MySQL 实例，逻辑库隔离）
-
-# 远程配置中心：与主仓共用 etcd 实例，path 独立
+# migrator staging 环境配置。差异：otel.env=staging / sample_ratio=0.5 / logger info / partition_count=4。
 etcd:
   endpoints:
     - "http://webook-etcd:2379"
   path: "/webook-migrator"
   type: "yaml"
 
-http:
-  addr: ":8200"
+server:
+  http:
+    addr: ":8200"
+    timeout: 15s
+    jwt:
+      disabled: false
 
-web:
-  jwt:
-    disabled: false
-
-mysql:
-  dsn: 'root:13520@tcp(webook-mysql:3306)/webook_migrator?parseTime=true&loc=UTC'
-
-redis:
-  addr: 'webook-redis:6379'
-  password: '13520'
+data:
+  mysql:
+    dsn: root:${MYSQL_PASS}@tcp(webook-mysql:3306)/webook_migrator?parseTime=true&loc=UTC
+  redis:
+    addr: "webook-redis:6379"
+    password: ${REDIS_PASS}
 
 logger:
-  level:
-    l: 0
+  level: info
   development: false
-  encoding: 'json'
-  outputPaths: [ 'stdout' ]
-  errorOutputPaths: [ 'stderr' ]
+  encoding: json
+  output_paths: [ stdout ]
+  error_output_paths: [ stderr ]
 
 otel:
   endpoint: "otel-collector:4317"
-  serviceName: "webook-migrator"
-  serviceVersion: "0.1.0"
+  service_name: "webook-migrator"
+  service_version: "0.1.0"
   env: "staging"
-  sampleRatio: 0.5
+  sample_ratio: 0.5
 
-# 表名 / PK 列从 task.TablesJSON 读取（创建 task 时配）
 migrator:
   full:
-    batchSize: 1000
-    channelBuf: 4096
+    batch_size: 1000
+    channel_buf: 4096
   incr:
-    batchSize: 100
-    channelBuf: 4096
-    # staging 启用 partition 并行模拟生产；4 partition + Sink 连接池容量需对齐
-    partitionCount: 4
+    batch_size: 100
+    channel_buf: 4096
+    partition_count: 4 # staging 模拟生产并发；与 Sink 连接池容量对齐
   verify:
-    batchSize: 1000
-    channelBuf: 4096
-  # cdc 增量订阅;staging 用 2001 段避免跟 dev/prod 撞 binlog 槽位
+    batch_size: 1000
+    channel_buf: 4096
   canal:
     addr: "webook-mysql:3306"
     user: "canal"
-    password: "canal"
-    serverIdBase: 2001
+    password: ${CANAL_PASS} # 自建中间件密码走 ${ENV}；local/test 明文，L2 剥 K8s Secret
+    server_id_base: 2001
     flavor: "mysql"
   es:
     addrs:
