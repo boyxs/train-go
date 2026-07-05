@@ -137,7 +137,7 @@ sampleRatio = min(1.0, TargetTracesPerSec / AvgQPS)
 
 **现象排查**：如果观察到"很多请求只收到一两个 trace"，先确认不是 sampleRatio 过低导致的——按公式反算一下 `AvgQPS × sampleRatio` 是否符合预期。
 
-> 此公式也同步在 `webook/config/prod.yaml` 的 `otel.sampleRatio` 注释中，改动请保持两处一致。
+> `webook/internal/config/prod.yaml` 的 `otel.sample_ratio` 注释指向本公式；改采样率按此公式重算。
 
 ### 错误/慢请求全留怎么做
 

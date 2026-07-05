@@ -55,13 +55,13 @@ data:
 llm:
   providers:
     - name: deepseek
-      api_key: ${LLM_DEEPSEEK_API_KEY}
+      api_key: ${DEEPSEEK_API_KEY}
       base_url: "https://api.deepseek.com"
       model: "deepseek-chat"
       max_tokens: 2048
       timeout: 60
     - name: kimi
-      api_key: ${LLM_KIMI_API_KEY}
+      api_key: ${KIMI_API_KEY}
       base_url: "https://api.moonshot.cn/v1"
       model: "kimi-k2.5"
       max_tokens: 2048
@@ -69,7 +69,7 @@ llm:
 
 embedding:
   base_url: "https://qianfan.baidubce.com/v2"
-  api_key: ${EMBEDDING_API_KEY}
+  api_key: ${QIANFAN_API_KEY}
   model: "qwen3-embedding-0.6b"
   dims: 1024
   timeout: 30

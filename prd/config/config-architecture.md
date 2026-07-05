@@ -198,13 +198,13 @@ otel:
 llm:
   providers:
     - name: deepseek
-      api_key: ${LLM_DEEPSEEK_API_KEY}
+      api_key: ${DEEPSEEK_API_KEY}
       base_url: https://api.deepseek.com
       model: deepseek-chat
       max_tokens: 2048
       timeout: 60               # 秒（int）
     - name: kimi
-      api_key: ${LLM_KIMI_API_KEY}
+      api_key: ${KIMI_API_KEY}
       base_url: https://api.moonshot.cn/v1
       model: kimi-k2.5
       max_tokens: 2048
@@ -212,7 +212,7 @@ llm:
 
 embedding:
   base_url: https://qianfan.baidubce.com/v2
-  api_key: ${EMBEDDING_API_KEY}
+  api_key: ${QIANFAN_API_KEY}
   model: qwen3-embedding-0.6b
   dims: 1024                  # 向量维度，与 ES mapping 对齐；改需重建索引
   timeout: 30
@@ -469,7 +469,7 @@ retry:
 
 | 类别 | 处理 | 例 |
 |------|------|-----|
-| 外部真实凭据 | **全环境** `${ENV}` 占位，git 里绝不出现 | `LLM_DEEPSEEK_API_KEY` / `LLM_KIMI_API_KEY` / `EMBEDDING_API_KEY` |
+| 外部真实凭据 | **全环境** `${ENV}` 占位，git 里绝不出现 | `DEEPSEEK_API_KEY` / `KIMI_API_KEY` / `QIANFAN_API_KEY` |
 | 自建中间件密码 | local / test 可明文（本机 docker，威胁面为零）；dev / staging / prod 占位 | `MYSQL_PASS` / `REDIS_PASS` |
 
 - 注入机制（**解析后展开，结构上免疫 yaml 注入**）：`viperx.LoadLocal` 先读 cwd 的 `.env`（若有）注入进程环境（见下）→ `yaml.Unmarshal` 解析出配置树（模板里的 `${NAME}` 是合法 yaml 标量）→ `expandTree` 递归遍历树、**只对已解析的字符串叶子**做 `${NAME}` 展开（map / slice 全走到，覆盖 `providers[]` 等列表元素）→ `viper.MergeConfigMap` 塞回。**关键**：展开发生在「已是 Go 字符串的值」上，注入值不再经过 yaml 解析器 → 密钥含 `#` / `: ` / 换行 / 引号 / `{[` 只是普通字符，**无法破坏结构或注入伪键**（旧版在解析前对字节做替换有此隐患，已废弃）
@@ -545,7 +545,7 @@ retry:
 3. **超时治理**（行为变化，一起上，见 §6）：HTTP server 超时中间件（默认 15s + SSE 豁免清单）；gRPC unary 拦截器（5s）；client `methodConfig.timeout`（3s）。chat 的 `/chat/*` SSE 路径进豁免清单
 4. **消费方补调参默认**：kafka 初始化 / ai client / embedding client 各加 `if <=0 用默认`（就地兜底，不集中）
 5. 逐服务迁移（worker → interaction → comment → chat → migrator → core）：每服务 = ioc 各 Provider 改 `viper.UnmarshalKey` 到新段类型（grpcx 类型 + 内联叶子段，每下游一 Provider 读 `client.grpc.<name>`）+ 挂超时中间件/拦截器 + `wire ./...` + 5 yaml（域划分 / snake_case / duration / 调参键显式 / `${ENV}`）+ etcd 重整 + `go build ./... && go test ./<svc>/...` + **实际启动跑通关键路径**。无 config 包、无 Bootstrap
-6. `deploy/`：`.env.<env>` + example 增 `LLM_*_API_KEY` / `EMBEDDING_API_KEY`；Grafana 加 config reload 告警
+6. `deploy/`：`.env.<env>` + example 增 `DEEPSEEK_API_KEY` / `KIMI_API_KEY` / `QIANFAN_API_KEY`；Grafana 加 config reload 告警
 7. 收尾：已泄露 apiKey 供应商侧轮换；yaml 注释按 §7 清洗；同步 `webook/CLAUDE.md`「环境说明」+ `CHANGELOG.md`；上线前 5 环境各压一次长调用 / 流式确认超时不误杀
 
 ## 14. 决策记录
@@ -568,3 +568,4 @@ retry:
 | 2026-07-03 | retry / health_check | 机制（struct + grpcx 组装 service config）本次一起落，缺省全关零行为变化；启用按服务过三点评审（breaker 交互 / 观测口径 / 幂等作用域） |
 | 2026-07-03 | 超时治理（不分期，一起落） | HTTP 中间件(15s，SSE 豁免) + gRPC unary 拦截器(5s) + client methodConfig.timeout(3s)；streaming / 出站 LLM 豁免。均调参键就地兜底、yaml 可覆盖（用户：不留未做完，一起做） |
 | 2026-07-03 | 热更优先级 | 不依赖 viper file>kvstore；reload 后远程子集逐键 `viper.Set`(override) 必覆盖本地默认（消除原「回填」loose end） |
+| 2026-07-05 | 外部凭据 env 命名 | 改纯厂商 `DEEPSEEK_API_KEY`/`KIMI_API_KEY`/`QIANFAN_API_KEY`（原 `LLM_DEEPSEEK`/`LLM_KIMI`/`EMBEDDING`）：key 属厂商、与能力无关，对齐 OpenAI/Anthropic SDK；厂商用平台产品名（`QIANFAN` 非 `BAIDU`，同 `KIMI` 非 `MOONSHOT`）（用户选 B：纯厂商 vs 能力+厂商） |

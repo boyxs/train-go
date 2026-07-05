@@ -91,10 +91,10 @@ import (
 
 func InitOTel() func(context.Context) error {
     type Config struct {
-        Endpoint    string  `yaml:"endpoint"`
-        ServiceName string  `yaml:"serviceName"`
-        Env         string  `yaml:"env"`
-        SampleRatio float64 `yaml:"sampleRatio"`
+        Endpoint    string  `mapstructure:"endpoint"`
+        ServiceName string  `mapstructure:"service_name"`
+        Env         string  `mapstructure:"env"`
+        SampleRatio float64 `mapstructure:"sample_ratio"`
     }
     var cfg Config
     if err := viper.UnmarshalKey("otel", &cfg); err != nil {
@@ -151,9 +151,9 @@ func InitOTel() func(context.Context) error {
 ```yaml
 otel:
   endpoint: "localhost:4317"
-  serviceName: "webook"
+  service_name: "webook"
   env: "local"
-  sampleRatio: 1.0       # local 全采样；prod 改 0.1
+  sample_ratio: 1.0       # local 全采样；prod 改 0.1
 ```
 
 **main.go 收尾**：
