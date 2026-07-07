@@ -89,6 +89,14 @@ func (s *CommentServer) CountComment(ctx context.Context, req *commentv1.CountCo
 	return &commentv1.CountCommentResponse{Count: n}, nil
 }
 
+func (s *CommentServer) BatchCountComment(ctx context.Context, req *commentv1.BatchCountCommentRequest) (*commentv1.BatchCountCommentResponse, error) {
+	counts, err := s.svc.BatchCount(ctx, req.GetBiz(), req.GetBizIds())
+	if err != nil {
+		return nil, err
+	}
+	return &commentv1.BatchCountCommentResponse{Counts: counts}, nil
+}
+
 // normLimit 限定分页 limit 在 (0,100]，默认 20。
 func normLimit(limit int32) int {
 	n := int(limit)

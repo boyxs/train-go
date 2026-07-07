@@ -19,6 +19,7 @@ type CommentRepository interface {
 	GetReplies(ctx context.Context, rootId int64, offset, limit int) ([]domain.Comment, error)
 	Delete(ctx context.Context, id, uid int64) (bool, error)
 	Count(ctx context.Context, biz string, bizId int64) (int64, error)
+	BatchCount(ctx context.Context, biz string, bizIds []int64) (map[int64]int64, error)
 }
 
 type CacheCommentRepository struct {
@@ -110,6 +111,11 @@ func (r *CacheCommentRepository) Count(ctx context.Context, biz string, bizId in
 			logger.String("biz", biz), logger.Int64("bizId", bizId), logger.Error(setErr))
 	}
 	return n, nil
+}
+
+// BatchCount 批量走一次 GROUP BY DB 查询（不逐 id 读/回填缓存：他人主页非热点，单查已够快）。
+func (r *CacheCommentRepository) BatchCount(ctx context.Context, biz string, bizIds []int64) (map[int64]int64, error) {
+	return r.dao.BatchCount(ctx, biz, bizIds)
 }
 
 // toEntity / toDomain 是字段映射的唯一真相源；批量一律 slicex.Map(list, r.toDomain)。

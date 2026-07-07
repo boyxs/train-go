@@ -19,12 +19,12 @@ type Config struct {
 
 // ProviderConfig 单个 OpenAI 兼容 provider 的连接参数
 type ProviderConfig struct {
-	Name      string `mapstructure:"name"`
-	ApiKey    string `mapstructure:"api_key"`
-	BaseUrl   string `mapstructure:"base_url"`
-	Model     string `mapstructure:"model"`
-	MaxTokens int    `mapstructure:"max_tokens"`
-	Timeout   int    `mapstructure:"timeout"` // 秒
+	Name      string        `mapstructure:"name"`
+	ApiKey    string        `mapstructure:"api_key"`
+	BaseUrl   string        `mapstructure:"base_url"`
+	Model     string        `mapstructure:"model"`
+	MaxTokens int           `mapstructure:"max_tokens"`
+	Timeout   time.Duration `mapstructure:"timeout"` // 请求超时（duration 字符串，如 60s）
 }
 
 // OpenAIClient 兼容 OpenAI 协议的通用客户端（DeepSeek、Kimi 等）
@@ -36,7 +36,7 @@ type OpenAIClient struct {
 }
 
 func NewOpenAIClient(cfg ProviderConfig) *OpenAIClient {
-	timeout := time.Duration(cfg.Timeout) * time.Second
+	timeout := cfg.Timeout
 	if timeout <= 0 {
 		timeout = 60 * time.Second
 	}

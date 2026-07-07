@@ -82,6 +82,7 @@ Handler (web/) → Service (service/) → Repository (repository/) → DAO (dao/
 - **core**（最早）：整个服务在 `internal/` 下（含 `main.go` / `wire.go` / `ioc/`），历史遗留布局
 - **拆分服务**（`chat/`、`migrator/`、`interaction/`、`worker/`）：包平铺在 `<svc>/` 下，**不套 `internal/`**——单 module 仓库里 `<svc>/internal/` 只能挡仓内兄弟服务导包，当前无跨服务导包需求，边界靠 review 维持
 - **新增服务跟随平铺布局**，不效仿 core；每个拆分服务各自带 `<svc>/CLAUDE.md`（拆分原因 / 边界 / 接入方）
+- **端口分配（铁律，新增服务动手前必查现有占用）**：业务服务走 `80x0/80x1` 段——**每服务独占一个十位段**，HTTP（metrics/health 或 core 网关）= `80x0`、gRPC = `80x1`。已占用：core `8010/8011` · chat `8020` · comment `8030/8031` · interaction `8040/8041` · worker `8050` · relation `8060/8061` → **下一个新服务用 `8070/8071`**。运维控制台（migrator）走 `82xx`、otel `88xx`、exporter `9xxx`。**禁止把新服务端口塞进别人的十位段**（如 relation 用 `8042` 撞进 interaction 的 `804x` 段）；config 5 份 yaml 的 `server.http.addr`/`server.grpc.addr` + deploy(compose/prometheus/nginx) 一致按此分配
 - 接 etcd 配置热更的服务（core / chat / migrator / interaction）`ioc/config.go` 同构持有 `ConfigChangeCallbacks`（`web.go` 追加回调、`main.go` 统一触发），新服务接热更时镜像此文件；**`worker` 是例外**——纯静态本地配置（只 `LoadLocal` 不 `WatchRemote`），etcd 仅用于 gRPC 服务发现，配置变更靠重启
 
 ## 分层规则
@@ -100,6 +101,29 @@ Handler (web/) → Service (service/) → Repository (repository/) → DAO (dao/
   - dispatch（factory / registry）：独立文件 `factory.go` / `registry.go`
   - 每个具体实现各占一个**按行为/技术命名**的文件（`mysql.go` / `mongo.go` / `identity.go`）
   - 范本：`pipeline/source`（source.go + factory.go + mysql/canal/es/mongo.go）、`pipeline/sink`、`pipeline/transform`
+
+### 三层职责边界（web / service / repository）
+
+> 一句话：**接入层只搬运、service 编排业务、repository 只存取**。跨源聚合是业务逻辑，永远在 service。
+> **接入层 = `web/`（core HTTP handler）或 `grpc/`（拆分服务的 gRPC server）**——两者同一层、同等"薄"，只是协议不同（HTTP VO ↔ pb）。
+
+| 层 | 只做 | 禁止 | 依赖 |
+|----|------|------|------|
+| **接入层**：`web/`(HTTP handler) / `grpc/`(gRPC server) | 参数绑定/校验（拦截器）、调 service、domain↔VO/pb 映射（`toPb`/`toDomain`/`toVO`）、错误→HTTP/gRPC status | 业务逻辑、跨源聚合编排、带业务语义的私有小方法（如 `commentCounts`/`likedTotalByAuthor`）、直接持有下游 gRPC/外部 client、循环里发 RPC | 只依赖 `service.XxxService` 接口（+ 映射用 domain/VO/pb） |
+| **service**（`service/`）| 业务规则/校验、**跨源聚合**（多 repo / 其它 service / gRPC client 组合）、降级策略、事务边界决策 | 直接读写 DB/Redis（走 repo）、拼 HTTP/VO/pb | repo 接口、其它 service 接口、**gRPC client（聚合依赖放这层）**、logger |
+| **repository**（`repository/`+`dao/`+`cache/`）| 持久化 + 缓存（Cache-Aside）、domain↔entity 转换 | 业务逻辑、跨服务调用、聚合别的领域 | dao、cache |
+
+**判定法**（写一段代码前自问）：涉及「≥2 个数据来源」或「有业务含义的加工/降级」？→ service。只是「把 service 结果摆成 VO/pb」？→ 接入层（web/grpc）。只是「一张表 / 一个缓存的存取」？→ repository。
+
+**接入层（web / grpc）出现这些即越界**（下沉 service）：`for … { cli.XxxRPC() }`；`svcA.Find…()` + `cliB.Batch…()` 拼装；`func (h *Handler/Server) xxxCounts(...)` 这类业务私有方法；handler/server 结构体持有**下游** `xxxv1.XxxServiceClient` 原始 gRPC client 做聚合。
+**接入层允许的"映射"**（不算业务）：`domain(+聚合结果) → VO/pb` 纯函数（`toXxxVO`/`toPb`）、`slicex.Map`、`err → *errs.Error`/gRPC status。
+> 注：gRPC server 用自己服务的 service 是本分；但**为聚合而持有别的服务的 gRPC client** 属越界（该聚合应在 service 层）。
+
+**纯转换 vs 业务小方法**（`toPb` 为何不算被禁的小方法）：`toPb`/`toDomain`/`toVO` 是**传输格式 ↔ domain 的纯映射**（无 I/O、无跨源、无业务判断），属接入层本职——`toPb`(gRPC server) ≡ `toVO`(HTTP handler)，放 `grpc/` 或 `web/` 都对，别为它单开"转换层"。被禁的"小方法"特指 `commentCounts` 这类**会发 RPC / 做聚合 / 做降级决策**的业务逻辑。判据：**方法体里有调用或业务分支 → 下沉 service；纯搬字段 → 留接入层。** 转换按层各管一段：接入层管「传输 ↔ domain」，repository 管「domain ↔ dao」（gRPC 路径的 repo 同样只做 domain↔dao、不碰 pb）。
+
+**gateway/BFF handler 同规**：core 作网关聚合下游（interaction/comment/relation gRPC + user 昵称）也是业务聚合——放 service，接入层只调用 + 映射。参见 `service.GRPCCommentService` / `GRPCRelationService`（持下游 gRPC client + userSvc + producer，聚合评论树/关系列表 + 昵称 + 计数 + 事件），对应 web handler 已瘦身为「调 service + `slicex.Map` 映射 VO」。
+
+范例：`/article/reader/author` 的互动/评论/获赞聚合在 `ArticleReaderService.AuthorArticles`（该 service 持有 comment gRPC client），web `Author` 仅 `svc.AuthorArticles(...)` + `slicex.Map(items, toReaderArticleVO)`。
 
 ## 命名规范
 
@@ -147,6 +171,7 @@ Handler (web/) → Service (service/) → Repository (repository/) → DAO (dao/
 1. 只写**单条**转换，方向编进名字（两侧类型常同名，按类型命名分不清方向）：
    - repository 层（domain ↔ dao）：`toDomain`（dao → domain）/ `toEntity`（domain → dao）
    - gRPC 层（domain ↔ pb）：`toPb`（domain → pb）/ `toDomain`（pb → domain，如需要）
+   - **一个 repository/层持多种 domain 类型时**（如 relation 的 stats/edge/block）：方向前缀不变、加类型后缀 `toDomain<Type>` / `toEntity<Type>`（如 `toDomainStats`/`toDomainEdge`/`toDomainBlock`），仍是**接收者方法**、单条、批量走 `slicex.Map(list, r.toDomain<Type>)`。**禁止纯类型名**（`toStats`/`toEdge`）——分不清方向，违背本条 why
 2. **批量一律 `slicex.Map(rows, toDomain/toEntity/toPb)`**（`pkg/slicex`），禁止手写 `toDomains`/`toXxxList`/`toXxxSlice` 等复数转换方法
 
 ```go

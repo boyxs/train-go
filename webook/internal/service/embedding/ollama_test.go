@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -34,7 +35,7 @@ func TestOllamaClient_Embed(t *testing.T) {
 		client := embedding.NewOllamaClient(embedding.OllamaConfig{
 			BaseUrl: srv.URL,
 			Model:   "bge-m3",
-			Timeout: 5,
+			Timeout: 5 * time.Second,
 		})
 
 		vec, err := client.Embed(context.Background(), "大白菜")
@@ -70,7 +71,7 @@ func TestOllamaClient_Embed(t *testing.T) {
 		client := embedding.NewOllamaClient(embedding.OllamaConfig{
 			BaseUrl: "http://127.0.0.1:1",
 			Model:   "bge-m3",
-			Timeout: 1,
+			Timeout: time.Second,
 		})
 		_, err := client.Embed(context.Background(), "hello")
 		assert.ErrorContains(t, err, "do request")

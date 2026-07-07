@@ -15,9 +15,13 @@ import React, { useEffect, useRef, useState } from 'react';
 
 import * as articleApi from '@/api/article';
 import * as interactionApi from '@/api/interaction';
+import { getRelationStat } from '@/api/relation';
+import { findProfile, findUserInfo } from '@/api/user';
 import { CommentSection } from '@/components/comment/CommentSection';
 import { Loading } from '@/components/common/Loading';
 import { PublicHeader } from '@/components/layout/PublicHeader';
+import { FollowButton } from '@/components/relation/FollowButton';
+import { UserHoverCard } from '@/components/relation/UserHoverCard';
 import { BIZ } from '@/constants/biz';
 import { useRequest } from '@/hooks/useRequest';
 import type { Interaction } from '@/types';
@@ -50,6 +54,21 @@ function ArticleReadPage({ articleId }: ArticleReadProps) {
         ? interactionApi.findUserState({ biz: BIZ.ARTICLE, bizId: id })
         : Promise.resolve(null),
     [articleId],
+  );
+
+  // 作者信息 + viewer 对作者的关系态（他人主页入口 + 就地关注）
+  const authorId = res?.data?.authorId;
+  const { data: authorInfoRes } = useRequest(
+    () => (authorId ? findUserInfo(authorId) : Promise.resolve(null)),
+    [authorId],
+  );
+  const { data: authorStatRes } = useRequest(
+    () => (authorId ? getRelationStat(authorId) : Promise.resolve(null)),
+    [authorId],
+  );
+  const { data: myProfile } = useRequest(
+    () => (tokenUtil.hasToken() ? findProfile() : Promise.resolve(null)),
+    [],
   );
 
   const [intrOverride, setIntrOverride] = useState<Interaction | null>(null);
@@ -122,6 +141,11 @@ function ArticleReadPage({ articleId }: ArticleReadProps) {
   };
 
   const article = res?.data;
+  const authorInfo = authorInfoRes?.data ?? null;
+  const authorStat = authorStatRes?.data ?? null;
+  const authorName =
+    authorInfo?.nickname || (authorId ? `用户 #${authorId}` : '');
+  const isSelfAuthor = !!authorId && myProfile?.id === authorId;
 
   if (loading) {
     return (
@@ -173,12 +197,49 @@ function ArticleReadPage({ articleId }: ArticleReadProps) {
               {article.title}
             </h1>
 
-            {/* 时间元信息 */}
-            <div className='flex items-center gap-1.5'>
-              <Clock size={14} color='#9CA3AF' />
-              <span className='text-[13px] font-medium text-[#9CA3AF]'>
-                {dayjs(article.createdAt).format('YYYY-MM-DD HH:mm')}
-              </span>
+            {/* 作者 + 时间 + 关注（他人主页入口） */}
+            <div className='flex items-center gap-3'>
+              {authorId ? (
+                <UserHoverCard userId={authorId} self={isSelfAuthor}>
+                  <div
+                    onClick={() => router.push(`/user/${authorId}`)}
+                    className='group flex cursor-pointer items-center gap-2.5'
+                  >
+                    <div
+                      className='flex h-10 w-10 items-center justify-center rounded-full text-base font-bold'
+                      style={{ background: '#F0FDFA', color: '#0D9488' }}
+                    >
+                      {(authorName[0] || '?').toUpperCase()}
+                    </div>
+                    <div>
+                      <div className='text-sm font-semibold text-[#1A1A1A] group-hover:text-[#0D9488]'>
+                        {authorName}
+                      </div>
+                      <div className='text-[13px] text-[#9CA3AF]'>
+                        {dayjs(article.createdAt).format('YYYY-MM-DD HH:mm')}
+                      </div>
+                    </div>
+                  </div>
+                </UserHoverCard>
+              ) : (
+                <div className='flex items-center gap-1.5'>
+                  <Clock size={14} color='#9CA3AF' />
+                  <span className='text-[13px] font-medium text-[#9CA3AF]'>
+                    {dayjs(article.createdAt).format('YYYY-MM-DD HH:mm')}
+                  </span>
+                </div>
+              )}
+              {authorId && !isSelfAuthor && (
+                <div className='ml-auto'>
+                  <FollowButton
+                    targetId={authorId}
+                    isFollowing={authorStat?.isFollowing ?? false}
+                    isMutual={authorStat?.isMutual ?? false}
+                    isBlocked={authorStat?.isBlocked}
+                    isBlockedBy={authorStat?.isBlockedBy}
+                  />
+                </div>
+              )}
             </div>
 
             {/* 分割线 */}

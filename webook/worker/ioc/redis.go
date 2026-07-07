@@ -6,6 +6,7 @@ import (
 	"github.com/spf13/viper"
 
 	redisprom "github.com/webook/pkg/redisx/prometheus"
+	"github.com/webook/shared/confkey"
 )
 
 // InitRedis 与 chat/core 同源。worker 仅用 redis 做 cron 分布式锁，但仍接上
@@ -16,7 +17,7 @@ func InitRedis() redis.Cmdable {
 		Password string `yaml:"password" mapstructure:"password"`
 	}
 	var cfg Config
-	if err := viper.UnmarshalKey("data.redis", &cfg); err != nil {
+	if err := viper.UnmarshalKey(confkey.DataRedis, &cfg); err != nil {
 		panic(err)
 	}
 	client := redis.NewClient(&redis.Options{

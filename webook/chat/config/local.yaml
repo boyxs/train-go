@@ -52,7 +52,7 @@ llm:
       base_url: "https://api.deepseek.com"
       model: "deepseek-chat"
       max_tokens: 2048
-      timeout: 60
+      timeout: 60s
 
 logger:
   level: debug

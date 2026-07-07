@@ -7,6 +7,7 @@ import (
 
 	"github.com/webook/pkg/ginx"
 	"github.com/webook/pkg/logger"
+	"github.com/webook/shared/confkey"
 )
 
 // InitLogger 由 yaml logger 段驱动:development 选 dev/prod base,再按 level/encoding/output 覆盖。
@@ -19,7 +20,7 @@ func InitLogger() logger.LoggerX {
 		OutputPaths      []string `mapstructure:"output_paths"`
 		ErrorOutputPaths []string `mapstructure:"error_output_paths"`
 	}
-	if err := viper.UnmarshalKey("logger", &lc); err != nil {
+	if err := viper.UnmarshalKey(confkey.Logger, &lc); err != nil {
 		panic(err)
 	}
 	var cfg zap.Config

@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/webook/pkg/viperx"
+	"github.com/webook/shared/confkey"
 )
 
 // worker 调度器：cron 定时任务 + Kafka 消费者，全部经 gRPC 派发给业务服务，自身零业务数据/逻辑
@@ -45,7 +46,7 @@ func main() {
 	}()
 
 	// 最小 HTTP：/metrics + /health
-	httpAddr := viper.GetString("server.http.addr")
+	httpAddr := viper.GetString(confkey.ServerHTTPAddr)
 	if httpAddr == "" {
 		httpAddr = ":8050"
 	}

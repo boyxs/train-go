@@ -20,12 +20,13 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	CommentService_CreateComment_FullMethodName    = "/webook.comment.v1.CommentService/CreateComment"
-	CommentService_ListComments_FullMethodName     = "/webook.comment.v1.CommentService/ListComments"
-	CommentService_BatchGetComments_FullMethodName = "/webook.comment.v1.CommentService/BatchGetComments"
-	CommentService_GetReplies_FullMethodName       = "/webook.comment.v1.CommentService/GetReplies"
-	CommentService_DeleteComment_FullMethodName    = "/webook.comment.v1.CommentService/DeleteComment"
-	CommentService_CountComment_FullMethodName     = "/webook.comment.v1.CommentService/CountComment"
+	CommentService_CreateComment_FullMethodName     = "/webook.comment.v1.CommentService/CreateComment"
+	CommentService_ListComments_FullMethodName      = "/webook.comment.v1.CommentService/ListComments"
+	CommentService_BatchGetComments_FullMethodName  = "/webook.comment.v1.CommentService/BatchGetComments"
+	CommentService_GetReplies_FullMethodName        = "/webook.comment.v1.CommentService/GetReplies"
+	CommentService_DeleteComment_FullMethodName     = "/webook.comment.v1.CommentService/DeleteComment"
+	CommentService_CountComment_FullMethodName      = "/webook.comment.v1.CommentService/CountComment"
+	CommentService_BatchCountComment_FullMethodName = "/webook.comment.v1.CommentService/BatchCountComment"
 )
 
 // CommentServiceClient is the client API for CommentService service.
@@ -48,6 +49,7 @@ type CommentServiceClient interface {
 	GetReplies(ctx context.Context, in *GetRepliesRequest, opts ...grpc.CallOption) (*GetRepliesResponse, error)
 	DeleteComment(ctx context.Context, in *DeleteCommentRequest, opts ...grpc.CallOption) (*DeleteCommentResponse, error)
 	CountComment(ctx context.Context, in *CountCommentRequest, opts ...grpc.CallOption) (*CountCommentResponse, error)
+	BatchCountComment(ctx context.Context, in *BatchCountCommentRequest, opts ...grpc.CallOption) (*BatchCountCommentResponse, error)
 }
 
 type commentServiceClient struct {
@@ -118,6 +120,16 @@ func (c *commentServiceClient) CountComment(ctx context.Context, in *CountCommen
 	return out, nil
 }
 
+func (c *commentServiceClient) BatchCountComment(ctx context.Context, in *BatchCountCommentRequest, opts ...grpc.CallOption) (*BatchCountCommentResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(BatchCountCommentResponse)
+	err := c.cc.Invoke(ctx, CommentService_BatchCountComment_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // CommentServiceServer is the server API for CommentService service.
 // All implementations must embed UnimplementedCommentServiceServer
 // for forward compatibility.
@@ -138,6 +150,7 @@ type CommentServiceServer interface {
 	GetReplies(context.Context, *GetRepliesRequest) (*GetRepliesResponse, error)
 	DeleteComment(context.Context, *DeleteCommentRequest) (*DeleteCommentResponse, error)
 	CountComment(context.Context, *CountCommentRequest) (*CountCommentResponse, error)
+	BatchCountComment(context.Context, *BatchCountCommentRequest) (*BatchCountCommentResponse, error)
 	mustEmbedUnimplementedCommentServiceServer()
 }
 
@@ -165,6 +178,9 @@ func (UnimplementedCommentServiceServer) DeleteComment(context.Context, *DeleteC
 }
 func (UnimplementedCommentServiceServer) CountComment(context.Context, *CountCommentRequest) (*CountCommentResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CountComment not implemented")
+}
+func (UnimplementedCommentServiceServer) BatchCountComment(context.Context, *BatchCountCommentRequest) (*BatchCountCommentResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method BatchCountComment not implemented")
 }
 func (UnimplementedCommentServiceServer) mustEmbedUnimplementedCommentServiceServer() {}
 func (UnimplementedCommentServiceServer) testEmbeddedByValue()                        {}
@@ -295,6 +311,24 @@ func _CommentService_CountComment_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CommentService_BatchCountComment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BatchCountCommentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CommentServiceServer).BatchCountComment(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CommentService_BatchCountComment_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CommentServiceServer).BatchCountComment(ctx, req.(*BatchCountCommentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // CommentService_ServiceDesc is the grpc.ServiceDesc for CommentService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -325,6 +359,10 @@ var CommentService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CountComment",
 			Handler:    _CommentService_CountComment_Handler,
+		},
+		{
+			MethodName: "BatchCountComment",
+			Handler:    _CommentService_BatchCountComment_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

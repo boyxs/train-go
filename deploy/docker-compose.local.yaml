@@ -56,6 +56,17 @@ services:
     ports:
       - "${INTERACTION_HOST_PORT:-8040}:8040"
 
+  webook-relation:
+    image: webook-relation:local
+    pull_policy: never
+    build:
+      context: ../webook
+      dockerfile: relation/Dockerfile
+      args:
+        VERSION: local
+    ports:
+      - "${RELATION_HOST_PORT:-8060}:8060"
+
   webook-worker:
     image: webook-worker:local
     pull_policy: never

@@ -9,7 +9,7 @@ import (
 	interactionv1 "github.com/webook/api/gen/interaction/v1"
 	"github.com/webook/pkg/logger"
 	"github.com/webook/pkg/saramax"
-	"github.com/webook/worker/event"
+	"github.com/webook/worker/consumer/event"
 )
 
 // ConsumerConfig 互动事件消费配置。
@@ -62,7 +62,9 @@ func (c *InteractionConsumer) Start(ctx context.Context) error {
 				break
 			}
 		}
-		_ = group.Close()
+		if closeErr := group.Close(); closeErr != nil {
+			c.l.Warn("关闭消费者组出错", logger.Error(closeErr))
+		}
 	}
 	return nil
 }
@@ -70,14 +72,14 @@ func (c *InteractionConsumer) Start(ctx context.Context) error {
 // handleBatch ctx 已带 Kafka header 里的 trace context，下游 gRPC span 自动挂上。
 // 按 (biz,biz_id) 聚合本批 read 次数，一批一次 BatchIncrReadCount：取代逐条 IncrReadCount 的
 // N+1 over-the-wire；整批一次提交——某条失败时整批重投，不会重复累加批内已成功项。
-func (c *InteractionConsumer) handleBatch(ctx context.Context, _ []*sarama.ConsumerMessage, events []event.InteractionEvent) error {
+func (c *InteractionConsumer) handleBatch(ctx context.Context, _ []*sarama.ConsumerMessage, evts []event.InteractionEvent) error {
 	type aggKey struct {
 		biz   string
 		bizId int64
 	}
-	counts := make(map[aggKey]int64, len(events))
-	order := make([]aggKey, 0, len(events))
-	for _, evt := range events {
+	counts := make(map[aggKey]int64, len(evts))
+	order := make([]aggKey, 0, len(evts))
+	for _, evt := range evts {
 		if evt.Type != "read" {
 			continue
 		}

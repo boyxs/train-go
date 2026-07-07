@@ -8,6 +8,7 @@ import (
 
 	"github.com/webook/internal/events"
 	"github.com/webook/pkg/logger"
+	"github.com/webook/shared/confkey"
 )
 
 // KafkaConfig 映射 yaml data.kafka 段（core 仅生产）。时间为 duration;超时缺省就地兜底。
@@ -25,7 +26,7 @@ type KafkaConfig struct {
 
 func InitKafkaConfig() KafkaConfig {
 	var cfg KafkaConfig
-	if err := viper.UnmarshalKey("data.kafka", &cfg); err != nil {
+	if err := viper.UnmarshalKey(confkey.DataKafka, &cfg); err != nil {
 		panic(err)
 	}
 	return cfg

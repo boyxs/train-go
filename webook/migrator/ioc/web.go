@@ -22,6 +22,7 @@ import (
 	"github.com/webook/pkg/ginx/middleware/timeout"
 	"github.com/webook/pkg/jwtx"
 	"github.com/webook/pkg/logger"
+	"github.com/webook/shared/confkey"
 )
 
 // InitWebServer 装配 gin engine + 注入 middleware 链 + 注册路由。
@@ -72,7 +73,7 @@ func InitMiddlewares(
 			Build(),
 		otelgin.Middleware("webook-migrator", otelgin.WithTracerProvider(tp)),
 		// HTTP 软超时（默认 15s）；migrator 无 SSE，不豁免
-		timeout.NewMiddlewareBuilder(viper.GetDuration("server.http.timeout")).Build(),
+		timeout.NewMiddlewareBuilder(viper.GetDuration(confkey.ServerHTTPTimeout)).Build(),
 		cors.New(cors.Config{
 			AllowMethods:     []string{"PUT", "PATCH", "POST", "GET", "DELETE", "OPTIONS"},
 			AllowHeaders:     []string{"Content-Type", jwtx.HeaderAuthorization, consts.AccessHeader, consts.RefreshHeader},

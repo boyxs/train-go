@@ -33,14 +33,14 @@ llm:
       base_url: "https://api.deepseek.com"
       model: "deepseek-chat"
       max_tokens: 2048
-      timeout: 60
+      timeout: 60s
     # kimi 仅 dev：多配一个 provider 专门测 TimeoutFailover 主备切换
     - name: kimi
       api_key: ${KIMI_API_KEY}
       base_url: "https://api.moonshot.cn/v1"
       model: "kimi-k2.5"
       max_tokens: 2048
-      timeout: 60
+      timeout: 60s
 
 logger:
   level: debug

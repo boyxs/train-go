@@ -67,7 +67,8 @@ func InitWebServer() *gin.Engine {
 	articleAuthorService := service.NewInternalArticleAuthorService(articleAuthorRepository, articleReaderRepository, articleSearchService, loggerX)
 	interactionService := newFakeInteractionService()
 	articleAuthorHandler := web.NewInternalArticleAuthorHandler(articleAuthorService, interactionService, loggerX)
-	articleReaderService := service.NewInternalArticleReaderService(articleReaderRepository)
+	commentServiceClient := provideNilCommentClient()
+	articleReaderService := service.NewInternalArticleReaderService(articleReaderRepository, interactionService, commentServiceClient, loggerX)
 	articleReaderHandler := web.NewInternalArticleReaderHandler(articleReaderService, interactionService, loggerX)
 	interactionHandler := web.NewInternalInteractionHandler(interactionService, loggerX)
 	oAuth2Service := ioc.InitWechatOAuth2Service()
@@ -87,9 +88,10 @@ func InitWebServer() *gin.Engine {
 	rankingRepository := repository.NewCacheArticleRankingRepository(rankingCache, rankingDAO, loggerX)
 	rankingService := service.NewArticleRankingService(rankingRepository, articleReaderRepository, interactionService, clickEventService, loggerX)
 	rankingHandler := web.NewArticleRankingHandler(rankingService, loggerX)
-	commentServiceClient := provideNilCommentClient()
-	commentHandler := web.NewInternalCommentHandler(commentServiceClient, interactionService, userService, loggerX)
-	engine := ioc.InitWebServer(v, userHandler, articleAuthorHandler, articleReaderHandler, interactionHandler, oAuth2Handler, articleSearchHandler, clickEventHandler, articlePolishHandler, rankingHandler, commentHandler)
+	commentService := service.NewGRPCCommentService(commentServiceClient, interactionService, userService, loggerX)
+	commentHandler := web.NewInternalCommentHandler(commentService)
+	relationHandler := provideTestRelationHandler(userService, loggerX)
+	engine := ioc.InitWebServer(v, userHandler, articleAuthorHandler, articleReaderHandler, interactionHandler, oAuth2Handler, articleSearchHandler, clickEventHandler, articlePolishHandler, rankingHandler, commentHandler, relationHandler)
 	return engine
 }
 
@@ -130,8 +132,9 @@ func InitArticleReaderHandler() web.ArticleReaderHandler {
 	dualWriter := ioc.InitMigratorSDKDualWriter(cmdable, loggerX)
 	taskName := ioc.InitMigratorSDKTaskName()
 	articleReaderRepository := repository.NewCacheArticleReaderRepository(articleReaderDAO, articleReaderNewDAO, articleCache, switchReader, dualWriter, taskName, loggerX)
-	articleReaderService := service.NewInternalArticleReaderService(articleReaderRepository)
 	interactionService := newFakeInteractionService()
+	commentServiceClient := provideNilCommentClient()
+	articleReaderService := service.NewInternalArticleReaderService(articleReaderRepository, interactionService, commentServiceClient, loggerX)
 	articleReaderHandler := web.NewInternalArticleReaderHandler(articleReaderService, interactionService, loggerX)
 	return articleReaderHandler
 }
@@ -177,6 +180,14 @@ func provideNoopTracerProvider() trace.TracerProvider {
 // 如后续要集成测评论网关，改为拨号真实 comment server。
 func provideNilCommentClient() commentv1.CommentServiceClient {
 	return nil
+}
+
+// provideTestRelationHandler：集成测试不拉起 relation gRPC server / kafka，用 nil client + nil producer
+// 构造 GRPCRelationService 再包成 handler（现有用例不触达 /relation/*）。nil 在此内联（不出现在
+// wire_gen 签名里）→ wire_gen 无需 import relation proto 包，规避 goimports 对 gen/relation/v1
+// （目录名 v1≠包名 relationv1）bare import 的重复别名误判。
+func provideTestRelationHandler(userSvc service.UserService, l logger.LoggerX) web.RelationHandler {
+	return web.NewInternalRelationHandler(service.NewGRPCRelationService(nil, userSvc, nil, l))
 }
 
 // provideTestMiddlewares 与 ioc.InitMiddlewares 同结构，但 metrics 走独立 Registry，

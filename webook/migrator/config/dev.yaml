@@ -41,6 +41,7 @@ migrator:
     batch_size: 100
     channel_buf: 4096
     partition_count: 1
+    flush_interval: 1s
   verify:
     batch_size: 1000
     channel_buf: 4096

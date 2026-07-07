@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -118,7 +119,7 @@ func TestOpenAIClient_Embed(t *testing.T) {
 				ApiKey:  "test-key",
 				Model:   "text-embedding-v3",
 				Dims:    1024,
-				Timeout: 5,
+				Timeout: 5 * time.Second,
 			})
 
 			ctx := context.Background()

@@ -9,6 +9,8 @@ mockgen:
 	@mockgen -source=./internal/service/code.go -package=svcmocks -destination=./internal/service/mocks/code_mock.go
 	@mockgen -source=./internal/service/article_search.go -package=svcmocks -destination=./internal/service/mocks/article_search_mock.go
 	@mockgen -source=./internal/service/interaction.go -package=svcmocks -destination=./internal/service/mocks/interaction_mock.go
+	@mockgen -source=./internal/service/comment.go -package=svcmocks -destination=./internal/service/mocks/comment_mock.go
+	@mockgen -source=./internal/service/relation.go -package=svcmocks -destination=./internal/service/mocks/relation_mock.go
 	#repository
 	@mockgen -source=./internal/repository/user.go -package=repomocks -destination=./internal/repository/mocks/user_mock.go
 	@mockgen -source=./internal/repository/article_author.go -package=repomocks -destination=./internal/repository/mocks/article_author_mock.go

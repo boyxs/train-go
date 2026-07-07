@@ -51,6 +51,8 @@ type CommentDAO interface {
 	// 返回命中的评论（供调用方清缓存）与是否实际删除。
 	Delete(ctx context.Context, id, uid int64) (Comment, bool, error)
 	Count(ctx context.Context, biz string, bizId int64) (int64, error)
+	// BatchCount 一次 GROUP BY 统计多个 bizId 的评论数（他人主页文章列表用，消 N+1）
+	BatchCount(ctx context.Context, biz string, bizIds []int64) (map[int64]int64, error)
 }
 
 type GormCommentDAO struct {
@@ -169,4 +171,27 @@ func (d *GormCommentDAO) Count(ctx context.Context, biz string, bizId int64) (in
 		Where("biz = ? AND biz_id = ?", biz, bizId).
 		Count(&n).Error
 	return n, err
+}
+
+func (d *GormCommentDAO) BatchCount(ctx context.Context, biz string, bizIds []int64) (map[int64]int64, error) {
+	res := make(map[int64]int64, len(bizIds))
+	if len(bizIds) == 0 {
+		return res, nil
+	}
+	var rows []struct {
+		BizId int64
+		Cnt   int64
+	}
+	err := d.db.WithContext(ctx).Model(&Comment{}).
+		Select("biz_id, count(*) as cnt").
+		Where("biz = ? AND biz_id IN ?", biz, bizIds).
+		Group("biz_id").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	for _, r := range rows {
+		res[r.BizId] = r.Cnt
+	}
+	return res, nil
 }

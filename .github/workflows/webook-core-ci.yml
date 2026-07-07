@@ -11,6 +11,7 @@ on:
       - 'webook/chat/**'        # chat 服务有独立 CI
       - 'webook/comment/**'     # comment 服务有独立 CI
       - 'webook/interaction/**' # interaction 服务有独立 CI
+      - 'webook/relation/**'    # relation 服务有独立 CI
       - 'webook/worker/**'      # worker 服务有独立 CI
       - 'deploy/**'
       - 'docs/**'

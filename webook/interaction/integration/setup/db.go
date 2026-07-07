@@ -6,10 +6,11 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/webook/interaction/repository/dao"
+	"github.com/webook/shared/confkey"
 )
 
 func InitDB() *gorm.DB {
-	db, err := gorm.Open(mysql.Open(viper.GetString("data.mysql.dsn")), &gorm.Config{})
+	db, err := gorm.Open(mysql.Open(viper.GetString(confkey.DataMySQLDSN)), &gorm.Config{})
 	if err != nil {
 		// 数据库都连接不上，就不要启动测试了
 		panic("failed to connect database")

@@ -86,6 +86,21 @@ func (mr *MockArticleReaderRepositoryMockRecorder) FindByIds(ctx, ids any) *gomo
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByIds", reflect.TypeOf((*MockArticleReaderRepository)(nil).FindByIds), ctx, ids)
 }
 
+// ListIdsByAuthor mocks base method.
+func (m *MockArticleReaderRepository) ListIdsByAuthor(ctx context.Context, uid int64) ([]int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListIdsByAuthor", ctx, uid)
+	ret0, _ := ret[0].([]int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListIdsByAuthor indicates an expected call of ListIdsByAuthor.
+func (mr *MockArticleReaderRepositoryMockRecorder) ListIdsByAuthor(ctx, uid any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListIdsByAuthor", reflect.TypeOf((*MockArticleReaderRepository)(nil).ListIdsByAuthor), ctx, uid)
+}
+
 // Page mocks base method.
 func (m *MockArticleReaderRepository) Page(ctx context.Context, offset, limit int) ([]domain.Article, int64, error) {
 	m.ctrl.T.Helper()
@@ -100,6 +115,22 @@ func (m *MockArticleReaderRepository) Page(ctx context.Context, offset, limit in
 func (mr *MockArticleReaderRepositoryMockRecorder) Page(ctx, offset, limit any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Page", reflect.TypeOf((*MockArticleReaderRepository)(nil).Page), ctx, offset, limit)
+}
+
+// PageByAuthor mocks base method.
+func (m *MockArticleReaderRepository) PageByAuthor(ctx context.Context, uid int64, offset, limit int) ([]domain.Article, int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PageByAuthor", ctx, uid, offset, limit)
+	ret0, _ := ret[0].([]domain.Article)
+	ret1, _ := ret[1].(int64)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// PageByAuthor indicates an expected call of PageByAuthor.
+func (mr *MockArticleReaderRepositoryMockRecorder) PageByAuthor(ctx, uid, offset, limit any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PageByAuthor", reflect.TypeOf((*MockArticleReaderRepository)(nil).PageByAuthor), ctx, uid, offset, limit)
 }
 
 // Upsert mocks base method.

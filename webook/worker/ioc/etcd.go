@@ -7,6 +7,8 @@ import (
 
 	"github.com/spf13/viper"
 	etcdv3 "go.etcd.io/etcd/client/v3"
+
+	"github.com/webook/shared/confkey"
 )
 
 // InitEtcdClient etcd 客户端，供 gRPC resolver 做服务发现。读 etcd.endpoints。
@@ -15,7 +17,7 @@ func InitEtcdClient() (*etcdv3.Client, func(), error) {
 		Endpoints []string `yaml:"endpoints"`
 	}
 	var cfg Config
-	if err := viper.UnmarshalKey("etcd", &cfg); err != nil {
+	if err := viper.UnmarshalKey(confkey.Etcd, &cfg); err != nil {
 		return nil, nil, err
 	}
 	if len(cfg.Endpoints) == 0 {

@@ -2,6 +2,57 @@
 
 <!-- 新功能前插在此，日期降序 -->
 
+## [2026-07-07] Go 多模块化 + go.work 架构方案（设计）
+
+**变更内容**: 出「`webook/` 单模块 → 每服务 + `pkg`/`api`/`shared` 各自独立 `go.mod` + `go.work`」架构方案；并决定顺带把历史占位模块名 `github.com/webook` 对齐真实仓库 `github.com/boyxs/train-go/webook`。仅设计文档，未动代码。
+**影响范围**: 新增 `prd/go-workspace/ARCHITECTURE.md`（10 模块拓扑 / `go.work`+`replace` 契约 / Docker·CI·wire·mock 配套改造 / 6 阶段迁移 / 风险 / 决策）。侦察确认依赖图无环、服务间零耦合（唯一跨服务边是 worker 契约测试 → `internal/events/interaction`）、根模块可解散（根目录无 `.go`）。
+**技术决策**: ① 模块前缀对齐真实仓库 `github.com/boyxs/train-go/webook`，作为拆分前**独立第一步**在单模块状态一次机械替换（369 `.go` + 6 `.proto` 的 `go_package` + CI `MODULE` env），`go build` 兜底；② `internal/` 保持原名（`.../webook/internal`），零 import 改写，不改 `core`（Go internal 可见性基于路径前缀，兄弟模块仍可 import）；③ `go.work` + 各 `go.mod` 加 `replace`（tidy/Docker/CI 离线确定性解析），Docker 用 `GOWORK=off`；④ 根 `go.mod`/`go.sum` 解散；⑤ `go.work`/`go.work.sum` 提交进 git（monorepo 实践）。
+**待办**: 实施——Phase 0 前缀迁移（单独提交）→ P1 叶子模块（api/shared/pkg）→ P2 建 `go.work` → P3 逐服务模块（init+replace+tidy+use，worker 特例加 internal）→ P4 删根模块 + `go work sync` → P5 改 Docker/CI/Makefile/mk + 同步 `webook/CLAUDE.md`·`coding-rules.md` → P6 端到端验证。CLAUDE.md/coding-rules 的多模块规则**待 Phase 5 落地时同步**（描述活状态，不提前写）。
+**会话**: 260707-go-workspace-多模块化
+**发布**: 待上线
+
+## [2026-07-06] 用户关系（relation）原型↔实现对齐 + 数据补齐（消 N+1）
+
+**变更内容**: 复盘 relation 原型与实现不一致并双向对齐——改原型（他人主页头部→PublicHeader、去 `@handle`/动态 Tab/文章缩略图；关注粉丝页补个人信息卡）+ 补后端数据匹配原型（列表每人 关注/粉丝数、粉丝「关注了你·时间」、文章卡评论数）；新增 comment `BatchCountComment` 一次 GROUP BY 消除评论数聚合的 N+1。
+**影响范围**:
+- 原型: `prd/relation/relation.pen`（他人主页/关注粉丝两 frame）+ 重导 `01/02` PNG + `PRD.md`（原型资产 + 对齐决策）
+- 后端(core): `internal/web/relation.go`（followees/followers 加 `BatchGetStats` 每人计数 + `followerItemVO.createdAt`）；`internal/web/article.go`（`/article/reader/author` 加 `commentCnt`，一次 `BatchCountComment`）
+- 后端(comment): `api/proto/comment/v1`（+`BatchCountComment`）+ gen；comment dao/repo/service/grpc 加 `BatchCount`（GROUP BY biz_id）；mocks 重生成；comment dao 真库测试
+- 前端: types（`FolloweeItem`/`FollowerItem` 加计数+`createdAt`；`ReaderArticle` 加 `commentCnt`）；`FollowButton`（`followLabel`「回关」）；`FollowList`（每人计数副行 + 粉丝「关注了你·时间」+ 已加载 X/总数）；`profile` 传 total；`detail` 文章卡「点赞·评论」
+**技术决策**: ① 评论数用批量 `BatchCountComment`（一次 GROUP BY）而非 N 次 `CountComment`，消 N+1 跨服务；② 每人计数复用 relation 现成 `BatchGetStats` 一次批量；③ 他人主页保持公开（PublicHeader）、关注粉丝保持组合页（含个人信息卡）；④ 无数据源项（`@handle`/动态/缩略图）改原型删除；⑤ **分层规范化**：他人主页文章的互动/评论/获赞聚合从 web 下沉到 `ArticleReaderService.AuthorArticles`（service 持 comment gRPC client、返回 `domain.ArticleWithStats`），web `Author` 仅调用 + `slicex.Map` 映射 VO；`webook/CLAUDE.md` 补「三层职责边界」规则（web 搬运 / service 编排聚合 / repo 存取）；⑥ 遗留数据 `user.created_at` 为 NULL 导致「加入时间」不显示，按 §5 约定回填；⑦ 按新规则清历史债：comment / relation 网关 handler 的聚合下沉到新 `service.GRPCCommentService` / `GRPCRelationService`（持下游 gRPC client + userSvc + producer，聚合评论树/关系列表 + 昵称 + 计数 + 事件），web handler 瘦身为「调 service + `slicex.Map` 映射 VO」，评论聚合测试迁到 service 层；`abstractFromContent` 提取为 `pkg/stringx.Abbreviate` + `domain.Article.DisplayAbstract()`；CLAUDE.md 规则明确「接入层 = web/ 或 grpc/」（gRPC server 等同 web 层）。
+**待办**: 移动端未运行态目检；获赞后续 denormalize；私信仍为 P1 占位。
+**会话**: 260706-relation-用户关系系统
+**发布**: 待上线
+
+## [2026-07-06] 用户关系（relation）前端全量 + 他人主页后端补齐
+
+**变更内容**: relation 前端落地（关注按钮 4 态 / 关注·粉丝 Tab / 黑名单页 + 拉黑弹窗 / 他人主页）；为「他人主页」补 core 只读端点（公开用户信息 + 按作者已发布文章 + 获赞聚合）。
+**影响范围**:
+- 后端(core)：`internal/repository/dao/article_reader.go`(+PageByAuthor/CountByAuthor/ListIdsByAuthor)、`internal/repository/article_reader.go`、`internal/service/article.go`(reader 层同名方法)、`internal/web/article.go`(POST `/article/reader/author` + ReaderArticleVO.likeCnt + likedTotal)、`internal/web/user.go`(公开 POST `/user/info`)、`internal/ioc/web.go`(两端点入 IgnoredPaths)、mocks 重生成。
+- 前端(webook-fe)：`types/relation.ts`+`api/relation.ts`(8 端点)、`types/user.ts`/`api/user.ts`(UserInfo)、`types/article.ts`/`api/article.ts`(ReaderArticle/AuthorArticlesResult)、`components/relation/{FollowButton,UserCard,FollowList}.tsx`、`hooks/useCursorList.ts`、`utils/format.ts`、`views/user/{profile,blocklist,detail}.tsx`、`app/(main)/user/profile`(Suspense)、`app/(main)/user/settings/blocklist`、`app/(auth)/user/[id]`。入口打通：`components/layout/Header.tsx`(用户菜单加「黑名单」)、`components/comment/CommentItem.tsx`(评论人头像/昵称点进他人主页)、`views/article/read.tsx`+`types/article.ts`(文章详情页新增作者行：头像/昵称点进他人主页 + 就地关注按钮，作者不再依赖评论才可达)。悬浮卡：`components/relation/UserHoverCard.tsx`(hover 头像/昵称出基本信息卡 + 关注/发私信便捷操作,懒加载+按 uid 模块级缓存+mouseEnterDelay 防划过触发),挂到评论区作者(`CommentItem`)与文章详情作者(`read.tsx`)。
+**技术决策**: ① 他人主页公开可读（置 `(auth)` 组 + PublicHeader，写操作走 FollowButton 的登录校验），对齐 article 读页；② 关注/粉丝/黑名单游标分页抽 `useCursorList`；③ 关注按钮 4 态精确对齐 relation.pen（padding[8,20]/lucide/token 色），乐观更新 + 失败回滚；④ 获赞无 per-user 计数器，实时聚合作者已发布文章 likeCnt；⑤ 昵称/简介经公开 `/user/info`，relation 列表昵称仍由 core 聚合。
+**待办**: 获赞后续 denormalize 到计数器；私信为占位提示（用户间 DM 属 P1 未建，**不接** AI `/chat`——二者无关）；文章卡展示点赞+浏览（评论数属 comment 服务，未二次聚合）；移动端用响应式类适配，未在运行态浏览器逐页目检。
+**会话**: 260706-relation-用户关系系统
+**发布**: 待上线
+
+## [2026-07-06] 用户关系（relation）新服务基建接入（部署/监控/CI）
+
+**变更内容**: relation 独立 gRPC 微服务接入部署与可观测栈——docker-compose 服务块 + Dockerfile + prometheus 抓取 + grafana 告警 + CI workflow + `.env` 变量，完成 CLAUDE.md「服务拆分」14 项清单。
+**影响范围**: 新增 `webook/relation/Dockerfile`、`.github/workflows/webook-relation-ci.yml`、`deploy/grafana/provisioning/alerting/webook-relation.yml`；改 `deploy/docker-compose.yaml` + `docker-compose.local.yaml`（webook-relation 服务/override）、`deploy/prometheus/prometheus.yml`（job）、8 份 `deploy/.env.*{,.example}`（`RELATION_IMAGE_TAG`/`RELATION_APP_ENV`）、6 兄弟 CI 的 `paths-ignore`（加 `webook/relation/**`）、`webook/relation/CLAUDE.md` 部署段。
+**技术决策**: 镜像 interaction（同为纯 gRPC 内部服务）——HTTP `:8060` 仅 `/metrics`+`/health`，业务走 gRPC `:8061`，不入 nginx；告警用 gRPC 表达式（无 HTTP 业务流量）；metric 命名 `webook_*`，service 靠 `job` label 区分。无需改动：`deploy.sh`（服务名透传）、grafana 看板（`$service` 变量 / `label_values(up{job=~"webook-.*"})` 自动纳入）、prometheus 录制规则（无 cron/lock）、nginx（gRPC 经 etcd）。
+**待办**: 仅剩前端（webook-fe：`api/relation.ts` + types + 关注按钮 3 态 + `/user/[id]` + profile 关注/粉丝 Tab + `blocklist` + 移动端）。**续接见 `prd/relation/HANDOVER.md`**。
+**会话**: 260706-relation-用户关系系统
+**发布**: 待上线
+
+## [2026-07-06] 用户关系系统（relation）设计 + 后端全链路（进行中）
+
+**变更内容**: 新增用户关系模块（关注/粉丝/拉黑）。完成需求+原型（`prd/relation/`：`relation.pen` + 5 PNG + PRD/ARCHITECTURE）+ 后端独立 gRPC 微服务 `webook/relation/` 的全链路业务逻辑（DAO/cache/repository/service/errs/domain/proto/gRPC server），32 条真库集成用例全绿。
+**影响范围**: 新增 `webook/relation/**`（domain/dao/cache/repository/service/errs/grpc/consts/scripts/integration/config）+ `api/proto/relation/v1/relation.proto` + `api/gen/relation/v1/**`；改 `webook/worker/event→events`（对齐 core 复数）；`webook/CLAUDE.md`（端口分配铁律 + 转换命名多类型）；`prd/relation/**`。
+**技术决策**: ① 独立 gRPC 服务（端口 8060/8061）——feed/chat 跨服务消费，放 core 会反向依赖网关；② 关注边 status 翻转 + 行锁 + GREATEST 计数（镜像 interaction）；③ 计数 cache-aside + 写后失效；④ 事件在 core 生产、gated on changed，relation 纯同步（对齐 interaction 边界铁律）；⑤ feed 后续独立服务，relation 只暴露关系查询 gRPC + `relation_events`。
+**待办**: ioc+wire+main（服务可跑）→ core 接入（web 8 endpoint + client + 事件 + wire）→ 前端 → 14 项新服务基建。**续接见 `prd/relation/HANDOVER.md`**。
+**会话**: 260706-relation-用户关系系统
+**发布**: 待上线
+
 ## [2026-07-05] 外部凭据 env 变量改纯厂商命名（DEEPSEEK/KIMI/QIANFAN）
 
 **变更内容**: `LLM_DEEPSEEK_API_KEY`/`LLM_KIMI_API_KEY`/`EMBEDDING_API_KEY` → `DEEPSEEK_API_KEY`/`KIMI_API_KEY`/`QIANFAN_API_KEY`。按「厂商凭据」命名（与能力无关，业界 `OPENAI_API_KEY` 风格），补掉 `EMBEDDING_API_KEY` 看不出厂商（百度千帆）的一致性缺口。

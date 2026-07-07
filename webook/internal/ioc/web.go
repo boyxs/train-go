@@ -22,6 +22,7 @@ import (
 	"github.com/webook/pkg/ginx/middleware/timeout"
 	"github.com/webook/pkg/jwtx"
 	"github.com/webook/pkg/logger"
+	"github.com/webook/shared/confkey"
 )
 
 func InitWebServer(
@@ -36,6 +37,7 @@ func InitWebServer(
 	polishHandler web.ArticlePolishHandler,
 	rankingHandler web.RankingHandler,
 	commentHandler web.CommentHandler,
+	relationHandler web.RelationHandler,
 ) *gin.Engine {
 	server := gin.Default()
 	ginx.UserKey = consts.UserKey // 登录态 ctx key，供 ginx.MustClaims/Claims 读取
@@ -56,6 +58,7 @@ func InitWebServer(
 	polishHandler.RegisterRoutes(server)
 	rankingHandler.RegisterRoutes(server)
 	commentHandler.RegisterRoutes(server)
+	relationHandler.RegisterRoutes(server)
 	return server
 }
 
@@ -77,7 +80,7 @@ func InitMiddlewares(
 			otelgin.WithTracerProvider(tp),
 		),
 		// HTTP 软超时（默认 15s）；LLM 润色 / 语义搜索豁免——按各自 client 超时(llm 60s / embedding)跑，不被 15s 切
-		timeout.NewMiddlewareBuilder(viper.GetDuration("server.http.timeout")).
+		timeout.NewMiddlewareBuilder(viper.GetDuration(confkey.ServerHTTPTimeout)).
 			ExemptPrefix("/article/polish", "/search/article").
 			Build(),
 		//cors
@@ -141,15 +144,18 @@ func loginJwtMiddleware(cmd redis.Cmdable) gin.HandlerFunc {
 			"/user/login_sms",
 			"/oauth2/wechat/authurl",
 			"/oauth2/wechat/callback",
+			"/user/info",
 			"/article/reader/detail",
 			"/article/reader/page",
+			"/article/reader/author",
 			"/interaction/view",
 			"/interaction/detail",
 			"/article/ranking/page",
 			"/article/ranking/archive/dates",
 			"/metrics", // Prometheus 抓取端点，由 nginx /metrics 的 IP 白名单层把关
 		).
-		// 评论 list/replies 公开可读，但登录态可选
-		OptionalPaths("/comment/list", "/comment/replies").
+		// 评论 list/replies + 关系 followees/followers/stat 公开可读，但登录态可选
+		OptionalPaths("/comment/list", "/comment/replies",
+			"/relation/followees", "/relation/followers", "/relation/stat").
 		Build()
 }

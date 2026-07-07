@@ -6,6 +6,7 @@ import (
 	"github.com/spf13/viper"
 
 	redisprom "github.com/webook/pkg/redisx/prometheus"
+	"github.com/webook/shared/confkey"
 )
 
 // InitRedis 初始化 migrator 使用的 Redis 客户端。
@@ -16,7 +17,7 @@ func InitRedis() redis.Cmdable {
 		Password string `yaml:"password" mapstructure:"password"`
 	}
 	var cfg Config
-	if err := viper.UnmarshalKey("data.redis", &cfg); err != nil {
+	if err := viper.UnmarshalKey(confkey.DataRedis, &cfg); err != nil {
 		panic(err)
 	}
 	client := redis.NewClient(&redis.Options{

@@ -14,6 +14,8 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 	"go.opentelemetry.io/otel/trace"
+
+	"github.com/webook/shared/confkey"
 )
 
 // InitOTel 初始化 OpenTelemetry：OTLP/gRPC → otel-collector → Zipkin，与 chat/internal 同源。
@@ -33,8 +35,8 @@ func InitOTel() (trace.TracerProvider, func(), error) {
 		Env:            "dev",
 		SampleRatio:    1.0,
 	}
-	if err := viper.UnmarshalKey("otel", &cfg); err != nil {
-		panic(err)
+	if err := viper.UnmarshalKey(confkey.OTel, &cfg); err != nil {
+		return nil, nil, err
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

@@ -42,6 +42,21 @@ func (m *MockCommentService) EXPECT() *MockCommentServiceMockRecorder {
 	return m.recorder
 }
 
+// BatchCount mocks base method.
+func (m *MockCommentService) BatchCount(ctx context.Context, biz string, bizIds []int64) (map[int64]int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "BatchCount", ctx, biz, bizIds)
+	ret0, _ := ret[0].(map[int64]int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// BatchCount indicates an expected call of BatchCount.
+func (mr *MockCommentServiceMockRecorder) BatchCount(ctx, biz, bizIds any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchCount", reflect.TypeOf((*MockCommentService)(nil).BatchCount), ctx, biz, bizIds)
+}
+
 // BatchGet mocks base method.
 func (m *MockCommentService) BatchGet(ctx context.Context, ids []int64) ([]domain.Comment, error) {
 	m.ctrl.T.Helper()

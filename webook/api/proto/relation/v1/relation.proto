@@ -1,0 +1,106 @@
+syntax = "proto3";
+
+package webook.relation.v1;
+
+option go_package = "github.com/webook/api/gen/relation/v1;relationv1";
+
+// RelationService 暴露用户关系（关注/粉丝/拉黑）的读写。core 经 gRPC 调用，鉴权后注入 uid。
+// 纯同步：事件（relation_events）由 core 网关在写成功且 changed 时生产，本服务不碰 Kafka。
+service RelationService {
+  // ── 写（changed=是否真状态翻转，core 据此门控事件）──────────
+  rpc Follow(FollowRequest) returns (FollowResponse);
+  rpc Unfollow(FollowRequest) returns (FollowResponse);
+  rpc Block(BlockRequest) returns (BlockResponse);
+  rpc Unblock(BlockRequest) returns (BlockResponse);
+
+  // ── 读 ────────────────────────────────────────────────
+  rpc GetStats(GetStatsRequest) returns (GetStatsResponse);
+  rpc BatchGetStats(BatchGetStatsRequest) returns (BatchGetStatsResponse);
+  rpc GetRelation(GetRelationRequest) returns (GetRelationResponse);
+  rpc ListFollowees(ListRequest) returns (ListFollowResponse);
+  rpc ListFollowers(ListRequest) returns (ListFollowResponse);
+  rpc ListBlocks(ListRequest) returns (ListBlockResponse);
+}
+
+// RelationStats 关系聚合计数。
+message RelationStats {
+  int64 uid = 1;
+  int64 followee_cnt = 2; // 关注数：该用户关注了多少人
+  int64 follower_cnt = 3; // 粉丝数：多少人关注该用户
+}
+
+// RelationState viewer 对某 target 的关系态（core 据此派生 is_mutual = is_following && is_followed_by）。
+message RelationState {
+  bool is_following = 1;    // viewer 关注了 target
+  bool is_followed_by = 2;  // target 关注了 viewer
+  bool is_blocked = 3;      // viewer 拉黑了 target
+  bool is_blocked_by = 4;   // target 拉黑了 viewer
+}
+
+message FollowEdge {
+  int64 follower_id = 1;
+  int64 followee_id = 2;
+  int64 created_at = 3;
+}
+
+message BlockEdge {
+  int64 uid = 1;
+  int64 blocked_uid = 2;
+  int64 created_at = 3;
+}
+
+// Follow / Unfollow 共用（follower → followee）。
+message FollowRequest {
+  int64 follower_id = 1;
+  int64 followee_id = 2;
+}
+message FollowResponse {
+  bool changed = 1;
+}
+
+// Block / Unblock 共用（uid 拉黑 blocked_id）。
+message BlockRequest {
+  int64 uid = 1;
+  int64 blocked_id = 2;
+}
+message BlockResponse {
+  bool changed = 1;
+}
+
+message GetStatsRequest {
+  int64 uid = 1;
+}
+message GetStatsResponse {
+  RelationStats stats = 1;
+}
+
+message BatchGetStatsRequest {
+  repeated int64 uids = 1;
+}
+message BatchGetStatsResponse {
+  map<int64, RelationStats> stats = 1; // key=uid，无记录的 uid 不在 map 中
+}
+
+message GetRelationRequest {
+  int64 viewer_id = 1;
+  repeated int64 target_ids = 2;
+}
+message GetRelationResponse {
+  map<int64, RelationState> states = 1; // key=target_id
+}
+
+// ListRequest 游标分页通用（cursor<=0 取首页，id DESC）。
+// uid 语义随方法：ListFollowees=关注者 / ListFollowers=被关注者 / ListBlocks=拉黑发起者。
+message ListRequest {
+  int64 uid = 1;
+  int64 cursor = 2;
+  int32 limit = 3;
+}
+message ListFollowResponse {
+  repeated FollowEdge edges = 1;
+  int64 next_cursor = 2; // 下一页游标（本页最后一条 id）；0=无更多
+}
+message ListBlockResponse {
+  repeated BlockEdge edges = 1;
+  int64 next_cursor = 2;
+}

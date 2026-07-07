@@ -23,6 +23,7 @@ type CommentService interface {
 	Delete(ctx context.Context, id, uid int64) error
 	BatchGet(ctx context.Context, ids []int64) ([]domain.Comment, error)
 	Count(ctx context.Context, biz string, bizId int64) (int64, error)
+	BatchCount(ctx context.Context, biz string, bizIds []int64) (map[int64]int64, error)
 }
 
 type InternalCommentService struct {
@@ -86,4 +87,8 @@ func (s *InternalCommentService) BatchGet(ctx context.Context, ids []int64) ([]d
 
 func (s *InternalCommentService) Count(ctx context.Context, biz string, bizId int64) (int64, error) {
 	return s.repo.Count(ctx, biz, bizId)
+}
+
+func (s *InternalCommentService) BatchCount(ctx context.Context, biz string, bizIds []int64) (map[int64]int64, error) {
+	return s.repo.BatchCount(ctx, biz, bizIds)
 }

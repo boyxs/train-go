@@ -79,14 +79,28 @@ type editReqUser struct {
 	AboutMe  string `json:"aboutMe"`
 }
 
+// userInfoReq 他人主页取某用户公开信息
+type userInfoReq struct {
+	Id int64 `json:"id" binding:"required,gt=0"`
+}
+
+// userInfoVO 他人主页头部用户公开信息（不含邮箱/手机等私密字段）
+type userInfoVO struct {
+	Id        int64  `json:"id"`
+	Nickname  string `json:"nickname"`
+	AboutMe   string `json:"aboutMe"`
+	CreatedAt int64  `json:"createdAt"`
+}
+
 func (h *InternalUserHandler) RegisterRoutes(server *gin.Engine) {
 	ug := server.Group("/user")
 	ug.POST("/register", ginx.WrapReq[registerReq](h.Register))
 	ug.POST("/login", ginx.WrapReq[loginReq](h.Login))
 	ug.POST("/logout", ginx.Wrap(h.Logout))
 	ug.POST("/edit", ginx.WrapReq[editReqUser](h.Edit))
-	ug.GET("/refresh_token", h.RefreshToken) // 直接返 401，不走 wrapper
-	ug.GET("/profile", h.Profile)            // 不走 wrapper：前端期望直接 Profile 不带 Result 包装
+	ug.GET("/refresh_token", h.RefreshToken)            // 直接返 401，不走 wrapper
+	ug.GET("/profile", h.Profile)                       // 不走 wrapper：前端期望直接 Profile 不带 Result 包装
+	ug.POST("/info", ginx.WrapReq[userInfoReq](h.Info)) // 公开：他人主页取昵称/简介/加入时间
 
 	//手机验证码登录相关功能
 	ug.POST("/login_sms/code/send", ginx.WrapReq[smsCodeReq](h.SendLoginSMSCode))
@@ -222,4 +236,19 @@ func (h *InternalUserHandler) Profile(ctx *gin.Context) {
 		return
 	}
 	ctx.JSON(http.StatusOK, profile)
+}
+
+// Info 他人主页头部：按 id 取某用户公开信息（昵称/简介/加入时间）。公开可读。
+func (h *InternalUserHandler) Info(ctx *gin.Context, req userInfoReq) (ginx.Result, error) {
+	u, err := h.userService.Profile(ctx.Request.Context(), req.Id)
+	if err != nil {
+		h.l.Warn("查询用户公开信息失败", logger.Int64("id", req.Id), logger.Error(err))
+		return ginx.NotFound("用户不存在"), nil
+	}
+	return ginx.Result{Data: userInfoVO{
+		Id:        u.Id,
+		Nickname:  u.Nickname,
+		AboutMe:   u.AboutMe,
+		CreatedAt: u.CreatedAt,
+	}}, nil
 }

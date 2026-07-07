@@ -43,6 +43,26 @@ func (m *MockCommentServiceClient) EXPECT() *MockCommentServiceClientMockRecorde
 	return m.recorder
 }
 
+// BatchCountComment mocks base method.
+func (m *MockCommentServiceClient) BatchCountComment(ctx context.Context, in *commentv1.BatchCountCommentRequest, opts ...grpc.CallOption) (*commentv1.BatchCountCommentResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, in}
+	for _, a := range opts {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "BatchCountComment", varargs...)
+	ret0, _ := ret[0].(*commentv1.BatchCountCommentResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// BatchCountComment indicates an expected call of BatchCountComment.
+func (mr *MockCommentServiceClientMockRecorder) BatchCountComment(ctx, in any, opts ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, in}, opts...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchCountComment", reflect.TypeOf((*MockCommentServiceClient)(nil).BatchCountComment), varargs...)
+}
+
 // BatchGetComments mocks base method.
 func (m *MockCommentServiceClient) BatchGetComments(ctx context.Context, in *commentv1.BatchGetCommentsRequest, opts ...grpc.CallOption) (*commentv1.BatchGetCommentsResponse, error) {
 	m.ctrl.T.Helper()

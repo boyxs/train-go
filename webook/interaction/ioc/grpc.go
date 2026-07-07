@@ -15,18 +15,19 @@ import (
 	"github.com/webook/pkg/grpcx/interceptor/errconv"
 	"github.com/webook/pkg/grpcx/interceptor/metrics"
 	"github.com/webook/pkg/logger"
+	"github.com/webook/shared/confkey"
 )
 
 // InitGRPCServer 组装 gRPC server 并注册 InteractionService，由 main 起 goroutine 监听。
 // otel StatsHandler + metrics/errconv 拦截器显式传入；消费注入的 TracerProvider。
 func InitGRPCServer(interactionSrv *interactiongrpc.InteractionServer, client *etcdv3.Client, l logger.LoggerX, tp trace.TracerProvider) *grpcx.Server {
 	cfg := grpcx.ServerConfig{
-		Addr:    viper.GetString("server.grpc.addr"),
-		Name:    viper.GetString("server.grpc.name"),
-		Host:    viper.GetString("server.grpc.host"),
-		TTL:     viper.GetDuration("server.grpc.ttl"),
-		Weight:  viper.GetInt("server.grpc.weight"),
-		Timeout: viper.GetDuration("server.grpc.timeout"),
+		Addr:    viper.GetString(confkey.ServerGRPCAddr),
+		Name:    viper.GetString(confkey.ServerGRPCName),
+		Host:    viper.GetString(confkey.ServerGRPCHost),
+		TTL:     viper.GetDuration(confkey.ServerGRPCTTL),
+		Weight:  viper.GetInt(confkey.ServerGRPCWeight),
+		Timeout: viper.GetDuration(confkey.ServerGRPCTimeout),
 	}
 	grpcMetrics := metrics.NewPrometheusBuilder("webook", "grpc", "requests", "gRPC 请求").
 		WithCounter().WithHistogram().WithInFlight()

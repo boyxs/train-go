@@ -74,3 +74,74 @@ func TestRepublishAfterWithdraw_ResetsDeletedAt_OnV1Table(t *testing.T) {
 	assert.Equal(t, "v2", pub.Title)
 	assert.Equal(t, "c2", pub.Content)
 }
+
+// TestArticleReaderDAO_ByAuthor 验证他人主页新增的按作者查询（PageByAuthor / CountByAuthor /
+// ListIdsByAuthor）：只返该作者、id DESC、offset/limit 正确、软删行被排除。
+// 用 NEW 侧 DAO（tableName=published_article_v1 临时表），不污染真实 published_article。
+//
+// 跑：cd webook && go test ./internal/repository/dao/ -run TestArticleReaderDAO_ByAuthor -v
+func TestArticleReaderDAO_ByAuthor(t *testing.T) {
+	viper.SetConfigFile("../../config/test.yaml")
+	if err := viper.ReadInConfig(); err != nil {
+		t.Skipf("test.yaml 不可用：%v", err)
+	}
+	dsn := viper.GetString("data.mysql.dsn")
+	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	if err != nil {
+		t.Skipf("mysql 不可达：%v", err)
+	}
+	require.NoError(t, db.AutoMigrate(&PublishedArticle{}))
+	require.NoError(t, db.Exec("DROP TABLE IF EXISTS published_article_v1").Error)
+	require.NoError(t, db.Exec("CREATE TABLE published_article_v1 LIKE published_article").Error)
+	defer func() { _ = db.Exec("DROP TABLE IF EXISTS published_article_v1").Error }()
+
+	d := ArticleReaderDAO(NewGormArticleReaderNewDAO(db))
+	ctx := context.Background()
+	now := time.Now().UnixMilli()
+	const authorA, authorB int64 = 1001, 2002
+
+	for _, a := range []PublishedArticle{
+		{Id: 1, Title: "a1", Content: "c", AuthorId: authorA, Status: 2, CreatedAt: now, UpdatedAt: now},
+		{Id: 2, Title: "a2", Content: "c", AuthorId: authorA, Status: 2, CreatedAt: now, UpdatedAt: now},
+		{Id: 3, Title: "a3", Content: "c", AuthorId: authorA, Status: 2, CreatedAt: now, UpdatedAt: now},
+		{Id: 4, Title: "b1", Content: "c", AuthorId: authorB, Status: 2, CreatedAt: now, UpdatedAt: now},
+	} {
+		require.NoError(t, d.Upsert(ctx, a))
+	}
+
+	// PageByAuthor：只返 A 的，id DESC
+	page, err := d.PageByAuthor(ctx, authorA, 0, 10)
+	require.NoError(t, err)
+	require.Len(t, page, 3)
+	assert.Equal(t, int64(3), page[0].Id, "应按 id DESC")
+	assert.Equal(t, int64(1), page[2].Id)
+	for _, a := range page {
+		assert.Equal(t, authorA, a.AuthorId, "不应混入其他作者")
+	}
+
+	// offset/limit 生效
+	page2, err := d.PageByAuthor(ctx, authorA, 2, 10)
+	require.NoError(t, err)
+	require.Len(t, page2, 1)
+	assert.Equal(t, int64(1), page2[0].Id)
+
+	// CountByAuthor / ListIdsByAuthor
+	cnt, err := d.CountByAuthor(ctx, authorA)
+	require.NoError(t, err)
+	assert.Equal(t, int64(3), cnt)
+	ids, err := d.ListIdsByAuthor(ctx, authorA)
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []int64{1, 2, 3}, ids)
+
+	// 软删一条 → Page/Count/List 均排除
+	require.NoError(t, d.Delete(ctx, 2, authorA))
+	page3, err := d.PageByAuthor(ctx, authorA, 0, 10)
+	require.NoError(t, err)
+	assert.Len(t, page3, 2, "软删行应被排除")
+	cnt2, err := d.CountByAuthor(ctx, authorA)
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), cnt2)
+	ids2, err := d.ListIdsByAuthor(ctx, authorA)
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []int64{1, 3}, ids2)
+}

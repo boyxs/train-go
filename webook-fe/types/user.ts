@@ -40,3 +40,11 @@ export interface EditProfileReq {
   birthday: number;
   aboutMe: string;
 }
+
+// POST /user/info — 他人主页公开信息（对应 web.userInfoVO，不含邮箱/手机）
+export interface UserInfo {
+  id: number;
+  nickname: string;
+  aboutMe: string;
+  createdAt: number;
+}
