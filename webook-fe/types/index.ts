@@ -6,9 +6,26 @@ export type {
   SmsLoginReq,
   SendCodeReq,
   EditProfileReq,
+  UserInfo,
 } from './user';
-export type { Article, EditArticleReq, WithdrawArticleReq } from './article';
+export type {
+  Article,
+  EditArticleReq,
+  WithdrawArticleReq,
+  ReaderArticle,
+  AuthorArticlesResult,
+} from './article';
 export { ArticleStatus } from './article';
+export type {
+  RelationStat,
+  UserBrief,
+  FolloweeItem,
+  FollowerItem,
+  BlockItem,
+  CursorList,
+  RelationListReq,
+  BlocklistReq,
+} from './relation';
 export type {
   Interaction,
   InteractionTarget,

@@ -16,6 +16,11 @@ type ArticleReaderDAO interface {
 	FindByIds(ctx context.Context, ids []int64) ([]PublishedArticle, error)
 	Page(ctx context.Context, offset int, limit int) ([]PublishedArticle, error)
 	Count(ctx context.Context) (int64, error)
+	// PageByAuthor 某作者已发布文章分页（他人主页「TA 的文章」）
+	PageByAuthor(ctx context.Context, uid int64, offset int, limit int) ([]PublishedArticle, error)
+	CountByAuthor(ctx context.Context, uid int64) (int64, error)
+	// ListIdsByAuthor 取某作者全部已发布文章 id（用于聚合「获赞」总数），上限 1000
+	ListIdsByAuthor(ctx context.Context, uid int64) ([]int64, error)
 }
 
 // ArticleReaderNewDAO named type 让 wire 区分 OLD/NEW 两个 ArticleReaderDAO 实例。
@@ -86,6 +91,33 @@ func (d *GormArticleReaderDAO) Count(ctx context.Context) (int64, error) {
 	// Model 给 GORM 注入 softDelete 过滤；Table 给动态表名。少 Model 会把软删行算进来。
 	err := d.db.WithContext(ctx).Table(d.tableName).Model(&PublishedArticle{}).Count(&count).Error
 	return count, err
+}
+
+func (d *GormArticleReaderDAO) PageByAuthor(ctx context.Context, uid int64, offset int, limit int) ([]PublishedArticle, error) {
+	var articles []PublishedArticle
+	err := d.db.WithContext(ctx).Table(d.tableName).
+		Select("id, title, abstract, author_id, status, category, created_at, updated_at").
+		Where("author_id = ?", uid).
+		Order("id DESC").
+		Offset(offset).Limit(limit).
+		Find(&articles).Error
+	return articles, err
+}
+
+func (d *GormArticleReaderDAO) CountByAuthor(ctx context.Context, uid int64) (int64, error) {
+	var count int64
+	err := d.db.WithContext(ctx).Table(d.tableName).Model(&PublishedArticle{}).
+		Where("author_id = ?", uid).Count(&count).Error
+	return count, err
+}
+
+func (d *GormArticleReaderDAO) ListIdsByAuthor(ctx context.Context, uid int64) ([]int64, error) {
+	var ids []int64
+	err := d.db.WithContext(ctx).Table(d.tableName).Model(&PublishedArticle{}).
+		Where("author_id = ?", uid).
+		Order("id DESC").Limit(1000).
+		Pluck("id", &ids).Error
+	return ids, err
 }
 
 // PublishedArticle 线上库模型

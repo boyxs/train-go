@@ -11,6 +11,7 @@ import (
 	"github.com/google/wire"
 
 	"github.com/webook/internal/events/interaction"
+	"github.com/webook/internal/events/relation"
 	"github.com/webook/internal/grpc"
 	"github.com/webook/internal/ioc"
 	"github.com/webook/internal/repository"
@@ -83,7 +84,16 @@ func InitWebServer() (App, func(), error) {
 	interactionEventProducer := interaction.NewSaramaInteractionEventProducer(producer)
 	interactionService := ioc.InitInteractionService(interactionServiceClient, rankingRepository, pool, interactionEventProducer, loggerX)
 	articleAuthorHandler := web.NewInternalArticleAuthorHandler(articleAuthorService, interactionService, loggerX)
-	articleReaderService := service.NewInternalArticleReaderService(articleReaderRepository)
+	commentConn, cleanup5, err := ioc.InitCommentConn(clientv3Client, prometheusBuilder)
+	if err != nil {
+		cleanup4()
+		cleanup3()
+		cleanup2()
+		cleanup()
+		return App{}, nil, err
+	}
+	commentServiceClient := ioc.InitCommentClient(commentConn)
+	articleReaderService := service.NewInternalArticleReaderService(articleReaderRepository, interactionService, commentServiceClient, loggerX)
 	articleReaderHandler := web.NewInternalArticleReaderHandler(articleReaderService, interactionService, loggerX)
 	interactionHandler := web.NewInternalInteractionHandler(interactionService, loggerX)
 	oAuth2Service := ioc.InitWechatOAuth2Service()
@@ -100,17 +110,22 @@ func InitWebServer() (App, func(), error) {
 	articlePolishHandler := web.NewAIArticlePolishHandler(articlePolishService, cmdable, loggerX)
 	rankingService := service.NewArticleRankingService(rankingRepository, articleReaderRepository, interactionService, clickEventService, loggerX)
 	rankingHandler := web.NewArticleRankingHandler(rankingService, loggerX)
-	commentConn, cleanup5, err := ioc.InitCommentConn(clientv3Client, prometheusBuilder)
+	commentService := service.NewGRPCCommentService(commentServiceClient, interactionService, userService, loggerX)
+	commentHandler := web.NewInternalCommentHandler(commentService)
+	relationConn, cleanup6, err := ioc.InitRelationConn(clientv3Client, prometheusBuilder)
 	if err != nil {
+		cleanup5()
 		cleanup4()
 		cleanup3()
 		cleanup2()
 		cleanup()
 		return App{}, nil, err
 	}
-	commentServiceClient := ioc.InitCommentClient(commentConn)
-	commentHandler := web.NewInternalCommentHandler(commentServiceClient, interactionService, userService, loggerX)
-	engine := ioc.InitWebServer(v, userHandler, articleAuthorHandler, articleReaderHandler, interactionHandler, oAuth2Handler, articleSearchHandler, clickEventHandler, articlePolishHandler, rankingHandler, commentHandler)
+	relationServiceClient := ioc.InitRelationClient(relationConn)
+	relationEventProducer := relation.NewSaramaRelationEventProducer(producer)
+	relationService := service.NewGRPCRelationService(relationServiceClient, userService, relationEventProducer, loggerX)
+	relationHandler := web.NewInternalRelationHandler(relationService)
+	engine := ioc.InitWebServer(v, userHandler, articleAuthorHandler, articleReaderHandler, interactionHandler, oAuth2Handler, articleSearchHandler, clickEventHandler, articlePolishHandler, rankingHandler, commentHandler, relationHandler)
 	searchServer := grpc.NewSearchServer(articleSearchService)
 	articleReaderServer := grpc.NewArticleReaderServer(articleReaderService)
 	rankingJobServer := grpc.NewRankingJobServer(rankingService)
@@ -120,6 +135,7 @@ func InitWebServer() (App, func(), error) {
 		GRPCServer: server,
 	}
 	return app, func() {
+		cleanup6()
 		cleanup5()
 		cleanup4()
 		cleanup3()
@@ -146,7 +162,7 @@ var articleRankingProviderSet = wire.NewSet(dao.NewGormArticleRankingDAO, cache.
 var migratorSDKProviderSet = wire.NewSet(ioc.InitMigratorSDKSwitchReader, ioc.InitMigratorSDKDualWriter, ioc.InitMigratorSDKTaskName, dao.NewGormArticleReaderNewDAO)
 
 // kafkaProviderSet Kafka 生产侧：core 只产 read 事件，消费由 webook-worker（调度器）负责。
-var kafkaProviderSet = wire.NewSet(ioc.InitKafkaConfig, ioc.InitSaramaConfig, ioc.InitEventProducer, interaction.NewSaramaInteractionEventProducer)
+var kafkaProviderSet = wire.NewSet(ioc.InitKafkaConfig, ioc.InitSaramaConfig, ioc.InitEventProducer, interaction.NewSaramaInteractionEventProducer, relation.NewSaramaRelationEventProducer)
 
 // App 应用入口：Web 服务 + gRPC 服务（消费者/定时任务已抽到 webook-worker）。
 type App struct {

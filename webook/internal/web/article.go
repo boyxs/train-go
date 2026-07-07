@@ -9,6 +9,7 @@ import (
 	"github.com/webook/internal/service"
 	"github.com/webook/pkg/ginx"
 	"github.com/webook/pkg/logger"
+	"github.com/webook/pkg/slicex"
 )
 
 type ArticleAuthorHandler interface {
@@ -244,25 +245,27 @@ func (h *InternalArticleReaderHandler) RegisterRoutes(server *gin.Engine) {
 	g := server.Group("/article/reader")
 	g.POST("/detail", ginx.WrapReq[idReq](h.Detail))
 	g.POST("/page", ginx.WrapReq[pageReq](h.Page))
+	g.POST("/author", ginx.WrapReq[authorArticlesReq](h.Author)) // 他人主页「TA 的文章」，公开可读
+}
+
+// authorArticlesReq 他人主页「TA 的文章」分页请求
+type authorArticlesReq struct {
+	AuthorId int64 `json:"authorId" binding:"required,gt=0"`
+	Page     int   `json:"page"`
+	PageSize int   `json:"pageSize"`
 }
 
 // ReaderArticleVO 读者视角的文章简要信息
 type ReaderArticleVO struct {
-	Id        int64  `json:"id"`
-	Title     string `json:"title"`
-	Abstract  string `json:"abstract"`
-	AuthorId  int64  `json:"authorId"`
-	ReadCnt   int64  `json:"readCnt"`
-	CreatedAt int64  `json:"createdAt"`
-	UpdatedAt int64  `json:"updatedAt"`
-}
-
-func abstractFromContent(content string, maxLen int) string {
-	r := []rune(content)
-	if len(r) <= maxLen {
-		return content
-	}
-	return string(r[:maxLen]) + "..."
+	Id         int64  `json:"id"`
+	Title      string `json:"title"`
+	Abstract   string `json:"abstract"`
+	AuthorId   int64  `json:"authorId"`
+	ReadCnt    int64  `json:"readCnt"`
+	LikeCnt    int64  `json:"likeCnt"`
+	CommentCnt int64  `json:"commentCnt"`
+	CreatedAt  int64  `json:"createdAt"`
+	UpdatedAt  int64  `json:"updatedAt"`
 }
 
 func (h *InternalArticleReaderHandler) Detail(ctx *gin.Context, req idReq) (ginx.Result, error) {
@@ -287,20 +290,44 @@ func (h *InternalArticleReaderHandler) Detail(ctx *gin.Context, req idReq) (ginx
 		// errgroup 任一返 err 都视为「文章不存在」（reader 端无权限/无 detail 都按 NotFound 暴露）
 		return ginx.Result{}, errs.ErrArticleNotFound.WithCause(err)
 	}
-	abstract := article.Abstract
-	if abstract == "" {
-		abstract = abstractFromContent(article.Content, 128)
-	}
 	return ginx.Result{Data: ReaderDetailVO{
 		Id:        article.Id,
 		Title:     article.Title,
 		Content:   article.Content,
-		Abstract:  abstract,
+		Abstract:  article.DisplayAbstract(),
 		AuthorId:  article.Author.Id,
 		ReadCnt:   intr.ReadCount,
 		CreatedAt: article.CreatedAt,
 		UpdatedAt: article.UpdatedAt,
 	}}, nil
+}
+
+// Author 他人主页「TA 的文章」：某作者已发布文章分页 + 获赞总数聚合。公开可读。
+func (h *InternalArticleReaderHandler) Author(ctx *gin.Context, req authorArticlesReq) (ginx.Result, error) {
+	items, total, likedTotal, err := h.svc.AuthorArticles(ctx, req.AuthorId, req.Page, req.PageSize)
+	if err != nil {
+		return ginx.Result{}, err
+	}
+	return ginx.Result{Data: gin.H{
+		"list":       slicex.Map(items, toReaderArticleVO),
+		"total":      total,
+		"likedTotal": likedTotal,
+	}}, nil
+}
+
+// toReaderArticleVO 领域(含聚合计数) → 读者文章 VO（纯映射；摘要缺省从正文截取）。
+func toReaderArticleVO(a domain.ArticleWithStats) ReaderArticleVO {
+	return ReaderArticleVO{
+		Id:         a.Id,
+		Title:      a.Title,
+		Abstract:   a.DisplayAbstract(),
+		AuthorId:   a.Author.Id,
+		ReadCnt:    a.ReadCnt,
+		LikeCnt:    a.LikeCnt,
+		CommentCnt: a.CommentCnt,
+		CreatedAt:  a.CreatedAt,
+		UpdatedAt:  a.UpdatedAt,
+	}
 }
 
 func (h *InternalArticleReaderHandler) Page(ctx *gin.Context, req pageReq) (ginx.Result, error) {
@@ -319,14 +346,10 @@ func (h *InternalArticleReaderHandler) Page(ctx *gin.Context, req pageReq) (ginx
 	}
 	list := make([]ReaderArticleVO, 0, len(articles))
 	for _, a := range articles {
-		abstract := a.Abstract
-		if abstract == "" {
-			abstract = abstractFromContent(a.Content, 128)
-		}
 		list = append(list, ReaderArticleVO{
 			Id:        a.Id,
 			Title:     a.Title,
-			Abstract:  abstract,
+			Abstract:  a.DisplayAbstract(),
 			AuthorId:  a.Author.Id,
 			ReadCnt:   intrMap[a.Id].ReadCount,
 			CreatedAt: a.CreatedAt,

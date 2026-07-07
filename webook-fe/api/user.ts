@@ -6,6 +6,7 @@ import type {
   Result,
   SendCodeReq,
   SmsLoginReq,
+  UserInfo,
 } from '@/types';
 
 import axios from './request';
@@ -28,6 +29,11 @@ export function logout() {
 // GET /user/profile — 直接返回 Profile 对象（无 Result 包装）
 export function findProfile() {
   return axios.get<Profile>('/user/profile');
+}
+
+// POST /user/info — 他人主页取某用户公开信息（公开）
+export function findUserInfo(id: number) {
+  return axios.post<Result<UserInfo>>('/user/info', { id });
 }
 
 // POST /user/edit — 返回 Result<Profile>

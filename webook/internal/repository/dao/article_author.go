@@ -8,6 +8,7 @@ import (
 	"gorm.io/plugin/soft_delete"
 
 	"github.com/webook/internal/errs"
+	"github.com/webook/pkg/stringx"
 )
 
 // ArticleAuthorDAO 制作库 DAO，只操作 article 表
@@ -146,14 +147,11 @@ func (Article) TableName() string {
 	return "article"
 }
 
-// ensureAbstract 若 abstract 为空，自动从 content 截取前 128 字符
+// ensureAbstract 若 abstract 为空，自动从 content 截取（截断逻辑复用 pkg/stringx；
+// dao 不可依赖 domain，故这里直接用 128 字面量，与 domain.AbstractMaxRunes 语义一致）。
 func ensureAbstract(abstract, content string) string {
 	if abstract != "" {
 		return abstract
 	}
-	r := []rune(content)
-	if len(r) <= 128 {
-		return content
-	}
-	return string(r[:128]) + "..."
+	return stringx.Abbreviate(content, 128)
 }

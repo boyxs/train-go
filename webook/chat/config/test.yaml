@@ -34,7 +34,7 @@ llm:
       base_url: "http://localhost:9999"
       model: "deepseek-chat"
       max_tokens: 256
-      timeout: 5
+      timeout: 5s
 
 logger:
   level: debug

@@ -57,6 +57,21 @@ func (mr *MockArticleReaderDAOMockRecorder) Count(ctx any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Count", reflect.TypeOf((*MockArticleReaderDAO)(nil).Count), ctx)
 }
 
+// CountByAuthor mocks base method.
+func (m *MockArticleReaderDAO) CountByAuthor(ctx context.Context, uid int64) (int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CountByAuthor", ctx, uid)
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CountByAuthor indicates an expected call of CountByAuthor.
+func (mr *MockArticleReaderDAOMockRecorder) CountByAuthor(ctx, uid any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CountByAuthor", reflect.TypeOf((*MockArticleReaderDAO)(nil).CountByAuthor), ctx, uid)
+}
+
 // Delete mocks base method.
 func (m *MockArticleReaderDAO) Delete(ctx context.Context, id, uid int64) error {
 	m.ctrl.T.Helper()
@@ -101,6 +116,21 @@ func (mr *MockArticleReaderDAOMockRecorder) FindByIds(ctx, ids any) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByIds", reflect.TypeOf((*MockArticleReaderDAO)(nil).FindByIds), ctx, ids)
 }
 
+// ListIdsByAuthor mocks base method.
+func (m *MockArticleReaderDAO) ListIdsByAuthor(ctx context.Context, uid int64) ([]int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListIdsByAuthor", ctx, uid)
+	ret0, _ := ret[0].([]int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListIdsByAuthor indicates an expected call of ListIdsByAuthor.
+func (mr *MockArticleReaderDAOMockRecorder) ListIdsByAuthor(ctx, uid any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListIdsByAuthor", reflect.TypeOf((*MockArticleReaderDAO)(nil).ListIdsByAuthor), ctx, uid)
+}
+
 // Page mocks base method.
 func (m *MockArticleReaderDAO) Page(ctx context.Context, offset, limit int) ([]dao.PublishedArticle, error) {
 	m.ctrl.T.Helper()
@@ -114,6 +144,21 @@ func (m *MockArticleReaderDAO) Page(ctx context.Context, offset, limit int) ([]d
 func (mr *MockArticleReaderDAOMockRecorder) Page(ctx, offset, limit any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Page", reflect.TypeOf((*MockArticleReaderDAO)(nil).Page), ctx, offset, limit)
+}
+
+// PageByAuthor mocks base method.
+func (m *MockArticleReaderDAO) PageByAuthor(ctx context.Context, uid int64, offset, limit int) ([]dao.PublishedArticle, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PageByAuthor", ctx, uid, offset, limit)
+	ret0, _ := ret[0].([]dao.PublishedArticle)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PageByAuthor indicates an expected call of PageByAuthor.
+func (mr *MockArticleReaderDAOMockRecorder) PageByAuthor(ctx, uid, offset, limit any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PageByAuthor", reflect.TypeOf((*MockArticleReaderDAO)(nil).PageByAuthor), ctx, uid, offset, limit)
 }
 
 // Upsert mocks base method.

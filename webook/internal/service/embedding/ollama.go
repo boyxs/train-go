@@ -13,9 +13,9 @@ import (
 
 // OllamaConfig 本地 Ollama embedding 配置
 type OllamaConfig struct {
-	BaseUrl string `mapstructure:"base_url"` // 默认 http://localhost:11434
-	Model   string `mapstructure:"model"`    // 默认 bge-m3
-	Timeout int    `mapstructure:"timeout"`  // 秒，默认 5
+	BaseUrl string        `mapstructure:"base_url"` // 默认 http://localhost:11434
+	Model   string        `mapstructure:"model"`    // 默认 bge-m3
+	Timeout time.Duration `mapstructure:"timeout"`  // 请求超时（duration 字符串，如 5s），默认 5s
 }
 
 // OllamaClient 调用本地 Ollama /api/embeddings 接口
@@ -32,7 +32,7 @@ func NewOllamaClient(cfg OllamaConfig) *OllamaClient {
 	if cfg.Model == "" {
 		cfg.Model = "bge-m3"
 	}
-	timeout := time.Duration(cfg.Timeout) * time.Second
+	timeout := cfg.Timeout
 	if timeout <= 0 {
 		timeout = 5 * time.Second
 	}

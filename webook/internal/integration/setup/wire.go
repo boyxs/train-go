@@ -37,6 +37,14 @@ func provideNilCommentClient() commentv1.CommentServiceClient {
 	return nil
 }
 
+// provideTestRelationHandler：集成测试不拉起 relation gRPC server / kafka，用 nil client + nil producer
+// 构造 GRPCRelationService 再包成 handler（现有用例不触达 /relation/*）。nil 在此内联（不出现在
+// wire_gen 签名里）→ wire_gen 无需 import relation proto 包，规避 goimports 对 gen/relation/v1
+// （目录名 v1≠包名 relationv1）bare import 的重复别名误判。
+func provideTestRelationHandler(userSvc service.UserService, l logger.LoggerX) web.RelationHandler {
+	return web.NewInternalRelationHandler(service.NewGRPCRelationService(nil, userSvc, nil, l))
+}
+
 // provideTestMiddlewares 与 ioc.InitMiddlewares 同结构，但 metrics 走独立 Registry，
 // 避免每个集成测试 SetupSuite 调 InitWebServer 时 DefaultRegisterer.MustRegister 重复 panic。
 // 省略 cors / 限流 / logger（httptest 无 cross-origin、不需限流、避免输出污染）。
@@ -92,8 +100,10 @@ func InitWebServer() *gin.Engine {
 		web.NewInternalArticleSearchHandler,
 		web.NewAIClickEventHandler,
 		web.NewAIArticlePolishHandler,
+		service.NewGRPCCommentService,
 		web.NewInternalCommentHandler,
 		provideNilCommentClient,
+		provideTestRelationHandler,
 		ioc.InitJwtHandler,
 		// 点击埋点
 		clickEventSvcProvider,
@@ -122,6 +132,7 @@ func InitArticleReaderHandler() web.ArticleReaderHandler {
 	wire.Build(
 		infraSvcProvider,
 		articleReaderSvcProvider,
+		provideNilCommentClient, // 集成测试不拉 comment gRPC，注 nil（现有用例不触达评论数聚合）
 		web.NewInternalArticleReaderHandler,
 	)
 	return &web.InternalArticleReaderHandler{}

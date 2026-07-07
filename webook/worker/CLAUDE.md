@@ -16,7 +16,7 @@
 
 - `job/`：cron 触发 core `RankingJobService`（榜单重算 / 归档）；spec→fn 表，锁 / 指标 / date 注入 / panic recover 由 `cronx.Wrapper` 统一。
 - `consumer/`：消费 `interaction_events`，按 `(biz,biz_id)` 聚合一批 → 调 interaction `BatchIncrReadCount`；自管连接、无限退避重连。
-- `event/`：自有 `InteractionEvent`（**契约 = topic + JSON，两端各自定义、不共享代码**；漂移由 `worker/event/contract_test.go` 守护）。
+  - `consumer/event/`：消费侧事件线格式契约（`InteractionEvent` + topic 常量，纯数据、**无生产者/消费者运行时**）。**契约 = topic + JSON，两端各自定义、不共享代码**；单数 `event` 刻意区别 core 复数 `events`（那是生产 + 消息 plumbing 全家桶）；漂移由 `worker/consumer/event/contract_test.go` 守护。
 
 ## 关键决策 / 注意点
 

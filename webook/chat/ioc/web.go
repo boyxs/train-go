@@ -21,6 +21,7 @@ import (
 	"github.com/webook/pkg/ginx/middleware/timeout"
 	"github.com/webook/pkg/jwtx"
 	"github.com/webook/pkg/logger"
+	"github.com/webook/shared/confkey"
 )
 
 // InitWebServer 与主仓 internal/ioc/web.go 同结构：middlewares 由 InitMiddlewares 装配后注入。
@@ -52,7 +53,7 @@ func InitMiddlewares(l logger.LoggerX, cmd redis.Cmdable, tp trace.TracerProvide
 		// 2. OTel root span
 		otelgin.Middleware("webook-chat", otelgin.WithTracerProvider(tp)),
 		// 3. HTTP 软超时（默认 15s）；SSE /chat 前缀豁免，长连不被切断
-		timeout.NewMiddlewareBuilder(viper.GetDuration("server.http.timeout")).ExemptPrefix("/chat").Build(),
+		timeout.NewMiddlewareBuilder(viper.GetDuration(confkey.ServerHTTPTimeout)).ExemptPrefix("/chat").Build(),
 		// 4. CORS
 		cors.New(cors.Config{
 			AllowMethods:     []string{"PUT", "PATCH", "POST", "GET", "DELETE", "OPTIONS"},

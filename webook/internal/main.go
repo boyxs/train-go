@@ -14,6 +14,7 @@ import (
 
 	"github.com/webook/internal/ioc"
 	"github.com/webook/pkg/viperx"
+	"github.com/webook/shared/confkey"
 )
 
 func main() {
@@ -21,7 +22,7 @@ func main() {
 		panic(err)
 	}
 	var cfg viperx.EtcdConfig
-	if err := viper.UnmarshalKey("etcd", &cfg); err != nil {
+	if err := viper.UnmarshalKey(confkey.Etcd, &cfg); err != nil {
 		panic(err)
 	}
 	viperx.WatchRemote(cfg, func() {
@@ -51,7 +52,7 @@ func main() {
 		}
 	}()
 	// HTTP server 用 http.Server(而非 engine.Run)以支持优雅关闭
-	httpAddr := viper.GetString("server.http.addr")
+	httpAddr := viper.GetString(confkey.ServerHTTPAddr)
 	if httpAddr == "" {
 		httpAddr = ":8010"
 	}

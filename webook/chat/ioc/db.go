@@ -10,6 +10,7 @@ import (
 	"github.com/webook/chat/repository/dao"
 	gormprom "github.com/webook/pkg/gormx/prometheus"
 	loggerx "github.com/webook/pkg/logger"
+	"github.com/webook/shared/confkey"
 )
 
 func InitDB(_ TimezoneReady, l loggerx.LoggerX) *gorm.DB {
@@ -23,7 +24,7 @@ func InitDB(_ TimezoneReady, l loggerx.LoggerX) *gorm.DB {
 			LogLevel:                  gormlogger.Info,
 		}),
 	}
-	db, err := gorm.Open(mysql.Open(viper.GetString("data.mysql.dsn")), &gormConfig)
+	db, err := gorm.Open(mysql.Open(viper.GetString(confkey.DataMySQLDSN)), &gormConfig)
 	if err != nil {
 		panic("[chat] failed to connect mysql: " + err.Error())
 	}

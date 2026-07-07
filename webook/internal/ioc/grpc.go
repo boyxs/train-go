@@ -14,11 +14,13 @@ import (
 	commentv1 "github.com/webook/api/gen/comment/v1"
 	interactionv1 "github.com/webook/api/gen/interaction/v1"
 	rankingv1 "github.com/webook/api/gen/ranking/v1"
+	relationv1 "github.com/webook/api/gen/relation/v1"
 	searchv1 "github.com/webook/api/gen/search/v1"
 	grpcsrv "github.com/webook/internal/grpc"
 	"github.com/webook/pkg/grpcx"
 	"github.com/webook/pkg/grpcx/interceptor/errconv"
 	"github.com/webook/pkg/grpcx/interceptor/metrics"
+	"github.com/webook/shared/confkey"
 )
 
 // InitGRPCMetrics 构造进程内唯一的 gRPC 指标 builder。
@@ -40,12 +42,12 @@ func InitGRPCServer(
 	l logger.LoggerX,
 ) *grpcx.Server {
 	cfg := grpcx.ServerConfig{
-		Addr:    viper.GetString("server.grpc.addr"),
-		Name:    viper.GetString("server.grpc.name"),
-		Host:    viper.GetString("server.grpc.host"),
-		TTL:     viper.GetDuration("server.grpc.ttl"),
-		Weight:  viper.GetInt("server.grpc.weight"),
-		Timeout: viper.GetDuration("server.grpc.timeout"),
+		Addr:    viper.GetString(confkey.ServerGRPCAddr),
+		Name:    viper.GetString(confkey.ServerGRPCName),
+		Host:    viper.GetString(confkey.ServerGRPCHost),
+		TTL:     viper.GetDuration(confkey.ServerGRPCTTL),
+		Weight:  viper.GetInt(confkey.ServerGRPCWeight),
+		Timeout: viper.GetDuration(confkey.ServerGRPCTimeout),
 	}
 	srv := grpcx.NewServer(cfg, client, l,
 		grpc.StatsHandler(otelgrpc.NewServerHandler()),
@@ -107,6 +109,29 @@ func InitInteractionConn(client *etcdv3.Client, grpcMetrics *metrics.PrometheusB
 
 func InitInteractionClient(c InteractionConn) interactionv1.InteractionServiceClient {
 	return interactionv1.NewInteractionServiceClient(c)
+}
+
+// RelationConn 是到 webook-relation 的 gRPC 连接。独立类型让 wire 能区分多个下游 conn。
+type RelationConn struct{ *grpc.ClientConn }
+
+// InitRelationConn 拨号 webook-relation。复用进程内唯一 grpcMetrics（与 server/其他 client 共享），拦截链对称。
+func InitRelationConn(client *etcdv3.Client, grpcMetrics *metrics.PrometheusBuilder) (RelationConn, func(), error) {
+	cfg, err := grpcClientConfig("webook-relation")
+	if err != nil {
+		return RelationConn{}, nil, err
+	}
+	conn, cleanup, err := grpcx.NewClient(client, cfg,
+		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
+		grpc.WithChainUnaryInterceptor(grpcMetrics.BuildUnaryClient(), errconv.UnaryClientInterceptor()),
+	)
+	if err != nil {
+		return RelationConn{}, nil, err
+	}
+	return RelationConn{conn}, cleanup, nil
+}
+
+func InitRelationClient(c RelationConn) relationv1.RelationServiceClient {
+	return relationv1.NewRelationServiceClient(c)
 }
 
 // grpcClientConfig 读 client.grpc.<name>(target/balancer/…);target 必填,缺失 → dial 失败,代码不派生。

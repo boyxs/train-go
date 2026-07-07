@@ -43,6 +43,7 @@ migrator:
     batch_size: 100
     channel_buf: 4096
     partition_count: 1 # 默认单 worker；多核大流量按 CPU+Sink 池配 4/8/16
+    flush_interval: 1s
   verify:
     batch_size: 1000
     channel_buf: 4096

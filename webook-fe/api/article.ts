@@ -1,5 +1,6 @@
 import type {
   Article,
+  AuthorArticlesResult,
   EditArticleReq,
   PageReq,
   PageResult,
@@ -71,4 +72,16 @@ export function pagePublishedArticles(params: Partial<PageReq> = {}) {
 // POST /article/reader/detail — 公开文章详情
 export function findPublishedArticle(id: number) {
   return axios.post<Result<Article>>('/article/reader/detail', { id });
+}
+
+// POST /article/reader/author — 某作者已发布文章 + 获赞总数（他人主页「TA 的文章」，公开）
+export function pageAuthorArticles(data: {
+  authorId: number;
+  page?: number;
+  pageSize?: number;
+}) {
+  return axios.post<Result<AuthorArticlesResult>>(
+    '/article/reader/author',
+    data,
+  );
 }

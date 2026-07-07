@@ -1,0 +1,12 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="webook" type="DatabaseScript">
+    <script-file value="$PROJECT_DIR$/webook/relation/scripts/relation.sql" />
+    <script-file value="$PROJECT_DIR$/webook/comment/scripts/comment.sql" />
+    <script-file value="$PROJECT_DIR$/webook/interaction/scripts/interaction.sql" />
+    <script-file value="$PROJECT_DIR$/webook/scripts/webook.sql" />
+    <script-mode>FILE</script-mode>
+    <data-source id="052ea3ba-50ba-4eab-9444-d4373027b7eb" namespace="schema/&quot;webook&quot;" />
+    <data-source id="052ea3ba-50ba-4eab-9444-d4373027b7eb" />
+    <method v="2" />
+  </configuration>
+</component>

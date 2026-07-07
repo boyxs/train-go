@@ -6,6 +6,7 @@ import (
 	"github.com/IBM/sarama"
 	"github.com/spf13/viper"
 
+	"github.com/webook/shared/confkey"
 	"github.com/webook/worker/consumer"
 )
 
@@ -22,7 +23,7 @@ type KafkaConfig struct {
 
 func InitKafkaConfig() KafkaConfig {
 	var kc KafkaConfig
-	if err := viper.UnmarshalKey("data.kafka", &kc); err != nil {
+	if err := viper.UnmarshalKey(confkey.DataKafka, &kc); err != nil {
 		panic(err)
 	}
 	return kc

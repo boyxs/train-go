@@ -3,6 +3,8 @@ package setup
 import (
 	"github.com/redis/go-redis/v9"
 	"github.com/spf13/viper"
+
+	"github.com/webook/shared/confkey"
 )
 
 func InitRedis() redis.Cmdable {
@@ -11,7 +13,7 @@ func InitRedis() redis.Cmdable {
 		Password string `yaml:"password" mapstructure:"password"`
 	}
 	var cfg = Config{}
-	err := viper.UnmarshalKey("data.redis", &cfg)
+	err := viper.UnmarshalKey(confkey.DataRedis, &cfg)
 	if err != nil {
 		panic(err)
 	}

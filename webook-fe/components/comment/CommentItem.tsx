@@ -3,8 +3,10 @@
 import { App } from 'antd';
 import dayjs from 'dayjs';
 import { Heart, Reply, Trash2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import React from 'react';
 
+import { UserHoverCard } from '@/components/relation/UserHoverCard';
 import type { Comment } from '@/types';
 
 // 头像配色循环（对齐原型 $primary/$av-amber/$av-green/$av-indigo）
@@ -61,7 +63,9 @@ export function CommentItem({
   onDelete,
 }: CommentItemProps) {
   const { modal } = App.useApp();
+  const router = useRouter();
   const size = isReply ? 30 : 36;
+  const goProfile = () => router.push(`/user/${comment.user.id}`);
   const isMine = currentUid !== null && comment.user.id === currentUid;
 
   // 删除走全局 Modal.confirm（项目约定）；避免每条评论挂一个 Popconfirm
@@ -81,32 +85,41 @@ export function CommentItem({
 
   return (
     <div className='flex gap-2.5'>
-      <div
-        className='flex items-center justify-center shrink-0'
-        style={{
-          width: size,
-          height: size,
-          borderRadius: '50%',
-          background: avatarColor(comment.user.id),
-        }}
-      >
-        <span
+      <UserHoverCard userId={comment.user.id} self={isMine}>
+        <div
+          onClick={goProfile}
+          className='flex shrink-0 cursor-pointer items-center justify-center'
           style={{
-            color: '#FFFFFF',
-            fontSize: isReply ? 12 : 14,
-            fontWeight: 600,
+            width: size,
+            height: size,
+            borderRadius: '50%',
+            background: avatarColor(comment.user.id),
           }}
         >
-          {initial(comment.user.name)}
-        </span>
-      </div>
+          <span
+            style={{
+              color: '#FFFFFF',
+              fontSize: isReply ? 12 : 14,
+              fontWeight: 600,
+            }}
+          >
+            {initial(comment.user.name)}
+          </span>
+        </div>
+      </UserHoverCard>
 
       <div className='flex flex-col gap-1.5 flex-1 min-w-0'>
         {/* 元信息 */}
         <div className='flex items-center gap-2'>
-          <span style={{ fontSize: 13, fontWeight: 600, color: '#1A1A1A' }}>
-            {comment.user.name}
-          </span>
+          <UserHoverCard userId={comment.user.id} self={isMine}>
+            <span
+              onClick={goProfile}
+              className='cursor-pointer hover:text-[#0D9488]'
+              style={{ fontSize: 13, fontWeight: 600, color: '#1A1A1A' }}
+            >
+              {comment.user.name}
+            </span>
+          </UserHoverCard>
           {isMine && (
             <span
               style={{

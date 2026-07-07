@@ -10,6 +10,7 @@ import (
 	"github.com/webook/internal/repository/dao"
 	gormprom "github.com/webook/pkg/gormx/prometheus"
 	loggerx "github.com/webook/pkg/logger"
+	"github.com/webook/shared/confkey"
 )
 
 func InitDB(_ TimezoneReady, l loggerx.LoggerX) *gorm.DB {
@@ -24,7 +25,7 @@ func InitDB(_ TimezoneReady, l loggerx.LoggerX) *gorm.DB {
 			LogLevel:                  logger.Info,
 		}),
 	}
-	db, err := gorm.Open(mysql.Open(viper.GetString("data.mysql.dsn")), &gormConfig)
+	db, err := gorm.Open(mysql.Open(viper.GetString(confkey.DataMySQLDSN)), &gormConfig)
 	// db, err := gorm.Open(mysql.Open(config.Config.MySQL.DSN), &gorm.Config{})
 	if err != nil {
 		// 数据库都连接不上，就不要启动服务了

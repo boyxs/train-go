@@ -9,6 +9,7 @@ import {
   MenuOutlined,
   ReadOutlined,
   SearchOutlined,
+  StopOutlined,
   UserOutlined,
 } from '@ant-design/icons';
 import { Avatar, Button, Drawer, Dropdown, Input, Menu } from 'antd';
@@ -46,6 +47,12 @@ export const Header: React.FC = () => {
       icon: <UserOutlined />,
       label: '个人信息',
       onClick: () => router.push('/user/profile'),
+    },
+    {
+      key: 'blocklist',
+      icon: <StopOutlined />,
+      label: '黑名单',
+      onClick: () => router.push('/user/settings/blocklist'),
     },
     { type: 'divider' },
     {

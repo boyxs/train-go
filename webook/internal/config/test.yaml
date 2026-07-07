@@ -31,6 +31,9 @@ client:
     webook-interaction:
       target: "etcd:///service/webook-interaction"
       balancer: "breaker_swrr"
+    webook-relation:
+      target: "etcd:///service/webook-relation"
+      balancer: "breaker_swrr"
 
 data:
   mysql:
@@ -59,25 +62,25 @@ llm:
       base_url: "https://api.deepseek.com"
       model: "deepseek-chat"
       max_tokens: 2048
-      timeout: 60
+      timeout: 60s
     - name: kimi
       api_key: ${KIMI_API_KEY}
       base_url: "https://api.moonshot.cn/v1"
       model: "kimi-k2.5"
       max_tokens: 2048
-      timeout: 60
+      timeout: 60s
 
 embedding:
   base_url: "https://qianfan.baidubce.com/v2"
   api_key: ${QIANFAN_API_KEY}
   model: "qwen3-embedding-0.6b"
   dims: 1024
-  timeout: 30
+  timeout: 30s
 
 ollama:
   base_url: "http://localhost:11434"
   model: "bge-m3"
-  timeout: 5
+  timeout: 5s
 
 migrator:
   sdk:

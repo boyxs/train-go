@@ -1,4 +1,11 @@
-.idea
+.idea/*
+!.idea/runConfigurations
+# 以下 3 个 runConfig 内联了明文 LLM API Key，禁止入库（本地保留，勿共享）
+/.idea/runConfigurations/webook_core.xml
+/.idea/runConfigurations/webook_core_r.xml
+/.idea/runConfigurations/webook_chat.xml
+# 子项目 IDE 目录：.idea/* 仅锚定仓库根，webook/.idea 含本地 dataSources 需显式忽略
+webook/.idea/
 test.db
 *.out
 go.work

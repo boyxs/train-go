@@ -22,6 +22,7 @@ import (
 	"github.com/webook/migrator/service/incr"
 	"github.com/webook/migrator/service/verify"
 	"github.com/webook/pkg/logger"
+	"github.com/webook/shared/confkey"
 )
 
 // InitDBResolver 注入 dsn.Resolver。
@@ -87,7 +88,7 @@ func buildCanalClient(l logger.LoggerX) func(task domain.Task) (source.BinlogCli
 			return nil, err
 		}
 		regex := make([]string, 0, len(tables))
-		dbName := extractDBName(viper.GetString("data.mysql.dsn"))
+		dbName := extractDBName(viper.GetString(confkey.DataMySQLDSN))
 		for _, tm := range tables {
 			// 严格匹配 dbName.tableName
 			regex = append(regex, fmt.Sprintf(`%s\.%s`, dbName, tm.Src))

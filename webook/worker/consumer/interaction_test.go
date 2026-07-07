@@ -11,7 +11,7 @@ import (
 
 	interactionv1 "github.com/webook/api/gen/interaction/v1"
 	"github.com/webook/pkg/logger"
-	"github.com/webook/worker/event"
+	"github.com/webook/worker/consumer/event"
 )
 
 // mockInterClient 桩 interaction gRPC client：只记 BatchIncrReadCount 的入参，其余 RPC 由嵌入接口占位。

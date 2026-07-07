@@ -20,6 +20,10 @@ type ArticleReaderRepository interface {
 	// FindByIds 批量查；缓存命中部分 id 直接返回，剩余走 IN 查询 + 回填。结果按入参 ids 顺序返回，缺失 id 跳过
 	FindByIds(ctx context.Context, ids []int64) ([]domain.Article, error)
 	Page(ctx context.Context, offset int, limit int) ([]domain.Article, int64, error)
+	// PageByAuthor 某作者已发布文章分页 + 总数（他人主页「TA 的文章」）
+	PageByAuthor(ctx context.Context, uid int64, offset int, limit int) ([]domain.Article, int64, error)
+	// ListIdsByAuthor 某作者全部已发布文章 id（聚合「获赞」总数）
+	ListIdsByAuthor(ctx context.Context, uid int64) ([]int64, error)
 }
 
 // CacheArticleReaderRepository 线上库 Repository（含 migratorsdk 双写 / 切读）。
@@ -213,6 +217,35 @@ func (r *CacheArticleReaderRepository) Page(ctx context.Context, offset int, lim
 	}
 
 	return result, count, nil
+}
+
+// PageByAuthor 他人主页「TA 的文章」：始终走 oldDAO（同 Page 不切 SDK），不缓存（非首页热点）。
+func (r *CacheArticleReaderRepository) PageByAuthor(ctx context.Context, uid int64, offset int, limit int) ([]domain.Article, int64, error) {
+	var articles []dao.PublishedArticle
+	var count int64
+	var eg errgroup.Group
+	eg.Go(func() error {
+		var e error
+		articles, e = r.oldDAO.PageByAuthor(ctx, uid, offset, limit)
+		return e
+	})
+	eg.Go(func() error {
+		var e error
+		count, e = r.oldDAO.CountByAuthor(ctx, uid)
+		return e
+	})
+	if err := eg.Wait(); err != nil {
+		return nil, 0, err
+	}
+	result := make([]domain.Article, 0, len(articles))
+	for _, a := range articles {
+		result = append(result, r.toDomain(a))
+	}
+	return result, count, nil
+}
+
+func (r *CacheArticleReaderRepository) ListIdsByAuthor(ctx context.Context, uid int64) ([]int64, error) {
+	return r.oldDAO.ListIdsByAuthor(ctx, uid)
 }
 
 func (r *CacheArticleReaderRepository) toDomain(a dao.PublishedArticle) domain.Article {

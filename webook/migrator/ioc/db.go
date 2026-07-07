@@ -10,6 +10,7 @@ import (
 	"github.com/webook/migrator/repository/dao"
 	gormprom "github.com/webook/pkg/gormx/prometheus"
 	loggerx "github.com/webook/pkg/logger"
+	"github.com/webook/shared/confkey"
 )
 
 // InitDB 初始化 migrator 控制库的 GORM 连接。
@@ -30,7 +31,7 @@ func InitDB(_ TimezoneReady, l loggerx.LoggerX) *gorm.DB {
 			LogLevel:                  gormlogger.Info,
 		}),
 	}
-	db, err := gorm.Open(mysql.Open(viper.GetString("data.mysql.dsn")), &gormConfig)
+	db, err := gorm.Open(mysql.Open(viper.GetString(confkey.DataMySQLDSN)), &gormConfig)
 	if err != nil {
 		panic("[migrator] failed to connect mysql: " + err.Error())
 	}

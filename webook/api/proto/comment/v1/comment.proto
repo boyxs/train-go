@@ -19,6 +19,7 @@ service CommentService {
   rpc GetReplies(GetRepliesRequest) returns (GetRepliesResponse);
   rpc DeleteComment(DeleteCommentRequest) returns (DeleteCommentResponse);
   rpc CountComment(CountCommentRequest) returns (CountCommentResponse);
+  rpc BatchCountComment(BatchCountCommentRequest) returns (BatchCountCommentResponse);
 }
 
 message Comment {
@@ -86,4 +87,11 @@ message CountCommentRequest {
 }
 message CountCommentResponse {
   int64 count = 1;
+}
+message BatchCountCommentRequest {
+  string biz = 1;
+  repeated int64 biz_ids = 2;
+}
+message BatchCountCommentResponse {
+  map<int64, int64> counts = 1; // key=biz_id，无评论的 id 不在 map 中
 }
