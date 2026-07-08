@@ -7,10 +7,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/webook/migrator/domain"
-	"github.com/webook/migrator/errs"
-	"github.com/webook/migrator/repository/dao"
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/migrator/domain"
+	"github.com/boyxs/train-go/webook/migrator/errs"
+	"github.com/boyxs/train-go/webook/migrator/repository/dao"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 // ── stubTaskDAO 手写 stub，方法按调用闭包注入 ─────────────────

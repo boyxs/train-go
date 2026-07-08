@@ -1,6 +1,6 @@
 package errs
 
-import "github.com/webook/pkg/errs"
+import "github.com/boyxs/train-go/webook/pkg/errs"
 
 // 文章作者侧错误（DAO 层用 author_id WHERE 条件做权限收敛，找不到统一报 NotFound）
 var (

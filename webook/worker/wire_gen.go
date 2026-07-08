@@ -11,9 +11,9 @@ import (
 
 	"github.com/robfig/cron/v3"
 
-	"github.com/webook/worker/consumer"
-	"github.com/webook/worker/ioc"
-	"github.com/webook/worker/job"
+	"github.com/boyxs/train-go/webook/worker/consumer"
+	"github.com/boyxs/train-go/webook/worker/ioc"
+	"github.com/boyxs/train-go/webook/worker/job"
 )
 
 // Injectors from wire.go:

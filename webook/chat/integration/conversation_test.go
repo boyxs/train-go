@@ -14,12 +14,12 @@ import (
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 
-	"github.com/webook/chat/domain"
-	"github.com/webook/chat/errs"
-	"github.com/webook/chat/repository"
-	"github.com/webook/chat/repository/cache"
-	"github.com/webook/chat/repository/dao"
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/chat/domain"
+	"github.com/boyxs/train-go/webook/chat/errs"
+	"github.com/boyxs/train-go/webook/chat/repository"
+	"github.com/boyxs/train-go/webook/chat/repository/cache"
+	"github.com/boyxs/train-go/webook/chat/repository/dao"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 // ConversationRepoSuite 直接接真实 mysql + redis，跳过 wire（避免 LLM/gRPC 全栈起来）。

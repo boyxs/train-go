@@ -16,7 +16,7 @@ import (
 	"google.golang.org/grpc/resolver"
 	"google.golang.org/grpc/resolver/manual"
 
-	"github.com/webook/pkg/grpcx/balancer/group"
+	"github.com/boyxs/train-go/webook/pkg/grpcx/balancer/group"
 )
 
 // startHealthServer 起一个报 SERVING 的健康 server(免自定义 proto),返回监听地址。

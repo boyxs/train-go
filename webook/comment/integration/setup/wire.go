@@ -5,12 +5,12 @@ package setup
 import (
 	"github.com/google/wire"
 
-	commentgrpc "github.com/webook/comment/grpc"
-	"github.com/webook/comment/ioc"
-	"github.com/webook/comment/repository"
-	"github.com/webook/comment/repository/cache"
-	"github.com/webook/comment/repository/dao"
-	"github.com/webook/comment/service"
+	commentgrpc "github.com/boyxs/train-go/webook/comment/grpc"
+	"github.com/boyxs/train-go/webook/comment/ioc"
+	"github.com/boyxs/train-go/webook/comment/repository"
+	"github.com/boyxs/train-go/webook/comment/repository/cache"
+	"github.com/boyxs/train-go/webook/comment/repository/dao"
+	"github.com/boyxs/train-go/webook/comment/service"
 )
 
 // InitCommentServer 组装真 dao/cache/repository/service 的 CommentServer，

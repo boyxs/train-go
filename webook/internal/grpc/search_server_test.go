@@ -13,9 +13,9 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	searchv1 "github.com/webook/api/gen/search/v1"
-	"github.com/webook/internal/domain"
-	svcmocks "github.com/webook/internal/service/mocks"
+	searchv1 "github.com/boyxs/train-go/webook/api/gen/search/v1"
+	"github.com/boyxs/train-go/webook/internal/domain"
+	svcmocks "github.com/boyxs/train-go/webook/internal/service/mocks"
 )
 
 func TestSearchServer_SearchArticles_Happy(t *testing.T) {

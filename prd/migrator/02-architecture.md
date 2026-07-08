@@ -601,6 +601,8 @@ PRD §7.2 的错误码列表以此为权威；任何冲突回退到本表。
 
 **布局原则**：与 `webook/chat/` 平级，复用 webook 主仓 `go.mod`（module `github.com/webook`），可直接 import `github.com/webook/pkg/saramax`、`github.com/webook/pkg/gormx`、`github.com/webook/pkg/logger` 等已有工具。**不重复独立 go.mod**。
 
+> **注（2026-07 多模块化后已变更，以 `prd/go-workspace/ARCHITECTURE.md` 为准）**：全仓已改为多模块 + `go.work`，模块前缀对齐真实仓库 `github.com/boyxs/train-go/webook`。migrator 现为**独立 module** `github.com/boyxs/train-go/webook/migrator`，经 `require`+`replace ../pkg ../shared` 引本地依赖（不用 api）。下述"复用主仓单一 go.mod、不独立 go.mod"为当时设计，目录树仍有效、模块归属已变。
+
 ```
 webook/                                     ← 主仓（module github.com/webook）
 ├── chat/                                   ← 已有：聊天服务（与 migrator 平级）

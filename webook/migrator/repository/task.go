@@ -3,10 +3,10 @@ package repository
 import (
 	"context"
 
-	"github.com/webook/migrator/domain"
-	"github.com/webook/migrator/repository/dao"
-	"github.com/webook/pkg/logger"
-	"github.com/webook/pkg/slicex"
+	"github.com/boyxs/train-go/webook/migrator/domain"
+	"github.com/boyxs/train-go/webook/migrator/repository/dao"
+	"github.com/boyxs/train-go/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/pkg/slicex"
 )
 
 type ListOpts struct {

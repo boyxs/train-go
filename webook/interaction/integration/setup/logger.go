@@ -1,7 +1,7 @@
 package setup
 
 import (
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 func InitLogger() logger.LoggerX {

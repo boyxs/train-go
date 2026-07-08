@@ -374,17 +374,19 @@ func TestAllSentinelsHaveReason(t *testing.T) {
 	assert.Empty(t, missing, "以下 sentinel 缺 .WithReason：\n%s", strings.Join(missing, "\n"))
 }
 
-// repoRoot 从测试 cwd（.../webook/pkg/errs）向上找含 go.mod 的目录（webook/）。
+// repoRoot 从测试 cwd（.../webook/pkg/errs）向上找含 go.work 的 workspace 根（webook/）。
+// 多模块化后各模块自带 go.mod，"第一个 go.mod" 只会停在 pkg/ 扫不到任何服务的 errs sentinel；
+// 仅 go.work 标记全仓 workspace 根，据此锚定才能扫描全部服务的 .WithReason。
 func repoRoot(t *testing.T) string {
 	t.Helper()
 	dir, err := os.Getwd()
 	require.NoError(t, err)
 	for {
-		if _, statErr := os.Stat(filepath.Join(dir, "go.mod")); statErr == nil {
+		if _, statErr := os.Stat(filepath.Join(dir, "go.work")); statErr == nil {
 			return dir
 		}
 		parent := filepath.Dir(dir)
-		require.NotEqualf(t, parent, dir, "向上未找到 go.mod")
+		require.NotEqualf(t, parent, dir, "向上未找到 go.work")
 		dir = parent
 	}
 }

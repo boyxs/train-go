@@ -15,7 +15,7 @@ import (
 
 	gomock "go.uber.org/mock/gomock"
 
-	dao "github.com/webook/internal/repository/dao"
+	dao "github.com/boyxs/train-go/webook/internal/repository/dao"
 )
 
 // MockRankingDAO is a mock of RankingDAO interface.

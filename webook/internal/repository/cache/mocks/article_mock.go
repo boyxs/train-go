@@ -15,7 +15,7 @@ import (
 
 	gomock "go.uber.org/mock/gomock"
 
-	domain "github.com/webook/internal/domain"
+	domain "github.com/boyxs/train-go/webook/internal/domain"
 )
 
 // MockArticleCache is a mock of ArticleCache interface.

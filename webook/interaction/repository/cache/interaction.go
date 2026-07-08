@@ -10,8 +10,8 @@ import (
 
 	"github.com/redis/go-redis/v9"
 
-	"github.com/webook/interaction/consts"
-	"github.com/webook/interaction/domain"
+	"github.com/boyxs/train-go/webook/interaction/consts"
+	"github.com/boyxs/train-go/webook/interaction/domain"
 )
 
 //go:embed lua/incr_if_present.lua

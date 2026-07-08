@@ -6,7 +6,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 // BenchmarkServerInterceptor 量 logging server 拦截器每请求开销

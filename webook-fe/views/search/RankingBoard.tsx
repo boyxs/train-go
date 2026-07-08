@@ -19,6 +19,7 @@ import {
   UserOutlined,
 } from '@ant-design/icons';
 import { App, Drawer, Empty, Grid, List, Pagination, Skeleton } from 'antd';
+import dayjs from 'dayjs';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import React from 'react';
@@ -544,7 +545,7 @@ export default function RankingBoard() {
           <span style={{ fontSize: 12, color: '#9CA3AF' }}>·</span>
           <span style={{ fontSize: 12, fontWeight: 500, color: '#6B7280' }}>
             {updatedAt
-              ? `最后更新 ${new Date(updatedAt).toLocaleTimeString().slice(0, 5)}`
+              ? `最后更新 ${dayjs(updatedAt).format('HH:mm')}`
               : '加载中…'}
           </span>
           <button

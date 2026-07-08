@@ -5,8 +5,8 @@ import (
 
 	"google.golang.org/grpc"
 
-	relationv1 "github.com/webook/api/gen/relation/v1"
-	"github.com/webook/relation/errs"
+	relationv1 "github.com/boyxs/train-go/webook/api/gen/relation/v1"
+	"github.com/boyxs/train-go/webook/relation/errs"
 )
 
 // ValidateUnaryInterceptor 入口统一校验写请求的 id 非空，handler 不再逐个写。

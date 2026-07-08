@@ -3,9 +3,9 @@ package repository
 import (
 	"context"
 
-	"github.com/webook/migrator/domain"
-	"github.com/webook/migrator/repository/dao"
-	"github.com/webook/pkg/slicex"
+	"github.com/boyxs/train-go/webook/migrator/domain"
+	"github.com/boyxs/train-go/webook/migrator/repository/dao"
+	"github.com/boyxs/train-go/webook/pkg/slicex"
 )
 
 // DeadLetterRepository 死信仓储（重放消费侧用到的子集；落死信的生产侧直接走 Sink 链路）。

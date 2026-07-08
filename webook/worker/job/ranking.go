@@ -7,8 +7,8 @@ import (
 
 	"github.com/robfig/cron/v3"
 
-	rankingv1 "github.com/webook/api/gen/ranking/v1"
-	"github.com/webook/pkg/cronx"
+	rankingv1 "github.com/boyxs/train-go/webook/api/gen/ranking/v1"
+	"github.com/boyxs/train-go/webook/pkg/cronx"
 )
 
 const (

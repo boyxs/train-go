@@ -3,10 +3,10 @@ package grpc
 import (
 	"context"
 
-	relationv1 "github.com/webook/api/gen/relation/v1"
-	"github.com/webook/pkg/slicex"
-	"github.com/webook/relation/domain"
-	"github.com/webook/relation/service"
+	relationv1 "github.com/boyxs/train-go/webook/api/gen/relation/v1"
+	"github.com/boyxs/train-go/webook/pkg/slicex"
+	"github.com/boyxs/train-go/webook/relation/domain"
+	"github.com/boyxs/train-go/webook/relation/service"
 )
 
 // RelationServer 把 RelationService 适配成 gRPC 接口。

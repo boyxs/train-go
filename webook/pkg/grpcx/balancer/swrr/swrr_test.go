@@ -15,7 +15,7 @@ import (
 	"google.golang.org/grpc/resolver"
 	"google.golang.org/grpc/resolver/manual"
 
-	"github.com/webook/pkg/grpcx/balancer/weight"
+	"github.com/boyxs/train-go/webook/pkg/grpcx/balancer/weight"
 )
 
 // TestSWRR_Distribution 真起 3 个 gRPC server(权重 10:40:50),经 custom_swrr 发 1000 次调用,

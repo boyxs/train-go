@@ -14,9 +14,9 @@ import (
 	gormmysql "gorm.io/driver/mysql"
 	"gorm.io/gorm"
 
-	"github.com/webook/migrator/pipeline/sink"
-	"github.com/webook/migrator/pipeline/source"
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/migrator/pipeline/sink"
+	"github.com/boyxs/train-go/webook/migrator/pipeline/source"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 // TestMySQL_E2E_FullToMongo 端到端验证 MySQL→Mongo 全量（反向：sourceType=mysql + sinkType=mongo）：

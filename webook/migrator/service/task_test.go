@@ -7,10 +7,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/webook/migrator/domain"
-	"github.com/webook/migrator/errs"
-	"github.com/webook/migrator/repository"
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/migrator/domain"
+	"github.com/boyxs/train-go/webook/migrator/errs"
+	"github.com/boyxs/train-go/webook/migrator/repository"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 // newSvc 测试 helper：注入 NopLogger，每个 case 复用。

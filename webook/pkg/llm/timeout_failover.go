@@ -6,7 +6,7 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 // TimeoutFailoverClient 粘性主 provider + 连续故障计数切换

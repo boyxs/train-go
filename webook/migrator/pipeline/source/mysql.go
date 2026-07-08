@@ -8,7 +8,7 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 // defaultBatchSz 全量分片批量大小默认 1000；调小 → I/O 频繁，调大 → 锁/网络压力。

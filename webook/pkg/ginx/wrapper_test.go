@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/webook/pkg/errs"
+	"github.com/boyxs/train-go/webook/pkg/errs"
 )
 
 func init() {

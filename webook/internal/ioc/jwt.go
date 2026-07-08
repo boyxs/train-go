@@ -3,8 +3,8 @@ package ioc
 import (
 	"github.com/redis/go-redis/v9"
 
-	"github.com/webook/internal/consts"
-	"github.com/webook/pkg/jwtx"
+	"github.com/boyxs/train-go/webook/internal/consts"
+	"github.com/boyxs/train-go/webook/pkg/jwtx"
 )
 
 // InitJwtHandler 装配 pkg/jwtx 的 JWT 处理器（签发 + 提取 + 校验 + 登出全套）。

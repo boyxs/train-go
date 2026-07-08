@@ -8,10 +8,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
-	"github.com/webook/internal/service/sms"
-	smsmocks "github.com/webook/internal/service/sms/mocks"
-	"github.com/webook/pkg/ratelimit"
-	limitmocks "github.com/webook/pkg/ratelimit/mocks"
+	"github.com/boyxs/train-go/webook/internal/service/sms"
+	smsmocks "github.com/boyxs/train-go/webook/internal/service/sms/mocks"
+	"github.com/boyxs/train-go/webook/pkg/ratelimit"
+	limitmocks "github.com/boyxs/train-go/webook/pkg/ratelimit/mocks"
 )
 
 func TestRateLimitSmsService_Send(t *testing.T) {

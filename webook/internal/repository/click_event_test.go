@@ -9,12 +9,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
-	"github.com/webook/internal/domain"
-	"github.com/webook/internal/repository/cache"
-	cachemocks "github.com/webook/internal/repository/cache/mocks"
-	"github.com/webook/internal/repository/dao"
-	daomocks "github.com/webook/internal/repository/dao/mocks"
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/internal/domain"
+	"github.com/boyxs/train-go/webook/internal/repository/cache"
+	cachemocks "github.com/boyxs/train-go/webook/internal/repository/cache/mocks"
+	"github.com/boyxs/train-go/webook/internal/repository/dao"
+	daomocks "github.com/boyxs/train-go/webook/internal/repository/dao/mocks"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 func TestCacheAIClickEventRepository_RecordClick(t *testing.T) {

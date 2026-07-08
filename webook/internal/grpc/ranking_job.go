@@ -5,9 +5,9 @@ import (
 
 	"github.com/golang-module/carbon/v2"
 
-	rankingv1 "github.com/webook/api/gen/ranking/v1"
-	"github.com/webook/internal/service"
-	"github.com/webook/pkg/errs"
+	rankingv1 "github.com/boyxs/train-go/webook/api/gen/ranking/v1"
+	"github.com/boyxs/train-go/webook/internal/service"
+	"github.com/boyxs/train-go/webook/pkg/errs"
 )
 
 // RankingJobServer 把榜单重算/归档暴露给 webook-worker 调度器触发。

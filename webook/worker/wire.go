@@ -8,9 +8,9 @@ import (
 	"github.com/google/wire"
 	"github.com/robfig/cron/v3"
 
-	"github.com/webook/worker/consumer"
-	"github.com/webook/worker/ioc"
-	"github.com/webook/worker/job"
+	"github.com/boyxs/train-go/webook/worker/consumer"
+	"github.com/boyxs/train-go/webook/worker/ioc"
+	"github.com/boyxs/train-go/webook/worker/job"
 )
 
 // App worker 调度器进程入口：cron 定时任务 + Kafka 消费者 + 最小 HTTP(metrics/health)。

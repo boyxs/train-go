@@ -7,7 +7,7 @@ import (
 
 	"github.com/redis/go-redis/v9"
 
-	"github.com/webook/internal/errs"
+	"github.com/boyxs/train-go/webook/internal/errs"
 )
 
 //go:embed lua/store_code.lua

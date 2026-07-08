@@ -5,7 +5,7 @@ package errs
 import (
 	"gorm.io/gorm"
 
-	"github.com/webook/pkg/errs"
+	"github.com/boyxs/train-go/webook/pkg/errs"
 )
 
 // ErrRecordNotFound 通用「记录不存在」，alias gorm.ErrRecordNotFound

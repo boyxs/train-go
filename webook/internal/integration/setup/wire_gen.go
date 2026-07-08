@@ -16,17 +16,17 @@ import (
 	"go.opentelemetry.io/otel/trace"
 	"go.opentelemetry.io/otel/trace/noop"
 
-	commentv1 "github.com/webook/api/gen/comment/v1"
-	"github.com/webook/internal/consts"
-	"github.com/webook/internal/ioc"
-	"github.com/webook/internal/repository"
-	"github.com/webook/internal/repository/cache"
-	"github.com/webook/internal/repository/dao"
-	"github.com/webook/internal/service"
-	"github.com/webook/internal/web"
-	"github.com/webook/pkg/ginx/middleware/metrics"
-	"github.com/webook/pkg/jwtx"
-	"github.com/webook/pkg/logger"
+	commentv1 "github.com/boyxs/train-go/webook/api/gen/comment/v1"
+	"github.com/boyxs/train-go/webook/internal/consts"
+	"github.com/boyxs/train-go/webook/internal/ioc"
+	"github.com/boyxs/train-go/webook/internal/repository"
+	"github.com/boyxs/train-go/webook/internal/repository/cache"
+	"github.com/boyxs/train-go/webook/internal/repository/dao"
+	"github.com/boyxs/train-go/webook/internal/service"
+	"github.com/boyxs/train-go/webook/internal/web"
+	"github.com/boyxs/train-go/webook/pkg/ginx/middleware/metrics"
+	"github.com/boyxs/train-go/webook/pkg/jwtx"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 // Injectors from wire.go:

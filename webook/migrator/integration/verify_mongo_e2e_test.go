@@ -14,15 +14,15 @@ import (
 	gormmysql "gorm.io/driver/mysql"
 	"gorm.io/gorm"
 
-	"github.com/webook/migrator/domain"
-	"github.com/webook/migrator/pipeline/sink"
-	"github.com/webook/migrator/pipeline/source"
-	"github.com/webook/migrator/pipeline/transform"
-	"github.com/webook/migrator/repository"
-	"github.com/webook/migrator/repository/dao"
-	"github.com/webook/migrator/service"
-	"github.com/webook/migrator/service/verify"
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/migrator/domain"
+	"github.com/boyxs/train-go/webook/migrator/pipeline/sink"
+	"github.com/boyxs/train-go/webook/migrator/pipeline/source"
+	"github.com/boyxs/train-go/webook/migrator/pipeline/transform"
+	"github.com/boyxs/train-go/webook/migrator/repository"
+	"github.com/boyxs/train-go/webook/migrator/repository/dao"
+	"github.com/boyxs/train-go/webook/migrator/service"
+	"github.com/boyxs/train-go/webook/migrator/service/verify"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 // verifyTaskStub 最小 TaskService：VerifyEngine 的 Full/Sample 只调 Get；

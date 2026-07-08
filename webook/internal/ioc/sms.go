@@ -8,10 +8,10 @@ import (
 	"github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common/profile"
 	tsms "github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/sms/v20210111"
 
-	sms "github.com/webook/internal/service/sms"
-	"github.com/webook/internal/service/sms/memory"
-	"github.com/webook/internal/service/sms/tencent"
-	"github.com/webook/pkg/logger"
+	sms "github.com/boyxs/train-go/webook/internal/service/sms"
+	"github.com/boyxs/train-go/webook/internal/service/sms/memory"
+	"github.com/boyxs/train-go/webook/internal/service/sms/tencent"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 func InitSmsService(cmd redis.Cmdable, l logger.LoggerX) sms.SmsService {

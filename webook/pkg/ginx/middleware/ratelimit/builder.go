@@ -9,8 +9,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
 
-	"github.com/webook/pkg/ginx"
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/pkg/ginx"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 type Builder struct {

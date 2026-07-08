@@ -5,8 +5,8 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/spf13/viper"
 
-	redisprom "github.com/webook/pkg/redisx/prometheus"
-	"github.com/webook/shared/confkey"
+	redisprom "github.com/boyxs/train-go/webook/pkg/redisx/prometheus"
+	"github.com/boyxs/train-go/webook/shared/confkey"
 )
 
 // InitRedis 初始化 migrator 使用的 Redis 客户端。

@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 
-	rankingv1 "github.com/webook/api/gen/ranking/v1"
+	rankingv1 "github.com/boyxs/train-go/webook/api/gen/ranking/v1"
 )
 
 // mockRankingJobClient 桩 core RankingJobService client：记调用 + 透传的 date，其余 RPC 由嵌入接口占位。

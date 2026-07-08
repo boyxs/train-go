@@ -6,9 +6,9 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/webook/migrator/domain"
-	"github.com/webook/migrator/pipeline/dsn"
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/migrator/domain"
+	"github.com/boyxs/train-go/webook/migrator/pipeline/dsn"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 // SourceFactory 按 task + 表下标动态构造读端实例。方法返回类型即语义，调用方无需试探。

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 // FailoverClient 顺序尝试多个 Client，第一个成功即返回

@@ -17,13 +17,13 @@ import (
 	"go.uber.org/mock/gomock"
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/webook/internal/domain"
-	"github.com/webook/internal/errs"
-	"github.com/webook/internal/service"
-	svcmocks "github.com/webook/internal/service/mocks"
-	jwt "github.com/webook/pkg/jwtx"
-	jwtmocks "github.com/webook/pkg/jwtx/mocks"
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/internal/domain"
+	"github.com/boyxs/train-go/webook/internal/errs"
+	"github.com/boyxs/train-go/webook/internal/service"
+	svcmocks "github.com/boyxs/train-go/webook/internal/service/mocks"
+	jwt "github.com/boyxs/train-go/webook/pkg/jwtx"
+	jwtmocks "github.com/boyxs/train-go/webook/pkg/jwtx/mocks"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 func TestPasswordEncrypt(t *testing.T) {

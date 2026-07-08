@@ -15,7 +15,7 @@ import (
 
 	gomock "go.uber.org/mock/gomock"
 
-	domain "github.com/webook/internal/domain"
+	domain "github.com/boyxs/train-go/webook/internal/domain"
 )
 
 // MockUserService is a mock of UserService interface.

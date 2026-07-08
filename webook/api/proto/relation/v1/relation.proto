@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package webook.relation.v1;
 
-option go_package = "github.com/webook/api/gen/relation/v1;relationv1";
+option go_package = "github.com/boyxs/train-go/webook/api/gen/relation/v1;relationv1";
 
 // RelationService 暴露用户关系（关注/粉丝/拉黑）的读写。core 经 gRPC 调用，鉴权后注入 uid。
 // 纯同步：事件（relation_events）由 core 网关在写成功且 changed 时生产，本服务不碰 Kafka。

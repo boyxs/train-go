@@ -16,8 +16,8 @@ import (
 	gresolver "google.golang.org/grpc/resolver"
 	"google.golang.org/grpc/status"
 
-	"github.com/webook/pkg/grpcx/balancer/group"
-	"github.com/webook/pkg/grpcx/balancer/weight"
+	"github.com/boyxs/train-go/webook/pkg/grpcx/balancer/group"
+	"github.com/boyxs/train-go/webook/pkg/grpcx/balancer/weight"
 )
 
 type builder struct {

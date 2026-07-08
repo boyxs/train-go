@@ -11,12 +11,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/webook/migrator/domain"
-	migratorerrs "github.com/webook/migrator/errs"
-	"github.com/webook/migrator/repository"
-	"github.com/webook/migrator/repository/cache"
-	"github.com/webook/migrator/repository/dao"
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/migrator/domain"
+	migratorerrs "github.com/boyxs/train-go/webook/migrator/errs"
+	"github.com/boyxs/train-go/webook/migrator/repository"
+	"github.com/boyxs/train-go/webook/migrator/repository/cache"
+	"github.com/boyxs/train-go/webook/migrator/repository/dao"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 // ── stub TaskDAO ────────────────────────────────────────────

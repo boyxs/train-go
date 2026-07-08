@@ -4,8 +4,8 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/spf13/viper"
 
-	"github.com/webook/internal/migratorsdk"
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/internal/migratorsdk"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 // InitMigratorSDKSwitchReader 按 yaml flag 切 NoOp / Redis 实现。

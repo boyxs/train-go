@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/webook/migrator/pipeline/sink"
+	"github.com/boyxs/train-go/webook/migrator/pipeline/sink"
 )
 
 // TransformMongoToRelational 是 MongoToRelationalTransformer 在 Registry 里的注册名。

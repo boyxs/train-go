@@ -12,7 +12,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/status"
 
-	"github.com/webook/pkg/grpcx/interceptor"
+	"github.com/boyxs/train-go/webook/pkg/grpcx/interceptor"
 )
 
 // Builder 构造 server / client 两侧的指标采集拦截器。

@@ -6,9 +6,9 @@ import (
 	"github.com/IBM/sarama"
 	"github.com/spf13/viper"
 
-	"github.com/webook/internal/events"
-	"github.com/webook/pkg/logger"
-	"github.com/webook/shared/confkey"
+	"github.com/boyxs/train-go/webook/internal/events"
+	"github.com/boyxs/train-go/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/shared/confkey"
 )
 
 // KafkaConfig 映射 yaml data.kafka 段（core 仅生产）。时间为 duration;超时缺省就地兜底。

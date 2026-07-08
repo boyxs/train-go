@@ -9,10 +9,10 @@ import (
 	"github.com/golang-module/carbon/v2"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/webook/internal/consts"
-	"github.com/webook/internal/domain"
-	"github.com/webook/internal/repository"
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/internal/consts"
+	"github.com/boyxs/train-go/webook/internal/domain"
+	"github.com/boyxs/train-go/webook/internal/repository"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 const (

@@ -8,12 +8,12 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 
-	"github.com/webook/internal/consts"
-	"github.com/webook/internal/errs"
-	"github.com/webook/internal/service"
-	"github.com/webook/internal/service/oauth2"
-	"github.com/webook/pkg/ginx"
-	myJwt "github.com/webook/pkg/jwtx"
+	"github.com/boyxs/train-go/webook/internal/consts"
+	"github.com/boyxs/train-go/webook/internal/errs"
+	"github.com/boyxs/train-go/webook/internal/service"
+	"github.com/boyxs/train-go/webook/internal/service/oauth2"
+	"github.com/boyxs/train-go/webook/pkg/ginx"
+	myJwt "github.com/boyxs/train-go/webook/pkg/jwtx"
 )
 
 type OAuth2Handler interface {

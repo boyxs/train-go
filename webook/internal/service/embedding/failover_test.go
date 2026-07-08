@@ -9,9 +9,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
-	"github.com/webook/internal/service/embedding"
-	embmocks "github.com/webook/internal/service/embedding/mocks"
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/internal/service/embedding"
+	embmocks "github.com/boyxs/train-go/webook/internal/service/embedding/mocks"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 func TestFailoverClient_Embed(t *testing.T) {

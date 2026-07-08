@@ -9,13 +9,13 @@ import (
 	"google.golang.org/grpc/health"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 
-	commentv1 "github.com/webook/api/gen/comment/v1"
-	commentgrpc "github.com/webook/comment/grpc"
-	"github.com/webook/pkg/grpcx"
-	"github.com/webook/pkg/grpcx/interceptor/errconv"
-	"github.com/webook/pkg/grpcx/interceptor/metrics"
-	"github.com/webook/pkg/logger"
-	"github.com/webook/shared/confkey"
+	commentv1 "github.com/boyxs/train-go/webook/api/gen/comment/v1"
+	commentgrpc "github.com/boyxs/train-go/webook/comment/grpc"
+	"github.com/boyxs/train-go/webook/pkg/grpcx"
+	"github.com/boyxs/train-go/webook/pkg/grpcx/interceptor/errconv"
+	"github.com/boyxs/train-go/webook/pkg/grpcx/interceptor/metrics"
+	"github.com/boyxs/train-go/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/shared/confkey"
 )
 
 // InitGRPCServer 组装 gRPC server 并注册 CommentService，由 main 起 goroutine 监听。

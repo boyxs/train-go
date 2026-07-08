@@ -7,12 +7,12 @@
 package setup
 
 import (
-	"github.com/webook/comment/grpc"
-	"github.com/webook/comment/ioc"
-	"github.com/webook/comment/repository"
-	"github.com/webook/comment/repository/cache"
-	"github.com/webook/comment/repository/dao"
-	"github.com/webook/comment/service"
+	"github.com/boyxs/train-go/webook/comment/grpc"
+	"github.com/boyxs/train-go/webook/comment/ioc"
+	"github.com/boyxs/train-go/webook/comment/repository"
+	"github.com/boyxs/train-go/webook/comment/repository/cache"
+	"github.com/boyxs/train-go/webook/comment/repository/dao"
+	"github.com/boyxs/train-go/webook/comment/service"
 )
 
 // Injectors from wire.go:

@@ -9,8 +9,8 @@ import (
 
 	"github.com/redis/go-redis/v9"
 
-	"github.com/webook/chat/consts"
-	"github.com/webook/chat/domain"
+	"github.com/boyxs/train-go/webook/chat/consts"
+	"github.com/boyxs/train-go/webook/chat/domain"
 )
 
 const (

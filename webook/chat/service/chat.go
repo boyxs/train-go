@@ -10,14 +10,14 @@ import (
 	"time"
 	"unicode/utf8"
 
-	searchv1 "github.com/webook/api/gen/search/v1"
-	"github.com/webook/chat/consts"
-	"github.com/webook/chat/domain"
-	"github.com/webook/chat/errs"
-	"github.com/webook/chat/repository"
-	"github.com/webook/pkg/llm"
-	"github.com/webook/pkg/logger"
-	"github.com/webook/pkg/streamer"
+	searchv1 "github.com/boyxs/train-go/webook/api/gen/search/v1"
+	"github.com/boyxs/train-go/webook/chat/consts"
+	"github.com/boyxs/train-go/webook/chat/domain"
+	"github.com/boyxs/train-go/webook/chat/errs"
+	"github.com/boyxs/train-go/webook/chat/repository"
+	"github.com/boyxs/train-go/webook/pkg/llm"
+	"github.com/boyxs/train-go/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/pkg/streamer"
 )
 
 const (

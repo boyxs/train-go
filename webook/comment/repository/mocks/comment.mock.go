@@ -15,7 +15,7 @@ import (
 
 	gomock "go.uber.org/mock/gomock"
 
-	domain "github.com/webook/comment/domain"
+	domain "github.com/boyxs/train-go/webook/comment/domain"
 )
 
 // MockCommentRepository is a mock of CommentRepository interface.

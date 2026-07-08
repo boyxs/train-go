@@ -5,13 +5,13 @@ package main
 import (
 	"github.com/google/wire"
 
-	interactiongrpc "github.com/webook/interaction/grpc"
-	"github.com/webook/interaction/ioc"
-	"github.com/webook/interaction/repository"
-	"github.com/webook/interaction/repository/cache"
-	"github.com/webook/interaction/repository/dao"
-	"github.com/webook/interaction/service"
-	"github.com/webook/pkg/grpcx"
+	interactiongrpc "github.com/boyxs/train-go/webook/interaction/grpc"
+	"github.com/boyxs/train-go/webook/interaction/ioc"
+	"github.com/boyxs/train-go/webook/interaction/repository"
+	"github.com/boyxs/train-go/webook/interaction/repository/cache"
+	"github.com/boyxs/train-go/webook/interaction/repository/dao"
+	"github.com/boyxs/train-go/webook/interaction/service"
+	"github.com/boyxs/train-go/webook/pkg/grpcx"
 )
 
 // App interaction 服务进程入口（纯 gRPC server）。

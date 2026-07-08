@@ -1,6 +1,6 @@
 package domain
 
-import "github.com/webook/pkg/stringx"
+import "github.com/boyxs/train-go/webook/pkg/stringx"
 
 type Article struct {
 	Id        int64         `json:"id"`

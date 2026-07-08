@@ -17,8 +17,8 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/test/bufconn"
 
-	"github.com/webook/pkg/errs"
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/pkg/errs"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 // 用例 5.x：bufconn 起真实 gRPC server + client，端到端验证双向转换。

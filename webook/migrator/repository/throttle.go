@@ -3,8 +3,8 @@ package repository
 import (
 	"context"
 
-	"github.com/webook/migrator/domain"
-	"github.com/webook/migrator/repository/cache"
+	"github.com/boyxs/train-go/webook/migrator/domain"
+	"github.com/boyxs/train-go/webook/migrator/repository/cache"
 )
 
 // ThrottleRepository task 级限速配置仓储（Redis 持久化，"下次 Start 生效"语义）。

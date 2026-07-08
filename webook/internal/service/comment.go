@@ -5,9 +5,9 @@ import (
 	"sort"
 	"strings"
 
-	commentv1 "github.com/webook/api/gen/comment/v1"
-	"github.com/webook/internal/domain"
-	"github.com/webook/pkg/logger"
+	commentv1 "github.com/boyxs/train-go/webook/api/gen/comment/v1"
+	"github.com/boyxs/train-go/webook/internal/domain"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 const (

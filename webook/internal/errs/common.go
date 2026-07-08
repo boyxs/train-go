@@ -8,7 +8,7 @@
 //	article.go  文章 + 润色 + 搜索：ArticleNotFound / PolishEmptyTitle 等
 //	code.go     验证码：CodeInvalid / CodeSendTooMany 等
 //
-// 调用方一律 import "github.com/webook/internal/errs"，禁止跨层引用各自的旧 Err 变量。
+// 调用方一律 import "github.com/boyxs/train-go/webook/internal/errs"，禁止跨层引用各自的旧 Err 变量。
 package errs
 
 import (

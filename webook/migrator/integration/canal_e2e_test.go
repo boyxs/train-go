@@ -12,8 +12,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/webook/migrator/pipeline/source"
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/migrator/pipeline/source"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 // TestCanal_E2E 端到端验证:GoMySQLCanalClient 真订阅 binlog → INSERT/UPDATE/DELETE 触发事件到达。

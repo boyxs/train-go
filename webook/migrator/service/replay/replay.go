@@ -9,10 +9,10 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/webook/migrator/pipeline/sink"
-	"github.com/webook/migrator/repository"
-	"github.com/webook/migrator/service"
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/migrator/pipeline/sink"
+	"github.com/boyxs/train-go/webook/migrator/repository"
+	"github.com/boyxs/train-go/webook/migrator/service"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 // ReplayService 死信重放服务接口。

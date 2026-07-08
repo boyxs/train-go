@@ -11,7 +11,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/webook/pkg/ginx"
+	"github.com/boyxs/train-go/webook/pkg/ginx"
 )
 
 func newTestBuilder(reg *prometheus.Registry) *PrometheusBuilder {

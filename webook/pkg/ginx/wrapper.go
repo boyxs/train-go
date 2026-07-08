@@ -6,8 +6,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/webook/pkg/errs"
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/pkg/errs"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 // L 全局 Logger，由 ioc 启动时注入。默认 Nop 防 nil panic。

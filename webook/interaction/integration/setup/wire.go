@@ -5,11 +5,11 @@ package setup
 import (
 	"github.com/google/wire"
 
-	interactiongrpc "github.com/webook/interaction/grpc"
-	"github.com/webook/interaction/repository"
-	"github.com/webook/interaction/repository/cache"
-	"github.com/webook/interaction/repository/dao"
-	"github.com/webook/interaction/service"
+	interactiongrpc "github.com/boyxs/train-go/webook/interaction/grpc"
+	"github.com/boyxs/train-go/webook/interaction/repository"
+	"github.com/boyxs/train-go/webook/interaction/repository/cache"
+	"github.com/boyxs/train-go/webook/interaction/repository/dao"
+	"github.com/boyxs/train-go/webook/interaction/service"
 )
 
 // InitInteractionServer 组装真 dao/cache/repository/service 的 InteractionServer，

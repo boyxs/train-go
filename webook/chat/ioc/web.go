@@ -13,15 +13,15 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/webook/chat/consts"
-	"github.com/webook/chat/web"
-	"github.com/webook/pkg/ginx"
-	"github.com/webook/pkg/ginx/middleware/accesslog"
-	"github.com/webook/pkg/ginx/middleware/metrics"
-	"github.com/webook/pkg/ginx/middleware/timeout"
-	"github.com/webook/pkg/jwtx"
-	"github.com/webook/pkg/logger"
-	"github.com/webook/shared/confkey"
+	"github.com/boyxs/train-go/webook/chat/consts"
+	"github.com/boyxs/train-go/webook/chat/web"
+	"github.com/boyxs/train-go/webook/pkg/ginx"
+	"github.com/boyxs/train-go/webook/pkg/ginx/middleware/accesslog"
+	"github.com/boyxs/train-go/webook/pkg/ginx/middleware/metrics"
+	"github.com/boyxs/train-go/webook/pkg/ginx/middleware/timeout"
+	"github.com/boyxs/train-go/webook/pkg/jwtx"
+	"github.com/boyxs/train-go/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/shared/confkey"
 )
 
 // InitWebServer 与主仓 internal/ioc/web.go 同结构：middlewares 由 InitMiddlewares 装配后注入。

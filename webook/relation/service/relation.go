@@ -3,9 +3,9 @@ package service
 import (
 	"context"
 
-	"github.com/webook/relation/domain"
-	"github.com/webook/relation/errs"
-	"github.com/webook/relation/repository"
+	"github.com/boyxs/train-go/webook/relation/domain"
+	"github.com/boyxs/train-go/webook/relation/errs"
+	"github.com/boyxs/train-go/webook/relation/repository"
 )
 
 type RelationService interface {

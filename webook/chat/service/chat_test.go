@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/webook/chat/domain"
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/chat/domain"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 // stubMsgRepo 提示词构建测试

@@ -9,12 +9,12 @@ import (
 	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc"
 
-	commentv1 "github.com/webook/api/gen/comment/v1"
-	"github.com/webook/internal/domain"
-	"github.com/webook/internal/service"
-	svcmocks "github.com/webook/internal/service/mocks"
-	grpcmocks "github.com/webook/internal/web/grpcmocks"
-	"github.com/webook/pkg/logger"
+	commentv1 "github.com/boyxs/train-go/webook/api/gen/comment/v1"
+	"github.com/boyxs/train-go/webook/internal/domain"
+	"github.com/boyxs/train-go/webook/internal/service"
+	svcmocks "github.com/boyxs/train-go/webook/internal/service/mocks"
+	grpcmocks "github.com/boyxs/train-go/webook/internal/web/grpcmocks"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 // pbComment 评论者 uid = 100+id

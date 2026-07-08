@@ -11,9 +11,9 @@ import (
 
 	"github.com/redis/go-redis/v9"
 
-	"github.com/webook/internal/consts"
-	"github.com/webook/internal/service/embedding"
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/internal/consts"
+	"github.com/boyxs/train-go/webook/internal/service/embedding"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 // CachedEmbeddingClient 对 embedding.Client 加 Redis 缓存，相同 text 不重复调 API

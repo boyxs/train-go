@@ -12,7 +12,7 @@
 //   - mongo.go      MongoToRelationalTransformer（Mongo 文档拍平）
 package transform
 
-import "github.com/webook/migrator/pipeline/sink"
+import "github.com/boyxs/train-go/webook/migrator/pipeline/sink"
 
 // Transformer 把一条 Mutation reshape 成另一条（通常只改 Cols，Op/Table/PK 透传）。
 type Transformer interface {

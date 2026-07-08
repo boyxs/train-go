@@ -7,12 +7,12 @@ import (
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
 
-	"github.com/webook/pkg/grpcx"
-	"github.com/webook/pkg/grpcx/interceptor/errconv"
-	"github.com/webook/pkg/grpcx/interceptor/metrics"
+	"github.com/boyxs/train-go/webook/pkg/grpcx"
+	"github.com/boyxs/train-go/webook/pkg/grpcx/interceptor/errconv"
+	"github.com/boyxs/train-go/webook/pkg/grpcx/interceptor/metrics"
 
-	interactionv1 "github.com/webook/api/gen/interaction/v1"
-	rankingv1 "github.com/webook/api/gen/ranking/v1"
+	interactionv1 "github.com/boyxs/train-go/webook/api/gen/interaction/v1"
+	rankingv1 "github.com/boyxs/train-go/webook/api/gen/ranking/v1"
 )
 
 // InitGRPCMetrics 进程内唯一的 gRPC 指标 builder，多个下游 conn 共享（分两个会重复注册 panic）。

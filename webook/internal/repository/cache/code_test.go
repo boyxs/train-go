@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
-	"github.com/webook/internal/errs"
-	"github.com/webook/internal/repository/cache/redismocks"
+	"github.com/boyxs/train-go/webook/internal/errs"
+	"github.com/boyxs/train-go/webook/internal/repository/cache/redismocks"
 )
 
 func TestRedisCodeCache_Store(t *testing.T) {

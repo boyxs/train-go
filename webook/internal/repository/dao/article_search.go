@@ -8,7 +8,7 @@ import (
 
 	"github.com/elastic/go-elasticsearch/v8"
 
-	"github.com/webook/internal/errs"
+	"github.com/boyxs/train-go/webook/internal/errs"
 )
 
 const articleIndex = "article_v1"

@@ -12,11 +12,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
-	"github.com/webook/internal/consts"
-	"github.com/webook/internal/domain"
-	svcmocks "github.com/webook/internal/service/mocks"
-	jwt "github.com/webook/pkg/jwtx"
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/internal/consts"
+	"github.com/boyxs/train-go/webook/internal/domain"
+	svcmocks "github.com/boyxs/train-go/webook/internal/service/mocks"
+	jwt "github.com/boyxs/train-go/webook/pkg/jwtx"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 func setupClickEventRouter(handler ClickEventHandler) *gin.Engine {

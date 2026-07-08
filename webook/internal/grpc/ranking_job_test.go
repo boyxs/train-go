@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
-	rankingv1 "github.com/webook/api/gen/ranking/v1"
-	svcmocks "github.com/webook/internal/service/mocks"
+	rankingv1 "github.com/boyxs/train-go/webook/api/gen/ranking/v1"
+	svcmocks "github.com/boyxs/train-go/webook/internal/service/mocks"
 )
 
 func TestRankingJobServer_Recompute_RoutesByDimension(t *testing.T) {

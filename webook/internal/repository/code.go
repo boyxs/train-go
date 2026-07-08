@@ -3,7 +3,7 @@ package repository
 import (
 	"context"
 
-	"github.com/webook/internal/repository/cache"
+	"github.com/boyxs/train-go/webook/internal/repository/cache"
 )
 
 type CodeRepository interface {

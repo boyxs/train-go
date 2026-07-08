@@ -3,11 +3,11 @@ package repository
 import (
 	"context"
 
-	"github.com/webook/pkg/logger"
-	"github.com/webook/pkg/slicex"
-	"github.com/webook/relation/domain"
-	"github.com/webook/relation/repository/cache"
-	"github.com/webook/relation/repository/dao"
+	"github.com/boyxs/train-go/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/pkg/slicex"
+	"github.com/boyxs/train-go/webook/relation/domain"
+	"github.com/boyxs/train-go/webook/relation/repository/cache"
+	"github.com/boyxs/train-go/webook/relation/repository/dao"
 )
 
 type RelationRepository interface {

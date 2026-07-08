@@ -1,0 +1,14 @@
+go 1.25.6
+
+use (
+	./api
+	./chat
+	./comment
+	./interaction
+	./internal
+	./migrator
+	./pkg
+	./relation
+	./shared
+	./worker
+)

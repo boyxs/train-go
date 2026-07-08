@@ -3,9 +3,9 @@ package service
 import (
 	"context"
 
-	intrevt "github.com/webook/internal/events/interaction"
-	"github.com/webook/pkg/circuitbreaker"
-	"github.com/webook/pkg/logger"
+	intrevt "github.com/boyxs/train-go/webook/internal/events/interaction"
+	"github.com/boyxs/train-go/webook/pkg/circuitbreaker"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 // KafkaInteractionService 装饰器

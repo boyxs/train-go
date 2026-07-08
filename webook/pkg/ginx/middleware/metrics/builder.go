@@ -7,7 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/webook/pkg/ginx"
+	"github.com/boyxs/train-go/webook/pkg/ginx"
 )
 
 // Builder 指标中间件构造器接口

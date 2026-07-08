@@ -14,11 +14,11 @@ import (
 	gormmysql "gorm.io/driver/mysql"
 	"gorm.io/gorm"
 
-	"github.com/webook/migrator/domain"
-	"github.com/webook/migrator/pipeline/sink"
-	"github.com/webook/migrator/pipeline/source"
-	"github.com/webook/migrator/pipeline/transform"
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/migrator/domain"
+	"github.com/boyxs/train-go/webook/migrator/pipeline/sink"
+	"github.com/boyxs/train-go/webook/migrator/pipeline/source"
+	"github.com/boyxs/train-go/webook/migrator/pipeline/transform"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 // TestMongo_E2E_IncrToMySQL 端到端验证 Mongo→MySQL 增量：

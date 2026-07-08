@@ -6,7 +6,7 @@
 //   - Handler 直接 return *errs.Error，ginx.Wrap 自动把 Code 翻译成 HTTP status + 带出 reason
 package errs
 
-import "github.com/webook/pkg/errs"
+import "github.com/boyxs/train-go/webook/pkg/errs"
 
 var (
 	// 400 参数 / 校验类

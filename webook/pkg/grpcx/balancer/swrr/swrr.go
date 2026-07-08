@@ -7,7 +7,7 @@
 //
 // 用法(以 custom_swrr 为例):匿名 import 触发注册 + service config 选中:
 //
-//	import _ "github.com/webook/pkg/grpcx/balancer/swrr"
+//	import _ "github.com/boyxs/train-go/webook/pkg/grpcx/balancer/swrr"
 //	grpc.WithDefaultServiceConfig(`{"loadBalancingConfig":[{"custom_swrr":{}}]}`)
 package swrr
 
@@ -17,7 +17,7 @@ import (
 	"google.golang.org/grpc/balancer"
 	"google.golang.org/grpc/balancer/base"
 
-	"github.com/webook/pkg/grpcx/balancer/weight"
+	"github.com/boyxs/train-go/webook/pkg/grpcx/balancer/weight"
 )
 
 // Name 是基础 SWRR 均衡器注册到 gRPC 的名字,service config 里用它选中。

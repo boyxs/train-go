@@ -16,7 +16,7 @@ import (
 
 	gomock "go.uber.org/mock/gomock"
 
-	redislockx "github.com/webook/pkg/redislockx"
+	redislockx "github.com/boyxs/train-go/webook/pkg/redislockx"
 )
 
 // MockClient is a mock of Client interface.

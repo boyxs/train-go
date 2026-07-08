@@ -6,10 +6,10 @@ import (
 
 	"github.com/IBM/sarama"
 
-	interactionv1 "github.com/webook/api/gen/interaction/v1"
-	"github.com/webook/pkg/logger"
-	"github.com/webook/pkg/saramax"
-	"github.com/webook/worker/consumer/event"
+	interactionv1 "github.com/boyxs/train-go/webook/api/gen/interaction/v1"
+	"github.com/boyxs/train-go/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/pkg/saramax"
+	"github.com/boyxs/train-go/webook/worker/consumer/event"
 )
 
 // ConsumerConfig 互动事件消费配置。

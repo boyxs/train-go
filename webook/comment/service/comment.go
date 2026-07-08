@@ -6,12 +6,12 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/webook/comment/domain"
-	"github.com/webook/comment/errs"
-	"github.com/webook/comment/repository"
-	"github.com/webook/pkg/logger"
-	"github.com/webook/pkg/ratelimit"
-	"github.com/webook/pkg/sensitive"
+	"github.com/boyxs/train-go/webook/comment/domain"
+	"github.com/boyxs/train-go/webook/comment/errs"
+	"github.com/boyxs/train-go/webook/comment/repository"
+	"github.com/boyxs/train-go/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/pkg/ratelimit"
+	"github.com/boyxs/train-go/webook/pkg/sensitive"
 )
 
 const maxContentRunes = 500

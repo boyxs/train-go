@@ -9,8 +9,8 @@ import (
 
 	"github.com/redis/go-redis/v9"
 
-	"github.com/webook/relation/consts"
-	"github.com/webook/relation/domain"
+	"github.com/boyxs/train-go/webook/relation/consts"
+	"github.com/boyxs/train-go/webook/relation/domain"
 )
 
 type RelationCache interface {

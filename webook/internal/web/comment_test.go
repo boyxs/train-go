@@ -11,9 +11,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
-	"github.com/webook/internal/consts"
-	"github.com/webook/internal/domain"
-	svcmocks "github.com/webook/internal/service/mocks"
+	"github.com/boyxs/train-go/webook/internal/consts"
+	"github.com/boyxs/train-go/webook/internal/domain"
+	svcmocks "github.com/boyxs/train-go/webook/internal/service/mocks"
 )
 
 // serveComment 起临时 gin server，uid>0 时注入登录态（模拟 OptionalPaths 命中）。

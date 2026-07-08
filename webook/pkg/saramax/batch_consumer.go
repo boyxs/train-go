@@ -8,7 +8,7 @@ import (
 	"github.com/IBM/sarama"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 // BatchConsumer 批量消费者

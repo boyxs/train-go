@@ -11,8 +11,8 @@ import (
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 
-	"github.com/webook/migrator/domain"
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/migrator/domain"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 func newSinkFactory(t *testing.T) (SinkFactory, func()) {

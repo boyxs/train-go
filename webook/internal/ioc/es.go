@@ -10,9 +10,9 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/spf13/viper"
 
-	"github.com/webook/internal/repository/cache"
-	"github.com/webook/internal/service/embedding"
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/internal/repository/cache"
+	"github.com/boyxs/train-go/webook/internal/service/embedding"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 func InitESClient() *elasticsearch.TypedClient {

@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"strconv"
 
-	"github.com/webook/internal/events"
+	"github.com/boyxs/train-go/webook/internal/events"
 )
 
 // RelationEventProducer 关系事件生产者接口。事件类型由调用方在 RelationEvent.Type 指定。

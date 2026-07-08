@@ -7,12 +7,12 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
 
-	"github.com/webook/internal/consts"
-	"github.com/webook/internal/errs"
-	"github.com/webook/internal/service"
-	"github.com/webook/pkg/ginx"
-	"github.com/webook/pkg/logger"
-	"github.com/webook/pkg/ratelimit"
+	"github.com/boyxs/train-go/webook/internal/consts"
+	"github.com/boyxs/train-go/webook/internal/errs"
+	"github.com/boyxs/train-go/webook/internal/service"
+	"github.com/boyxs/train-go/webook/pkg/ginx"
+	"github.com/boyxs/train-go/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/pkg/ratelimit"
 )
 
 type ArticlePolishHandler interface {

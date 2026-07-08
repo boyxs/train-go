@@ -1,6 +1,6 @@
 package errs
 
-import "github.com/webook/pkg/errs"
+import "github.com/boyxs/train-go/webook/pkg/errs"
 
 var (
 	ErrContentEmpty     = errs.New(400, "评论内容不能为空").WithReason("COMMENT_CONTENT_EMPTY")

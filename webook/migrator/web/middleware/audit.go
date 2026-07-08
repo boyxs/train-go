@@ -13,10 +13,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/webook/migrator/consts"
-	"github.com/webook/migrator/domain"
-	"github.com/webook/migrator/repository"
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/migrator/consts"
+	"github.com/boyxs/train-go/webook/migrator/domain"
+	"github.com/boyxs/train-go/webook/migrator/repository"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 const (

@@ -10,10 +10,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/webook/migrator/domain"
-	migratorerrs "github.com/webook/migrator/errs"
-	"github.com/webook/migrator/repository"
-	"github.com/webook/migrator/service"
+	"github.com/boyxs/train-go/webook/migrator/domain"
+	migratorerrs "github.com/boyxs/train-go/webook/migrator/errs"
+	"github.com/boyxs/train-go/webook/migrator/repository"
+	"github.com/boyxs/train-go/webook/migrator/service"
 )
 
 // ── 手写 stub Service ──────────────────────────────────────

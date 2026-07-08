@@ -5,11 +5,11 @@ import (
 
 	"github.com/robfig/cron/v3"
 
-	"github.com/webook/pkg/cronx"
-	cronprom "github.com/webook/pkg/cronx/prometheus"
-	"github.com/webook/pkg/logger"
-	"github.com/webook/pkg/redislockx"
-	"github.com/webook/worker/job"
+	"github.com/boyxs/train-go/webook/pkg/cronx"
+	cronprom "github.com/boyxs/train-go/webook/pkg/cronx/prometheus"
+	"github.com/boyxs/train-go/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/pkg/redislockx"
+	"github.com/boyxs/train-go/webook/worker/job"
 )
 
 // InitCronMetrics 任务级指标统一在此注册，所有 Job 共享 *Metrics 句柄，task 标签区分（webook_cron_*）。

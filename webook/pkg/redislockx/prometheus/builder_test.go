@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/webook/pkg/redislockx"
+	"github.com/boyxs/train-go/webook/pkg/redislockx"
 )
 
 func newTestClient(t *testing.T, b *PrometheusBuilder) (redislockx.Client, *miniredis.Miniredis) {

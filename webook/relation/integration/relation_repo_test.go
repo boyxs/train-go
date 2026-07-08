@@ -10,12 +10,12 @@ import (
 	"github.com/stretchr/testify/suite"
 	"gorm.io/gorm"
 
-	"github.com/webook/pkg/logger"
-	"github.com/webook/relation/domain"
-	"github.com/webook/relation/integration/setup"
-	"github.com/webook/relation/repository"
-	"github.com/webook/relation/repository/cache"
-	"github.com/webook/relation/repository/dao"
+	"github.com/boyxs/train-go/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/relation/domain"
+	"github.com/boyxs/train-go/webook/relation/integration/setup"
+	"github.com/boyxs/train-go/webook/relation/repository"
+	"github.com/boyxs/train-go/webook/relation/repository/cache"
+	"github.com/boyxs/train-go/webook/relation/repository/dao"
 )
 
 // RelationRepoSuite 真实 MySQL + Redis：验证 repository 的 Cache-Aside（stats 计数缓存 + 写后失效）与 domain 转换。

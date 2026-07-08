@@ -9,12 +9,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
-	"github.com/webook/internal/domain"
-	"github.com/webook/internal/errs"
-	"github.com/webook/internal/repository"
-	repomocks "github.com/webook/internal/repository/mocks"
-	embmocks "github.com/webook/internal/service/embedding/mocks"
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/internal/domain"
+	"github.com/boyxs/train-go/webook/internal/errs"
+	"github.com/boyxs/train-go/webook/internal/repository"
+	repomocks "github.com/boyxs/train-go/webook/internal/repository/mocks"
+	embmocks "github.com/boyxs/train-go/webook/internal/service/embedding/mocks"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 var stubVec = make([]float32, 1024)

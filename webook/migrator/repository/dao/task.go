@@ -9,7 +9,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/plugin/soft_delete"
 
-	"github.com/webook/migrator/errs"
+	"github.com/boyxs/train-go/webook/migrator/errs"
 )
 
 type TaskDAO interface {

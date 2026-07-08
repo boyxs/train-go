@@ -8,9 +8,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/webook/migrator/consts"
-	"github.com/webook/migrator/domain"
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/migrator/consts"
+	"github.com/boyxs/train-go/webook/migrator/domain"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 // BinlogEvent 底层 binlog 事件抽象。

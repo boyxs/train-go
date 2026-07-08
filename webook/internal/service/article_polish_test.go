@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
-	"github.com/webook/internal/errs"
-	llmmocks "github.com/webook/pkg/llm/mocks"
+	"github.com/boyxs/train-go/webook/internal/errs"
+	llmmocks "github.com/boyxs/train-go/webook/pkg/llm/mocks"
 )
 
 func TestAIArticlePolishService_Polish(t *testing.T) {

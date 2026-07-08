@@ -10,7 +10,7 @@ import (
 
 	"github.com/elastic/go-elasticsearch/v8"
 
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 // ESSink 把 Mutation batch 写入 Elasticsearch（bulk API）。

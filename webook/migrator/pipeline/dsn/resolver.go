@@ -19,7 +19,7 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/webook/migrator/domain"
+	"github.com/boyxs/train-go/webook/migrator/domain"
 )
 
 // Resolver 把 task 解析为 src / dst 端的 *gorm.DB 连接。

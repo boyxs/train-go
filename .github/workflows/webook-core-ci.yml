@@ -24,6 +24,7 @@ on:
       - 'webook/internal/**'
       - 'webook/api/**'
       - 'webook/pkg/**'
+      - 'webook/shared/**'
       - 'webook/go.mod'
       - 'webook/go.sum'
       - '.github/workflows/webook-core-ci.yml'
@@ -40,7 +41,7 @@ concurrency:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository_owner }}/webook-core
-  MODULE: github.com/webook
+  MODULE: github.com/boyxs/train-go/webook
   # 禁止 CI 里修改 go.sum；依赖漂移必须本地先提交，防 CI 偷偷改依赖
   GOFLAGS: "-mod=readonly"
 
@@ -60,7 +61,7 @@ jobs:
         with:
           go-version: '1.25.6'
           cache: true
-          cache-dependency-path: webook/go.sum
+          cache-dependency-path: webook/**/go.sum
 
       - name: 安装 goimports（走 setup-go cache，已装就跳过）
         run: test -x "$(go env GOPATH)/bin/goimports" || go install golang.org/x/tools/cmd/goimports@v0.26.0

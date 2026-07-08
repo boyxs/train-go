@@ -9,7 +9,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/webook/pkg/grpcx/balancer/weight"
+	"github.com/boyxs/train-go/webook/pkg/grpcx/balancer/weight"
 )
 
 // NameBreaker 是带熔断的 SWRR 均衡器名(circuit breaker):在 custom_swrr 基础上,RPC 失败经 Done

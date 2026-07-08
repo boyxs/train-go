@@ -3,7 +3,7 @@ package oauth2
 import (
 	"context"
 
-	"github.com/webook/internal/domain"
+	"github.com/boyxs/train-go/webook/internal/domain"
 )
 
 type OAuth2Service interface {

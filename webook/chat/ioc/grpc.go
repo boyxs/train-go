@@ -6,13 +6,13 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 
-	"github.com/webook/pkg/grpcx"
-	"github.com/webook/pkg/grpcx/interceptor/errconv"
-	"github.com/webook/pkg/grpcx/interceptor/metrics"
+	"github.com/boyxs/train-go/webook/pkg/grpcx"
+	"github.com/boyxs/train-go/webook/pkg/grpcx/interceptor/errconv"
+	"github.com/boyxs/train-go/webook/pkg/grpcx/interceptor/metrics"
 
-	articlev1 "github.com/webook/api/gen/article/v1"
-	interactionv1 "github.com/webook/api/gen/interaction/v1"
-	searchv1 "github.com/webook/api/gen/search/v1"
+	articlev1 "github.com/boyxs/train-go/webook/api/gen/article/v1"
+	interactionv1 "github.com/boyxs/train-go/webook/api/gen/interaction/v1"
+	searchv1 "github.com/boyxs/train-go/webook/api/gen/search/v1"
 )
 
 // InitGRPCMetrics 进程内唯一的 gRPC 指标 builder，多个下游 conn 共享。

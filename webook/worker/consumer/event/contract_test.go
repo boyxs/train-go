@@ -7,8 +7,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	coreevt "github.com/webook/internal/events/interaction"
-	workerevt "github.com/webook/worker/consumer/event"
+	coreevt "github.com/boyxs/train-go/webook/internal/events/interaction"
+	workerevt "github.com/boyxs/train-go/webook/worker/consumer/event"
 )
 
 // 跨服务事件契约守卫：core 生产端与 worker 消费端的 InteractionEvent 不共享代码，

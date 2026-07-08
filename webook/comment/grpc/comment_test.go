@@ -8,9 +8,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
-	commentv1 "github.com/webook/api/gen/comment/v1"
-	"github.com/webook/comment/domain"
-	svcmocks "github.com/webook/comment/service/mocks"
+	commentv1 "github.com/boyxs/train-go/webook/api/gen/comment/v1"
+	"github.com/boyxs/train-go/webook/comment/domain"
+	svcmocks "github.com/boyxs/train-go/webook/comment/service/mocks"
 )
 
 func TestCommentServer_CreateComment(t *testing.T) {

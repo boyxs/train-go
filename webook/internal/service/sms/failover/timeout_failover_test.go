@@ -11,9 +11,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
-	"github.com/webook/internal/service/sms"
-	smsmocks "github.com/webook/internal/service/sms/mocks"
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/internal/service/sms"
+	smsmocks "github.com/boyxs/train-go/webook/internal/service/sms/mocks"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 func TestTimeoutFailoverSmsService_Send(t *testing.T) {

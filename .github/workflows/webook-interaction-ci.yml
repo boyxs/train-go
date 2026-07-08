@@ -23,6 +23,7 @@ on:
       - 'webook/interaction/**'
       - 'webook/api/**'
       - 'webook/pkg/**'
+      - 'webook/shared/**'
       - '.github/workflows/webook-interaction-ci.yml'
   workflow_dispatch:
 
@@ -36,7 +37,7 @@ concurrency:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository_owner }}/webook-interaction
-  MODULE: github.com/webook
+  MODULE: github.com/boyxs/train-go/webook
   GOFLAGS: "-mod=readonly"
 
 defaults:
@@ -54,7 +55,7 @@ jobs:
         with:
           go-version: '1.25.6'
           cache: true
-          cache-dependency-path: webook/go.sum
+          cache-dependency-path: webook/**/go.sum
 
       - name: 安装 goimports
         run: test -x "$(go env GOPATH)/bin/goimports" || go install golang.org/x/tools/cmd/goimports@v0.26.0

@@ -14,9 +14,9 @@ import (
 	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
 
-	articlev1 "github.com/webook/api/gen/article/v1"
-	"github.com/webook/internal/domain"
-	svcmocks "github.com/webook/internal/service/mocks"
+	articlev1 "github.com/boyxs/train-go/webook/api/gen/article/v1"
+	"github.com/boyxs/train-go/webook/internal/domain"
+	svcmocks "github.com/boyxs/train-go/webook/internal/service/mocks"
 )
 
 func TestArticleReaderServer_GetArticle_Happy(t *testing.T) {

@@ -1,5 +1,6 @@
-# 从 go.mod 第一行提取模块路径，单一真相源
-MODULE := $(shell head -1 go.mod | awk '{print $$2}')
+# 模块路径（多模块 go.work：各服务 + pkg/api/shared 独立 module，无 root go.mod）
+# goimports -local 用统一前缀即可覆盖全部子模块
+MODULE := github.com/boyxs/train-go/webook
 
 # 部署层入口：compose 文件 + .env.local 都在 ../deploy/（项目唯一真相源）
 # image 名 webook:local 与 docker-compose.local.yaml 对齐，pull_policy=never
@@ -10,11 +11,11 @@ COMPOSE := docker compose -p webook-local --env-file $(DEPLOY)/.env.local \
 
 .PHONY: build dc up down fmt fmt-check wire help
 
-# 宿主机交叉编译 Linux 二进制（产物：./webook），给 Dockerfile COPY 进镜像
+# 宿主机交叉编译 core（internal 模块）Linux 二进制（产物：webook/webook）
+# 注：CI/compose 走 internal/Dockerfile 容器内构建，此目标仅本地手动出二进制
 build:
 	@rm -f webook
-	@go mod tidy
-	@CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -tags=k8s -o webook .
+	@cd internal && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -tags=k8s -o ../webook .
 
 # 重新构建 webook 镜像 + 重启服务（需先 make build）
 # 仅作用 webook 服务，不动 mysql/redis/kafka 等中间件；要起全套用 ../deploy/deploy.sh local
@@ -52,10 +53,11 @@ fmt-check:
 		rm -f $$TMPFILE
 	@echo "✅ import 顺序规范"
 
-# 重新生成主 wire_gen.go + 集成测试 wire_gen.go，末尾自动格式化
+# 重新生成所有模块的 wire_gen.go（多模块：逐模块 wire ./... 覆盖各自 integration/setup），末尾格式化
 wire:
-	@wire ./...
-	@wire ./internal/integration/setup/...
+	@for m in internal chat comment interaction migrator relation worker; do \
+		echo "→ wire $$m"; (cd $$m && wire ./...) || exit 1; \
+	done
 	@$(MAKE) fmt
 
 help:

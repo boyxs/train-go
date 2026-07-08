@@ -16,10 +16,10 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/test/bufconn"
 
-	articlev1 "github.com/webook/api/gen/article/v1"
-	interactionv1 "github.com/webook/api/gen/interaction/v1"
-	searchv1 "github.com/webook/api/gen/search/v1"
-	"github.com/webook/pkg/logger"
+	articlev1 "github.com/boyxs/train-go/webook/api/gen/article/v1"
+	interactionv1 "github.com/boyxs/train-go/webook/api/gen/interaction/v1"
+	searchv1 "github.com/boyxs/train-go/webook/api/gen/search/v1"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 const bufSize = 1024 * 1024

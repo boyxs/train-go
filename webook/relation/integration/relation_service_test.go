@@ -10,14 +10,14 @@ import (
 	"github.com/stretchr/testify/suite"
 	"gorm.io/gorm"
 
-	"github.com/webook/pkg/logger"
-	"github.com/webook/relation/domain"
-	relationerrs "github.com/webook/relation/errs"
-	"github.com/webook/relation/integration/setup"
-	"github.com/webook/relation/repository"
-	"github.com/webook/relation/repository/cache"
-	"github.com/webook/relation/repository/dao"
-	"github.com/webook/relation/service"
+	"github.com/boyxs/train-go/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/relation/domain"
+	relationerrs "github.com/boyxs/train-go/webook/relation/errs"
+	"github.com/boyxs/train-go/webook/relation/integration/setup"
+	"github.com/boyxs/train-go/webook/relation/repository"
+	"github.com/boyxs/train-go/webook/relation/repository/cache"
+	"github.com/boyxs/train-go/webook/relation/repository/dao"
+	"github.com/boyxs/train-go/webook/relation/service"
 )
 
 // RelationServiceSuite 真实栈：验证 service 的业务校验（自关注/自拉黑/双向拉黑门控）与关系态组装。

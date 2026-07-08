@@ -6,11 +6,11 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/webook/interaction/domain"
-	"github.com/webook/interaction/repository/cache"
-	"github.com/webook/interaction/repository/dao"
-	"github.com/webook/pkg/logger"
-	"github.com/webook/pkg/slicex"
+	"github.com/boyxs/train-go/webook/interaction/domain"
+	"github.com/boyxs/train-go/webook/interaction/repository/cache"
+	"github.com/boyxs/train-go/webook/interaction/repository/dao"
+	"github.com/boyxs/train-go/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/pkg/slicex"
 )
 
 type InteractionRepository interface {

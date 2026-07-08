@@ -3,11 +3,11 @@ package grpc
 import (
 	"context"
 
-	commentv1 "github.com/webook/api/gen/comment/v1"
-	"github.com/webook/comment/domain"
-	"github.com/webook/comment/service"
-	"github.com/webook/pkg/errs"
-	"github.com/webook/pkg/slicex"
+	commentv1 "github.com/boyxs/train-go/webook/api/gen/comment/v1"
+	"github.com/boyxs/train-go/webook/comment/domain"
+	"github.com/boyxs/train-go/webook/comment/service"
+	"github.com/boyxs/train-go/webook/pkg/errs"
+	"github.com/boyxs/train-go/webook/pkg/slicex"
 )
 
 // CommentServer 把内部 CommentService 适配成 gRPC 接口。

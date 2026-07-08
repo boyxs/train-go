@@ -1,6 +1,6 @@
 package errs
 
-import "github.com/webook/pkg/errs"
+import "github.com/boyxs/train-go/webook/pkg/errs"
 
 // 用户注册 / 登录相关错误。HTTP code 选择：
 //

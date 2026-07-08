@@ -9,13 +9,13 @@ package main
 import (
 	"github.com/gin-gonic/gin"
 
-	"github.com/webook/chat/ioc"
-	"github.com/webook/chat/repository"
-	"github.com/webook/chat/repository/cache"
-	"github.com/webook/chat/repository/dao"
-	"github.com/webook/chat/service"
-	"github.com/webook/chat/web"
-	"github.com/webook/pkg/streamer"
+	"github.com/boyxs/train-go/webook/chat/ioc"
+	"github.com/boyxs/train-go/webook/chat/repository"
+	"github.com/boyxs/train-go/webook/chat/repository/cache"
+	"github.com/boyxs/train-go/webook/chat/repository/dao"
+	"github.com/boyxs/train-go/webook/chat/service"
+	"github.com/boyxs/train-go/webook/chat/web"
+	"github.com/boyxs/train-go/webook/pkg/streamer"
 )
 
 // Injectors from wire.go:

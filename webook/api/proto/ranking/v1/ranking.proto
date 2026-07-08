@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package webook.ranking.v1;
 
-option go_package = "github.com/webook/api/gen/ranking/v1;rankingv1";
+option go_package = "github.com/boyxs/train-go/webook/api/gen/ranking/v1;rankingv1";
 
 // RankingJobService 榜单重算/归档的触发入口，由 webook-core 实现（榜单数据与重算逻辑都在 core）。
 // webook-worker（调度器）按 cron 定时调用本服务触发重算——worker 只调度不持数据，对齐 bolee-task 模式。

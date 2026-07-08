@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package webook.search.v1;
 
-option go_package = "github.com/webook/api/gen/search/v1;searchv1";
+option go_package = "github.com/boyxs/train-go/webook/api/gen/search/v1;searchv1";
 
 // SearchService 提供文章搜索能力（被 webook-chat 等下游服务消费）。
 service SearchService {

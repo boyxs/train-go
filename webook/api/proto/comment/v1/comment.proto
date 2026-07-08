@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package webook.comment.v1;
 
-option go_package = "github.com/webook/api/gen/comment/v1;commentv1";
+option go_package = "github.com/boyxs/train-go/webook/api/gen/comment/v1;commentv1";
 
 // CommentService 提供盖楼式评论的读写（无限嵌套：root_id 标记楼、pid 直接父）。
 // 由 webook-core 经 gRPC 调用，core 负责 JWT 鉴权后注入 uid、并做 VO 转换给前端。

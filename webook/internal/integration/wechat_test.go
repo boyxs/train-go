@@ -11,9 +11,9 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/webook/internal/consts"
-	"github.com/webook/internal/integration/setup"
-	"github.com/webook/internal/web"
+	"github.com/boyxs/train-go/webook/internal/consts"
+	"github.com/boyxs/train-go/webook/internal/integration/setup"
+	"github.com/boyxs/train-go/webook/internal/web"
 )
 
 func TestOAuth2WechatHandler_Callback(t *testing.T) {

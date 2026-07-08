@@ -7,12 +7,12 @@ import (
 
 	"google.golang.org/grpc/status"
 
-	articlev1 "github.com/webook/api/gen/article/v1"
-	interactionv1 "github.com/webook/api/gen/interaction/v1"
-	searchv1 "github.com/webook/api/gen/search/v1"
-	"github.com/webook/chat/domain"
-	"github.com/webook/pkg/llm"
-	"github.com/webook/pkg/logger"
+	articlev1 "github.com/boyxs/train-go/webook/api/gen/article/v1"
+	interactionv1 "github.com/boyxs/train-go/webook/api/gen/interaction/v1"
+	searchv1 "github.com/boyxs/train-go/webook/api/gen/search/v1"
+	"github.com/boyxs/train-go/webook/chat/domain"
+	"github.com/boyxs/train-go/webook/pkg/llm"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 // chatToolDefinitions 聊天模块使用的工具定义（传给 LLM）。
