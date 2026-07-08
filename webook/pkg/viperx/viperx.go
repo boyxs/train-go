@@ -75,7 +75,7 @@ func LoadLocal() error {
 	env := pflag.String("env", os.Getenv("APP_ENV"), "运行环境配置文件路径")
 	pflag.Parse()
 	if *env == "" {
-		*env = "config/local.yaml"
+		panic(errors.New("APP_ENV/--env 未设置：容器/部署由 deploy/.env.<env> 注入；本地开发用 APP_ENV=config/local.yaml"))
 	}
 	// 读配置同目录的 .env 注入密钥(仅本地便利;真实环境变量优先,缺文件跳过)
 	if err := loadDotEnv(filepath.Join(filepath.Dir(*env), ".env")); err != nil {
