@@ -1,6 +1,6 @@
 package errs
 
-import "github.com/webook/pkg/errs"
+import "github.com/boyxs/train-go/webook/pkg/errs"
 
 // 关系业务错误 sentinel；Code 即 HTTP status，Reason 业务原因码，由 errconv 拦截器统一转 gRPC status。
 var (

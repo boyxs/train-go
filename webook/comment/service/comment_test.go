@@ -8,12 +8,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
-	"github.com/webook/comment/domain"
-	"github.com/webook/comment/errs"
-	repomocks "github.com/webook/comment/repository/mocks"
-	"github.com/webook/pkg/logger"
-	limitmocks "github.com/webook/pkg/ratelimit/mocks"
-	sensitivemocks "github.com/webook/pkg/sensitive/mocks"
+	"github.com/boyxs/train-go/webook/comment/domain"
+	"github.com/boyxs/train-go/webook/comment/errs"
+	repomocks "github.com/boyxs/train-go/webook/comment/repository/mocks"
+	"github.com/boyxs/train-go/webook/pkg/logger"
+	limitmocks "github.com/boyxs/train-go/webook/pkg/ratelimit/mocks"
+	sensitivemocks "github.com/boyxs/train-go/webook/pkg/sensitive/mocks"
 )
 
 func TestCommentService_Create(t *testing.T) {

@@ -7,8 +7,8 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/webook/migrator/consts"
-	"github.com/webook/migrator/errs"
+	"github.com/boyxs/train-go/webook/migrator/consts"
+	"github.com/boyxs/train-go/webook/migrator/errs"
 )
 
 func TestGormCheckpointDAO_Upsert(t *testing.T) {

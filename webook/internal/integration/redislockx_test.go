@@ -12,8 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/webook/internal/integration/setup"
-	"github.com/webook/pkg/redislockx"
+	"github.com/boyxs/train-go/webook/internal/integration/setup"
+	"github.com/boyxs/train-go/webook/pkg/redislockx"
 )
 
 // 分布式锁端到端集成测试 — 真 Redis 验证 SETNX 原子性、watchdog 续约、跨实例互斥。

@@ -3,8 +3,8 @@ package service
 import (
 	"context"
 
-	"github.com/webook/interaction/domain"
-	"github.com/webook/interaction/repository"
+	"github.com/boyxs/train-go/webook/interaction/domain"
+	"github.com/boyxs/train-go/webook/interaction/repository"
 )
 
 type InteractionService interface {

@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package webook.article.v1;
 
-option go_package = "github.com/webook/api/gen/article/v1;articlev1";
+option go_package = "github.com/boyxs/train-go/webook/api/gen/article/v1;articlev1";
 
 // ArticleReaderService 提供已发表文章的只读访问。
 // 不暴露 content 字段，调用方按需通过其它接口获取正文。

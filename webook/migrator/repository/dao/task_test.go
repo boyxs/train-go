@@ -12,7 +12,7 @@ import (
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 
-	"github.com/webook/migrator/errs"
+	"github.com/boyxs/train-go/webook/migrator/errs"
 )
 
 func TestGormTaskDAO_Insert(t *testing.T) {

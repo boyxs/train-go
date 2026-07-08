@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 
-	"github.com/webook/internal/domain"
-	"github.com/webook/internal/errs"
-	"github.com/webook/internal/repository/dao"
+	"github.com/boyxs/train-go/webook/internal/domain"
+	"github.com/boyxs/train-go/webook/internal/errs"
+	"github.com/boyxs/train-go/webook/internal/repository/dao"
 )
 
 type ArticleSearchRepository interface {

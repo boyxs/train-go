@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/suite"
 	"gorm.io/gorm"
 
-	"github.com/webook/relation/integration/setup"
-	"github.com/webook/relation/repository/dao"
+	"github.com/boyxs/train-go/webook/relation/integration/setup"
+	"github.com/boyxs/train-go/webook/relation/repository/dao"
 )
 
 // RelationDAOSuite 真实 MySQL：直查 relation_follow/relation_stats/relation_block 三表断言，

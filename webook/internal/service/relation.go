@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	relationv1 "github.com/webook/api/gen/relation/v1"
-	"github.com/webook/internal/domain"
-	relationevt "github.com/webook/internal/events/relation"
-	"github.com/webook/pkg/logger"
+	relationv1 "github.com/boyxs/train-go/webook/api/gen/relation/v1"
+	"github.com/boyxs/train-go/webook/internal/domain"
+	relationevt "github.com/boyxs/train-go/webook/internal/events/relation"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 // RelationService 用户关系 core 网关业务：调 relation gRPC 后端，聚合 user 昵称/简介 + 关系态 + 每人计数，

@@ -3,8 +3,8 @@ package repository
 import (
 	"context"
 
-	"github.com/webook/migrator/domain"
-	"github.com/webook/migrator/repository/cache"
+	"github.com/boyxs/train-go/webook/migrator/domain"
+	"github.com/boyxs/train-go/webook/migrator/repository/cache"
 )
 
 // SwitchStateRepository 切流状态仓储（stage / gray / cutover propose）。

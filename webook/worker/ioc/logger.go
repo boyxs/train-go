@@ -5,8 +5,8 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
-	"github.com/webook/pkg/logger"
-	"github.com/webook/shared/confkey"
+	"github.com/boyxs/train-go/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/shared/confkey"
 )
 
 // InitLogger 由 yaml logger 段驱动:development 选 dev/prod base,再按 level/encoding/output 覆盖。

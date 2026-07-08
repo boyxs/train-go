@@ -4,9 +4,9 @@ import (
 	"context"
 	"strings"
 
-	searchv1 "github.com/webook/api/gen/search/v1"
-	"github.com/webook/internal/errs"
-	"github.com/webook/internal/service"
+	searchv1 "github.com/boyxs/train-go/webook/api/gen/search/v1"
+	"github.com/boyxs/train-go/webook/internal/errs"
+	"github.com/boyxs/train-go/webook/internal/service"
 )
 
 // SearchServer 把内部 ArticleSearchService 适配成 gRPC 接口，给 chat 等下游调用。

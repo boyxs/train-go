@@ -15,7 +15,7 @@ import (
 
 	gomock "go.uber.org/mock/gomock"
 
-	llm "github.com/webook/pkg/llm"
+	llm "github.com/boyxs/train-go/webook/pkg/llm"
 )
 
 // MockClient is a mock of Client interface.

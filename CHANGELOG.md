@@ -2,6 +2,16 @@
 
 <!-- 新功能前插在此，日期降序 -->
 
+## [2026-07-07] Go 多模块化 + go.work 落地实现
+
+**变更内容**: 按 `prd/go-workspace/ARCHITECTURE.md` 落地——`webook/` 单模块拆为 10 个独立 module（每服务 + pkg/api/shared）+ `go.work`；历史占位模块名 `github.com/webook` → `github.com/boyxs/train-go/webook`（对齐真实仓库）。一个提交完成。
+**影响范围**: 369 `.go` 前缀重命名 + 6 `.proto` go_package；10 模块 `go.mod`（服务 `require`+`replace` 本地兄弟：migrator 无 api、worker 含 internal）+ `go.work`/`go.work.sum`；root `go.mod`/`go.sum` 删除；7 Dockerfile（`GOWORK=off`+replace 分层 COPY）；7 CI（`cache-dependency-path=webook/**/go.sum`、PR paths 补 `shared`）；根 `Makefile`/`mk`（MODULE 硬编码、wire/mockgen 逐模块 cd）；`webook/CLAUDE.md`、`.claude/rules/coding-rules.md`、`prd/migrator/02-architecture.md`（布局说明加注）。
+**技术决策**: ① 依赖版本零漂移——各模块 go.mod 从原版本 seed 再 tidy，避免 fresh tidy 抓 latest 误升级 grpc/gin/sarama/go-redis；② internal 保留原名不改 core（零 import 改写）；③ `go.work` + `replace` 双保险（`go mod tidy`/Docker/CI 全离线确定性）；④ 前缀迁移作为独立首步在单模块态一次机械替换；⑤ 修复 `pkg/errs` 全仓 sentinel guard 的 `repoRoot`：锚点 `go.mod`→`go.work`（多模块下才扫得全仓 60 个 reason）。
+**验证**: 10 模块 build+vet（workspace / GOWORK=off / -mod=readonly 三态）全绿；7 Dockerfile 构建命令编译通过（含 internal k8s tag、worker+internal）；chat Dockerfile COPY 集 scratch 模拟产出 Linux 二进制；pkg 单测全绿（含全仓 guard）+ internal service/web 单测全绿；离线 tidy 通过。
+**待办**: 集成测试 + 真 `docker build` + CI 实跑（本地无 MySQL/Redis/Kafka/etcd/docker）——push 后由 CI 验证；`.gitignore` 的 `go.work` 忽略行可删（go.work 已 tracked 故失效）。
+**会话**: 260707-go-workspace-多模块化
+**发布**: 待上线
+
 ## [2026-07-07] Go 多模块化 + go.work 架构方案（设计）
 
 **变更内容**: 出「`webook/` 单模块 → 每服务 + `pkg`/`api`/`shared` 各自独立 `go.mod` + `go.work`」架构方案；并决定顺带把历史占位模块名 `github.com/webook` 对齐真实仓库 `github.com/boyxs/train-go/webook`。仅设计文档，未动代码。

@@ -5,7 +5,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 
-	"github.com/webook/internal/service/sms"
+	"github.com/boyxs/train-go/webook/internal/service/sms"
 )
 
 type AuthSmsService struct {

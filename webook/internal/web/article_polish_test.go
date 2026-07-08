@@ -12,14 +12,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
-	"github.com/webook/internal/consts"
-	"github.com/webook/internal/domain"
-	"github.com/webook/internal/errs"
-	svcmocks "github.com/webook/internal/service/mocks"
-	"github.com/webook/pkg/ginx"
-	jwt "github.com/webook/pkg/jwtx"
-	"github.com/webook/pkg/logger"
-	limitmocks "github.com/webook/pkg/ratelimit/mocks"
+	"github.com/boyxs/train-go/webook/internal/consts"
+	"github.com/boyxs/train-go/webook/internal/domain"
+	"github.com/boyxs/train-go/webook/internal/errs"
+	svcmocks "github.com/boyxs/train-go/webook/internal/service/mocks"
+	"github.com/boyxs/train-go/webook/pkg/ginx"
+	jwt "github.com/boyxs/train-go/webook/pkg/jwtx"
+	"github.com/boyxs/train-go/webook/pkg/logger"
+	limitmocks "github.com/boyxs/train-go/webook/pkg/ratelimit/mocks"
 )
 
 // 单测里 InitWebServer 不跑，手动对齐 ginx.UserKey 与生产（= consts.UserKey），

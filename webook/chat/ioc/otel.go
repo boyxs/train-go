@@ -15,7 +15,7 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/webook/shared/confkey"
+	"github.com/boyxs/train-go/webook/shared/confkey"
 )
 
 // InitOTel 初始化 OpenTelemetry：OTLP/gRPC → otel-collector → Zipkin

@@ -6,8 +6,8 @@ import (
 	"github.com/IBM/sarama"
 	"github.com/spf13/viper"
 
-	"github.com/webook/shared/confkey"
-	"github.com/webook/worker/consumer"
+	"github.com/boyxs/train-go/webook/shared/confkey"
+	"github.com/boyxs/train-go/webook/worker/consumer"
 )
 
 // KafkaConfig 映射 yaml data.kafka 段（worker 只消费，不生产）。时间为 duration;缺省就地兜底。

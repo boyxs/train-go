@@ -8,8 +8,8 @@ import (
 	"google.golang.org/grpc/balancer/base"
 	"google.golang.org/grpc/metadata"
 
-	"github.com/webook/pkg/grpcx/balancer/group"
-	"github.com/webook/pkg/grpcx/balancer/weight"
+	"github.com/boyxs/train-go/webook/pkg/grpcx/balancer/group"
+	"github.com/boyxs/train-go/webook/pkg/grpcx/balancer/weight"
 )
 
 // NameGroup 是按请求 tier 分流的 SWRR 均衡器名:节点按 group 标签分桶,请求经 metadata

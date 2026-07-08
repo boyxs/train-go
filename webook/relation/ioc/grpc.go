@@ -9,14 +9,14 @@ import (
 	"google.golang.org/grpc/health"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 
-	relationv1 "github.com/webook/api/gen/relation/v1"
-	relationgrpc "github.com/webook/relation/grpc"
+	relationv1 "github.com/boyxs/train-go/webook/api/gen/relation/v1"
+	relationgrpc "github.com/boyxs/train-go/webook/relation/grpc"
 
-	"github.com/webook/pkg/grpcx"
-	"github.com/webook/pkg/grpcx/interceptor/errconv"
-	"github.com/webook/pkg/grpcx/interceptor/metrics"
-	"github.com/webook/pkg/logger"
-	"github.com/webook/shared/confkey"
+	"github.com/boyxs/train-go/webook/pkg/grpcx"
+	"github.com/boyxs/train-go/webook/pkg/grpcx/interceptor/errconv"
+	"github.com/boyxs/train-go/webook/pkg/grpcx/interceptor/metrics"
+	"github.com/boyxs/train-go/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/shared/confkey"
 )
 
 // InitGRPCServer 组装 gRPC server 并注册 RelationService，由 main 起 goroutine 监听。

@@ -12,9 +12,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/webook/migrator/consts"
-	"github.com/webook/migrator/domain"
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/migrator/consts"
+	"github.com/boyxs/train-go/webook/migrator/domain"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 // ── 手写 stub AuditLogRepository ───────────────────────────

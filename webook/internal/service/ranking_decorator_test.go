@@ -11,11 +11,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
-	"github.com/webook/internal/domain"
-	repomocks "github.com/webook/internal/repository/mocks"
-	svcmocks "github.com/webook/internal/service/mocks"
-	"github.com/webook/pkg/logger"
-	"github.com/webook/pkg/pool"
+	"github.com/boyxs/train-go/webook/internal/domain"
+	repomocks "github.com/boyxs/train-go/webook/internal/repository/mocks"
+	svcmocks "github.com/boyxs/train-go/webook/internal/service/mocks"
+	"github.com/boyxs/train-go/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/pkg/pool"
 )
 
 // testCounter 未注册的一次性计数器，给不关心丢弃指标的用例占位。

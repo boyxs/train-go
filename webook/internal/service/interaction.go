@@ -3,8 +3,8 @@ package service
 import (
 	"context"
 
-	interactionv1 "github.com/webook/api/gen/interaction/v1"
-	"github.com/webook/internal/domain"
+	interactionv1 "github.com/boyxs/train-go/webook/api/gen/interaction/v1"
+	"github.com/boyxs/train-go/webook/internal/domain"
 )
 
 type InteractionService interface {

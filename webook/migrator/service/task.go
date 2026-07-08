@@ -6,10 +6,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/webook/migrator/domain"
-	"github.com/webook/migrator/errs"
-	"github.com/webook/migrator/repository"
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/migrator/domain"
+	"github.com/boyxs/train-go/webook/migrator/errs"
+	"github.com/boyxs/train-go/webook/migrator/repository"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 // CreateReq 创建任务的 service 层入参。

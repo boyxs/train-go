@@ -16,9 +16,9 @@ import (
 
 	dto "github.com/prometheus/client_model/go"
 
-	cronprom "github.com/webook/pkg/cronx/prometheus"
-	"github.com/webook/pkg/logger"
-	"github.com/webook/pkg/redislockx"
+	cronprom "github.com/boyxs/train-go/webook/pkg/cronx/prometheus"
+	"github.com/boyxs/train-go/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/pkg/redislockx"
 )
 
 // recordingLogger 收集日志，用于断言 panic 路径里 stack 字段是否落地。

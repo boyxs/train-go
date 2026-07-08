@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	commentv1 "github.com/webook/api/gen/comment/v1"
-	"github.com/webook/internal/domain"
-	"github.com/webook/internal/repository"
-	"github.com/webook/pkg/logger"
+	commentv1 "github.com/boyxs/train-go/webook/api/gen/comment/v1"
+	"github.com/boyxs/train-go/webook/internal/domain"
+	"github.com/boyxs/train-go/webook/internal/repository"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 // ── 作者端 ─────────────────────────────────────────────────────────────────

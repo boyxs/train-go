@@ -8,8 +8,8 @@ import (
 
 	"github.com/IBM/sarama"
 
-	"github.com/webook/pkg/logger"
-	"github.com/webook/pkg/saramax"
+	"github.com/boyxs/train-go/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/pkg/saramax"
 )
 
 // SaramaSyncProducer 同步生产者，发送后等待 broker 确认

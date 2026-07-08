@@ -7,7 +7,7 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/webook/migrator/consts"
+	"github.com/boyxs/train-go/webook/migrator/consts"
 )
 
 // ── validate_log ───────────────────────────────

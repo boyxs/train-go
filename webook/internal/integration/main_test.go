@@ -6,8 +6,8 @@ import (
 
 	"github.com/spf13/viper"
 
-	"github.com/webook/internal/consts"
-	"github.com/webook/pkg/ginx"
+	"github.com/boyxs/train-go/webook/internal/consts"
+	"github.com/boyxs/train-go/webook/pkg/ginx"
 )
 
 func TestMain(m *testing.M) {

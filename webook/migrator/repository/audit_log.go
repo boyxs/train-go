@@ -3,8 +3,8 @@ package repository
 import (
 	"context"
 
-	"github.com/webook/migrator/domain"
-	"github.com/webook/migrator/repository/dao"
+	"github.com/boyxs/train-go/webook/migrator/domain"
+	"github.com/boyxs/train-go/webook/migrator/repository/dao"
 )
 
 // AuditLogRepository 审计日志仓储（append-only）。

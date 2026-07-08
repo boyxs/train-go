@@ -7,10 +7,10 @@ import (
 	gormlogger "gorm.io/gorm/logger"
 	"gorm.io/plugin/opentelemetry/tracing"
 
-	"github.com/webook/migrator/repository/dao"
-	gormprom "github.com/webook/pkg/gormx/prometheus"
-	loggerx "github.com/webook/pkg/logger"
-	"github.com/webook/shared/confkey"
+	"github.com/boyxs/train-go/webook/migrator/repository/dao"
+	gormprom "github.com/boyxs/train-go/webook/pkg/gormx/prometheus"
+	loggerx "github.com/boyxs/train-go/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/shared/confkey"
 )
 
 // InitDB 初始化 migrator 控制库的 GORM 连接。

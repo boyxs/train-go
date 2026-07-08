@@ -2,23 +2,24 @@
 
 Go + Gin + GORM + Redis + Wire（DI）
 
-模块路径: `github.com/webook`
+模块路径: `github.com/boyxs/train-go/webook`（多模块 go.work：各服务 + pkg/api/shared 各自独立 module，无 root go.mod）
 
 ## 常用命令
 
 ```bash
-go build ./...                        # 编译
-go vet ./...                          # 静态分析
-go test ./...                         # 全量测试
-go test ./internal/integration/...    # 集成测试（需 MySQL + Redis）
-wire ./...                            # 重新生成主 wire_gen.go
-wire ./internal/integration/setup/... # 重新生成集成测试 wire_gen.go
-make -f mk/mock.mk mockgen           # 重新生成 Mock
-make -f mk/es.mk help                # ES 管理命令
-make -f mk/infra.mk help             # 基础设施管理
+# 多模块 go.work：从 webook/ 用带路径的 go 命令可跨模块（workspace 生效）；
+# 裸 ./... 不跨模块，需带子路径，或 cd 进各模块目录。
+go build ./internal/... ./chat/...    # 编译指定模块（或 cd <svc> && go build ./...）
+go vet ./internal/... ./pkg/...       # 静态分析
+go test ./internal/integration/...    # 集成测试（需 MySQL + Redis；cd internal && go test ./... 亦可）
+cd internal && wire ./...             # 重新生成 core 的 wire_gen.go（各模块同理 cd <svc>）
+make wire                             # 一键重生成全部模块的 wire_gen.go
+make -f mk/mock.mk mockgen            # 重新生成 Mock（内部逐模块 cd）
+make -f mk/es.mk help                 # ES 管理命令
+make -f mk/infra.mk help              # 基础设施管理
 
-# 启动示例（默认用 config/local.yaml）
-APP_ENV=config/local.yaml go run main.go
+# 启动 core 示例（默认用 config/local.yaml）
+cd internal && APP_ENV=config/local.yaml go run .
 ```
 
 ## 环境说明
@@ -362,7 +363,7 @@ func (h *InternalXxxHandler) Mine(ctx *gin.Context) (Result, error) {
 ```go
 package errs
 
-import "github.com/webook/pkg/errs"
+import "github.com/boyxs/train-go/webook/pkg/errs"
 
 // 包级 sentinel：每个必须 .WithReason(SCREAMING_SNAKE 业务原因码，全局唯一)——过 TestAllSentinelsHaveReason guard。
 // Is 优先按 reason 比对（Message 改文案不破坏匹配 / 不再要求全局唯一）。
@@ -412,10 +413,10 @@ if errors.Is(err, errs.ErrResourceNotFound) { ... }
 
 ## 提交前必跑 goimports
 
-CI 用 `goimports -local github.com/webook -l .` 检查 import 顺序，乱了直接 fail。**任何 commit 前必须在 `webook/` 跑一次原生命令**：
+CI 用 `goimports -local github.com/boyxs/train-go/webook -l ./<svc> ./api ./pkg` 检查 import 顺序，乱了直接 fail。**任何 commit 前必须在 `webook/` 跑一次原生命令**（`-local` 用统一前缀即可覆盖全部子模块；从 webook/ 递归格式化跨模块生效）：
 
 ```bash
-cd webook && goimports -local github.com/webook -w .
+cd webook && goimports -local github.com/boyxs/train-go/webook -w .
 ```
 
 把本地 import 自动分组到第三组，避免 CI 红 + 二次 commit。`workflow:done` 流水 build/lint 之前必须先跑这条命令再继续验证。

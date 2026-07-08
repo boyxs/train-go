@@ -3,9 +3,9 @@ package repository
 import (
 	"context"
 
-	"github.com/webook/migrator/domain"
-	"github.com/webook/migrator/repository/dao"
-	"github.com/webook/pkg/slicex"
+	"github.com/boyxs/train-go/webook/migrator/domain"
+	"github.com/boyxs/train-go/webook/migrator/repository/dao"
+	"github.com/boyxs/train-go/webook/pkg/slicex"
 )
 
 // CheckpointRepository checkpoint 仓储。引擎层经此持久化/恢复游标，不直接触 DAO。

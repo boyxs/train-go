@@ -18,12 +18,12 @@ import (
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 
-	"github.com/webook/migrator/repository"
-	"github.com/webook/migrator/repository/dao"
-	"github.com/webook/migrator/service"
-	"github.com/webook/migrator/web"
-	"github.com/webook/migrator/web/middleware"
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/migrator/repository"
+	"github.com/boyxs/train-go/webook/migrator/repository/dao"
+	"github.com/boyxs/train-go/webook/migrator/service"
+	"github.com/boyxs/train-go/webook/migrator/web"
+	"github.com/boyxs/train-go/webook/migrator/web/middleware"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 // TaskE2ESuite 端到端：拼真实 mysql + redis + handler + audit middleware，

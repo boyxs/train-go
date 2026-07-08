@@ -6,8 +6,8 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/webook/internal/service/sms"
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/internal/service/sms"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 type TimeoutFailoverSmsService struct {

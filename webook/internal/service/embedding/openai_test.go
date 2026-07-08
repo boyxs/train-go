@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/webook/internal/service/embedding"
+	"github.com/boyxs/train-go/webook/internal/service/embedding"
 )
 
 func newEmbedServer(statusCode int, body any) *httptest.Server {

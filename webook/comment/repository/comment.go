@@ -4,11 +4,11 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/webook/comment/domain"
-	"github.com/webook/comment/repository/cache"
-	"github.com/webook/comment/repository/dao"
-	"github.com/webook/pkg/logger"
-	"github.com/webook/pkg/slicex"
+	"github.com/boyxs/train-go/webook/comment/domain"
+	"github.com/boyxs/train-go/webook/comment/repository/cache"
+	"github.com/boyxs/train-go/webook/comment/repository/dao"
+	"github.com/boyxs/train-go/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/pkg/slicex"
 )
 
 type CommentRepository interface {

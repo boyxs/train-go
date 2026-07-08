@@ -36,15 +36,15 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"github.com/webook/migrator/consts"
-	"github.com/webook/migrator/domain"
-	migratorerrs "github.com/webook/migrator/errs"
-	"github.com/webook/migrator/pipeline/sink"
-	"github.com/webook/migrator/pipeline/source"
-	"github.com/webook/migrator/pipeline/transform"
-	"github.com/webook/migrator/repository"
-	"github.com/webook/migrator/service"
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/migrator/consts"
+	"github.com/boyxs/train-go/webook/migrator/domain"
+	migratorerrs "github.com/boyxs/train-go/webook/migrator/errs"
+	"github.com/boyxs/train-go/webook/migrator/pipeline/sink"
+	"github.com/boyxs/train-go/webook/migrator/pipeline/source"
+	"github.com/boyxs/train-go/webook/migrator/pipeline/transform"
+	"github.com/boyxs/train-go/webook/migrator/repository"
+	"github.com/boyxs/train-go/webook/migrator/service"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 const (

@@ -16,8 +16,8 @@ import (
 	_ "google.golang.org/grpc/health" // init 注册客户端健康检查函数,HealthCheck=true 才真正生效
 	"google.golang.org/grpc/keepalive"
 
-	_ "github.com/webook/pkg/grpcx/balancer/swrr" // 注册 custom_swrr / breaker_swrr / group_swrr
-	etcdresolver "github.com/webook/pkg/grpcx/resolver/etcd"
+	_ "github.com/boyxs/train-go/webook/pkg/grpcx/balancer/swrr" // 注册 custom_swrr / breaker_swrr / group_swrr
+	etcdresolver "github.com/boyxs/train-go/webook/pkg/grpcx/resolver/etcd"
 )
 
 // ClientConfig 描述一个下游 gRPC 连接。target/balancer 必填;其余为调参 / 功能开关式缺省(不写=关)。

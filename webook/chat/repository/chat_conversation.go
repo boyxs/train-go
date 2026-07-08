@@ -3,10 +3,10 @@ package repository
 import (
 	"context"
 
-	"github.com/webook/chat/domain"
-	"github.com/webook/chat/repository/cache"
-	"github.com/webook/chat/repository/dao"
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/chat/domain"
+	"github.com/boyxs/train-go/webook/chat/repository/cache"
+	"github.com/boyxs/train-go/webook/chat/repository/dao"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 type ConversationRepository interface {

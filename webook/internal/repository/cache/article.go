@@ -9,9 +9,9 @@ import (
 
 	"github.com/redis/go-redis/v9"
 
-	"github.com/webook/internal/consts"
-	"github.com/webook/internal/domain"
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/internal/consts"
+	"github.com/boyxs/train-go/webook/internal/domain"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 type ArticleCache interface {

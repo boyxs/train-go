@@ -6,16 +6,16 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
 
-	intrevt "github.com/webook/internal/events/interaction"
-	relationevt "github.com/webook/internal/events/relation"
-	grpcsrv "github.com/webook/internal/grpc"
-	"github.com/webook/internal/ioc"
-	"github.com/webook/internal/repository"
-	"github.com/webook/internal/repository/cache"
-	"github.com/webook/internal/repository/dao"
-	"github.com/webook/internal/service"
-	"github.com/webook/internal/web"
-	"github.com/webook/pkg/grpcx"
+	intrevt "github.com/boyxs/train-go/webook/internal/events/interaction"
+	relationevt "github.com/boyxs/train-go/webook/internal/events/relation"
+	grpcsrv "github.com/boyxs/train-go/webook/internal/grpc"
+	"github.com/boyxs/train-go/webook/internal/ioc"
+	"github.com/boyxs/train-go/webook/internal/repository"
+	"github.com/boyxs/train-go/webook/internal/repository/cache"
+	"github.com/boyxs/train-go/webook/internal/repository/dao"
+	"github.com/boyxs/train-go/webook/internal/service"
+	"github.com/boyxs/train-go/webook/internal/web"
+	"github.com/boyxs/train-go/webook/pkg/grpcx"
 )
 
 // searchProviderSet 搜索模块的 Wire Provider 集合（不含 Handler）

@@ -9,9 +9,9 @@ import (
 
 	"github.com/golang-module/carbon/v2"
 
-	cronprom "github.com/webook/pkg/cronx/prometheus"
-	"github.com/webook/pkg/logger"
-	"github.com/webook/pkg/redislockx"
+	cronprom "github.com/boyxs/train-go/webook/pkg/cronx/prometheus"
+	"github.com/boyxs/train-go/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/pkg/redislockx"
 )
 
 // Task 定时任务回调签名。date 由 Wrapper 注入（YYYY-MM-DD），方便对齐归档日期。

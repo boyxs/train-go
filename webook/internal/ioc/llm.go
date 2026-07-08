@@ -3,8 +3,8 @@ package ioc
 import (
 	"github.com/spf13/viper"
 
-	"github.com/webook/pkg/llm"
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/pkg/llm"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 // LLM provider 配置 + 客户端构造。供 article_polish 等需要 LLM 的模块使用。

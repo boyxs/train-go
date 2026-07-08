@@ -12,8 +12,8 @@ import (
 
 	"github.com/spf13/viper"
 
-	"github.com/webook/pkg/viperx"
-	"github.com/webook/shared/confkey"
+	"github.com/boyxs/train-go/webook/pkg/viperx"
+	"github.com/boyxs/train-go/webook/shared/confkey"
 )
 
 // worker 调度器：cron 定时任务 + Kafka 消费者，全部经 gRPC 派发给业务服务，自身零业务数据/逻辑

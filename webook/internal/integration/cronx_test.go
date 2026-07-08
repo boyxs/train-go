@@ -14,11 +14,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/webook/internal/integration/setup"
-	"github.com/webook/pkg/cronx"
-	cronprom "github.com/webook/pkg/cronx/prometheus"
-	"github.com/webook/pkg/logger"
-	"github.com/webook/pkg/redislockx"
+	"github.com/boyxs/train-go/webook/internal/integration/setup"
+	"github.com/boyxs/train-go/webook/pkg/cronx"
+	cronprom "github.com/boyxs/train-go/webook/pkg/cronx/prometheus"
+	"github.com/boyxs/train-go/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/pkg/redislockx"
 )
 
 // cron + Wrapper + 真锁端到端 — 验多实例下"只一个跑"、长任务靠 watchdog 续约跑完。

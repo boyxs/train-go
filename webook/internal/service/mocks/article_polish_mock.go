@@ -15,7 +15,7 @@ import (
 
 	gomock "go.uber.org/mock/gomock"
 
-	domain "github.com/webook/internal/domain"
+	domain "github.com/boyxs/train-go/webook/internal/domain"
 )
 
 // MockArticlePolishService is a mock of ArticlePolishService interface.

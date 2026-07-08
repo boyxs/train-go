@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/webook/internal/domain"
-	"github.com/webook/internal/errs"
-	"github.com/webook/pkg/llm"
+	"github.com/boyxs/train-go/webook/internal/domain"
+	"github.com/boyxs/train-go/webook/internal/errs"
+	"github.com/boyxs/train-go/webook/pkg/llm"
 )
 
 const polishPrompt = `你是一个中文技术文章润色助手。用户会提供文章标题和正文，你需要：

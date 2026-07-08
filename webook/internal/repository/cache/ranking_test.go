@@ -8,8 +8,8 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/webook/internal/domain"
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/internal/domain"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 func newRankingCache(t *testing.T) (*miniredis.Miniredis, RankingCache) {

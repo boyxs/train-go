@@ -10,8 +10,8 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 
-	"github.com/webook/migrator/domain"
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/migrator/domain"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 // fakeScanner 喂 canned 文档，绕开真 Mongo（驱动逻辑由真 goMongoScanner 在 e2e 覆盖）。

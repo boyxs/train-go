@@ -8,7 +8,7 @@ import (
 
 	"github.com/redis/go-redis/v9"
 
-	"github.com/webook/comment/consts"
+	"github.com/boyxs/train-go/webook/comment/consts"
 )
 
 // CommentCache 评论缓存。P0 只缓存评论总数（列表/最热缓存在 core 聚合层）。

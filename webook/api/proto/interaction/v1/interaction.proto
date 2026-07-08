@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package webook.interaction.v1;
 
-option go_package = "github.com/webook/api/gen/interaction/v1;interactionv1";
+option go_package = "github.com/boyxs/train-go/webook/api/gen/interaction/v1;interactionv1";
 
 // InteractionService 暴露互动（点赞/收藏/浏览/计数）的读写。core 经 gRPC 调用，鉴权后注入 uid。
 // 按 (biz, biz_id) 的通用限界上下文：新增可互动实体 = 新 biz 值，零代码改动。

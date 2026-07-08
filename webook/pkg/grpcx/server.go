@@ -11,8 +11,8 @@ import (
 	"go.etcd.io/etcd/client/v3/naming/endpoints"
 	"google.golang.org/grpc"
 
-	"github.com/webook/pkg/logger"
-	"github.com/webook/pkg/netx"
+	"github.com/boyxs/train-go/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/pkg/netx"
 )
 
 // defaultLeaseTTL 是未配置 TTL 时的租约默认值。

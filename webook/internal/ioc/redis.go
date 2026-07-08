@@ -5,9 +5,9 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/spf13/viper"
 
-	redisprom "github.com/webook/pkg/redisx/prometheus"
+	redisprom "github.com/boyxs/train-go/webook/pkg/redisx/prometheus"
 
-	"github.com/webook/shared/confkey"
+	"github.com/boyxs/train-go/webook/shared/confkey"
 )
 
 func InitRedis() redis.Cmdable {

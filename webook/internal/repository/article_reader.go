@@ -5,11 +5,11 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"github.com/webook/internal/domain"
-	"github.com/webook/internal/migratorsdk"
-	"github.com/webook/internal/repository/cache"
-	"github.com/webook/internal/repository/dao"
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/internal/domain"
+	"github.com/boyxs/train-go/webook/internal/migratorsdk"
+	"github.com/boyxs/train-go/webook/internal/repository/cache"
+	"github.com/boyxs/train-go/webook/internal/repository/dao"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 // ArticleReaderRepository 线上库 Repository

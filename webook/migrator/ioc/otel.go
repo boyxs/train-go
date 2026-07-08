@@ -16,7 +16,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 	"go.opentelemetry.io/otel/trace/noop"
 
-	"github.com/webook/shared/confkey"
+	"github.com/boyxs/train-go/webook/shared/confkey"
 )
 
 // InitOTel 初始化 OpenTelemetry：OTLP/gRPC → otel-collector。

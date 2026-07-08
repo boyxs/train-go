@@ -7,10 +7,10 @@ import (
 
 	"gorm.io/gorm"
 
-	articlev1 "github.com/webook/api/gen/article/v1"
-	"github.com/webook/internal/errs"
-	"github.com/webook/internal/service"
-	pkgerrs "github.com/webook/pkg/errs"
+	articlev1 "github.com/boyxs/train-go/webook/api/gen/article/v1"
+	"github.com/boyxs/train-go/webook/internal/errs"
+	"github.com/boyxs/train-go/webook/internal/service"
+	pkgerrs "github.com/boyxs/train-go/webook/pkg/errs"
 )
 
 const batchGetArticlesMaxIDs = 100

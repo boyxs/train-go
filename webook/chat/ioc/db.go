@@ -7,10 +7,10 @@ import (
 	gormlogger "gorm.io/gorm/logger"
 	"gorm.io/plugin/opentelemetry/tracing"
 
-	"github.com/webook/chat/repository/dao"
-	gormprom "github.com/webook/pkg/gormx/prometheus"
-	loggerx "github.com/webook/pkg/logger"
-	"github.com/webook/shared/confkey"
+	"github.com/boyxs/train-go/webook/chat/repository/dao"
+	gormprom "github.com/boyxs/train-go/webook/pkg/gormx/prometheus"
+	loggerx "github.com/boyxs/train-go/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/shared/confkey"
 )
 
 func InitDB(_ TimezoneReady, l loggerx.LoggerX) *gorm.DB {

@@ -5,8 +5,8 @@ import (
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 
-	"github.com/webook/relation/repository/dao"
-	"github.com/webook/shared/confkey"
+	"github.com/boyxs/train-go/webook/relation/repository/dao"
+	"github.com/boyxs/train-go/webook/shared/confkey"
 )
 
 func InitDB() *gorm.DB {

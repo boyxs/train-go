@@ -14,11 +14,11 @@ import (
 	"google.golang.org/grpc/test/bufconn"
 	"gorm.io/gorm"
 
-	interactionv1 "github.com/webook/api/gen/interaction/v1"
-	interactiongrpc "github.com/webook/interaction/grpc"
-	"github.com/webook/interaction/integration/setup"
-	"github.com/webook/interaction/repository/dao"
-	"github.com/webook/pkg/grpcx/interceptor/errconv"
+	interactionv1 "github.com/boyxs/train-go/webook/api/gen/interaction/v1"
+	interactiongrpc "github.com/boyxs/train-go/webook/interaction/grpc"
+	"github.com/boyxs/train-go/webook/interaction/integration/setup"
+	"github.com/boyxs/train-go/webook/interaction/repository/dao"
+	"github.com/boyxs/train-go/webook/pkg/grpcx/interceptor/errconv"
 )
 
 const (

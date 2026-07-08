@@ -3,7 +3,7 @@ package ioc
 import (
 	"github.com/spf13/viper"
 
-	"github.com/webook/pkg/sensitive"
+	"github.com/boyxs/train-go/webook/pkg/sensitive"
 )
 
 // InitSensitiveFilter 从 yaml sensitive.words 加载敏感词构建 DFA 过滤器。

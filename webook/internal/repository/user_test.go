@@ -10,13 +10,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
-	"github.com/webook/internal/consts"
-	"github.com/webook/internal/domain"
-	"github.com/webook/internal/errs"
-	"github.com/webook/internal/repository/cache"
-	cachemocks "github.com/webook/internal/repository/cache/mocks"
-	"github.com/webook/internal/repository/dao"
-	daomocks "github.com/webook/internal/repository/dao/mocks"
+	"github.com/boyxs/train-go/webook/internal/consts"
+	"github.com/boyxs/train-go/webook/internal/domain"
+	"github.com/boyxs/train-go/webook/internal/errs"
+	"github.com/boyxs/train-go/webook/internal/repository/cache"
+	cachemocks "github.com/boyxs/train-go/webook/internal/repository/cache/mocks"
+	"github.com/boyxs/train-go/webook/internal/repository/dao"
+	daomocks "github.com/boyxs/train-go/webook/internal/repository/dao/mocks"
 )
 
 func TestRedisUserRepository_FindById(t *testing.T) {

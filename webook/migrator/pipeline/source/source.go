@@ -11,7 +11,7 @@ package source
 import (
 	"context"
 
-	"github.com/webook/migrator/domain"
+	"github.com/boyxs/train-go/webook/migrator/domain"
 )
 
 // FullSource 全量读端：按分片全量扫描。

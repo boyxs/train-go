@@ -3,10 +3,10 @@ package grpc
 import (
 	"context"
 
-	interactionv1 "github.com/webook/api/gen/interaction/v1"
-	"github.com/webook/interaction/domain"
-	"github.com/webook/interaction/service"
-	"github.com/webook/pkg/slicex"
+	interactionv1 "github.com/boyxs/train-go/webook/api/gen/interaction/v1"
+	"github.com/boyxs/train-go/webook/interaction/domain"
+	"github.com/boyxs/train-go/webook/interaction/service"
+	"github.com/boyxs/train-go/webook/pkg/slicex"
 )
 
 // InteractionServer 把 InteractionService 适配成 gRPC 接口。

@@ -8,7 +8,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	mongoopts "go.mongodb.org/mongo-driver/mongo/options"
 
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 // InitMongoClient 进程级共享 mongo 客户端；启动期 Ping 一次，不可达返 nil（让 mongo task 启动期报错而非运行期）。

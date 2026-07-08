@@ -8,19 +8,19 @@ import (
 	"google.golang.org/grpc/health"
 	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 
-	articlev1 "github.com/webook/api/gen/article/v1"
-	commentv1 "github.com/webook/api/gen/comment/v1"
-	interactionv1 "github.com/webook/api/gen/interaction/v1"
-	rankingv1 "github.com/webook/api/gen/ranking/v1"
-	relationv1 "github.com/webook/api/gen/relation/v1"
-	searchv1 "github.com/webook/api/gen/search/v1"
-	grpcsrv "github.com/webook/internal/grpc"
-	"github.com/webook/pkg/grpcx"
-	"github.com/webook/pkg/grpcx/interceptor/errconv"
-	"github.com/webook/pkg/grpcx/interceptor/metrics"
-	"github.com/webook/shared/confkey"
+	articlev1 "github.com/boyxs/train-go/webook/api/gen/article/v1"
+	commentv1 "github.com/boyxs/train-go/webook/api/gen/comment/v1"
+	interactionv1 "github.com/boyxs/train-go/webook/api/gen/interaction/v1"
+	rankingv1 "github.com/boyxs/train-go/webook/api/gen/ranking/v1"
+	relationv1 "github.com/boyxs/train-go/webook/api/gen/relation/v1"
+	searchv1 "github.com/boyxs/train-go/webook/api/gen/search/v1"
+	grpcsrv "github.com/boyxs/train-go/webook/internal/grpc"
+	"github.com/boyxs/train-go/webook/pkg/grpcx"
+	"github.com/boyxs/train-go/webook/pkg/grpcx/interceptor/errconv"
+	"github.com/boyxs/train-go/webook/pkg/grpcx/interceptor/metrics"
+	"github.com/boyxs/train-go/webook/shared/confkey"
 )
 
 // InitGRPCMetrics 构造进程内唯一的 gRPC 指标 builder。

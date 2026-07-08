@@ -15,10 +15,10 @@ import (
 	"google.golang.org/grpc/test/bufconn"
 	"gorm.io/gorm"
 
-	commentv1 "github.com/webook/api/gen/comment/v1"
-	"github.com/webook/comment/integration/setup"
-	"github.com/webook/comment/repository/dao"
-	"github.com/webook/pkg/grpcx/interceptor/errconv"
+	commentv1 "github.com/boyxs/train-go/webook/api/gen/comment/v1"
+	"github.com/boyxs/train-go/webook/comment/integration/setup"
+	"github.com/boyxs/train-go/webook/comment/repository/dao"
+	"github.com/boyxs/train-go/webook/pkg/grpcx/interceptor/errconv"
 )
 
 const (

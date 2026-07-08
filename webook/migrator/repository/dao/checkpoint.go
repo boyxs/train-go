@@ -7,7 +7,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
-	"github.com/webook/migrator/errs"
+	"github.com/boyxs/train-go/webook/migrator/errs"
 )
 
 // CheckpointUpdate 用于乐观锁更新的入参（封装多个字段，避免长参数列表）。

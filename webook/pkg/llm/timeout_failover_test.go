@@ -9,9 +9,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
-	"github.com/webook/pkg/llm"
-	llmmocks "github.com/webook/pkg/llm/mocks"
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/pkg/llm"
+	llmmocks "github.com/boyxs/train-go/webook/pkg/llm/mocks"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 func TestTimeoutFailoverClient_ChatStream(t *testing.T) {

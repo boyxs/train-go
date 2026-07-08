@@ -13,9 +13,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/viper"
 
-	"github.com/webook/interaction/ioc"
-	"github.com/webook/pkg/viperx"
-	"github.com/webook/shared/confkey"
+	"github.com/boyxs/train-go/webook/interaction/ioc"
+	"github.com/boyxs/train-go/webook/pkg/viperx"
+	"github.com/boyxs/train-go/webook/shared/confkey"
 )
 
 func main() {

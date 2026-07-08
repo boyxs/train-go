@@ -7,9 +7,9 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/webook/migrator/repository"
-	"github.com/webook/migrator/service/incr"
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/migrator/repository"
+	"github.com/boyxs/train-go/webook/migrator/service/incr"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 // 指标命名遵守根 CLAUDE.md：webook_<subsystem>_*（subsystem=migration），禁止 webook_<service>_*；

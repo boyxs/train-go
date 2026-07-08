@@ -5,8 +5,8 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/spf13/viper"
 
-	redisprom "github.com/webook/pkg/redisx/prometheus"
-	"github.com/webook/shared/confkey"
+	redisprom "github.com/boyxs/train-go/webook/pkg/redisx/prometheus"
+	"github.com/boyxs/train-go/webook/shared/confkey"
 )
 
 // InitRedis 与 chat/core 同源。worker 仅用 redis 做 cron 分布式锁，但仍接上

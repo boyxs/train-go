@@ -10,16 +10,16 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
 
-	"github.com/webook/internal/events/interaction"
-	"github.com/webook/internal/events/relation"
-	"github.com/webook/internal/grpc"
-	"github.com/webook/internal/ioc"
-	"github.com/webook/internal/repository"
-	"github.com/webook/internal/repository/cache"
-	"github.com/webook/internal/repository/dao"
-	"github.com/webook/internal/service"
-	"github.com/webook/internal/web"
-	"github.com/webook/pkg/grpcx"
+	"github.com/boyxs/train-go/webook/internal/events/interaction"
+	"github.com/boyxs/train-go/webook/internal/events/relation"
+	"github.com/boyxs/train-go/webook/internal/grpc"
+	"github.com/boyxs/train-go/webook/internal/ioc"
+	"github.com/boyxs/train-go/webook/internal/repository"
+	"github.com/boyxs/train-go/webook/internal/repository/cache"
+	"github.com/boyxs/train-go/webook/internal/repository/dao"
+	"github.com/boyxs/train-go/webook/internal/service"
+	"github.com/boyxs/train-go/webook/internal/web"
+	"github.com/boyxs/train-go/webook/pkg/grpcx"
 )
 
 // Injectors from wire.go:

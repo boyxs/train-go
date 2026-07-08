@@ -7,18 +7,23 @@ FROM golang:1.25.6-alpine AS builder
 
 ARG VERSION=dev
 WORKDIR /src
+# 多模块 + go.work：GOWORK=off 用各 go.mod 的 replace 解析本地依赖（确定性，不依赖 workspace）
+ENV GOFLAGS=-mod=readonly GOWORK=off GOPROXY=https://goproxy.cn,direct
 
-# 先 mod download，利用 docker layer cache
-COPY go.mod go.sum ./
-ENV GOPROXY=https://goproxy.cn,direct
-RUN go mod download
+# 缓存层：先 COPY migrator 及本地依赖的 go.mod/go.sum（migrator 不用 api；shared 仅 go.mod），再 download
+COPY migrator/go.mod migrator/go.sum ./migrator/
+COPY pkg/go.mod  pkg/go.sum  ./pkg/
+COPY shared/go.mod           ./shared/
+RUN cd migrator && go mod download
 
-# 整仓 COPY，go build 能解析所有 webook/pkg 等子包
-COPY . .
+# 再 COPY 源码，go build 经 migrator/go.mod 的 replace 解析 ../pkg ../shared
+COPY pkg/    ./pkg/
+COPY shared/ ./shared/
+COPY migrator/ ./migrator/
 
-RUN CGO_ENABLED=0 GOOS=linux go build \
+RUN cd migrator && CGO_ENABLED=0 GOOS=linux go build \
     -ldflags="-s -w -X main.version=${VERSION}" \
-    -o /out/migrator ./migrator
+    -o /out/migrator .
 
 # ── Runtime stage
 FROM alpine:3.20

@@ -10,12 +10,11 @@ IMAGE := train/webook:1.0.0
 deploy:
 	@echo "--- [1/5] Compiling Go binary (Linux/AMD64) ---"
 	@rm -f webook
-	@go mod tidy
-	@CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -tags=k8s -o webook .
+	@cd internal && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -tags=k8s -o ../webook .
 
 	@echo "--- [2/5] Building Docker image ---"
 	@docker rmi -f $(IMAGE) || true
-	@docker build -t $(IMAGE) .
+	@docker build -f internal/Dockerfile -t $(IMAGE) .
 
 	@echo "--- [3/5] Sync image to K3s containerd ---"
 	@docker save $(IMAGE) -o webook.tar

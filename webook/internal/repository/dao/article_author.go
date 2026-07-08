@@ -7,8 +7,8 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/plugin/soft_delete"
 
-	"github.com/webook/internal/errs"
-	"github.com/webook/pkg/stringx"
+	"github.com/boyxs/train-go/webook/internal/errs"
+	"github.com/boyxs/train-go/webook/pkg/stringx"
 )
 
 // ArticleAuthorDAO 制作库 DAO，只操作 article 表

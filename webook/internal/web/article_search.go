@@ -5,10 +5,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/webook/internal/errs"
-	"github.com/webook/internal/service"
-	"github.com/webook/pkg/ginx"
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/internal/errs"
+	"github.com/boyxs/train-go/webook/internal/service"
+	"github.com/boyxs/train-go/webook/pkg/ginx"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 type ArticleSearchHandler interface {

@@ -9,8 +9,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/webook/pkg/errs"
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/pkg/errs"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 // UnaryServerInterceptor 把 handler 的 *errs.Error 转成 status（client 拿到对应 code）；

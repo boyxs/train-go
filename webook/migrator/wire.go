@@ -6,15 +6,15 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
 
-	"github.com/webook/migrator/ioc"
-	"github.com/webook/migrator/repository"
-	"github.com/webook/migrator/repository/cache"
-	"github.com/webook/migrator/repository/dao"
-	"github.com/webook/migrator/service"
-	"github.com/webook/migrator/service/replay"
-	"github.com/webook/migrator/service/switching"
-	"github.com/webook/migrator/web"
-	"github.com/webook/migrator/web/middleware"
+	"github.com/boyxs/train-go/webook/migrator/ioc"
+	"github.com/boyxs/train-go/webook/migrator/repository"
+	"github.com/boyxs/train-go/webook/migrator/repository/cache"
+	"github.com/boyxs/train-go/webook/migrator/repository/dao"
+	"github.com/boyxs/train-go/webook/migrator/service"
+	"github.com/boyxs/train-go/webook/migrator/service/replay"
+	"github.com/boyxs/train-go/webook/migrator/service/switching"
+	"github.com/boyxs/train-go/webook/migrator/web"
+	"github.com/boyxs/train-go/webook/migrator/web/middleware"
 )
 
 // App migrator 服务进程入口。

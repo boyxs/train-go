@@ -14,9 +14,9 @@
 
 ## 3. Wire 依赖注入
 
-- **禁止手动编辑 `wire_gen.go`**，只修改 `wire.go`，然后运行 wire 自动生成：
-  - 主入口：`cd webook && wire ./...`
-  - 集成测试：`cd webook && wire ./internal/integration/setup/...`
+- **禁止手动编辑 `wire_gen.go`**，只修改 `wire.go`，然后运行 wire 自动生成（多模块：逐模块在其目录内跑）：
+  - 各服务模块：`cd webook/<svc> && wire ./...`（`<svc>`=internal/chat/comment/interaction/migrator/relation/worker；`wire ./...` 会覆盖该模块根 + 其 `integration/setup` 的全部 wire.go）
+  - 一键重生成全部模块：`cd webook && make wire`
 - 修改 Provider 签名（加/删参数）、新增/删除 Provider 时，改 `wire.go` 后立即跑 wire 验证
 - Provider Set 按模块组织（`searchProviderSet`、`chatProviderSet`），新模块新建 Set
 

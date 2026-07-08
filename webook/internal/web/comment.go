@@ -3,10 +3,10 @@ package web
 import (
 	"github.com/gin-gonic/gin"
 
-	"github.com/webook/internal/domain"
-	"github.com/webook/internal/service"
-	"github.com/webook/pkg/ginx"
-	"github.com/webook/pkg/slicex"
+	"github.com/boyxs/train-go/webook/internal/domain"
+	"github.com/boyxs/train-go/webook/internal/service"
+	"github.com/boyxs/train-go/webook/pkg/ginx"
+	"github.com/boyxs/train-go/webook/pkg/slicex"
 )
 
 // CommentHandler 评论 HTTP 接入层：绑定请求 → 调 CommentService → domain→VO 映射。

@@ -15,10 +15,10 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
-	"github.com/webook/pkg/grpcx/interceptor"
+	"github.com/boyxs/train-go/webook/pkg/grpcx/interceptor"
 )
 
-const instrumentationName = "github.com/webook/pkg/grpcx/interceptor/tracing"
+const instrumentationName = "github.com/boyxs/train-go/webook/pkg/grpcx/interceptor/tracing"
 
 // Builder 构造 server / client 两侧的链路追踪拦截器。
 type Builder interface {

@@ -13,16 +13,16 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/webook/migrator/consts"
-	"github.com/webook/migrator/web"
-	"github.com/webook/migrator/web/middleware"
-	"github.com/webook/pkg/ginx/middleware/accesslog"
-	"github.com/webook/pkg/ginx/middleware/metrics"
-	"github.com/webook/pkg/ginx/middleware/ratelimit"
-	"github.com/webook/pkg/ginx/middleware/timeout"
-	"github.com/webook/pkg/jwtx"
-	"github.com/webook/pkg/logger"
-	"github.com/webook/shared/confkey"
+	"github.com/boyxs/train-go/webook/migrator/consts"
+	"github.com/boyxs/train-go/webook/migrator/web"
+	"github.com/boyxs/train-go/webook/migrator/web/middleware"
+	"github.com/boyxs/train-go/webook/pkg/ginx/middleware/accesslog"
+	"github.com/boyxs/train-go/webook/pkg/ginx/middleware/metrics"
+	"github.com/boyxs/train-go/webook/pkg/ginx/middleware/ratelimit"
+	"github.com/boyxs/train-go/webook/pkg/ginx/middleware/timeout"
+	"github.com/boyxs/train-go/webook/pkg/jwtx"
+	"github.com/boyxs/train-go/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/shared/confkey"
 )
 
 // InitWebServer 装配 gin engine + 注入 middleware 链 + 注册路由。

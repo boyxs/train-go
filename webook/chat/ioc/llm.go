@@ -6,9 +6,9 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/spf13/viper"
 
-	"github.com/webook/pkg/llm"
-	"github.com/webook/pkg/logger"
-	"github.com/webook/pkg/ratelimit"
+	"github.com/boyxs/train-go/webook/pkg/llm"
+	"github.com/boyxs/train-go/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/pkg/ratelimit"
 )
 
 func InitLLMConfig() llm.Config {

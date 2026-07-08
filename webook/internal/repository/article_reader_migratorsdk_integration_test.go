@@ -11,12 +11,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
-	"github.com/webook/internal/domain"
-	"github.com/webook/internal/migratorsdk"
-	cachemocks "github.com/webook/internal/repository/cache/mocks"
-	"github.com/webook/internal/repository/dao"
-	daomocks "github.com/webook/internal/repository/dao/mocks"
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/internal/domain"
+	"github.com/boyxs/train-go/webook/internal/migratorsdk"
+	cachemocks "github.com/boyxs/train-go/webook/internal/repository/cache/mocks"
+	"github.com/boyxs/train-go/webook/internal/repository/dao"
+	daomocks "github.com/boyxs/train-go/webook/internal/repository/dao/mocks"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 // 集成测试：miniredis 真 Redis + mock DAO；驱动 RedisSwitchReader / RedisDualWriter 真实现按 stage 切换行为。

@@ -12,8 +12,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/webook/internal/integration/setup"
-	"github.com/webook/internal/web"
+	"github.com/boyxs/train-go/webook/internal/integration/setup"
+	"github.com/boyxs/train-go/webook/internal/web"
 )
 
 func TestInternalUserHandler_SendSMSCode(t *testing.T) {

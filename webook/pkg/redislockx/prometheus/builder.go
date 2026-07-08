@@ -6,7 +6,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/webook/pkg/redislockx"
+	"github.com/boyxs/train-go/webook/pkg/redislockx"
 )
 
 // Builder 锁指标装饰器构造器接口

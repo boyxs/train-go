@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/webook/internal/domain"
+	"github.com/boyxs/train-go/webook/internal/domain"
 )
 
 func TestComputeTrend(t *testing.T) {

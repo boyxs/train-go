@@ -11,8 +11,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/webook/pkg/grpcx/interceptor"
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/pkg/grpcx/interceptor"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 type Builder interface {

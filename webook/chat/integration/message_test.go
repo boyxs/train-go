@@ -12,11 +12,11 @@ import (
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 
-	"github.com/webook/chat/domain"
-	"github.com/webook/chat/repository"
-	"github.com/webook/chat/repository/cache"
-	"github.com/webook/chat/repository/dao"
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/chat/domain"
+	"github.com/boyxs/train-go/webook/chat/repository"
+	"github.com/boyxs/train-go/webook/chat/repository/cache"
+	"github.com/boyxs/train-go/webook/chat/repository/dao"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 // MessageRepoSuite 真实 mysql + redis；覆盖消息 CRUD、Cache-Aside、Lite 字段裁剪、反馈更新等。

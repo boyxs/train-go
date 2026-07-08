@@ -21,11 +21,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/webook/migrator/domain"
-	migratorerrs "github.com/webook/migrator/errs"
-	"github.com/webook/migrator/repository"
-	"github.com/webook/pkg/errs"
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/migrator/domain"
+	migratorerrs "github.com/boyxs/train-go/webook/migrator/errs"
+	"github.com/boyxs/train-go/webook/migrator/repository"
+	"github.com/boyxs/train-go/webook/pkg/errs"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 // ErrApprovalSameActor 双人复核的 propose 与 approve 是同一 actor。

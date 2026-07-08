@@ -6,7 +6,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/spf13/viper"
 
-	"github.com/webook/pkg/ratelimit"
+	"github.com/boyxs/train-go/webook/pkg/ratelimit"
 )
 
 // InitLimiter 评论发表限流（Redis 滑动窗口）。窗口/阈值从 yaml ratelimit.comment，缺省 1 分钟 30 次。

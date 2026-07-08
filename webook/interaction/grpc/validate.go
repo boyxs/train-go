@@ -5,8 +5,8 @@ import (
 
 	"google.golang.org/grpc"
 
-	interactionv1 "github.com/webook/api/gen/interaction/v1"
-	"github.com/webook/interaction/errs"
+	interactionv1 "github.com/boyxs/train-go/webook/api/gen/interaction/v1"
+	"github.com/boyxs/train-go/webook/interaction/errs"
 )
 
 // requireUserMethods 需登录（uid>0）的方法集。

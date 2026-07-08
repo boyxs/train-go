@@ -12,9 +12,9 @@ import (
 
 	"github.com/spf13/viper"
 
-	"github.com/webook/chat/ioc"
-	"github.com/webook/pkg/viperx"
-	"github.com/webook/shared/confkey"
+	"github.com/boyxs/train-go/webook/chat/ioc"
+	"github.com/boyxs/train-go/webook/pkg/viperx"
+	"github.com/boyxs/train-go/webook/shared/confkey"
 )
 
 func main() {

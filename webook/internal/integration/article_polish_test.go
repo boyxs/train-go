@@ -15,10 +15,10 @@ import (
 	"github.com/stretchr/testify/suite"
 	"gorm.io/gorm"
 
-	"github.com/webook/internal/consts"
-	"github.com/webook/internal/integration/setup"
-	"github.com/webook/internal/web"
-	myJwt "github.com/webook/pkg/jwtx"
+	"github.com/boyxs/train-go/webook/internal/consts"
+	"github.com/boyxs/train-go/webook/internal/integration/setup"
+	"github.com/boyxs/train-go/webook/internal/web"
+	myJwt "github.com/boyxs/train-go/webook/pkg/jwtx"
 )
 
 type ArticlePolishSuite struct {

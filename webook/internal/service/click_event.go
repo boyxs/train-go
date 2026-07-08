@@ -3,8 +3,8 @@ package service
 import (
 	"context"
 
-	"github.com/webook/internal/domain"
-	"github.com/webook/internal/repository"
+	"github.com/boyxs/train-go/webook/internal/domain"
+	"github.com/boyxs/train-go/webook/internal/repository"
 )
 
 type ClickEventService interface {

@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"math/rand"
 
-	"github.com/webook/internal/errs"
-	"github.com/webook/internal/repository"
-	"github.com/webook/internal/service/sms"
+	"github.com/boyxs/train-go/webook/internal/errs"
+	"github.com/boyxs/train-go/webook/internal/repository"
+	"github.com/boyxs/train-go/webook/internal/service/sms"
 )
 
 type CodeService interface {

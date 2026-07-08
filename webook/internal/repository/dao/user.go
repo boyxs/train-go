@@ -10,7 +10,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/plugin/soft_delete"
 
-	"github.com/webook/internal/errs"
+	"github.com/boyxs/train-go/webook/internal/errs"
 )
 
 type UserDAO interface {

@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/webook/internal/events"
+	"github.com/boyxs/train-go/webook/internal/events"
 )
 
 // InteractionEventProducer 互动事件生产者接口。

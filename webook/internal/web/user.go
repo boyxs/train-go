@@ -6,13 +6,13 @@ import (
 	"github.com/gin-gonic/gin"
 	jwt2 "github.com/golang-jwt/jwt/v5"
 
-	"github.com/webook/internal/consts"
-	"github.com/webook/internal/domain"
-	"github.com/webook/internal/errs"
-	"github.com/webook/internal/service"
-	"github.com/webook/pkg/ginx"
-	jwt "github.com/webook/pkg/jwtx"
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/internal/consts"
+	"github.com/boyxs/train-go/webook/internal/domain"
+	"github.com/boyxs/train-go/webook/internal/errs"
+	"github.com/boyxs/train-go/webook/internal/service"
+	"github.com/boyxs/train-go/webook/pkg/ginx"
+	jwt "github.com/boyxs/train-go/webook/pkg/jwtx"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 
 	//"regexp" 此库不支持 (?=
 	regexp "github.com/dlclark/regexp2"

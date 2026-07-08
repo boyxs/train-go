@@ -7,13 +7,13 @@
 package main
 
 import (
-	"github.com/webook/interaction/grpc"
-	"github.com/webook/interaction/ioc"
-	"github.com/webook/interaction/repository"
-	"github.com/webook/interaction/repository/cache"
-	"github.com/webook/interaction/repository/dao"
-	"github.com/webook/interaction/service"
-	"github.com/webook/pkg/grpcx"
+	"github.com/boyxs/train-go/webook/interaction/grpc"
+	"github.com/boyxs/train-go/webook/interaction/ioc"
+	"github.com/boyxs/train-go/webook/interaction/repository"
+	"github.com/boyxs/train-go/webook/interaction/repository/cache"
+	"github.com/boyxs/train-go/webook/interaction/repository/dao"
+	"github.com/boyxs/train-go/webook/interaction/service"
+	"github.com/boyxs/train-go/webook/pkg/grpcx"
 )
 
 // Injectors from wire.go:

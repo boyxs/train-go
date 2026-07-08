@@ -8,7 +8,7 @@ import (
 	"github.com/spf13/viper"
 	etcdv3 "go.etcd.io/etcd/client/v3"
 
-	"github.com/webook/shared/confkey"
+	"github.com/boyxs/train-go/webook/shared/confkey"
 )
 
 // InitEtcdClient 初始化 etcd 客户端，供 gRPC resolver 做服务发现（拨号 etcd:///service/webook-core）。

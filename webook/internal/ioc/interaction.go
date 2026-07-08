@@ -6,13 +6,13 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	interactionv1 "github.com/webook/api/gen/interaction/v1"
-	intrevt "github.com/webook/internal/events/interaction"
-	"github.com/webook/internal/repository"
-	"github.com/webook/internal/service"
-	"github.com/webook/pkg/circuitbreaker"
-	"github.com/webook/pkg/logger"
-	"github.com/webook/pkg/pool"
+	interactionv1 "github.com/boyxs/train-go/webook/api/gen/interaction/v1"
+	intrevt "github.com/boyxs/train-go/webook/internal/events/interaction"
+	"github.com/boyxs/train-go/webook/internal/repository"
+	"github.com/boyxs/train-go/webook/internal/service"
+	"github.com/boyxs/train-go/webook/pkg/circuitbreaker"
+	"github.com/boyxs/train-go/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/pkg/pool"
 )
 
 // ranking boost 协程池规模：固定 worker + 有界队列。队列满即丢弃（cron 全量重算兜底）。

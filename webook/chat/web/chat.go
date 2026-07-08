@@ -11,13 +11,13 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/webook/chat/consts"
-	"github.com/webook/chat/errs"
-	"github.com/webook/chat/service"
-	"github.com/webook/pkg/ginx"
-	"github.com/webook/pkg/jwtx"
-	"github.com/webook/pkg/logger"
-	"github.com/webook/pkg/ratelimit"
+	"github.com/boyxs/train-go/webook/chat/consts"
+	"github.com/boyxs/train-go/webook/chat/errs"
+	"github.com/boyxs/train-go/webook/chat/service"
+	"github.com/boyxs/train-go/webook/pkg/ginx"
+	"github.com/boyxs/train-go/webook/pkg/jwtx"
+	"github.com/boyxs/train-go/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/pkg/ratelimit"
 )
 
 type ChatHandler interface {

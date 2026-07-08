@@ -7,10 +7,10 @@ import (
 	"github.com/golang-module/carbon/v2"
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/webook/internal/domain"
-	"github.com/webook/internal/repository"
-	"github.com/webook/pkg/logger"
-	"github.com/webook/pkg/pool"
+	"github.com/boyxs/train-go/webook/internal/domain"
+	"github.com/boyxs/train-go/webook/internal/repository"
+	"github.com/boyxs/train-go/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/pkg/pool"
 )
 
 // 增量 boost 权重：与 hot 公式 α/β/γ 对齐。

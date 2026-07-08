@@ -7,7 +7,7 @@ import (
 
 	"github.com/IBM/sarama"
 
-	"github.com/webook/pkg/logger"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 // KafkaSink 把 Mutation 发到 Kafka topic（下游消费者订阅 binlog 风格变更流）。
