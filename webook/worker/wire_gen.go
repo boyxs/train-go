@@ -37,11 +37,11 @@ func InitApp() (App, func(), error) {
 		return App{}, nil, err
 	}
 	rankingJobServiceClient := ioc.InitRankingJobClient(coreConn)
-	cmdable := ioc.InitRedis()
-	redislockxClient := ioc.InitLockClient(cmdable)
+	universalClient := ioc.InitRedis()
+	redislockClient := ioc.InitLockClient(universalClient)
 	metrics := ioc.InitCronMetrics()
 	loggerX := ioc.InitLogger()
-	wrapper := ioc.InitCronWrapper(redislockxClient, metrics, loggerX)
+	wrapper := ioc.InitCronWrapper(redislockClient, metrics, loggerX)
 	rankingJob := job.NewRankingJob(rankingJobServiceClient, wrapper)
 	cron, err := ioc.InitCron(timezoneReady, rankingJob)
 	if err != nil {

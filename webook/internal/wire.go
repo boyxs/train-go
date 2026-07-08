@@ -5,6 +5,7 @@ package main
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
+	"github.com/redis/go-redis/v9"
 
 	intrevt "github.com/boyxs/train-go/webook/internal/events/interaction"
 	relationevt "github.com/boyxs/train-go/webook/internal/events/relation"
@@ -80,8 +81,11 @@ type App struct {
 func InitWebServer() (App, func(), error) {
 	wire.Build(
 		//infra
-		ioc.InitDB, ioc.InitRedis, ioc.InitLogger, ioc.InitTimezone,
+		ioc.InitDB, ioc.InitRedis, ioc.InitLockClient, ioc.InitLogger, ioc.InitTimezone,
 		ioc.InitOTel,
+		// Bind
+		wire.Bind(new(redis.Cmdable), new(*redis.Client)),
+		wire.Bind(new(redis.UniversalClient), new(*redis.Client)),
 		//dao
 		dao.NewGormUserDAO,
 		dao.NewGormArticleAuthorDAO,

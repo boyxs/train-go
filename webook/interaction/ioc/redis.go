@@ -9,7 +9,7 @@ import (
 	"github.com/boyxs/train-go/webook/shared/confkey"
 )
 
-func InitRedis() redis.Cmdable {
+func InitRedis() *redis.Client {
 	type Config struct {
 		Addr     string `yaml:"addr" mapstructure:"addr"`
 		Password string `yaml:"password" mapstructure:"password"`

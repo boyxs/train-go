@@ -18,13 +18,13 @@ import (
 	"github.com/boyxs/train-go/webook/pkg/cronx"
 	cronprom "github.com/boyxs/train-go/webook/pkg/cronx/prometheus"
 	"github.com/boyxs/train-go/webook/pkg/logger"
-	"github.com/boyxs/train-go/webook/pkg/redislockx"
+	"github.com/boyxs/train-go/webook/pkg/redislock"
 )
 
 // cron + Wrapper + 真锁端到端 — 验多实例下"只一个跑"、长任务靠 watchdog 续约跑完。
 type CronxSuite struct {
 	suite.Suite
-	cmd redis.Cmdable
+	cmd redis.UniversalClient
 }
 
 func TestCronxIntegration(t *testing.T) {
@@ -37,7 +37,7 @@ func (s *CronxSuite) SetupSuite() {
 
 func (s *CronxSuite) TearDownTest() {
 	ctx := context.Background()
-	keys, _ := s.cmd.Keys(ctx, "cronx:lock:integration_*").Result()
+	keys, _ := s.cmd.Keys(ctx, "redislock:{cronx:lock:integration_*").Result()
 	if len(keys) > 0 {
 		s.cmd.Del(ctx, keys...)
 	}
@@ -46,7 +46,7 @@ func (s *CronxSuite) TearDownTest() {
 func (s *CronxSuite) newWrapper() *cronx.Wrapper {
 	reg := prometheus.NewRegistry()
 	metrics := cronprom.NewPrometheusBuilder("test", "cron", "test").Registry(reg).Build()
-	return cronx.NewWrapper(redislockx.NewClient(s.cmd), metrics, logger.NewNopLogger())
+	return cronx.NewWrapper(redislock.NewClient(s.cmd), metrics, logger.NewNopLogger())
 }
 
 // 3 个 Wrapper 实例（模拟 3 K8s pod）同时 Wrap 相同 task name + 同一刻调用，
@@ -95,7 +95,7 @@ func (s *CronxSuite) TestMultiWrapper_OnlyOneRuns() {
 func (s *CronxSuite) TestLongTask_WatchdogKeepsLockAlive() {
 	t := s.T()
 	w := cronx.NewWrapper(
-		redislockx.NewClient(s.cmd),
+		redislock.NewClient(s.cmd),
 		cronprom.NewPrometheusBuilder("test", "cron", "test").Registry(prometheus.NewRegistry()).Build(),
 		logger.NewNopLogger(),
 		cronx.WithLockTTL(1*time.Second), // 故意短 TTL；watchdog 333ms 续约
@@ -107,7 +107,7 @@ func (s *CronxSuite) TestLongTask_WatchdogKeepsLockAlive() {
 		atomic.AddInt32(&ran, 1)
 		time.Sleep(1500 * time.Millisecond) // 业务先跑过原 TTL=1s
 		// 此刻 wall-clock=1.5s 已过原 TTL，watchdog 须续上 key 才能存在
-		exists, _ := s.cmd.Exists(context.Background(), "cronx:lock:integration_long").Result()
+		exists, _ := s.cmd.Exists(context.Background(), "redislock:{cronx:lock:integration_long}:lock").Result()
 		atomic.StoreInt64(&aliveAfterTTL, exists)
 		time.Sleep(1000 * time.Millisecond) // 再跑 1s 验证持续续约
 		return nil
@@ -120,7 +120,7 @@ func (s *CronxSuite) TestLongTask_WatchdogKeepsLockAlive() {
 		"过原 TTL 后 key 必须仍存在，证明 watchdog 续上了（OFF 时 key 已自然过期）")
 
 	// 业务跑完后锁应已释放（cronx.release 用独立 ctx 调 Unlock）
-	exists, err := s.cmd.Exists(context.Background(), "cronx:lock:integration_long").Result()
+	exists, err := s.cmd.Exists(context.Background(), "redislock:{cronx:lock:integration_long}:lock").Result()
 	require.NoError(t, err)
 	assert.Equal(t, int64(0), exists, "业务跑完 + release 后 lock key 应消失")
 }

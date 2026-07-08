@@ -85,7 +85,7 @@ func (s *ArticleRankingService) Page(ctx context.Context, date, dim, cat string,
 }
 
 // RecomputeHot 重算当日热度榜（总榜 + 5 个分区榜）。
-// 分布式锁由 job 层统一处理（pkg/redislockx），service 不感知部署形态。
+// 分布式锁由 job 层统一处理（pkg/redislock），service 不感知部署形态。
 func (s *ArticleRankingService) RecomputeHot(ctx context.Context, date string) error {
 	candidates, err := s.loadCandidates(ctx)
 	if err != nil {

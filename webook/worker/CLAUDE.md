@@ -20,7 +20,7 @@
 
 ## 关键决策 / 注意点
 
-- **cron 分布式锁**：`redislockx` watchdog（类 Redisson），`InitCronWrapper` 显式 `WithLockTTL(30s)` 作 crash 让贤窗口
+- **cron 分布式锁**：`redislock` watchdog（自研 Lua 核心），`InitCronWrapper` 显式 `WithLockTTL(30s)` 作 crash 让贤窗口
   （**勿吃隐式默认值**）；丢锁由 prometheus 装饰器记 `webook_lock_watchdog_lost_total`（告警见
   `deploy/grafana/provisioning/alerting/webook-worker.yml`），**勿在 cronx 再传 `WithOnLost`，会覆盖该指标**。
 - **静态配置**：worker 只 `LoadLocal`、不 `WatchRemote`，无 etcd 配置热更（区别于 core / chat / interaction）；

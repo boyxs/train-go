@@ -2,6 +2,30 @@
 
 <!-- 新功能前插在此，日期降序 -->
 
+## [2026-07-08] redislock P1+P2 实现：改名去 bsm + 自研 Lua 核心 + 单机/集群 + fencing
+
+**变更内容**: 按 `prd/redislock/ARCHITECTURE.md` 落地 P1+P2——`pkg/redislockx` 重命名重写为纯自研 `pkg/redislock`（移除 `bsm/redislock`）；自研 Lua 核心（获取/释放/续约，`hash{ownerToken:重入计数}` 存储 + hash-tag key）；watchdog 搬入 P0 修复（网络错误距上次成功≥租约视同丢锁→OnLost+退出）；参数经 Options（waitTime/leaseTime/watchdogTimeout/retryInterval/fencing）+ 查询方法 + ForceUnlock；单机/集群同一 `NewClient(redis.UniversalClient)`；P2 fencing（`WithFencing`+`Fence()` 跨获取单调 + 资源侧 `FenceAccepted` helper）。cron 行为零回归。
+**影响范围**:
+- 新增 `pkg/redislock/`：`redislock.go`(接口 Client/RedisLock)+`consts/options/script/factory/client/lock/fence.go`+`scripts/{acquire,release,refresh,fence}.lua`+`prometheus/`+`mocks/`+单测+`bench_test.go`(§7.1 微基准)+`loadtest/cmd/loadserver`(§7.2 HTTP 壳 /acquire·/release·/stats·/metrics)+`loadtest/jmeter/`(JMeter 计划)
+- 删除 `pkg/redislockx/`（含 mocks/prometheus/tests）
+- 迁移消费者：`pkg/cronx/wrapper.go`(+test)（`TryLock(ctx,key,ttl)`→`WithWatchdogTimeout`）、`worker/ioc/{lock,cron,redis}.go`（`InitRedis`/`InitLockClient` 入参 `redis.Cmdable`→`redis.UniversalClient`）、worker `wire_gen.go` 重生成、`internal/service/ranking.go`(注释)、`internal/integration/{redislock,cronx}_test.go`（重写 + 新 key 模型/句柄查询）、`internal/integration/setup/redis.go`(→UniversalClient)、`mk/mock.mk`、`pkg/go.mod`(去 bsm)
+- 指标扩展 `webook_lock_fence_issued_total`
+- 文档：`worker/CLAUDE.md`、`prd/config/config-architecture.md` 引用改名
+**技术决策**: ① 自研 Lua 全原子（4 脚本），hash 模型天然支持重入计数；② fencing 计数器持久不过期（过期→单调断裂）、仅全新获取 INCR；③ watchdog `innerMu` 串行化脚本执行 + `stop`/`Once` + P0 三分支；④ `NewClient(UniversalClient)` 单机/集群透明、hash-tag `{k}` 化解 CROSSSLOT；⑤ `Refresh` 去掉 ttl 参数（用句柄租约），签名 `(ctx,key,opts...)` 干净；⑥ 句柄接口领域名 `RedisLock`（非裸 `Lock`）。
+**验证**: `pkg/redislock`+`prometheus`+`cronx` 单测全绿（miniredis，含 watchdog wall-clock + fencing 单调）；`make verify`（fmt + 10 模块 workspace/GOWORK=off）全绿；benchmark 量化开销（uncontended≈200µs、watchdog +19µs、fencing +6.5µs 每 op）；真 Redis 压测经 JMeter HTTP 壳 loadserver（`/acquire`+`/release`+`/stats`+`/metrics`）——单 key 极限竞争下 mutexViolations/fenceMonotonicBreaks/watchdog_lost 全 0，httptest 并发自测 + 真二进制 smoke 佐证。集群集成测（真 ClusterClient）随 CI。
+**待办**: P3 可重入（`WithReentrant` 跨 goroutine）、P4 pub/sub 阻塞+公平锁、P5 多主 quorum+部署——按消费者需求逐段推；集群 ClusterClient 集成测（需真 ClusterClient）随后补。
+**会话**: 260708-redislock-重设计
+**发布**: 待上线
+
+## [2026-07-08] redislock（原 redislockx）安全可靠锁库重设计方案（设计）
+
+**变更内容**: 出「`pkg/redislockx` → 重命名并重设计为纯自研 `pkg/redislock`」方案：补齐可重入 / 公平锁 / pub-sub 阻塞 / 多主 quorum / fencing 五能力，支持单机 + 集群 + 多主三拓扑；获取沿用本仓 `Client.TryLock/Lock → 句柄` 模型、句柄接口领域名 `RedisLock`、参数（waitTime/leaseTime）经 Options；配 benchmark + 真实压测 harness（互斥/公平/单调不变量校验）验证有效性。仅设计文档，未动代码。
+**影响范围**: 新增 `prd/redislock/ARCHITECTURE.md`（三拓扑 / 五能力 Lua 草图 / fencing 资源侧契约 / 风险 / 5 阶段任务 / 前瞻·分层·wire 三章）。当前唯一消费者 worker cron（经 `pkg/cronx` → `TryLock`）。
+**技术决策**: ① 自研 Lua 核心、移除 bsm/redislock（可重入 hash / pub-sub / 公平 / fencing 均非 bsm 能力），移除后 `redislock` 包名腾出故改名；② fencing 是唯一真安全（单调令牌 + 资源侧校验），多主/集群只解决可用性；③ 重入身份显式传 ownerID（Go 无稳定 goroutine id）；④ 存储统一 hash 模型；⑤ 沿用本仓 `Client.TryLock/Lock` 获取模型，句柄接口用领域名 `RedisLock`（非裸 `Lock`，避免与方法 `Lock()` 同词），纯自研、不引入外部术语；⑥ 单机/集群同一 `NewClient(redis.UniversalClient)`，key hash-tag 化解集群 CROSSSLOT；⑦ watchdog 沿用 ttl/3（含已修 P0：网络错误超 ttl 视同丢锁）。
+**待办**: 实施 P1（改名+自研核心+单机/集群）→ P2（fencing）→ P3（重入）→ P4（pub-sub+公平）→ P5（多主+部署重构）；建议先 P1+P2 上线。**落地时同步**（描述活状态、不提前写）：`webook/worker/CLAUDE.md`、`prd/config/config-architecture.md` 的 `redislockx` 引用改 `redislock`。另：本会话 P0 watchdog 修复 + §8 命名对齐（`RedisLock`/`safe*`→`fire*`）已完成待提交（独立 commit）。
+**会话**: 260708-redislock-重设计
+**发布**: 待上线
+
 ## [2026-07-07] Go 多模块化 + go.work 落地实现
 
 **变更内容**: 按 `prd/go-workspace/ARCHITECTURE.md` 落地——`webook/` 单模块拆为 10 个独立 module（每服务 + pkg/api/shared）+ `go.work`；历史占位模块名 `github.com/webook` → `github.com/boyxs/train-go/webook`（对齐真实仓库）。一个提交完成。

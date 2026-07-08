@@ -11,7 +11,7 @@ import (
 
 	cronprom "github.com/boyxs/train-go/webook/pkg/cronx/prometheus"
 	"github.com/boyxs/train-go/webook/pkg/logger"
-	"github.com/boyxs/train-go/webook/pkg/redislockx"
+	"github.com/boyxs/train-go/webook/pkg/redislock"
 )
 
 // Task 定时任务回调签名。date 由 Wrapper 注入（YYYY-MM-DD），方便对齐归档日期。
@@ -20,7 +20,7 @@ type Task func(ctx context.Context, date string) error
 // Wrapper 把"抢锁 → 跑业务 → 释放锁 + 4 组指标 + panic recover" 模板封死。
 // 多 Job 共享一个实例，task 标签区分。业务无关，搬自原 internal/job/ranking.go。
 type Wrapper struct {
-	lock       redislockx.Client
+	lock       redislock.Client
 	metrics    *cronprom.Metrics
 	l          logger.LoggerX
 	now        func() time.Time
@@ -41,14 +41,14 @@ func WithLockKeyPrefix(prefix string) WrapperOption {
 	return func(w *Wrapper) { w.keyFn = func(name string) string { return prefix + name } }
 }
 
-// WithLockTTL 设置锁 TTL。默认 30s（实例 crash 后让贤窗口）；
-// watchdog 续约间隔由 redislockx 自动取 ttl/3（对齐 Redisson）。
+// WithLockTTL 设置锁 TTL。默认 30s（实例 crash 后让贤窗口）；映射到 redislock 的
+// WithWatchdogTimeout(ttl)——watchdog 每 ttl/3 续约保活。
 func WithLockTTL(d time.Duration) WrapperOption {
 	return func(w *Wrapper) { w.lockTTL = d }
 }
 
 // NewWrapper 业务 Job 注入用：所有 cron callback 都从 Wrap() 得到。
-func NewWrapper(lock redislockx.Client, m *cronprom.Metrics, l logger.LoggerX, opts ...WrapperOption) *Wrapper {
+func NewWrapper(lock redislock.Client, m *cronprom.Metrics, l logger.LoggerX, opts ...WrapperOption) *Wrapper {
 	w := &Wrapper{
 		lock:       lock,
 		metrics:    m,
@@ -86,9 +86,9 @@ func (w *Wrapper) Wrap(name string, timeout time.Duration, fn Task) func() {
 	}
 }
 
-func (w *Wrapper) acquire(ctx context.Context, name, lockKey string) (redislockx.Lock, bool) {
-	// watchdog 自动开（redislockx 默认 ttl/3，对齐 Redisson）
-	lock, ok, err := w.lock.TryLock(ctx, lockKey, w.lockTTL)
+func (w *Wrapper) acquire(ctx context.Context, name, lockKey string) (redislock.RedisLock, bool) {
+	// watchdog 自动开（WithWatchdogTimeout 未设 leaseTime → 走 watchdog，续约 ttl/3）
+	lock, ok, err := w.lock.TryLock(ctx, lockKey, redislock.WithWatchdogTimeout(w.lockTTL))
 	if err != nil {
 		w.metrics.Runs(name, "error").Inc()
 		w.l.Error("cronx 抢锁失败",
@@ -104,10 +104,10 @@ func (w *Wrapper) acquire(ctx context.Context, name, lockKey string) (redislockx
 	return lock, true
 }
 
-func (w *Wrapper) release(name string, lock redislockx.Lock) {
+func (w *Wrapper) release(name string, lock redislock.RedisLock) {
 	ctx, cancel := context.WithTimeout(context.Background(), w.relTimeout)
 	defer cancel()
-	if err := lock.Unlock(ctx); err != nil && !errors.Is(err, redislockx.ErrLockNotHeld) {
+	if err := lock.Unlock(ctx); err != nil && !errors.Is(err, redislock.ErrLockNotHeld) {
 		w.l.Warn("cronx 锁释放异常",
 			logger.String("task", name), logger.Error(err))
 	}

@@ -18,7 +18,7 @@ import (
 
 	cronprom "github.com/boyxs/train-go/webook/pkg/cronx/prometheus"
 	"github.com/boyxs/train-go/webook/pkg/logger"
-	"github.com/boyxs/train-go/webook/pkg/redislockx"
+	"github.com/boyxs/train-go/webook/pkg/redislock"
 )
 
 // recordingLogger 收集日志，用于断言 panic 路径里 stack 字段是否落地。
@@ -65,7 +65,7 @@ type fixture struct {
 	w       *Wrapper
 	mr      *miniredis.Miniredis
 	rdb     *redis.Client
-	lock    redislockx.Client
+	lock    redislock.Client
 	metrics *cronprom.Metrics
 	reg     *prometheus.Registry
 	log     *recordingLogger
@@ -78,7 +78,7 @@ func newFixture(t *testing.T, opts ...WrapperOption) *fixture {
 
 	reg := prometheus.NewRegistry()
 	metrics := cronprom.NewPrometheusBuilder("webook", "cron", "test").Registry(reg).Build()
-	lock := redislockx.NewClient(rdb)
+	lock := redislock.NewClient(rdb)
 	rl := &recordingLogger{}
 	w := NewWrapper(lock, metrics, rl, opts...)
 
@@ -173,7 +173,7 @@ func TestWrapper_Wrap_Success(t *testing.T) {
 func TestWrapper_Wrap_LockBusy(t *testing.T) {
 	f := newFixture(t, WithLockKeyPrefix("test:lock:"))
 
-	first, ok, err := f.lock.TryLock(context.Background(), "test:lock:hot", 5*time.Second)
+	first, ok, err := f.lock.TryLock(context.Background(), "test:lock:hot", redislock.WithLeaseTime(5*time.Second))
 	require.NoError(t, err)
 	require.True(t, ok)
 	t.Cleanup(func() { _ = first.Unlock(context.Background()) })
@@ -244,7 +244,7 @@ func TestWrapper_Wrap_UnlockUsesIndependentCtx(t *testing.T) {
 	cb()
 
 	// 业务 ctx 已 canceled，但 Unlock 用独立 ctx 仍走完 → 锁应已释放
-	again, ok, err := f.lock.TryLock(context.Background(), "test:lock:hot", time.Second)
+	again, ok, err := f.lock.TryLock(context.Background(), "test:lock:hot", redislock.WithLeaseTime(time.Second))
 	require.NoError(t, err)
 	assert.True(t, ok, "Wrap 退出后锁应已释放，能再次抢到")
 	if again != nil {

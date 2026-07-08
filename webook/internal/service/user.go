@@ -3,9 +3,15 @@ package service
 import (
 	"context"
 	"errors"
+	"strconv"
+	"time"
 
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
+
+	"github.com/boyxs/train-go/webook/pkg/logger"
+
+	"github.com/boyxs/train-go/webook/pkg/redislock"
 
 	"github.com/boyxs/train-go/webook/internal/domain"
 	"github.com/boyxs/train-go/webook/internal/errs"
@@ -23,12 +29,16 @@ type UserService interface {
 	FindOrCreateByWechat(ctx context.Context, wechatAuth domain.WechatAuth) (domain.User, error)
 }
 type InternalUserService struct {
-	repo repository.UserRepository
+	repo        repository.UserRepository
+	redisClient redislock.Client
+	l           logger.LoggerX
 }
 
-func NewInternalUserService(repo repository.UserRepository) UserService {
+func NewInternalUserService(repo repository.UserRepository, redisClient redislock.Client, l logger.LoggerX) UserService {
 	return &InternalUserService{
-		repo: repo,
+		repo:        repo,
+		redisClient: redisClient,
+		l:           l,
 	}
 }
 
@@ -60,6 +70,21 @@ func (us *InternalUserService) Login(ctx context.Context, email string, password
 }
 
 func (us *InternalUserService) Profile(ctx context.Context, userid int64) (domain.User, error) {
+	lock, ok, err := us.redisClient.TryLock(ctx,
+		"user:info:"+strconv.FormatInt(userid, 10),
+		redislock.WithWatchdogTimeout(30*time.Second),
+		redislock.WithWaitTime(10*time.Second),
+	)
+	if !ok {
+		return domain.User{}, err
+	}
+	// 拿到锁后再 defer：此时 lock 必非 nil，避免被占/出错时 nil.Unlock 空指针 panic；
+	// 用独立 ctx 释放，业务 ctx 已超时/取消也能正常解锁。
+	defer func() {
+		if err := lock.Unlock(context.Background()); err != nil && !errors.Is(err, redislock.ErrLockNotHeld) {
+			us.l.Warn("释放用户信息锁失败", logger.Int64("uid", userid), logger.Error(err))
+		}
+	}()
 	user, err := us.repo.FindById(ctx, userid)
 	if err != nil {
 		return domain.User{}, err

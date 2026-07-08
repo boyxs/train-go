@@ -7,7 +7,9 @@ import (
 	"github.com/boyxs/train-go/webook/shared/confkey"
 )
 
-func InitRedis() redis.Cmdable {
+// InitRedis 返回具体 *redis.Client，wire 侧用 wire.Bind 绑到 Cmdable + UniversalClient，
+// 与 ioc.InitRedis 同构（集成测试连真实测试库 Redis）。
+func InitRedis() *redis.Client {
 	type Config struct {
 		Addr     string `yaml:"addr" mapstructure:"addr"`
 		Password string `yaml:"password" mapstructure:"password"`

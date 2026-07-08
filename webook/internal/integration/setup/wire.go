@@ -168,6 +168,10 @@ func InitClickEventHandler() web.ClickEventHandler {
 
 var infraSvcProvider = wire.NewSet(
 	InitRedis,
+	// 一个 *redis.Client 连接同时供 cache/中间件（Cmdable）与分布式锁（UniversalClient）
+	wire.Bind(new(redis.Cmdable), new(*redis.Client)),
+	wire.Bind(new(redis.UniversalClient), new(*redis.Client)),
+	ioc.InitLockClient, // UserService 依赖 redislock.Client，集成测试走真实锁
 	InitDB,
 	InitLogger,
 )

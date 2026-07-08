@@ -12,6 +12,8 @@ import (
 	"github.com/boyxs/train-go/webook/internal/errs"
 	"github.com/boyxs/train-go/webook/internal/repository"
 	repomocks "github.com/boyxs/train-go/webook/internal/repository/mocks"
+	"github.com/boyxs/train-go/webook/pkg/logger"
+	lockmocks "github.com/boyxs/train-go/webook/pkg/redislock/mocks"
 )
 
 func TestInternalUserService_Login(t *testing.T) {
@@ -100,7 +102,8 @@ func TestInternalUserService_Login(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 			repo := tc.mock(ctrl)
-			userService := NewInternalUserService(repo)
+			// Login 路径不触达分布式锁，注入空 mock 满足签名即可
+			userService := NewInternalUserService(repo, lockmocks.NewMockClient(ctrl), logger.NewNopLogger())
 			user, err := userService.Login(tc.ctx, tc.email, tc.password)
 			assert.Equal(t, tc.wantErr, err)
 			assert.Equal(t, tc.wantUser, user)

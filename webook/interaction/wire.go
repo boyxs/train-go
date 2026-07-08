@@ -4,6 +4,7 @@ package main
 
 import (
 	"github.com/google/wire"
+	"github.com/redis/go-redis/v9"
 
 	interactiongrpc "github.com/boyxs/train-go/webook/interaction/grpc"
 	"github.com/boyxs/train-go/webook/interaction/ioc"
@@ -28,6 +29,8 @@ func InitApp() (App, func(), error) {
 		ioc.InitDB,
 		ioc.InitRedis,
 		ioc.InitEtcdClient,
+		// Bind
+		wire.Bind(new(redis.Cmdable), new(*redis.Client)),
 		// dao + cache + repository
 		dao.NewGormInteractionDAO,
 		cache.NewRedisInteractionCache,

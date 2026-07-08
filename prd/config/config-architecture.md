@@ -35,7 +35,7 @@
 4. **地址统一 `addr`**（`":8011"` / `"host:port"` 形式），废除 `port` 整数键。
 5. **就地读取，无中央装配与校验**：`<svc>/config/` 只放 yaml；每个 ioc Provider `viper.UnmarshalKey("<段>", &cfg)` 读自己那段直接用（沿用现有 `internal/ioc/otel.go` 模式），**无中央 Bootstrap struct、无 MustLoad、无 Validate 层**。段类型各归其位（§6）。配置错误在**消费点自然暴露**（空 `target` → dial 失败、空 `name` → `Register` 报错、坏 `dsn` → 连库失败），不在加载期集中拦截。
 6. **身份/接线键显式声明，禁止「过度兼容」的构建**：身份/接线配置（`addr` / `dsn` / `target` / `balancer` / 服务名 / `endpoints`）由 **wire Provider + yaml 段一一对应**显式声明，代码**绝不派生、绝不猜测、绝不静默兜底**缺失值。反例——老 `grpcClientConfig` 在 target 缺失时按 `etcd:///service/<name>` 推导：段名拼错照样"能跑"，问题被推迟到 RPC 且症状远离根因。本架构不写这种"替业务补全的构建方法"；缺了就是零值 → 消费点自然失败，**而非被派生值掩盖**（这才是"显式"的意义，不靠校验层兜）。仅允许「功能开关式缺省」（段缺失 = 功能关闭，如 `etcd.path` 不配 = 不接热更），且必须登记在本文档。
-7. **最优调参默认值就地兜底**：性能调参键（`ttl` / `watchdog` / `weight` / `retry` / `keep_alive` / `msg size` / 各类超时退避）的最优值**写在消费它的代码里**（`const` + `if <=0` 兜底，或 functional-option 默认），作 yaml 缺失 / 写 0 时的兜底 fallback（yaml 正常显式写出这些键、可改），与消费代码同版本演进。范本已在仓内：`grpcx.defaultLeaseTTL=30`（`server.go:20`）、`redislockx.applyOptions{watchdogInterval: ttl/3, retryInterval: 100ms}`（`options.go:55`）。**不在 config 层再写集中的默认应用方法**（无 `applyDefaults()`、无远离消费点的 `viper.SetDefault` 表）。与原则 6 的分界线见 §4。
+7. **最优调参默认值就地兜底**：性能调参键（`ttl` / `watchdog` / `weight` / `retry` / `keep_alive` / `msg size` / 各类超时退避）的最优值**写在消费它的代码里**（`const` + `if <=0` 兜底，或 functional-option 默认），作 yaml 缺失 / 写 0 时的兜底 fallback（yaml 正常显式写出这些键、可改），与消费代码同版本演进。范本已在仓内：`grpcx.defaultLeaseTTL=30`（`server.go:20`）、`redislock.applyOptions{watchdogInterval: ttl/3, retryInterval: 100ms}`（`options.go:55`）。**不在 config 层再写集中的默认应用方法**（无 `applyDefaults()`、无远离消费点的 `viper.SetDefault` 表）。与原则 6 的分界线见 §4。
 8. **密钥不进 git**：外部真实凭据（LLM / embedding apiKey）一律 `${ENV}` 占位注入；本机 docker 自建中间件密码按环境处理（见 §9）。
 9. **不落死配置**：代码没消费的键不进 yaml。有推荐值的调参键在 yaml 显式写出、可改，代码默认仅兜底；仅功能开关式缺省与纯 pkg 内部调参可省（见 §4）。
 
@@ -56,7 +56,7 @@
 |------|------|----------|--------|-----------|
 | **身份 / 接线**（必填） | `server.grpc.addr`、`data.mysql.dsn`、`client.grpc.<svc>.target` / `balancer`、`server.grpc.name`、`etcd.endpoints`、`data.redis.addr` | 全环境显式写 | 消费点自然失败（dial/连库/Register 报错） | 无默认 |
 | **调参**（可选，进 yaml） | `server.grpc.ttl` / `weight`、`client.grpc.<svc>.retry` / `keep_alive` / `max_*_msg_size`、`data.kafka.*_timeout`、`llm.providers[].timeout` / `max_tokens` | 省略（偏离默认才写） | 用代码默认（"用推荐值"） | **代码就地兜底** |
-| **纯代码调参**（不进 yaml） | `redislockx` 的 `watchdog` / `retryInterval` | 不出现 | 用代码默认 | **代码就地兜底** |
+| **纯代码调参**（不进 yaml） | `redislock` 的 `watchdog` / `retryInterval` | 不出现 | 用代码默认 | **代码就地兜底** |
 
 **判据**：这个键填错 / 缺了，是"配置写错了"还是"没指定，用最优"？错了 → 必填（缺则消费点自然失败，原则 6）；没指定就用最优 → 调参、兜底（原则 7）。
 
@@ -72,7 +72,7 @@ if ttl <= 0 { // yaml 省略 ttl → 解到 0 → 用 30s
     ttl = defaultLeaseTTL
 }
 
-// 范本二：functional-option 默认（pkg/redislockx/options.go）
+// 范本二：functional-option 默认（pkg/redislock/options.go）
 cfg := &lockConfig{
     retryInterval:    100 * time.Millisecond,
     watchdogInterval: ttl / 3, // 最优默认；调用方只在偏离时传 WithWatchdog
@@ -250,8 +250,8 @@ migrator:
 | `data.kafka.metadata_retry_backoff` | `250ms` | kafka 初始化 |
 | `llm.providers[].timeout` | `60`（秒，int） | ai client |
 | `llm.providers[].max_tokens` | `2048` | ai client |
-| `redislockx` watchdog | `ttl/3` | `redislockx.applyOptions`（不进 yaml） |
-| `redislockx` retryInterval | `100ms` | `redislockx.applyOptions`（不进 yaml） |
+| `redislock` watchdog | `ttl/3` | `redislock.applyOptions`（不进 yaml） |
+| `redislock` retryInterval | `100ms` | `redislock.applyOptions`（不进 yaml） |
 
 ### 域职责
 

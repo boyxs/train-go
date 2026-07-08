@@ -5,7 +5,7 @@ mockgen:
 	#── pkg（跨服务共享工具）
 	@cd pkg && mockgen -source=./jwtx/types.go -package=jwtmocks -destination=./jwtx/mocks/jwt_mock.go
 	@cd pkg && mockgen -source=./llm/types.go -package=llmmocks -destination=./llm/mocks/llm_mock.go
-	@cd pkg && mockgen -source=./redislockx/types.go -package=lockmocks -destination=./redislockx/mocks/lock_mock.go
+	@cd pkg && mockgen -source=./redislock/redislock.go -package=lockmocks -destination=./redislock/mocks/lock_mock.go
 	@cd pkg && mockgen -source=./sensitive/types.go -package=sensitivemocks -destination=./sensitive/mocks/filter.mock.go
 	@cd pkg && mockgen -source=./ratelimit/types.go -package=limitmocks -destination=./ratelimit/mocks/limiter.mock.go
 	#── internal（core：service）

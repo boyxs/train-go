@@ -8,7 +8,7 @@ import (
 	"github.com/boyxs/train-go/webook/pkg/cronx"
 	cronprom "github.com/boyxs/train-go/webook/pkg/cronx/prometheus"
 	"github.com/boyxs/train-go/webook/pkg/logger"
-	"github.com/boyxs/train-go/webook/pkg/redislockx"
+	"github.com/boyxs/train-go/webook/pkg/redislock"
 	"github.com/boyxs/train-go/webook/worker/job"
 )
 
@@ -21,7 +21,7 @@ func InitCronMetrics() *cronprom.Metrics {
 // 显式 WithLockTTL(30s)：榜单任务分钟级（重算/归档 ~1-2min），30s 是实例 crash 后的让贤窗口，
 // watchdog 每 10s（ttl/3）续约保活；不显式声明就吃 cronx 默认，多副本单跑保证不能依赖隐式默认值。
 // 丢锁由 prometheus 装饰器记 webook_lock_watchdog_lost_total（勿在此再传 WithOnLost，会覆盖该指标）。
-func InitCronWrapper(lock redislockx.Client, m *cronprom.Metrics, l logger.LoggerX) *cronx.Wrapper {
+func InitCronWrapper(lock redislock.Client, m *cronprom.Metrics, l logger.LoggerX) *cronx.Wrapper {
 	return cronx.NewWrapper(lock, m, l, cronx.WithLockTTL(30*time.Second))
 }
 

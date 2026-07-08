@@ -6,7 +6,6 @@ require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/IBM/sarama v1.48.2
 	github.com/alicebob/miniredis/v2 v2.37.0
-	github.com/bsm/redislock v0.9.4
 	github.com/gin-gonic/gin v1.11.0
 	github.com/go-kratos/aegis v0.2.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
