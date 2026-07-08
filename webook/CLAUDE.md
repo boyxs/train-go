@@ -4,6 +4,8 @@ Go + Gin + GORM + Redis + Wire（DI）
 
 模块路径: `github.com/boyxs/train-go/webook`（多模块 go.work：各服务 + pkg/api/shared 各自独立 module，无 root go.mod）
 
+> **模块消费**：仓内走 `replace ../x` 本地解析、不经 go get；对外/跨仓 `go get` 本仓（私有）模块需 `GOPRIVATE=github.com/boyxs/*` + git 认证。模块版本 tag 用目录前缀式 `webook/<mod>/vX.Y.Z`（如 `webook/pkg/v1.0.0`），别和服务部署 tag `webook-<svc>-v*` 混。详见 `prd/go-workspace/ARCHITECTURE.md` §10。
+
 ## 常用命令
 
 ```bash

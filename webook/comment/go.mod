@@ -3,9 +3,9 @@ module github.com/boyxs/train-go/webook/comment
 go 1.25.6
 
 require (
-	github.com/boyxs/train-go/webook/api v0.0.0-00010101000000-000000000000
-	github.com/boyxs/train-go/webook/pkg v0.0.0-00010101000000-000000000000
-	github.com/boyxs/train-go/webook/shared v0.0.0-00010101000000-000000000000
+	github.com/boyxs/train-go/webook/api v1.0.0
+	github.com/boyxs/train-go/webook/pkg v1.0.0
+	github.com/boyxs/train-go/webook/shared v1.0.0
 	github.com/golang-module/carbon/v2 v2.6.9
 	github.com/google/wire v0.7.0
 	github.com/prometheus/client_golang v1.23.2

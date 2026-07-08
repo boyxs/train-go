@@ -6,9 +6,9 @@ require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/IBM/sarama v1.48.2
 	github.com/alicebob/miniredis/v2 v2.37.0
-	github.com/boyxs/train-go/webook/api v0.0.0-00010101000000-000000000000
-	github.com/boyxs/train-go/webook/pkg v0.0.0-00010101000000-000000000000
-	github.com/boyxs/train-go/webook/shared v0.0.0-00010101000000-000000000000
+	github.com/boyxs/train-go/webook/api v1.0.0
+	github.com/boyxs/train-go/webook/pkg v1.0.0
+	github.com/boyxs/train-go/webook/shared v1.0.0
 	github.com/dlclark/regexp2 v1.11.5
 	github.com/ecodeclub/ekit v0.0.10
 	github.com/elastic/go-elasticsearch/v8 v8.19.6

@@ -281,6 +281,34 @@ RUN cd chat && CGO_ENABLED=0 GOOS=linux go build \
 4. **根模块**：彻底解散（删 `webook/go.mod`/`go.sum`），根目录无 Go 包。
 5. **go.work/go.work.sum**：提交进 git（monorepo 实践）。
 
+## 10. 对外消费与模块版本 tag
+
+### 模块版本 tag（目录前缀式，必须）
+多模块仓库里子模块的版本 tag 必须带**仓库内子目录路径前缀**，否则 go 工具解析不到：
+- `webook/pkg/vX.Y.Z` → 模块 `github.com/boyxs/train-go/webook/pkg`
+- `webook/api/vX.Y.Z` → 模块 `github.com/boyxs/train-go/webook/api`（其余模块同理）
+
+已发布：`webook/pkg/v1.0.0`、`webook/api/v1.0.0`（annotated）。
+⚠ 勿与**服务部署 tag** 混淆：`webook-core-v*` / `webook-chat-v*` / `webook-fe-v*` 是另一套、触发镜像构建，与模块版本 tag 无关。
+
+### 仓内消费：走 replace，不经 go get / 不联网
+`internal`/`chat`/… 通过各 `go.mod` 的 `replace ../pkg`、`../api` 本地解析——**不 go get、不联网、与 tag 无关**。日常开发无需下面的私有模块配置。
+
+### 对外 / 跨仓消费：私有仓需 GOPRIVATE + git 认证
+`github.com/boyxs/train-go` 是**私有仓库**。别的仓库要 `go get` 本仓模块，消费端机器须先配（否则报 sumdb 404 + `git ls-remote` 认证失败 exit 128）：
+
+```bash
+# 1) 声明私有模块：跳过 goproxy.cn + sum.golang.org（公共校验库没有私有模块 → 否则 404）
+go env -w GOPRIVATE=github.com/boyxs/*
+# 2) git 私有仓认证（二选一）
+git config --global credential.helper store                                # HTTPS + PAT（首次存一次）
+git config --global url."git@github.com:".insteadOf "https://github.com/"   # 或走已配的 SSH key
+# 3) 取用
+go get github.com/boyxs/train-go/webook/pkg@v1.0.0
+```
+
+> 能 push 本仓的机器（凭据已存，如 Windows Git Credential Manager）通常**只差 `GOPRIVATE`**；干净的 Linux / 容器 / CI 环境才需额外配 #2。
+
 ---
 
-**下一步**：本方案确认后进入实施——建议 **Phase 0（前缀迁移）单独一个提交**先落地并验证，再逐 Phase 做多模块拆分。实施走逐文件/逐模块 Edit + 每步 `go build` 验证流程。
+**落地状态**：本方案已实现——多模块化于 commit `9fe5abe`（`refactor/go-multi-module` 分支）一个提交落地并 force-push；`pkg`/`api` 已打 `v1.0.0` 模块 tag 并推送。CI 实跑需开 PR 到 main（`refactor/**` 不在 push 触发分支）。

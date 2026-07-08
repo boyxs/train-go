@@ -3,9 +3,9 @@ module github.com/boyxs/train-go/webook/chat
 go 1.25.6
 
 require (
-	github.com/boyxs/train-go/webook/api v0.0.0-00010101000000-000000000000
-	github.com/boyxs/train-go/webook/pkg v0.0.0-00010101000000-000000000000
-	github.com/boyxs/train-go/webook/shared v0.0.0-00010101000000-000000000000
+	github.com/boyxs/train-go/webook/api v1.0.0
+	github.com/boyxs/train-go/webook/pkg v1.0.0
+	github.com/boyxs/train-go/webook/shared v1.0.0
 	github.com/gin-contrib/cors v1.7.6
 	github.com/gin-gonic/gin v1.11.0
 	github.com/golang-module/carbon/v2 v2.6.9

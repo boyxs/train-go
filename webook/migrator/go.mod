@@ -7,8 +7,8 @@ require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/IBM/sarama v1.48.2
 	github.com/alicebob/miniredis/v2 v2.37.0
-	github.com/boyxs/train-go/webook/pkg v0.0.0-00010101000000-000000000000
-	github.com/boyxs/train-go/webook/shared v0.0.0-00010101000000-000000000000
+	github.com/boyxs/train-go/webook/pkg v1.0.0
+	github.com/boyxs/train-go/webook/shared v1.0.0
 	github.com/elastic/go-elasticsearch/v8 v8.19.6
 	github.com/gin-contrib/cors v1.7.6
 	github.com/gin-gonic/gin v1.11.0
