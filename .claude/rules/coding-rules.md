@@ -10,6 +10,7 @@
 
 - 修改源代码（`.go` `.tsx` `.ts` `.js`）必须使用 Edit 工具，禁止 `sed -i` / `awk` / `perl -i`
 - 每次 Edit 后立即 build + lint 验证，不积累多文件后验证
+- **多模块仓库提交前必跑 `cd webook && make verify`**（fmt-check + 各模块 workspace build/vet + **GOWORK=off** 构建）——`GOWORK=off` 等同 Docker/CI 的解析方式，能抓到 workspace 模式（go.work 的 `use`）会**掩盖**的 replace 路径错配 / 依赖漂移（如 `../api` 误写成 `../api0`：workspace 下照跑绿、Docker/CI 里必炸）
 - 批量重命名/替换超过 3 个文件时，逐文件 Edit 并逐个验证
 
 ## 3. Wire 依赖注入

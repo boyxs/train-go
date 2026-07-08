@@ -68,7 +68,7 @@ jobs:
 
       - name: 检查 import 顺序
         run: |
-          DIFF=$(goimports -local "$MODULE" -l .)
+          DIFF=$(goimports -local "$MODULE" -l ./internal ./api ./pkg)
           if [ -n "$DIFF" ]; then
             echo "❌ 以下文件 import 未按规范排序，请本地执行：goimports -local $MODULE -w ."
             echo "$DIFF"
@@ -77,15 +77,15 @@ jobs:
           echo "✅ import 顺序规范"
 
       - name: go vet
-        run: go vet ./...
+        run: go vet ./internal/... ./api/... ./pkg/...
 
       - name: 单元测试
         # main 和 tag 发布路径跑 -race（慢 2-5x 但抓并发 bug）；feature 开发快速反馈
         run: |
           if [[ "${{ github.ref }}" == "refs/heads/main" ]] || [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            go test -race $(go list ./... | grep -v /integration)
+            go test -race $(go list ./internal/... ./api/... ./pkg/... | grep -v /integration)
           else
-            go test $(go list ./... | grep -v /integration)
+            go test $(go list ./internal/... ./api/... ./pkg/... | grep -v /integration)
           fi
 
   build-push:

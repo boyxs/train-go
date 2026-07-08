@@ -2,6 +2,9 @@
 # goimports -local 用统一前缀即可覆盖全部子模块
 MODULE := github.com/boyxs/train-go/webook
 
+# 全部 10 个 module（叶子 + 服务）——verify 等逐模块操作用
+MODULES := api shared pkg internal chat comment interaction migrator relation worker
+
 # 部署层入口：compose 文件 + .env.local 都在 ../deploy/（项目唯一真相源）
 # image 名 webook:local 与 docker-compose.local.yaml 对齐，pull_policy=never
 DEPLOY  := ../deploy
@@ -9,7 +12,7 @@ COMPOSE := docker compose -p webook-local --env-file $(DEPLOY)/.env.local \
            -f $(DEPLOY)/docker-compose.yaml \
            -f $(DEPLOY)/docker-compose.local.yaml
 
-.PHONY: build dc up down fmt fmt-check wire help
+.PHONY: build dc up down fmt fmt-check verify wire help
 
 # 宿主机交叉编译 core（internal 模块）Linux 二进制（产物：webook/webook）
 # 注：CI/compose 走 internal/Dockerfile 容器内构建，此目标仅本地手动出二进制
@@ -53,6 +56,25 @@ fmt-check:
 		rm -f $$TMPFILE
 	@echo "✅ import 顺序规范"
 
+# 提交前全量校验（多模块）：格式 + 各模块 build/vet（workspace）+ GOWORK=off 构建
+# 为何两种模式都跑：workspace 用 go.work 的 use 会掩盖单模块 go.mod 里写错的 replace
+# （如 ../api 误写成 ../api0），只有 GOWORK=off（= Docker/CI 的解析方式）才暴露。
+# 注：recipe 内 echo 一律用 ASCII——Windows GBK 终端下中文会 mojibake 且可能破坏 shell 引号。
+verify: fmt-check
+	@echo "-- [1/2] build+vet each module (workspace) --"
+	@for m in $(MODULES); do \
+		printf '  %-12s ' "$$m"; \
+		(cd $$m && go build ./... >/dev/null && go vet ./... >/dev/null) && echo ok \
+			|| { echo "FAIL: $$m build/vet"; exit 1; }; \
+	done
+	@echo "-- [2/2] GOWORK=off build each module (Docker/CI parity; catches bad replace) --"
+	@for m in $(MODULES); do \
+		printf '  %-12s ' "$$m"; \
+		(cd $$m && GOWORK=off GOFLAGS=-mod=readonly go build ./... >/dev/null) && echo ok \
+			|| { echo "FAIL: $$m GOWORK=off build -- check go.mod replace path / dep drift"; exit 1; }; \
+	done
+	@echo "OK: fmt + 10 modules build under workspace and GOWORK=off"
+
 # 重新生成所有模块的 wire_gen.go（多模块：逐模块 wire ./... 覆盖各自 integration/setup），末尾格式化
 wire:
 	@for m in internal chat comment interaction migrator relation worker; do \
@@ -67,6 +89,7 @@ help:
 	@echo "make down               - 停 webook 服务（中间件不动）"
 	@echo "make fmt                - goimports 格式化（本地包分组）"
 	@echo "make fmt-check          - 只检查不改动（CI 用）"
+	@echo "make verify             - 提交前全量校验（格式 + workspace + GOWORK=off 构建，抓 replace 错配）"
 	@echo "make wire               - 重新生成 wire_gen.go + 格式化"
 	@echo "make -f mk/k8s.mk help  - K3s 部署相关命令"
 	@echo ""
