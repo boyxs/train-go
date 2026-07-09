@@ -2,6 +2,33 @@
 
 <!-- 新功能前插在此，日期降序 -->
 
+## [2026-07-09] redisx 统一 redis 配置 + worker/core 集群支持 + MGetPub 集群安全
+
+**变更内容**: ① 新增 `pkg/redisx.Config`（完整 redis 连接 + 高级配置：mode/addr/addrs/password/池/超时/重试/集群路由，零值回落 go-redis 默认）+ `NewClient(cfg)`（按 mode 建单机/集群 UniversalClient、映射全部高级配置），收敛各服务内联 `Config{Addr,Password}`（原 7 模块 ~11 处各写一份）；② worker + core ioc 迁移到 redisx，支持 `mode: single|cluster`；③ **修 core MGetPub 集群 CROSSSLOT**——`MGet(多 key)` → Get 流水线（ClusterClient 按 slot 自动拆分，保分片不 CROSSSLOT）。
+**影响范围**:
+- 新增 `pkg/redisx/client.go`（`Config` + `NewClient`）+ `client_test.go`（单机/集群类型 + 高级配置映射断言，TDD RED→GREEN）
+- **全部 11 处 redis 建点迁 `redisx.NewClient`**（worker/core/chat/comment/interaction/migrator/relation 的 ioc + 各 integration/setup），消除内联 `Config{Addr,Password}`；返回类型**按需收窄**（cache→`Cmdable`、锁→`UniversalClient`，遵循接口隔离）；`interaction`/`internal`/`internal-integration-setup` 的 wire 由 `*redis.Client` 双绑改 `Cmdable←UniversalClient` + `wire ./...` 重生成（`loadserver` 独立工具读 env 非 yaml、不在此列）
+- `internal/repository/cache/article.go` MGetPub 改 Get 流水线；`article_test.go` + miniredis MGetPub 测试（原无测试，命中/miss/损坏/空全覆盖）
+- worker + core 各 5 份 config yaml：`data.redis` 加 mode/addrs；**test→集群（7001-7003），其余单机**；worker 锁校准 `max_retries:-1`/`context_timeout_enabled` 移入 yaml，core 是共享 cache 用默认重试
+**技术决策**: ① 连接 + 高级配置进 Config（yaml 好控制），worker 锁校准也移 yaml；② MGetPub 用 Get 流水线而非 hash-tag（后者把所有文章挤一 slot 成热点，流水线保分片）；③ 类型名保持 `Config`（idiomatic，如 `tls.Config`），文件名 `client.go`（对齐 grpcx `server.go`/`client.go`）；④ worker redis 锁专用（关重试）vs core 共享 cache（默认重试）刻意分道；⑤ 审计确认 core 唯一跨槽点是 MGetPub（`HMGet` 单 key、`Eval` 单 key、jwt/ratelimit 单 key 均安全）。
+**验证**: 真 3 主集群探针实测——MGetPub 改前 `CROSSSLOT Keys in request don't hash to the same slot`、改后取回全部（Get 流水线）；`pkg/redisx` + article cache（含新 MGetPub）+ redislock cluster 测试全绿；`make verify` 10 模块（含 wire 重生成）全绿。
+**待办**: core-cache 集群集成测（可仿 `RedislockClusterSuite`）；sharded SSUBSCRIBE 集群优化。
+**会话**: 260708-redislock-重设计
+**发布**: 待上线
+
+## [2026-07-09] redislock 集群真机验证 + 空 key 守卫
+
+**变更内容**: 真 3 主 Redis 集群（7001-7003）实测 redislock——多 key Lua（release=lock+ch / fencing=lock+fence / fair=lock+queue+qts）靠 hash tag `{k}` 全部同槽、**无 CROSSSLOT**；**cluster 广播 pub/sub 唤醒生效**（阻塞 Lock 释放后近即时拿到、非等轮询）；100 goroutine 跨实例互斥只 1 赢。补 `internal/integration` 的 `RedislockClusterSuite`（skip-if-集群不可达）+ pkg 的 slot 一致性守卫单测。TDD 顺带发现并堵掉空 key 隐患：`TryLock/Lock("")` → 空 hash tag `{}` → 集群整键哈希 → 多 key CROSSSLOT，加 `ErrEmptyKey` 入口 fail-fast。
+**影响范围**:
+- `pkg/redislock/redislock.go`（+`ErrEmptyKey`）+`client.go`（TryLock/Lock 空 key 守卫）
+- 新增 `pkg/redislock/consts_test.go`（slot 守卫：5 个 key-builder 同非空 hash tag）+ `client_test.go`（空 key 拒绝 RED→GREEN）
+- `internal/integration/redislock_test.go`（+`RedislockClusterSuite`：多 key 无 CROSSSLOT / 跨 goroutine 互斥 / cluster pub/sub 唤醒；地址默认 7001-7003、`REDISLOCK_CLUSTER_ADDRS` 可覆盖、密码走 `REDISLOCK_REDIS_PASS`）
+**技术决策**: ① 库对**正常 key** 本就 cluster-correct（`UniversalClient` + 全 key `{k}` hash tag），真机验证坐实、核心无需改；② 唯一隐患是空 key（空 tag 退化整键哈希），fail-fast 拒绝；③ slot 守卫纯字符串比对 hash tag（无需真集群、CI 可跑），防将来加第 6 种 key 忘 `{k}`；④ 集群集成测 skip-if-不可达（本地起 3 主 / CI 有集群才跑）；⑤ sharded SSUBSCRIBE 仍留后续（广播 pub/sub 真机已够用）；⑥ worker ioc cluster mode 切换仍不做（无集群部署，过早）。
+**验证**: 真 3 主集群集成测 3 子测全 PASS（多 key/互斥/pub-sub）；`pkg/redislock` 37 单测全绿；`make verify` 10 模块全绿。空 key RED→GREEN：`TryLock("")` 原 ok=true/nil → 加守卫后 `ErrEmptyKey`。
+**待办**: worker ioc cluster mode 接线（待真集群部署）；sharded SSUBSCRIBE；P5 多主 quorum。
+**会话**: 260708-redislock-重设计
+**发布**: 待上线
+
 ## [2026-07-08] worker 锁专用 redis client 校准：关自动重试防 acquire 重复计数
 
 **变更内容**: worker 的 redis client 仅用于 cron 分布式锁，`InitRedis` 补两项 go-redis Options——`MaxRetries=-1`（关自动重试）+ `ContextTimeoutEnabled=true`。默认 `MaxRetries=3` 在"命令已执行但响应丢失"时会重发整条命令，而 acquire 脚本 `hincrby` **非幂等** → 重复 +1 → 计数虚高、Unlock 减不到 0、锁滞留到 lease 过期（幻觉持有，别副本这段抢不到、可能跳 cron tick）。`refresh`(pexpire)/`release`(hexists 守卫) 幂等无此患，唯 acquire 有 → 整体关重试最稳。

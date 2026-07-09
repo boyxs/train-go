@@ -39,6 +39,7 @@ data:
   mysql:
     dsn: root:13520@tcp(localhost:3306)/webook?parseTime=true&loc=UTC
   redis:
+    mode: single
     addr: "127.0.0.1:6379"
     password: "13520"
   kafka:

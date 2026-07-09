@@ -2,6 +2,8 @@ package integration
 
 import (
 	"context"
+	"os"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -17,8 +19,8 @@ import (
 )
 
 // 分布式锁端到端集成测试 — 真 Redis 验证获取原子性、watchdog 续约、跨实例互斥。
-// 跑前置：docker compose up redis；config/test.yaml 指向该 Redis。
-// miniredis 单连接共享，跨连接竞争只能用真 Redis 验。
+// 跑前置：config/test.yaml 现指向 3 主集群（7001-7003），需本地起集群或 CI 预置；
+// 不可达则整套 skip（见 SetupSuite），不硬失败。miniredis 单连接共享，跨连接竞争只能用真 Redis 验。
 type RedislockSuite struct {
 	suite.Suite
 	cmd redis.UniversalClient
@@ -30,6 +32,14 @@ func TestRedislockIntegration(t *testing.T) {
 
 func (s *RedislockSuite) SetupSuite() {
 	s.cmd = setup.InitRedis()
+	// config/test.yaml 指向 3 主集群，不可达则整套 skip（与 RedislockClusterSuite 同款守卫），
+	// 避免本地/CI 无集群时硬失败。
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := s.cmd.Ping(ctx).Err(); err != nil {
+		_ = s.cmd.Close()
+		s.T().Skipf("跳过：Redis 不可达 %v（config/test.yaml 指向 3 主集群 7001-7003，需本地起集群或 CI 预置）", err)
+	}
 }
 
 func (s *RedislockSuite) TearDownTest() {
@@ -254,4 +264,128 @@ func (s *RedislockSuite) TestFair_FIFOAcrossWaiters() {
 	require.NoError(t, holder.Unlock(ctx)) // 放锁，队头依次获取
 	wg.Wait()
 	assert.Equal(t, []int{0, 1, 2, 3}, order, "公平锁应按 FIFO 入队顺序发锁")
+}
+
+// RedislockClusterSuite 真 Redis 集群集成测（3 主）。集群不可达则整套 skip。
+// 跑：REDISLOCK_REDIS_PASS=xxx go test ./internal/integration/ -run TestRedislockCluster
+// 地址默认 127.0.0.1:7001-7003，可用 REDISLOCK_CLUSTER_ADDRS 覆盖（逗号分隔）。
+type RedislockClusterSuite struct {
+	suite.Suite
+	cmd *redis.ClusterClient
+}
+
+func TestRedislockCluster(t *testing.T) {
+	suite.Run(t, &RedislockClusterSuite{})
+}
+
+func (s *RedislockClusterSuite) SetupSuite() {
+	addrs := []string{"127.0.0.1:7001", "127.0.0.1:7002", "127.0.0.1:7003"}
+	if v := os.Getenv("REDISLOCK_CLUSTER_ADDRS"); v != "" {
+		addrs = strings.Split(v, ",")
+	}
+	cmd := redis.NewClusterClient(&redis.ClusterOptions{Addrs: addrs, Password: os.Getenv("REDISLOCK_REDIS_PASS")})
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := cmd.Ping(ctx).Err(); err != nil {
+		_ = cmd.Close()
+		s.T().Skipf("跳过：Redis 集群不可达 %v: %v（设 REDISLOCK_CLUSTER_ADDRS/REDISLOCK_REDIS_PASS 开启）", addrs, err)
+	}
+	s.cmd = cmd
+}
+
+func (s *RedislockClusterSuite) TearDownSuite() {
+	if s.cmd != nil {
+		_ = s.cmd.Close()
+	}
+}
+
+// cleanup 删一把锁的全部 key（同槽，单次 Del 安全）。
+func (s *RedislockClusterSuite) cleanup(k string) {
+	p := "redislock:{" + k + "}:"
+	s.cmd.Del(context.Background(), p+"lock", p+"fence", p+"ch", p+"queue", p+"qts")
+}
+
+// 多 key Lua 在集群不报 CROSSSLOT：release(lock+ch) / fencing(lock+fence) / fair(lock+queue+qts) 均成功。
+func (s *RedislockClusterSuite) TestMultiKeyNoCrossSlot() {
+	t := s.T()
+	cli := redislock.NewClient(s.cmd)
+	ctx := context.Background()
+
+	lk, ok, err := cli.TryLock(ctx, "itcluster:basic", redislock.WithLeaseTime(10*time.Second))
+	require.NoError(t, err)
+	require.True(t, ok)
+	require.NoError(t, lk.Unlock(ctx), "release(lock+ch) 多 key 不应 CROSSSLOT")
+	s.cleanup("itcluster:basic")
+
+	lf, ok, err := cli.TryLock(ctx, "itcluster:fence", redislock.WithLeaseTime(10*time.Second), redislock.WithFencing())
+	require.NoError(t, err, "fencing(lock+fence) 多 key 不应 CROSSSLOT")
+	require.True(t, ok)
+	assert.Greater(t, lf.Fence(), int64(0))
+	require.NoError(t, lf.Unlock(ctx))
+	s.cleanup("itcluster:fence")
+
+	fl, ok, err := cli.TryLock(ctx, "itcluster:fair", redislock.WithFair(), redislock.WithLeaseTime(10*time.Second))
+	require.NoError(t, err, "fair(lock+queue+qts) 三 key 不应 CROSSSLOT")
+	require.True(t, ok)
+	require.NoError(t, fl.Unlock(ctx))
+	s.cleanup("itcluster:fair")
+}
+
+// 集群下跨 goroutine 互斥：100 抢 1 赢。
+func (s *RedislockClusterSuite) TestMutex() {
+	t := s.T()
+	cli := redislock.NewClient(s.cmd)
+	ctx := context.Background()
+	key := "itcluster:mutex"
+	s.cleanup(key)
+
+	const n = 100
+	var success int32
+	var wg sync.WaitGroup
+	holders := make(chan redislock.RedisLock, n)
+	wg.Add(n)
+	for i := 0; i < n; i++ {
+		go func() {
+			defer wg.Done()
+			if lk, ok, err := cli.TryLock(ctx, key, redislock.WithLeaseTime(5*time.Second)); err == nil && ok {
+				atomic.AddInt32(&success, 1)
+				holders <- lk
+			}
+		}()
+	}
+	wg.Wait()
+	close(holders)
+	assert.Equal(t, int32(1), atomic.LoadInt32(&success), "集群下 100 抢锁应只 1 赢")
+	for lk := range holders {
+		_ = lk.Unlock(ctx)
+	}
+	s.cleanup(key)
+}
+
+// 集群下 pub/sub 阻塞唤醒：持有者释放后，阻塞 Lock 近即时拿到（retryInterval 设大排除轮询）。
+func (s *RedislockClusterSuite) TestBlockingPubSubHandsOff() {
+	t := s.T()
+	cli := redislock.NewClient(s.cmd)
+	ctx := context.Background()
+	key := "itcluster:blocking"
+	s.cleanup(key)
+
+	first, ok, err := cli.TryLock(ctx, key, redislock.WithLeaseTime(30*time.Second))
+	require.NoError(t, err)
+	require.True(t, ok)
+	go func() {
+		time.Sleep(150 * time.Millisecond)
+		_ = first.Unlock(ctx)
+	}()
+
+	bg, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	start := time.Now()
+	second, err := cli.Lock(bg, key, redislock.WithLeaseTime(30*time.Second), redislock.WithRetryInterval(5*time.Second))
+	elapsed := time.Since(start)
+	require.NoError(t, err)
+	require.NotNil(t, second)
+	_ = second.Unlock(ctx)
+	s.cleanup(key)
+	assert.Less(t, elapsed, 2*time.Second, "集群 pub/sub 广播唤醒应近即时（非等 5s 轮询）")
 }

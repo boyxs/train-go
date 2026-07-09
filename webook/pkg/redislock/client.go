@@ -29,6 +29,9 @@ func resolveToken(cfg *lockConfig) string {
 }
 
 func (c *RedisClient) TryLock(ctx context.Context, key string, opts ...Options) (RedisLock, bool, error) {
+	if key == "" {
+		return nil, false, ErrEmptyKey // 空 key → 空 hash tag → 集群多 key CROSSSLOT，fail-fast
+	}
 	cfg := applyOptions(opts)
 	if err := cfg.validate(); err != nil {
 		return nil, false, err
@@ -51,6 +54,9 @@ func (c *RedisClient) TryLock(ctx context.Context, key string, opts ...Options) 
 }
 
 func (c *RedisClient) Lock(ctx context.Context, key string, opts ...Options) (RedisLock, error) {
+	if key == "" {
+		return nil, ErrEmptyKey
+	}
 	cfg := applyOptions(opts)
 	if err := cfg.validate(); err != nil {
 		return nil, err

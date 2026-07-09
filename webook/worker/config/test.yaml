@@ -19,8 +19,16 @@ client:
 
 data:
   redis:
-    addr: "127.0.0.1:6379"
+    # worker 仅用 redis 做 cron 分布式锁；test对接 3 主集群（7001-7003）
+    mode: cluster
+    addrs:
+      - "127.0.0.1:7001"
+      - "127.0.0.1:7002"
+      - "127.0.0.1:7003"
     password: "13520"
+    # 锁专用校准：关自动重试（acquire 非幂等）+ ctx 作用到 I/O
+    max_retries: -1
+    context_timeout_enabled: true
   kafka:
     addrs:
       - "localhost:9094"

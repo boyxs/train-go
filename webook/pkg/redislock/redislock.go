@@ -10,6 +10,11 @@ import (
 // Unlock / Refresh 校验 ownerToken 不匹配时返回。
 var ErrLockNotHeld = errors.New("redislock: lock not held")
 
+// ErrEmptyKey 空 key 被拒：空 key → 空 hash tag `redislock:{}:...` → Redis 集群退化为整键哈希，
+// 同一把锁的多个 key（lock/ch/fence/queue/qts）落不同 slot → 多 key Lua 报 CROSSSLOT。
+// 单机不炸但语义无意义，故统一在获取入口 fail-fast。
+var ErrEmptyKey = errors.New("redislock: empty key not allowed")
+
 //go:generate mockgen -source=./redislock.go -package=lockmocks -destination=./mocks/lock_mock.go
 
 // Client 自研分布式锁工厂。多副本部署下用同一 Redis 抢锁。

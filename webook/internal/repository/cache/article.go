@@ -3,6 +3,7 @@ package cache
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/rand"
 	"time"
@@ -113,28 +114,31 @@ func (ac *RedisArticleCache) GetPub(ctx context.Context, id int64) (domain.Artic
 }
 
 // MGetPub 批量取公开文章；返回 id→Article map，缺失/反序列化失败的 id 不在结果里。
-// 整体 MGET 失败才向上抛 error；个别 key miss 不算错误。
+// 走 Get 流水线（集群按 slot 自动拆分、不 CROSSSLOT、保分片）；整体失败才向上抛，个别 miss/损坏跳过。
 func (ac *RedisArticleCache) MGetPub(ctx context.Context, ids []int64) (map[int64]domain.Article, error) {
 	if len(ids) == 0 {
 		return map[int64]domain.Article{}, nil
 	}
-	keys := make([]string, len(ids))
+	// 用 Get 流水线取代 MGET：集群下 ClusterClient 按 slot 自动拆分流水线到各节点，不像
+	// MGET(多 key) 那样跨槽 CROSSSLOT；单机行为等价。个别 key miss 不算整体失败。
+	pipe := ac.cmd.Pipeline()
+	cmds := make([]*redis.StringCmd, len(ids))
 	for i, id := range ids {
-		keys[i] = ac.getPubKey(id)
+		cmds[i] = pipe.Get(ctx, ac.getPubKey(id))
 	}
-	values, err := ac.cmd.MGet(ctx, keys...).Result()
-	if err != nil {
+	// Exec 在有 key miss 时以 redis.Nil 作首个错误返回（非整体失败）；其余错误才向上抛。
+	if _, err := pipe.Exec(ctx); err != nil && !errors.Is(err, redis.Nil) {
 		return nil, err
 	}
 	result := make(map[int64]domain.Article, len(ids))
-	for i, v := range values {
-		if v == nil {
-			continue
+	for i, cmd := range cmds {
+		raw, err := cmd.Result()
+		if errors.Is(err, redis.Nil) {
+			continue // 个别 miss
 		}
-		raw, ok := v.(string)
-		if !ok {
-			ac.l.Warn("MGetPub 返回值类型异常",
-				logger.Int64("id", ids[i]), logger.String("type", fmt.Sprintf("%T", v)))
+		if err != nil {
+			ac.l.Warn("MGetPub 单 key 取值失败",
+				logger.Int64("id", ids[i]), logger.Error(err))
 			continue
 		}
 		var article domain.Article

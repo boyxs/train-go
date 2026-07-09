@@ -5,6 +5,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/spf13/viper"
 
+	"github.com/boyxs/train-go/webook/pkg/redisx"
 	redisprom "github.com/boyxs/train-go/webook/pkg/redisx/prometheus"
 	"github.com/boyxs/train-go/webook/shared/confkey"
 )
@@ -12,18 +13,11 @@ import (
 // InitRedis 初始化 migrator 使用的 Redis 客户端。
 // 与 chat/ioc/redis.go 同构；metric / OTel 自动注入。
 func InitRedis() redis.Cmdable {
-	type Config struct {
-		Addr     string `yaml:"addr" mapstructure:"addr"`
-		Password string `yaml:"password" mapstructure:"password"`
-	}
-	var cfg Config
+	var cfg redisx.Config
 	if err := viper.UnmarshalKey(confkey.DataRedis, &cfg); err != nil {
 		panic(err)
 	}
-	client := redis.NewClient(&redis.Options{
-		Addr:     cfg.Addr,
-		Password: cfg.Password,
-	})
+	client := redisx.NewClient(cfg)
 	client.AddHook(redisprom.NewPrometheusBuilder("webook", "redis", "cmd", "Redis 命令统计").
 		WithCounter().
 		WithHistogram().

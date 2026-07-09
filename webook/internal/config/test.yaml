@@ -39,7 +39,12 @@ data:
   mysql:
     dsn: root:13520@tcp(localhost:3306)/webook_test?parseTime=true&loc=UTC
   redis:
-    addr: "127.0.0.1:6379"
+    # 集成测对接 3 主集群（7001-7003），验证 cluster 下 cache 多 key（MGetPub 走 Get 流水线）无 CROSSSLOT
+    mode: cluster
+    addrs:
+      - "127.0.0.1:7001"
+      - "127.0.0.1:7002"
+      - "127.0.0.1:7003"
     password: "13520"
   kafka:
     addrs:

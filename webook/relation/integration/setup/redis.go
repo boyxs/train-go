@@ -4,20 +4,14 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/spf13/viper"
 
+	"github.com/boyxs/train-go/webook/pkg/redisx"
 	"github.com/boyxs/train-go/webook/shared/confkey"
 )
 
 func InitRedis() redis.Cmdable {
-	type Config struct {
-		Addr     string `yaml:"addr" mapstructure:"addr"`
-		Password string `yaml:"password" mapstructure:"password"`
-	}
-	var cfg = Config{}
+	var cfg redisx.Config
 	if err := viper.UnmarshalKey(confkey.DataRedis, &cfg); err != nil {
 		panic(err)
 	}
-	return redis.NewClient(&redis.Options{
-		Addr:     cfg.Addr,
-		Password: cfg.Password,
-	})
+	return redisx.NewClient(cfg)
 }

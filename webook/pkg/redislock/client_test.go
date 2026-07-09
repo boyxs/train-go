@@ -22,6 +22,24 @@ func newTestClient(t *testing.T) (Client, *miniredis.Miniredis, *redis.Client) {
 	return NewClient(rdb), s, rdb
 }
 
+// 空 key 必须被拒：空 hash tag `{}` 在 Redis 集群退化为整键哈希 → 同一把锁多个 key 落不同
+// slot → 多 key Lua（release/fencing/fair）CROSSSLOT。获取入口 fail-fast。
+func TestTryLock_EmptyKeyRejected(t *testing.T) {
+	cli, _, _ := newTestClient(t)
+	ctx := context.Background()
+
+	_, ok, err := cli.TryLock(ctx, "", WithLeaseTime(time.Second))
+	assert.ErrorIs(t, err, ErrEmptyKey, "TryLock 空 key 应返回 ErrEmptyKey")
+	assert.False(t, ok)
+
+	// Lock 用有界 ctx：未加守卫时空 key 会阻塞（miniredis 不按 wall-clock 过期），
+	// 200ms 超时兜底；加守卫后应立即返回 ErrEmptyKey（ErrorIs 区分两者）。
+	lockCtx, cancel := context.WithTimeout(ctx, 200*time.Millisecond)
+	defer cancel()
+	_, err = cli.Lock(lockCtx, "", WithLeaseTime(time.Second))
+	assert.ErrorIs(t, err, ErrEmptyKey, "Lock 空 key 应返回 ErrEmptyKey")
+}
+
 func TestTryLock_Success(t *testing.T) {
 	cli, s, rdb := newTestClient(t)
 	ctx := context.Background()

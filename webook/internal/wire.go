@@ -84,8 +84,7 @@ func InitWebServer() (App, func(), error) {
 		ioc.InitDB, ioc.InitRedis, ioc.InitLockClient, ioc.InitLogger, ioc.InitTimezone,
 		ioc.InitOTel,
 		// Bind
-		wire.Bind(new(redis.Cmdable), new(*redis.Client)),
-		wire.Bind(new(redis.UniversalClient), new(*redis.Client)),
+		wire.Bind(new(redis.Cmdable), new(redis.UniversalClient)),
 		//dao
 		dao.NewGormUserDAO,
 		dao.NewGormArticleAuthorDAO,

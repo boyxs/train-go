@@ -19,8 +19,12 @@ client:
 
 data:
   redis:
+    mode: single
     addr: "127.0.0.1:6379"
     password: "13520"
+    # 锁专用校准：关自动重试（acquire 非幂等，重发会重复计数）+ ctx 作用到 I/O
+    max_retries: -1
+    context_timeout_enabled: true
   kafka:
     addrs:
       - "localhost:9094"

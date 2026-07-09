@@ -1,7 +1,7 @@
 # redislock 详细设计：安全可靠的自研分布式锁库
 
 > 状态：**详细设计 v7，已确认**（architect 产出；本文档为新会话实施的唯一依据，力求自包含）
-> 实现进度（见 CHANGELOG 2026-07-08）：**P1 单机/集群自研核心 + P2 fencing + P3 可重入（`WithReentrant`）+ P4 阻塞增强（pub/sub 唤醒 + 公平锁 `WithFair`）已落地**；P5（多主 quorum + 部署重构）待按消费者需求推进。
+> 实现进度（见 CHANGELOG 2026-07-08~09）：**P1 单机/集群自研核心 + P2 fencing + P3 可重入（`WithReentrant`）+ P4 阻塞增强（pub/sub 唤醒 + 公平锁 `WithFair`）已落地**；**集群支持已在真 3 主集群集成测通过**（多 key 无 CROSSSLOT / 广播 pub/sub 唤醒 / 跨 goroutine 互斥），空 key 入口 fail-fast（`ErrEmptyKey`，防空 hash tag 集群 CROSSSLOT）。P5（多主 quorum + 部署重构）待按消费者需求推进。
 > 范围：`webook/pkg/redislockx` → 重命名并重设计为 `webook/pkg/redislock`
 > 定位：**纯自研**，全量能力（P1–P5），**单机 + 集群 + 多主 quorum 三拓扑**
 > 命名：接口 `Client` / `RedisLock`（自研、领域名，无外部产品术语）；参数语义借鉴成熟分布式锁（`waitTime`/`leaseTime`），但**全部经 Options 交付**

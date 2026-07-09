@@ -4,9 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"testing"
+	"time"
 
+	"github.com/alicebob/miniredis/v2"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
 	"github.com/boyxs/train-go/webook/internal/domain"
@@ -118,4 +121,29 @@ func TestRedisArticleCache_DelFirstPage(t *testing.T) {
 
 	err := ac.DelFirstPage(context.Background())
 	assert.NoError(t, err)
+}
+
+// MGetPub 走 Get 流水线（集群安全）：命中返回、个别 miss/损坏跳过且不让整体报错。用 miniredis 跑真流水线。
+func TestRedisArticleCache_MGetPub(t *testing.T) {
+	mr := miniredis.RunT(t)
+	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	t.Cleanup(func() { _ = rdb.Close() })
+	c := NewRedisArticleCache(rdb, logger.NewNopLogger())
+	ac := c.(*RedisArticleCache)
+	ctx := context.Background()
+
+	require.NoError(t, ac.SetPub(ctx, domain.Article{Id: 1, Title: "a"}))
+	require.NoError(t, ac.SetPub(ctx, domain.Article{Id: 3, Title: "c"}))
+	// id=2 不写（miss）；id=4 注入损坏 JSON
+	require.NoError(t, rdb.Set(ctx, ac.getPubKey(4), "not-json", time.Minute).Err())
+
+	got, err := ac.MGetPub(ctx, []int64{1, 2, 3, 4})
+	require.NoError(t, err, "个别 miss/损坏不应让整体 MGetPub 报错")
+	assert.Len(t, got, 2, "命中 1、3；2 miss、4 损坏均跳过")
+	assert.Equal(t, "a", got[1].Title)
+	assert.Equal(t, "c", got[3].Title)
+
+	empty, err := ac.MGetPub(ctx, nil)
+	require.NoError(t, err)
+	assert.Empty(t, empty)
 }

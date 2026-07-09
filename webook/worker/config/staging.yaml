@@ -19,8 +19,12 @@ client:
 
 data:
   redis:
+    mode: single
     addr: "webook-redis:6379"
     password: ${REDIS_PASS}
+    # 锁专用校准：关自动重试（acquire 非幂等）+ ctx 作用到 I/O
+    max_retries: -1
+    context_timeout_enabled: true
   kafka:
     addrs:
       - "webook-kafka:9092"
