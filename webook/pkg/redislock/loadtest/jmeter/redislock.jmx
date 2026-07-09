@@ -32,7 +32,7 @@
       </ThreadGroup>
       <hashTree>
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="acquire">
-          <stringProp name="HTTPSampler.path">/acquire?key=${__P(key,jmeter:lock)}&amp;lease=${__P(lease,0s)}&amp;watchdog=${__P(watchdog,30s)}&amp;wait=${__P(wait,0s)}&amp;fencing=${__P(fencing,true)}</stringProp>
+          <stringProp name="HTTPSampler.path">/acquire?key=${__P(key,jmeter:lock)}&amp;lease=${__P(lease,0s)}&amp;watchdog=${__P(watchdog,30s)}&amp;wait=${__P(wait,0s)}&amp;fencing=${__P(fencing,true)}&amp;fair=${__P(fair,false)}</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.use_keepalive">true</boolProp>

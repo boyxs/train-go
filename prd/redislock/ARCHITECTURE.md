@@ -1,6 +1,7 @@
 # redislock 详细设计：安全可靠的自研分布式锁库
 
-> 状态：**详细设计 v7，已确认，实现就绪**（architect 产出；本文档为新会话实施的唯一依据，力求自包含）
+> 状态：**详细设计 v7，已确认**（architect 产出；本文档为新会话实施的唯一依据，力求自包含）
+> 实现进度（见 CHANGELOG 2026-07-08）：**P1 单机/集群自研核心 + P2 fencing + P3 可重入（`WithReentrant`）+ P4 阻塞增强（pub/sub 唤醒 + 公平锁 `WithFair`）已落地**；P5（多主 quorum + 部署重构）待按消费者需求推进。
 > 范围：`webook/pkg/redislockx` → 重命名并重设计为 `webook/pkg/redislock`
 > 定位：**纯自研**，全量能力（P1–P5），**单机 + 集群 + 多主 quorum 三拓扑**
 > 命名：接口 `Client` / `RedisLock`（自研、领域名，无外部产品术语）；参数语义借鉴成熟分布式锁（`waitTime`/`leaseTime`），但**全部经 Options 交付**
@@ -353,15 +354,16 @@ pkg/redislock/
   client.go      # 单个 client 的 Client 实现（单机/集群共用 UniversalClient + hash-tag key；与 quorum.go 多 client 区分）
   quorum.go      # 多主 quorum Client（多数派编排）
   lock.go        # RedisLock 句柄实现 + watchdog（P0 迁移；TryLock/Lock 返回它）
-  reentrant.go   # 重入计数封装
-  fair.go        # 公平队列 + 超时逐出
-  pubsub.go      # 阻塞获取订阅生命周期（单机/集群 sharded 分支）
+  fair.go        # 公平锁：acquireFair + dequeueFair（FIFO 队列 + 超时逐出，Lua 在 scripts/）
+  pubsub.go      # 阻塞获取订阅生命周期（当前广播 SUBSCRIBE；集群 sharded SSUBSCRIBE 待后续）
   fence.go       # fencing 生成 + 资源侧校验 helper
   script.go      # Lua 集中（//go:embed）
-  options.go     # Options + QuorumOptions（functional options）
+  options.go     # Options（functional options）+ WithReentrant/WithFair/…
   consts.go      # redislock:{k} hash-tag key Pattern
   prometheus/    # 指标装饰器（builder 链式，扩展新指标）
+  loadtest/      # 真实压测：loadtest.go（Go 并发 harness）+ cmd/loadserver（JMeter HTTP 壳）+ jmeter/
 ```
+> 落地偏离：**重入未单独成 `reentrant.go`**——`WithReentrant(ownerId)` 在 options.go，重入计数天然是 acquire/fair Lua 的 `hincrby`，无独立 Go 逻辑可封装。`quorum.go`（多主）随 P5。
 命名：接口 `Client`/`RedisLock`；工厂实现 `RedisClient`(单机/集群)/`QuorumClient`(多主)；装饰器 `MetricsClient`/`ObservedLock`（实现 `RedisLock`）；构造函数返回接口；receiver 首字母小写；**所有 struct 导出**（§8）。
 
 ## C. DI / wire + 配置

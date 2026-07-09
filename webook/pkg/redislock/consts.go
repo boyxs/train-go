@@ -14,5 +14,11 @@ func fenceKey(k string) string { return keyPrefix + "{" + k + "}:fence" }
 // channelKey 释放通知 channel，唤醒 pub/sub 阻塞的等待者。
 func channelKey(k string) string { return keyPrefix + "{" + k + "}:ch" }
 
+// queueKey 公平锁 FIFO 等待队列（list，队头 = 下一个该拿锁的 ownerToken）。
+func queueKey(k string) string { return keyPrefix + "{" + k + "}:queue" }
+
+// qtsKey 公平锁等待者逐出表（zset，ownerToken → 逐出 deadline ms）；停止刷新即被清理。
+func qtsKey(k string) string { return keyPrefix + "{" + k + "}:qts" }
+
 // unlockMsg 完全释放时 publish 到 channelKey 的负载，内容不重要，唤醒即可。
 const unlockMsg = "released"

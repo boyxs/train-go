@@ -19,67 +19,63 @@ type RedisClient struct {
 // 持有者，Unlock / Refresh 校验所有权防误删他人锁。
 func newToken() string { return uuid.NewString() }
 
+// resolveToken 本次获取的 ownerToken：WithReentrant 的显式 ownerId 优先（同一 ownerId
+// 可重入、跨 goroutine 共享持有者身份），否则随机 token（每次获取身份独立、天然不可重入）。
+func resolveToken(cfg *lockConfig) string {
+	if cfg.ownerId != "" {
+		return cfg.ownerId
+	}
+	return newToken()
+}
+
 func (c *RedisClient) TryLock(ctx context.Context, key string, opts ...Options) (RedisLock, bool, error) {
 	cfg := applyOptions(opts)
-	token := newToken()
-
-	var deadline time.Time
-	if cfg.waitTime > 0 {
-		deadline = time.Now().Add(cfg.waitTime)
+	if err := cfg.validate(); err != nil {
+		return nil, false, err
 	}
-	for {
-		lock, ok, err := c.acquire(ctx, key, token, cfg)
+	token := resolveToken(cfg)
+	// 无 WaitTime：非阻塞单次尝试，被占立即软失败。
+	if cfg.waitTime <= 0 {
+		lock, _, err := c.tryAcquire(ctx, key, token, cfg)
 		if err != nil {
 			return nil, false, err
 		}
-		if ok {
-			return lock, true, nil
+		// 公平锁非阻塞未拿到：脚本已把我入队，但我并不打算等 → 立即退出队列，不占位堵后面的人。
+		if lock == nil && cfg.fair {
+			c.dequeueFair(key, token)
 		}
-		// 被占：无 WaitTime 立即软失败；有 WaitTime 但已超时也软失败
-		if cfg.waitTime <= 0 || !time.Now().Before(deadline) {
-			return nil, false, nil
-		}
-		// 阻塞路径 P1 用轮询兜底（pub/sub 阻塞是 P4）
-		select {
-		case <-ctx.Done():
-			return nil, false, ctx.Err()
-		case <-time.After(cfg.retryInterval):
-		}
+		return lock, lock != nil, nil
 	}
+	// 有 WaitTime：阻塞至 deadline，走 pub/sub 唤醒 + 兜底轮询（§3.4）。
+	return c.blockingAcquire(ctx, key, token, cfg, time.Now().Add(cfg.waitTime))
 }
 
 func (c *RedisClient) Lock(ctx context.Context, key string, opts ...Options) (RedisLock, error) {
 	cfg := applyOptions(opts)
-	token := newToken()
-	for {
-		lock, ok, err := c.acquire(ctx, key, token, cfg)
-		if err != nil {
-			return nil, err
-		}
-		if ok {
-			return lock, nil
-		}
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		case <-time.After(cfg.retryInterval):
-		}
+	if err := cfg.validate(); err != nil {
+		return nil, err
 	}
+	token := resolveToken(cfg)
+	// ctx 即等待上限（deadline 零值 = 无 WaitTime 上限）；pub/sub 唤醒 + 兜底轮询。
+	lock, _, err := c.blockingAcquire(ctx, key, token, cfg, time.Time{})
+	return lock, err
 }
 
-// acquire 单次获取尝试。拿到 (lock, true, nil)；被占 (nil, false, nil)；网络错误 (nil, false, err)。
-// fencing 开启时走 fencing 变体（见 fence.go）。
-func (c *RedisClient) acquire(ctx context.Context, key, token string, cfg *lockConfig) (RedisLock, bool, error) {
-	if cfg.fencing {
+// tryAcquire 单次获取尝试。成功 (lock, 0, nil)；被占 (nil, pttlMs, nil)（pttlMs=剩余租约，
+// 供阻塞路径算兜底等待）；网络错误 (nil, 0, err)。公平 / fencing 各走独立变体（fair.go / fence.go）。
+func (c *RedisClient) tryAcquire(ctx context.Context, key, token string, cfg *lockConfig) (RedisLock, int64, error) {
+	switch {
+	case cfg.fair:
+		return c.acquireFair(ctx, key, token, cfg)
+	case cfg.fencing:
 		return c.acquireFencing(ctx, key, token, cfg)
 	}
 	res, err := acquireScript.Run(ctx, c.cmd, []string{lockKey(key)}, cfg.leaseMs(), token).Int64()
 	if err != nil {
-		return nil, false, err
+		return nil, 0, err
 	}
 	if res != -1 {
-		// 被占，res 为剩余 pttl
-		return nil, false, nil
+		return nil, res, nil // 被占，res 为剩余 pttl
 	}
-	return newLock(c, key, token, 0, cfg), true, nil
+	return newLock(c, key, token, 0, cfg), 0, nil
 }

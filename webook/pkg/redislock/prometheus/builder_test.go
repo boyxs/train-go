@@ -61,7 +61,24 @@ func TestBuild_WatchdogLost_Counter(t *testing.T) {
 	}, 2*time.Second, 20*time.Millisecond, "watchdog_lost_total 应被 +1")
 }
 
-// Lock 阻塞模式：实际等待时长应被 wait_seconds 观测。
+// TryLock 也须观测 wait_seconds（获取耗时）——否则 TryLock-only 的消费者（cron/loadserver
+// 全是 TryLock）该指标永远空、公平锁/WaitTime 的排队阻塞时间也不可见。
+func TestBuild_TryLockWait_Histogram(t *testing.T) {
+	reg := prometheus.NewRegistry()
+	cli, _ := newTestClient(t,
+		NewPrometheusBuilder("webook", "lock", "test").Registry(reg))
+	ctx := context.Background()
+
+	lock, ok, err := cli.TryLock(ctx, "k1", redislock.WithLeaseTime(time.Second))
+	require.NoError(t, err)
+	require.True(t, ok)
+	t.Cleanup(func() { _ = lock.Unlock(ctx) })
+
+	assert.Equal(t, uint64(1), getHistogramCount(t, reg, "webook_lock_wait_seconds"),
+		"TryLock 后应观测一次 wait_seconds（获取耗时）")
+}
+
+// Lock 阻塞模式：实际等待时长应被 wait_seconds 观测（用增量断言，不受 setup TryLock 是否观测影响）。
 func TestBuild_LockWait_Histogram(t *testing.T) {
 	reg := prometheus.NewRegistry()
 	cli, _ := newTestClient(t,
@@ -73,13 +90,14 @@ func TestBuild_LockWait_Histogram(t *testing.T) {
 	require.True(t, ok)
 	t.Cleanup(func() { _ = first.Unlock(bg) })
 
+	before := getHistogramCount(t, reg, "webook_lock_wait_seconds")
+
 	ctx, cancel := context.WithTimeout(bg, 100*time.Millisecond)
 	defer cancel()
-
 	_, _ = cli.Lock(ctx, "k1",
 		redislock.WithLeaseTime(5*time.Second), redislock.WithRetryInterval(20*time.Millisecond))
 
-	assert.Equal(t, uint64(1), getHistogramCount(t, reg, "webook_lock_wait_seconds"),
+	assert.Equal(t, before+1, getHistogramCount(t, reg, "webook_lock_wait_seconds"),
 		"Lock 阻塞结束（含失败）后必须观测一次 wait_seconds")
 }
 

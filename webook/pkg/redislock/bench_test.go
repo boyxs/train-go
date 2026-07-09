@@ -170,3 +170,96 @@ func BenchmarkFencingOverhead(b *testing.B) {
 		}
 	})
 }
+
+// BenchmarkReentrant 重入 N 层的开销：非重入基线（每次全新获取+释放）vs 同 ownerId 连续
+// acquire N 次再 release N 次。量化重入每多一层的额外 hincrby 往返成本。
+func BenchmarkReentrant(b *testing.B) {
+	rdb, backend := benchRedis(b)
+	b.Logf("backend=%s", backend)
+	cli := NewClient(rdb)
+	ctx := context.Background()
+	const key = "bench:reentrant"
+	b.Cleanup(func() { delKeys(rdb, key) })
+
+	b.Run("non-reentrant", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			lk, ok, err := cli.TryLock(ctx, key, WithLeaseTime(30*time.Second))
+			if err != nil || !ok {
+				b.Fatalf("acquire: ok=%v err=%v", ok, err)
+			}
+			_ = lk.Unlock(ctx)
+		}
+	})
+
+	for _, depth := range []int{2, 4, 8} {
+		b.Run(fmt.Sprintf("depth%d", depth), func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				locks := make([]RedisLock, 0, depth)
+				for d := 0; d < depth; d++ {
+					lk, ok, err := cli.TryLock(ctx, key, WithReentrant("bench-owner"), WithLeaseTime(30*time.Second))
+					if err != nil || !ok {
+						b.Fatalf("reentrant acquire d=%d: ok=%v err=%v", d, ok, err)
+					}
+					locks = append(locks, lk)
+				}
+				for _, lk := range locks {
+					_ = lk.Unlock(ctx)
+				}
+			}
+		})
+	}
+}
+
+// BenchmarkBlockingLock_PubSubVsPoll 阻塞获取的 hand-off 延迟：pub/sub 唤醒 vs 纯轮询（§7.1，证 §3.4 收益）。
+// 每次迭代：持有者占锁、holdMs 后释放；测等待者从"开始等"到"拿到"的耗时（ns/op = 平均 hand-off 延迟）。
+// poll 臂手动轮询（模拟 P4-9 前）；pubsub 臂用 Lock（retryInterval 设大，确保靠 pub/sub 而非轮询唤醒）。
+func BenchmarkBlockingLock_PubSubVsPoll(b *testing.B) {
+	rdb, backend := benchRedis(b)
+	b.Logf("backend=%s", backend)
+	cli := NewClient(rdb)
+	ctx := context.Background()
+	const key = "bench:handoff"
+	const holdMs = 5 * time.Millisecond
+	const pollInterval = 50 * time.Millisecond
+	b.Cleanup(func() { delKeys(rdb, key) })
+
+	// handoff 起持有者→holdMs 后释放→等待者阻塞获取。acquire 由各臂提供（轮询 / pub-sub）。
+	handoff := func(b *testing.B, acquire func()) {
+		for i := 0; i < b.N; i++ {
+			h, ok, err := cli.TryLock(ctx, key, WithLeaseTime(5*time.Second))
+			if err != nil || !ok {
+				b.Fatalf("holder: ok=%v err=%v", ok, err)
+			}
+			rel := make(chan struct{})
+			go func() { time.Sleep(holdMs); _ = h.Unlock(ctx); close(rel) }()
+			acquire() // 阻塞直到拿到
+			<-rel
+		}
+	}
+
+	b.Run("poll", func(b *testing.B) {
+		handoff(b, func() {
+			for {
+				lk, ok, err := cli.TryLock(ctx, key, WithLeaseTime(5*time.Second))
+				if err != nil {
+					b.Fatal(err)
+				}
+				if ok {
+					_ = lk.Unlock(ctx)
+					return
+				}
+				time.Sleep(pollInterval)
+			}
+		})
+	})
+
+	b.Run("pubsub", func(b *testing.B) {
+		handoff(b, func() {
+			lk, err := cli.Lock(ctx, key, WithLeaseTime(5*time.Second), WithRetryInterval(1*time.Second))
+			if err != nil {
+				b.Fatal(err)
+			}
+			_ = lk.Unlock(ctx)
+		})
+	})
+}

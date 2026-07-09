@@ -44,6 +44,18 @@ jmeter -n -t redislock.jmx -l wd.jtl \
 - **丢锁检测**：压测中途 `redis-cli -a <pass> shutdown nosave`（或断网）几秒，`/metrics` 的
   `webook_lock_watchdog_lost_total` 会涨（续约失败超租约 → 视同丢锁、goroutine 退出），Redis 恢复后继续。
 
+### 压公平锁（FIFO 排队）
+
+```bash
+# 32 线程抢单 key，fair 排队 + wait=2s；公平模式下几乎无 busy（都排队等），延迟↑吞吐↓换 FIFO 无饿死
+jmeter -n -t redislock.jmx -l fair.jtl \
+  -Jthreads=32 -Jduration=60 -Jkey=jmeter:fair -Jlease=3s -Jfair=true -Jwait=2s -Jfencing=false -Jhold=5
+```
+
+- **互斥仍成立**：`/stats` 的 `mutexViolations=0`（公平只改获取顺序，不改"同时只一个持有者"）。
+- **FIFO 顺序**由库的单测 / 集成测 / `loadtest.Config.Run` 校验（HTTP 无状态难判定入队序）；JMeter 这里验公平下的吞吐/延迟/互斥。
+- `fair=true` **必须配 `fencing=false`**（二者组合库返回 `ErrFairFencingUnsupported`），且 `wait>0` 才真排队。
+
 ## 3. 校验不变量（跑完必看）
 
 ```bash
@@ -52,8 +64,9 @@ curl -s http://127.0.0.1:8099/stats
 #  "mutexViolations":0,"fenceMonotonicBreaks":0}
 ```
 
-`mutexViolations` 或 `fenceMonotonicBreaks` > 0 → **锁不安全，FAIL**。`activeHolds` 跑完应回落到 0
-（每次 acquire 都被 release 配平）。多轮之间用 `POST /reset` 或重启 loadserver 清零。
+`mutexViolations` 或 `fenceMonotonicBreaks` > 0 → **锁不安全，FAIL**。`activeHolds` 稳态应配平回落，
+**收尾可能残留 1~2**（JMeter 在 duration 边界把某个 acquire↔release 配对切断了；对应 Redis 锁靠 lease
+自动过期，不影响互斥判定）。多轮之间用 `POST /reset`（清零计数 + 主动释放残留句柄）或重启 loadserver 清零。
 
 ## 4. Grafana（可选）
 
@@ -74,14 +87,16 @@ watchdog_lost_total / fence_issued_total）。prometheus 抓 `127.0.0.1:8099/met
 | `watchdog` | `30s` | `lease=0s` 时的 watchdog 超时（续约每 /3）。调小（如 `500ms`）+ 长 `hold` 才压得到续约/丢锁路径 |
 | `wait` | `0s` | TryLock 等待上限；`0s`=拿不到立即 busy |
 | `fencing` | `true` | 是否启用 fencing（校验令牌单调） |
+| `fair` | `false` | 公平锁 FIFO 排队；**需配 `wait`>0** 才排队等待（否则拿不到即 busy），且须 `fencing=false`（不与 fencing 组合） |
 
 ## 端点
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| POST | `/acquire?key=&lease=&wait=&fencing=` | 200 `{token,fence}` / 409 `{busy:true}` / 500 |
+| POST | `/acquire?key=&lease=&wait=&fencing=&fair=` | 200 `{token,fence}` / 409 `{busy:true}` / 500 |
 | POST | `/release?key=&token=` | 200 `{released:true}` / 410（未知/已释放 token） |
 | GET | `/stats` | 计数 + 不变量违规数（JSON） |
+| POST | `/reset` | 清零计数 + 释放残留句柄（多轮压测之间调，免重启） |
 | GET | `/metrics` | prometheus `webook_lock_*` |
 | GET | `/healthz` | `ok` |
 

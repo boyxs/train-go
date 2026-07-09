@@ -16,6 +16,8 @@ type lockConfig struct {
 	waitTime        time.Duration // TryLock 拿不到时最多阻塞该时长
 	retryInterval   time.Duration // 阻塞路径兜底轮询间隔
 	fencing         bool          // 启用 fencing，Fence() 返回单调令牌
+	fair            bool          // 公平锁：FIFO 排队获取，防抢占饿死
+	ownerId         string        // 显式持有者身份（WithReentrant）；空则每次获取用随机 token
 
 	onLost    func(key string, err error) // watchdog 续约失败（丢锁）回调
 	onRefresh func(key string)            // watchdog 每次成功续约回调
@@ -48,6 +50,20 @@ func WithRetryInterval(d time.Duration) Options {
 // 真安全须资源侧配合校验（见 fence.go / §3.3）。
 func WithFencing() Options {
 	return func(c *lockConfig) { c.fencing = true }
+}
+
+// WithFair 公平锁：按开始等待的先后 FIFO 排队获取，杜绝抢占式下早等者被后来者反复插队饿死。
+// 仅在阻塞路径（Lock / TryLock+WaitTime）有意义；实现见 fair.go / §3.5。
+func WithFair() Options {
+	return func(c *lockConfig) { c.fair = true }
+}
+
+// WithReentrant 显式持有者身份 ownerId：同一 ownerId 的多次获取即重入（计数 +1），
+// 而非被自己挡住。Go 无稳定 goroutine id（ADR-2），故重入身份必须显式传：跨 goroutine
+// 共享同一临界区时各方传同一 ownerId 即可重入。空 ownerId（默认）每次获取用随机 token，
+// 天然不可重入。释放需与获取次数相等才真正释放（release.lua 计数归零才 del）。
+func WithReentrant(ownerId string) Options {
+	return func(c *lockConfig) { c.ownerId = ownerId }
 }
 
 // WithOnLost watchdog 续约失败（丢锁）回调；挂指标 / 告警。回调在 watchdog goroutine 内
@@ -90,4 +106,19 @@ func (c *lockConfig) watchdogEnabled() bool {
 // watchdogInterval watchdog 续约间隔 = 租约 / 3。
 func (c *lockConfig) watchdogInterval() time.Duration {
 	return c.watchdogTimeout / 3
+}
+
+// heartbeatMs 公平锁等待者的逐出 deadline 心跳（= 3×retryInterval）：活等待者每次获取尝试
+// （间隔 ≤ retryInterval）都刷新 deadline，3× 余量下不会被误逐；崩溃者停止刷新 →
+// 约 3×retryInterval 后被队头清理逐出（§3.5 死等待者逐出）。
+func (c *lockConfig) heartbeatMs() int64 {
+	return (3 * c.retryInterval).Milliseconds()
+}
+
+// validate 组合校验：fair 与 fencing 暂不支持同时启用（需专门 fair+fence 原子脚本，P4 未做）。
+func (c *lockConfig) validate() error {
+	if c.fair && c.fencing {
+		return ErrFairFencingUnsupported
+	}
+	return nil
 }

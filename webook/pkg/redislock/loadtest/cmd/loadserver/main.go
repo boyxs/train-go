@@ -49,7 +49,8 @@ func (s *server) keyState(key string) *keyState {
 //
 //	lease    固定租约，>0 关 watchdog；=0s 走 watchdog（缺省 3s）
 //	watchdog lease=0s 时自定义 watchdog 超时（续约每 /3）；缺省用库默认 30s
-//	wait     TryLock 等待上限；fencing=true 启用 fencing
+//	wait     TryLock 等待上限；fencing=true 启用 fencing；fair=true 公平锁 FIFO 排队
+//	（fair 需配 wait>0 才排队等待，否则拿不到即软失败；fair 不与 fencing 组合，库会报错）
 func acquireOpts(q map[string][]string) ([]redislock.Options, error) {
 	get := func(k string) string {
 		if v := q[k]; len(v) > 0 {
@@ -84,6 +85,9 @@ func acquireOpts(q map[string][]string) ([]redislock.Options, error) {
 	}
 	if get("fencing") == "true" {
 		opts = append(opts, redislock.WithFencing())
+	}
+	if get("fair") == "true" {
+		opts = append(opts, redislock.WithFair())
 	}
 	return opts, nil
 }
@@ -164,11 +168,29 @@ func (s *server) handleStats(w http.ResponseWriter, _ *http.Request) {
 	})
 }
 
+// handleReset 清零计数 + 释放残留句柄，回到干净起点（多轮压测之间调，免重启 loadserver）。
+// 残留句柄多来自上一轮 shutdown 边界未配平的 acquire（对应 Redis 锁本会 lease 过期，这里主动释放更快）。
+func (s *server) handleReset(w http.ResponseWriter, r *http.Request) {
+	s.handles.Range(func(k, v any) bool {
+		if lk, ok := v.(redislock.RedisLock); ok {
+			_ = lk.Unlock(r.Context()) // best-effort：失败也无妨，锁会 lease 过期
+		}
+		s.handles.Delete(k)
+		return true
+	})
+	s.keys.Range(func(k, _ any) bool { s.keys.Delete(k); return true })
+	for _, p := range []*int64{&s.acquired, &s.busy, &s.errs, &s.released, &s.releaseErr, &s.mutexViol, &s.fenceViol, &s.active} {
+		atomic.StoreInt64(p, 0)
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"reset": true})
+}
+
 func (s *server) routes() *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/acquire", s.handleAcquire)
 	mux.HandleFunc("/release", s.handleRelease)
 	mux.HandleFunc("/stats", s.handleStats)
+	mux.HandleFunc("/reset", s.handleReset)
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("ok")) })
 	return mux
 }

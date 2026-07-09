@@ -94,9 +94,75 @@ func TestLoadServer_WatchdogParam_KeepsAlive(t *testing.T) {
 	assert.Zero(t, getStats(t, c, ts.URL)["mutexViolations"])
 }
 
-func doAcquireWD(t *testing.T, c *http.Client, base, key string) string {
+// 公平锁参数端到端：多线程 fair=true&wait=2s 抢同一 key，排队 FIFO 获取，服务端互斥不变量不破。
+func TestLoadServer_FairParam(t *testing.T) {
+	rdb, backend := testRedis(t)
+	t.Logf("backend=%s", backend)
+	s := newServer(redislock.NewClient(rdb))
+	ts := httptest.NewServer(s.routes())
+	t.Cleanup(ts.Close)
+	c := &http.Client{Timeout: 5 * time.Second}
+
+	const (
+		workers = 8
+		key     = "jmeter:fair"
+		dur     = 1500 * time.Millisecond
+	)
+	deadline := time.Now().Add(dur)
+	var wg sync.WaitGroup
+	for w := 0; w < workers; w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for time.Now().Before(deadline) {
+				token := doAcquireFair(t, c, ts.URL, key)
+				if token == "" {
+					continue
+				}
+				time.Sleep(2 * time.Millisecond) // 临界区 think-time
+				doRelease(t, c, ts.URL, key, token)
+			}
+		}()
+	}
+	wg.Wait()
+
+	st := getStats(t, c, ts.URL)
+	t.Logf("fair stats=%+v", st)
+	assert.Zero(t, st["mutexViolations"], "公平锁互斥被破坏")
+	assert.Positive(t, st["acquired"], "应有成功获取")
+	assert.Zero(t, st["activeHolds"], "结束后不应有残留持有")
+}
+
+// /reset 清零计数 + 释放残留句柄，回到干净起点（多轮压测之间免重启）。
+func TestLoadServer_Reset(t *testing.T) {
+	rdb, _ := testRedis(t)
+	s := newServer(redislock.NewClient(rdb))
+	ts := httptest.NewServer(s.routes())
+	t.Cleanup(ts.Close)
+	c := &http.Client{Timeout: 5 * time.Second}
+
+	// 制造计数 + 一个残留持有（acquire 不 release，模拟 shutdown 边界的孤儿）
+	token := doAcquire(t, c, ts.URL, "jmeter:reset")
+	require.NotEmpty(t, token)
+	st := getStats(t, c, ts.URL)
+	require.Positive(t, st["acquired"])
+	require.Equal(t, int64(1), st["activeHolds"], "有一个未释放的持有")
+
+	resp, err := c.Post(ts.URL+"/reset", "", nil)
+	require.NoError(t, err)
+	_ = resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	st = getStats(t, c, ts.URL)
+	assert.Zero(t, st["acquired"], "reset 后计数应归零")
+	assert.Zero(t, st["activeHolds"], "reset 应释放残留句柄")
+	assert.Zero(t, st["mutexViolations"])
+}
+
+// acquireQ POST /acquire?<query>，返回 token（409 busy 返 ""）。三个 do* 包装它传各自参数。
+func acquireQ(t *testing.T, c *http.Client, base, query string) string {
 	t.Helper()
-	resp, err := c.Post(base+"/acquire?key="+key+"&lease=0s&watchdog=200ms", "", nil)
+	resp, err := c.Post(base+"/acquire?"+query, "", nil)
 	require.NoError(t, err)
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode == http.StatusConflict {
@@ -110,20 +176,16 @@ func doAcquireWD(t *testing.T, c *http.Client, base, key string) string {
 	return b.Token
 }
 
+func doAcquireWD(t *testing.T, c *http.Client, base, key string) string {
+	return acquireQ(t, c, base, "key="+key+"&lease=0s&watchdog=200ms")
+}
+
 func doAcquire(t *testing.T, c *http.Client, base, key string) string {
-	t.Helper()
-	resp, err := c.Post(base+"/acquire?key="+key+"&lease=3s&fencing=true", "", nil)
-	require.NoError(t, err)
-	defer func() { _ = resp.Body.Close() }()
-	if resp.StatusCode == http.StatusConflict {
-		return ""
-	}
-	require.Equal(t, http.StatusOK, resp.StatusCode)
-	var body struct {
-		Token string `json:"token"`
-	}
-	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
-	return body.Token
+	return acquireQ(t, c, base, "key="+key+"&lease=3s&fencing=true")
+}
+
+func doAcquireFair(t *testing.T, c *http.Client, base, key string) string {
+	return acquireQ(t, c, base, "key="+key+"&lease=3s&fair=true&wait=2s")
 }
 
 func doRelease(t *testing.T, c *http.Client, base, key, token string) {

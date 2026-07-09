@@ -140,14 +140,16 @@ func (s *RedislockSuite) TestCrossClient_Mutex() {
 	assert.False(t, ok2, "另一 Client 应抢不到（跨实例互斥）")
 }
 
-// Lock 阻塞模式：先占用，第二个 Lock 阻塞重试，前者 Unlock 后立即拿到。
+// Lock 阻塞模式（P4-9 pub/sub）：先占用，第二个 Lock 阻塞重试，前者 Unlock 后近即时拿到。
+// retryInterval 故意设 5s（远大于释放时刻），只有 pub/sub 唤醒能让它在 ~200ms 拿到——
+// 真 Redis 验证 §3.4 收益（轮询要等满 5s）。
 func (s *RedislockSuite) TestBlockingLock_HandsOff() {
 	t := s.T()
 	cli := redislock.NewClient(s.cmd)
 	ctx := context.Background()
 	key := "itlock:blocking"
 
-	first, ok, err := cli.TryLock(ctx, key, redislock.WithLeaseTime(5*time.Second))
+	first, ok, err := cli.TryLock(ctx, key, redislock.WithLeaseTime(30*time.Second))
 	require.NoError(t, err)
 	require.True(t, ok)
 
@@ -156,12 +158,12 @@ func (s *RedislockSuite) TestBlockingLock_HandsOff() {
 		_ = first.Unlock(ctx)
 	}()
 
-	bgCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	bgCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	start := time.Now()
 	second, err := cli.Lock(bgCtx, key,
-		redislock.WithLeaseTime(5*time.Second),
-		redislock.WithRetryInterval(50*time.Millisecond))
+		redislock.WithLeaseTime(30*time.Second),
+		redislock.WithRetryInterval(5*time.Second))
 	elapsed := time.Since(start)
 
 	require.NoError(t, err, "ctx 没超时应能拿到")
@@ -169,5 +171,87 @@ func (s *RedislockSuite) TestBlockingLock_HandsOff() {
 	t.Cleanup(func() { _ = second.Unlock(ctx) })
 
 	assert.GreaterOrEqual(t, elapsed, 150*time.Millisecond, "应至少阻塞到 first Unlock")
-	assert.Less(t, elapsed, 1*time.Second, "first Unlock 后应及时拿到")
+	assert.Less(t, elapsed, 1*time.Second, "pub/sub 唤醒应近即时拿到，而非等 5s 轮询间隔")
+}
+
+// 可重入（P3）：同 ownerId 重入 N 次、释放 N 次才真释放；不同 owner 互斥。
+// 真 Redis 验 Lua 的 hincrby 重入计数（miniredis Lua 是重实现，真 Redis 兜底）。
+func (s *RedislockSuite) TestReentrant_SameOwnerAndCrossOwnerMutex() {
+	t := s.T()
+	cli := redislock.NewClient(s.cmd)
+	ctx := context.Background()
+	key := "itlock:reentrant"
+
+	// 同 owner 重入两次
+	l1, ok, err := cli.TryLock(ctx, key, redislock.WithReentrant("owner-A"), redislock.WithLeaseTime(10*time.Second))
+	require.NoError(t, err)
+	require.True(t, ok)
+	l2, ok, err := cli.TryLock(ctx, key, redislock.WithReentrant("owner-A"), redislock.WithLeaseTime(10*time.Second))
+	require.NoError(t, err)
+	require.True(t, ok, "同 owner 应重入成功")
+
+	hc, err := l2.HoldCount(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, 2, hc, "重入深度应为 2")
+
+	// 不同 owner 互斥
+	_, ok, err = cli.TryLock(ctx, key, redislock.WithReentrant("owner-B"), redislock.WithLeaseTime(10*time.Second))
+	require.NoError(t, err)
+	assert.False(t, ok, "不同 owner 应互斥")
+
+	// 释放 N 次才真释放
+	require.NoError(t, l1.Unlock(ctx))
+	locked, err := l2.IsLocked(ctx)
+	require.NoError(t, err)
+	assert.True(t, locked, "释放一次仍应持有")
+
+	require.NoError(t, l2.Unlock(ctx))
+	locked, err = l2.IsLocked(ctx)
+	require.NoError(t, err)
+	assert.False(t, locked, "释放两次后应真正释放")
+}
+
+// 公平锁 FIFO（P4-10）：多个等待者按入队先后依次拿到锁。真 Redis 验队列 Lua + pub/sub 唤醒协作。
+func (s *RedislockSuite) TestFair_FIFOAcrossWaiters() {
+	t := s.T()
+	cli := redislock.NewClient(s.cmd)
+	ctx := context.Background()
+	key := "itlock:fair"
+	queue := "redislock:{itlock:fair}:queue" // 队列 key（hash-tag 与锁同槽）
+
+	holder, ok, err := cli.TryLock(ctx, key, redislock.WithLeaseTime(30*time.Second))
+	require.NoError(t, err)
+	require.True(t, ok)
+
+	const n = 4
+	var mu sync.Mutex
+	var order []int
+	bgCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	var wg sync.WaitGroup
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			lk, err := cli.Lock(bgCtx, key, redislock.WithFair(),
+				redislock.WithLeaseTime(30*time.Second), redislock.WithRetryInterval(50*time.Millisecond))
+			if err != nil {
+				return
+			}
+			mu.Lock()
+			order = append(order, id)
+			mu.Unlock()
+			time.Sleep(30 * time.Millisecond)
+			_ = lk.Unlock(ctx)
+		}(i)
+		// 等 id 真正入队再起下一个 → 队列顺序确定
+		want := int64(i + 1)
+		require.Eventually(t, func() bool {
+			return s.cmd.LLen(ctx, queue).Val() == want
+		}, 3*time.Second, 20*time.Millisecond, "waiter %d 应入公平队列", i)
+	}
+
+	require.NoError(t, holder.Unlock(ctx)) // 放锁，队头依次获取
+	wg.Wait()
+	assert.Equal(t, []int{0, 1, 2, 3}, order, "公平锁应按 FIFO 入队顺序发锁")
 }

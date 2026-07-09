@@ -67,3 +67,30 @@ func TestFencing_BusyReturnsFalse(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, before, after, "被占不该 bump fencing 计数器")
 }
+
+// 同 owner 重入不 bump fencing 计数器：重入沿用首次令牌，重入句柄 Fence()=0（fence.lua）。
+func TestFencing_ReentrantDoesNotBump(t *testing.T) {
+	cli, _, rdb := newTestClient(t)
+	ctx := context.Background()
+
+	first, ok, err := cli.TryLock(ctx, "k1", WithReentrant("owner-A"), WithLeaseTime(5*time.Second), WithFencing())
+	require.NoError(t, err)
+	require.True(t, ok)
+	require.Greater(t, first.Fence(), int64(0), "首次全新获取应发一个令牌")
+
+	before, err := rdb.Get(ctx, fenceKey("k1")).Int64()
+	require.NoError(t, err)
+
+	second, ok, err := cli.TryLock(ctx, "k1", WithReentrant("owner-A"), WithLeaseTime(5*time.Second), WithFencing())
+	require.NoError(t, err)
+	require.True(t, ok, "同 owner 应重入成功")
+
+	after, err := rdb.Get(ctx, fenceKey("k1")).Int64()
+	require.NoError(t, err)
+	assert.Equal(t, before, after, "重入不该 bump fencing 计数器")
+	assert.Equal(t, int64(0), second.Fence(), "重入句柄 Fence()=0（沿用首次令牌）")
+
+	// 重入 2 次须释放 2 次
+	require.NoError(t, second.Unlock(ctx))
+	require.NoError(t, first.Unlock(ctx))
+}

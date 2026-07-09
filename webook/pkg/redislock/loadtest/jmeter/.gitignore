@@ -1,0 +1,4 @@
+# JMeter 运行产物（压测输出，勿提交）；只 track redislock.jmx + README.md
+*.jtl
+*.log
+report/

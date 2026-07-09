@@ -10,20 +10,20 @@ import (
 //
 // 为什么需要 fencing（唯一真安全）：持有者 GC/STW 暂停 → 锁 TTL 过期被别人拿走 →
 // 暂停结束仍以为持锁去写 → 双写。锁本身挡不住这个时序，唯一解 = 单调令牌 + 资源侧校验。
-func (c *RedisClient) acquireFencing(ctx context.Context, key, token string, cfg *lockConfig) (RedisLock, bool, error) {
+func (c *RedisClient) acquireFencing(ctx context.Context, key, token string, cfg *lockConfig) (RedisLock, int64, error) {
 	raw, err := fenceScript.Run(ctx, c.cmd, []string{lockKey(key), fenceKey(key)}, cfg.leaseMs(), token).Slice()
 	if err != nil {
-		return nil, false, err
+		return nil, 0, err
 	}
 	if len(raw) != 2 {
-		return nil, false, fmt.Errorf("redislock: 非法 fencing 获取结果 %v", raw)
+		return nil, 0, fmt.Errorf("redislock: 非法 fencing 获取结果 %v", raw)
 	}
 	status, _ := raw[0].(int64)
 	fence, _ := raw[1].(int64)
 	if status != -1 {
-		return nil, false, nil // 被占，status 为剩余 pttl
+		return nil, status, nil // 被占，status 为剩余 pttl
 	}
-	return newLock(c, key, token, fence, cfg), true, nil
+	return newLock(c, key, token, fence, cfg), 0, nil
 }
 
 // FenceAccepted 资源侧 fencing 校验（应用层写法，§3.3 "二选一"之一）：

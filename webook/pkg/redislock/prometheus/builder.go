@@ -22,7 +22,7 @@ type Builder interface {
 // 默认输出（cron / 业务都全要）：
 //   - {ns}_{sub}_acquire_total       (Counter, result=success/busy/error)
 //   - {ns}_{sub}_held_seconds        (Histogram, 无标签；key 基数高不打)
-//   - {ns}_{sub}_wait_seconds        (Histogram, 阻塞 Lock 等待时长)
+//   - {ns}_{sub}_wait_seconds        (Histogram, 获取等待时长；TryLock / Lock 均观测)
 //   - {ns}_{sub}_watchdog_lost_total (Counter, watchdog 续约失败 = 幻觉持锁告警)
 type PrometheusBuilder struct {
 	namespace string
@@ -78,7 +78,7 @@ func (b *PrometheusBuilder) Build(inner redislock.Client) redislock.Client {
 		Namespace: b.namespace,
 		Subsystem: b.subsystem,
 		Name:      "wait_seconds",
-		Help:      b.help + "（阻塞 Lock 实际等待时长，含失败）",
+		Help:      b.help + "（获取等待时长：TryLock / Lock 从调用到拿到或放弃，含 WaitTime / 公平排队阻塞；非阻塞即单次往返）",
 		Buckets:   defaultWaitBuckets,
 	})
 	watchdogLost := prometheus.NewCounter(prometheus.CounterOpts{
@@ -123,7 +123,11 @@ func (c *MetricsClient) withOnLost(opts []redislock.Options) []redislock.Options
 }
 
 func (c *MetricsClient) TryLock(ctx context.Context, key string, opts ...redislock.Options) (redislock.RedisLock, bool, error) {
+	start := time.Now()
 	lock, ok, err := c.inner.TryLock(ctx, key, c.withOnLost(opts)...)
+	// 获取耗时：非阻塞≈单次往返；WaitTime / 公平排队则含阻塞等待。TryLock 是主 API，必须观测，
+	// 否则 wait_seconds 对 cron / loadserver 等 TryLock-only 消费者永远为空。
+	c.wait.Observe(time.Since(start).Seconds())
 	switch {
 	case err != nil:
 		c.acquire.WithLabelValues("error").Inc()

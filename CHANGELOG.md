@@ -2,6 +2,80 @@
 
 <!-- 新功能前插在此，日期降序 -->
 
+## [2026-07-08] worker 锁专用 redis client 校准：关自动重试防 acquire 重复计数
+
+**变更内容**: worker 的 redis client 仅用于 cron 分布式锁，`InitRedis` 补两项 go-redis Options——`MaxRetries=-1`（关自动重试）+ `ContextTimeoutEnabled=true`。默认 `MaxRetries=3` 在"命令已执行但响应丢失"时会重发整条命令，而 acquire 脚本 `hincrby` **非幂等** → 重复 +1 → 计数虚高、Unlock 减不到 0、锁滞留到 lease 过期（幻觉持有，别副本这段抢不到、可能跳 cron tick）。`refresh`(pexpire)/`release`(hexists 守卫) 幂等无此患，唯 acquire 有 → 整体关重试最稳。
+**影响范围**: `worker/ioc/redis.go`（仅此一处；与 chat/core 共享 redis client **刻意分道**——它们要 cache 的透明重试，锁不能要）
+**技术决策**: ① 锁的瞬时错误交调用方降级 + watchdog 自身重试循环，不靠 go-redis 静默重试；② **不收紧 ReadTimeout**——对 cron 快失败会让 tick 直接跳过（不如晚点跑），默认 3s 已有界；③ cron 低并发（每 30s 一次）+ `ConnMaxIdleTime` 30min，默认池足够、连接常温，不调池；④ perf 定位：先实测否决了 token RandPool（crypto/rand 57ns 已快、池反而 -3×），Redis 往返是延迟下限改不掉，客户端唯一实招是这个 acquire 幂等性配置。
+**验证**: worker build + `make verify`（10 模块 workspace/GOWORK=off）全绿。
+**会话**: 260708-redislock-重设计
+**发布**: 待上线
+
+## [2026-07-08] redislock 压测补全：Go 并发 harness + pub/sub-vs-poll 基准 + JMeter 公平锁
+
+**变更内容**: 补齐 §7 压测——① 新增 `loadtest/loadtest.go` 进程内并发 harness（`Config.Run`→`Report`，多 goroutine 真 Redis 抢锁，校验 MutexViolations/FenceMonotonicBreaks 必须 0 + QPS/延迟分位），入口 `TestLoad`（真 Redis 不可达则 skip）；② 补 §7.1 缺的 `BenchmarkBlockingLock_PubSubVsPoll`（量化 pub/sub 唤醒 vs 纯轮询 hand-off 延迟）；③ loadserver + JMeter 计划接入公平锁（`fair=true`）。
+**影响范围**:
+- 新增 `pkg/redislock/loadtest/loadtest.go`+`loadtest_test.go`（§7.2 Go harness）
+- `pkg/redislock/bench_test.go`：+`BenchmarkBlockingLock_PubSubVsPoll`（poll 臂手动轮询 vs pubsub 臂 Lock）
+- `loadtest/cmd/loadserver/main.go`：`acquireOpts` +`fair=true`、新增 `POST /reset`（清零计数 + 释放残留句柄，多轮压测免重启；README 曾引用但一直缺实现）；`main_test.go` 抽 `acquireQ` 助手消重 + `TestLoadServer_FairParam`/`TestLoadServer_Reset`
+- `loadtest/jmeter/redislock.jmx`（+`fair` 属性）+`README.md`（fair 压测示例/属性/端点；软化 `activeHolds` 收尾残留措辞 + 补 `/reset` 端点行）
+- **修 `wait_seconds` 死指标**（`prometheus/builder.go`）：查压测 `/metrics` 发现 `wait_seconds` 恒 0——原仅 `Lock()` 观测，而全部消费者（cron/worker/loadserver）走 `TryLock`，且 `TryLock+WaitTime`/公平排队阻塞时间也不可见。改为 `TryLock` 也观测获取耗时（含阻塞排队），Help 拓宽；`builder_test.go` 加 `TestBuild_TryLockWait_Histogram` + Lock 测改增量断言
+**技术决策**: ① Go harness 与 JMeter HTTP 壳互补（前者 go test 直跑、后者外部工具驱动，同一不变量口径）；② pub/sub-vs-poll 基准用"poll 臂手动 TryLock 轮询 + pubsub 臂 Lock(大 retryInterval)"隔离两种唤醒机制；③ 公平锁经 loadserver 仅验互斥（HTTP 无状态难判 FIFO 入队序，FIFO 由单测/集成/harness 保证）；④ 重入不接 loadserver（token=ownerId 固定→句柄 map 撞车 + 同 owner 多持有会误报 mutexViolation，语义不合 HTTP 壳）。
+**验证**（真 Redis 127.0.0.1:6379，§7.3 判据全达标）:
+- `TestLoad` 三模式 MutexViolations=0 / FenceMonotonicBreaks=0：default(64g/4key QPS≈1453、p99 2.5ms)、fair(32g/2key **busy=0** 全排队、p99 221ms)、fencing(64g/4key 令牌单调 0 破)
+- `BenchmarkBlockingLock_PubSubVsPoll`：poll 51.7ms/op vs pubsub 5.9ms/op（**~8.7× hand-off 提速**，坐实 §3.4 收益）
+- micro-bench（真 Redis）：uncontended 186µs、watchdog +9µs、fencing +1µs、reentrant depth 线性
+- loadserver 自测（真 Redis）fair busy=0/mutex=0；`make verify` 全绿
+**待办**: `BenchmarkQuorum3`（§7.1，绑 P5 多主）；fair FIFO 的 JMeter 侧校验（当前靠库测保证）。
+**会话**: 260708-redislock-重设计
+**发布**: 待上线
+
+## [2026-07-08] redislock P4-10 公平锁：WithFair FIFO 排队 + 死等待者逐出
+
+**变更内容**: 按 §3.5 落地 P4 任务 10（本库最复杂、正确性风险最高能力）——`WithFair()` 公平锁：被占时按开始等待先后 FIFO 排队，杜绝抢占式下早等者被后来者反复插队饿死。数据用 `queue`(list FIFO 队列) + `qts`(zset ownerToken→逐出 deadline)；`fair_acquire.lua` 原子四步（清理队头死等待者 → 重入 → 锁空闲且队头是我则出队获取 → 否则入队尾+刷新 deadline）；释放复用 `release.lua` 的 publish 唤醒，唤醒后只有队头能在脚本成功，从而 FIFO。优雅放弃（ctx 取消 / WaitTime 到点）主动 `fair_cancel.lua` 出队，崩溃者靠 deadline 逐出兜底。
+**影响范围**:
+- 新增 `scripts/fair_acquire.lua`+`fair_cancel.lua`；`script.go`(+2 embed/script)；`consts.go`(+queueKey/qtsKey)
+- `options.go`：`WithFair()`+`fair` 字段+`heartbeatMs()`(3×retryInterval)+`validate()`
+- 新增 `fair.go`：`acquireFair` / `dequeueFair` / `ErrFairFencingUnsupported`
+- `client.go`：`tryAcquire` 改 switch（fair / fencing / 普通）+ `TryLock`/`Lock` 入口 `validate()` + 非阻塞 fair 未拿到即 `dequeueFair`
+- `pubsub.go`：`blockingAcquire` 放弃路径（WaitTime 到点 / ctx 取消）主动 `dequeueFair`
+- 单测 `fair_test.go`（入队 / FIFO 顺序 / 死等待者逐出 / 公平重入 / fair+fencing 报错 5 例）；集成测 `redislock_test.go`（真 Redis 4 等待者 FIFO）
+**技术决策**: ① deadline=3×retryInterval **每次尝试刷新**（心跳）——活等待者永不误逐、崩溃者约 3×retryInterval 被逐，统一适配 Lock（无 waitTime）与 TryLock+WaitTime；② 优雅放弃主动出队（不等 deadline，减后面人等待）+ 崩溃靠 deadline 兜底，双保险；③ fair+fencing **fail-loud 报错**（不静默丢 fencing 安全）；④ now 用 Go 传（miniredis 兼容，逐出 best-effort 容忍客户端时钟微偏）；⑤ queue/qts 自清理（Redis 空 list/zset 自动删键，无泄漏，release.lua 无需改）；⑥ 复用 P4-9 的 `blockingAcquire` 订阅唤醒循环，fair 只换获取 Lua。
+**验证**: `pkg/redislock` 35 单测全绿（新增 5）；FIFO 顺序测试 4 并发等待者严格 [0,1,2,3]；注入 deadline 过期的死队头后被逐出、活获取者拿到；`make verify`（fmt + 10 模块 workspace/GOWORK=off）全绿；集成测编译校验（真 Redis 手动 `docker compose up redis` 跑）。RED→GREEN：先 `WithFair` 存根跑出确定性 RED（阻塞等待者不入队、`queue` 恒空 → `Eventually` 2s 超时），再实现 fair_acquire 转绿。
+**待办**: fair 微基准（§7.1 未列，loadtest harness 的 `Fair` 字段可后补接入）；sharded SSUBSCRIBE 集群优化；fair+fencing 组合（需专门 fair+fence 原子脚本）；P5 多主 quorum + 部署。至此 **P1–P4 全部落地**。
+**会话**: 260708-redislock-重设计
+**发布**: 待上线
+
+## [2026-07-08] redislock P4-9 阻塞增强：Lock/WaitTime 走 pub/sub 唤醒（去轮询死等）
+
+**变更内容**: 按 `prd/redislock/ARCHITECTURE.md` 落地 P4 任务 9——`Lock` 与 `TryLock+WaitTime` 的阻塞获取从"固定间隔轮询"升级为 **pub/sub 唤醒**：先 `SUBSCRIBE redislock:{k}:ch`（订阅先于试获取，堵住"释放信号在订阅前发出"的丢失窗口）→ 试获取 → 被占则 `select{释放消息唤醒 / min(pttl,retryInterval) 兜底轮询 / ctx.Done}` 后重试；所有退出路径 defer 退订防连接/goroutine 泄漏。释放后近即时拿到（原轮询要等满 retryInterval），持有者崩溃不 publish 时靠 pttl 兜底在锁自然过期附近重试。
+**影响范围**:
+- 新增 `pkg/redislock/pubsub.go`：`blockingAcquire`（订阅生命周期 + 唤醒/兜底/取消三路 select）+ `blockWait`（min(pttl,retryInterval) 且不超 deadline）
+- `pkg/redislock/client.go`：`acquire`→`tryAcquire`（被占时 surface 剩余 pttl 供兜底计算）；`TryLock` 无 WaitTime 走单次 tryAcquire、有 WaitTime 走 blockingAcquire；`Lock` 走 blockingAcquire（deadline 零值=仅 ctx 上限）
+- `pkg/redislock/fence.go`：`acquireFencing` 同步改为 surface pttl 的签名
+- 单测 `client_test.go`：pub/sub 唤醒近即时（大 retryInterval 下释放后 <1s）+ 无订阅 goroutine 泄漏（30 轮 goroutine 数持平）
+- 集成测 `internal/integration/redislock_test.go`：`TestBlockingLock_HandsOff` 改用 retryInterval=5s，成为真 Redis 的 pub/sub 收益证明
+**技术决策**: ① 订阅先于试获取（§3.4），消除 lost-wakeup 窗口；② 兜底 `min(pttl,retryInterval)`：pub/sub 是快路径，pttl 兜底覆盖"持有者崩溃不 publish→锁 TTL 自然过期"的慢路径，兼顾延迟与正确；③ `tryAcquire` 统一 surface pttl（acquire.lua/fence.lua 本就返回剩余 pttl，之前丢弃），阻塞与非阻塞共用一处获取逻辑；④ 广播 `SUBSCRIBE`（单机/集群均正确），sharded `SSUBSCRIBE`（集群省广播）留待集群消费者时优化，已在 pubsub.go 注明；⑤ 非阻塞 TryLock（无 WaitTime）不订阅、零额外开销。
+**验证**: `pkg/redislock` 30 单测全绿（新增 2：pub/sub 唤醒 0.11s vs 原轮询 5.01s、无泄漏 30 轮）；miniredis 探针证实其投递 Lua PUBLISH 给订阅者（故唤醒可单测）；`make verify`（fmt + 10 模块 workspace/GOWORK=off）全绿；集成测编译校验（真 Redis 手动跑）。`-race` 需 cgo 本地缺失→CI 跑（§6）。RED→GREEN：先写唤醒测试对轮询代码跑出 `5.001s not less than 1s`，再实现 pub/sub 转 0.11s。
+**待办**: P4 任务 10 公平锁 `WithFair()`（§3.5，大、正确性风险最高，依赖本次 pub/sub 唤醒机制）下一轮单独 TDD；sharded SSUBSCRIBE 集群优化待集群消费者；P5 多主 quorum 未动。
+**会话**: 260708-redislock-重设计
+**发布**: 待上线
+
+## [2026-07-08] redislock P3 可重入：WithReentrant 显式 ownerId 跨 goroutine 共享持有者身份
+
+**变更内容**: 按 `prd/redislock/ARCHITECTURE.md` 落地 P3——新增 `WithReentrant(ownerId)` 选项：同一 ownerId 的多次获取即重入（hash 计数 +1），释放需与获取次数相等才真正释放；Go 无稳定 goroutine id（ADR-2），故重入身份显式传，协作 goroutine 传同一 ownerId 即共享同一临界区。默认（不传）每次获取用随机 token、天然不可重入（opt-in，零回归）。存储/Lua 零改动（acquire/release/fence.lua 的 hincrby 重入计数在 P1+P2 已就绪），仅补获取时的 token 解析。
+**影响范围**:
+- `pkg/redislock/options.go`：新增 `WithReentrant(ownerId)` + `lockConfig.ownerId` 字段
+- `pkg/redislock/client.go`：新增 `resolveToken(cfg)`——ownerId 非空用它当 token，否则随机 `newToken()`；`TryLock`/`Lock` 改用之
+- 单测 `client_test.go`（同 owner 重入 / 释放 N 次 / 跨 owner 互斥 / Token==ownerId / 默认 opt-in / 跨 goroutine 共享 6 例）+ `fence_test.go`（重入不 bump fencing 计数器 1 例）
+- `bench_test.go`：新增 `BenchmarkReentrant`（非重入基线 vs depth 2/4/8 重入开销，§7.1）
+- `internal/integration/redislock_test.go`：真 Redis 重入 + 跨 owner 互斥用例
+**技术决策**: ① 重入身份显式 ownerId（ADR-2，Go 无 goroutine id 不 hack），默认随机 token 保持 opt-in、零回归；② token 解析集中 `resolveToken` 一处，Lua/存储不动（重入计数天然在 hash `hincrby`）；③ 命名遵循本仓铁律 `Id` 风格（`ownerId` 非 `ownerID`）；④ 重入 × fencing：重入不 bump 单调计数器、重入句柄 `Fence()`=0（沿用首次令牌，fence.lua 既有行为，补测试固化）。
+**验证**: `pkg/redislock` 28 单测全绿（新增 7 例：6 重入 + 1 fencing 交互）；`make verify`（fmt + 10 模块 workspace/GOWORK=off）全绿；`BenchmarkReentrant` 冒烟跑通；集成测编译校验（`go vet` 通过，真 Redis 手动 `docker compose up redis` 跑）。RED→GREEN 严格执行：先 stub 选项让编译、断言失败（second ok=false / Token 为随机 UUID）证明行为缺失，再接 `client.go` 转绿。
+**待办**: `reentrant_depth` 指标（贯穿 §5 task 14）暂缓——正确实现需每次获取多一次 HoldCount 往返（污染热路径）或改 acquire.lua 返回协议（风险波及 P1 全部测试），性价比低，待有消费者需求再评估；P4 pub/sub 阻塞+公平锁、P5 多主 quorum 未动。
+**会话**: 260708-redislock-重设计
+**发布**: 待上线
+
 ## [2026-07-08] redislock P1+P2 实现：改名去 bsm + 自研 Lua 核心 + 单机/集群 + fencing
 
 **变更内容**: 按 `prd/redislock/ARCHITECTURE.md` 落地 P1+P2——`pkg/redislockx` 重命名重写为纯自研 `pkg/redislock`（移除 `bsm/redislock`）；自研 Lua 核心（获取/释放/续约，`hash{ownerToken:重入计数}` 存储 + hash-tag key）；watchdog 搬入 P0 修复（网络错误距上次成功≥租约视同丢锁→OnLost+退出）；参数经 Options（waitTime/leaseTime/watchdogTimeout/retryInterval/fencing）+ 查询方法 + ForceUnlock；单机/集群同一 `NewClient(redis.UniversalClient)`；P2 fencing（`WithFencing`+`Fence()` 跨获取单调 + 资源侧 `FenceAccepted` helper）。cron 行为零回归。
