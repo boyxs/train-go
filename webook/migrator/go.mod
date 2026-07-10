@@ -9,7 +9,7 @@ require (
 	github.com/alicebob/miniredis/v2 v2.37.0
 	github.com/boyxs/train-go/webook/pkg v1.0.0
 	github.com/boyxs/train-go/webook/shared v1.0.0
-	github.com/elastic/go-elasticsearch/v8 v8.19.6
+	github.com/elastic/go-elasticsearch/v9 v9.4.2
 	github.com/gin-contrib/cors v1.7.6
 	github.com/gin-gonic/gin v1.11.0
 	github.com/go-mysql-org/go-mysql v1.15.0

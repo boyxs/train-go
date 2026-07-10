@@ -26,6 +26,7 @@ services:
       APP_ENV: "${CORE_APP_ENV}"         # .env.<env> 指定 config/<env>.yaml
       MYSQL_PASS: "${MYSQL_PASS}"
       REDIS_PASS: "${REDIS_PASS}"
+      ES_PASS: "${ES_PASS}"      # data.es.password 走此占位
       DEEPSEEK_API_KEY: "${DEEPSEEK_API_KEY}"
       KIMI_API_KEY: "${KIMI_API_KEY}"
       QIANFAN_API_KEY: "${QIANFAN_API_KEY}"
@@ -195,6 +196,7 @@ services:
       MYSQL_PASS: "${MYSQL_PASS}"
       REDIS_PASS: "${REDIS_PASS}"
       CANAL_PASS: "${CANAL_PASS}"        # canal binlog 订阅密码（dev/staging/prod 走 ${ENV}）
+      ES_PASS: "${ES_PASS}"      # migrator.es.password 走此占位
       DEPLOY_ENV: "${DEPLOY_ENV}"
       TZ: "Asia/Shanghai"
       GOMEMLIMIT: "${MIGRATOR_GOMEMLIMIT:-320MiB}"
@@ -323,20 +325,22 @@ services:
       start_period: 30s       # JVM 启动 + metadata 加载需要时间
 
   webook-es:
-    image: elasticsearch:8.12.2
+    image: elasticsearch:9.3.2
     container_name: webook-es
     restart: always
     pull_policy: missing
     mem_limit: ${ES_MEM:-1024m}
     environment:
       discovery.type: single-node
-      xpack.security.enabled: "false"
-      xpack.security.http.ssl.enabled: "false"
+      xpack.security.enabled: "true"           # 开启内置用户认证（Basic auth）
+      xpack.security.http.ssl.enabled: "false" # 单机内网免 TLS，仅 Basic auth over HTTP
+      ELASTIC_PASSWORD: "${ES_PASS}"        # 内置 elastic 用户密码（仅首次启动 bootstrap 生效；改密需清 es-data volume 或走 _security API）
       ES_JAVA_OPTS: "${ES_HEAP:--Xms512m -Xmx512m}"
     volumes:
       - es-data:/usr/share/elasticsearch/data
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health || exit 1"]
+      # $$ 转义成容器内字面量 $，读容器环境里的 ELASTIC_PASSWORD
+      test: ["CMD-SHELL", "curl -sf -u elastic:$$ELASTIC_PASSWORD http://localhost:9200/_cluster/health || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 10

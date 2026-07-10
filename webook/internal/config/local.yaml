@@ -54,7 +54,10 @@ data:
     metadata_retry_backoff: 250ms
     metadata_timeout: 5s
   es:
-    addr: "http://localhost:9200"
+    addrs: # 多节点即集群
+      - "http://localhost:9200"
+    username: "elastic"
+    password: "elastic" # 本地默认明文 elastic（对齐 deploy/.env.local 的 ES_PASS）；本地 ES 若未开安全，凭据被服务端忽略、无害
 
 llm:
   providers:

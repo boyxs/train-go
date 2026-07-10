@@ -6,7 +6,7 @@ import (
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/IBM/sarama"
-	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v9"
 	"github.com/spf13/viper"
 	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
@@ -174,11 +174,15 @@ func buildESClient() (*elasticsearch.Client, error) {
 	if len(addrs) == 0 {
 		return nil, fmt.Errorf("migrator.es.addrs 未配置")
 	}
-	return elasticsearch.NewClient(elasticsearch.Config{
-		Addresses: addrs,
-		Username:  viper.GetString("migrator.es.username"),
-		Password:  viper.GetString("migrator.es.password"),
-	})
+	// go-elasticsearch v9 起用函数式 Option（NewClient/Config 已弃用），与 core ioc.InitESClient 对齐。
+	opts := []elasticsearch.Option{
+		elasticsearch.WithAddresses(addrs...),
+		elasticsearch.WithBasicAuth(
+			viper.GetString("migrator.es.username"),
+			viper.GetString("migrator.es.password"),
+		),
+	}
+	return elasticsearch.New(opts...)
 }
 
 func buildESSink(indexName string, l logger.LoggerX) (sink.Sink, error) {

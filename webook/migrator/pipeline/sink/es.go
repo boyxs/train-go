@@ -8,7 +8,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v9"
 
 	"github.com/boyxs/train-go/webook/pkg/logger"
 )

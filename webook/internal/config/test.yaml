@@ -58,7 +58,10 @@ data:
     metadata_retry_backoff: 250ms
     metadata_timeout: 5s
   es:
-    addr: "http://localhost:9200"
+    addrs: # 多节点即集群
+      - "http://localhost:9200"
+    username: "elastic"
+    password: "elastic" # 本地明文（连无认证 ES 时忽略）
 
 llm:
   providers:

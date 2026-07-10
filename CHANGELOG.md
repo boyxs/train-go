@@ -2,6 +2,50 @@
 
 <!-- 新功能前插在此，日期降序 -->
 
+## [2026-07-10] ES 集群/认证支持 + xpack.security 强制密码 + ioc 重构
+
+**变更内容**: core/migrator 的 ES 配置支持多节点（集群）+ Basic 认证；`deploy` 的 webook-es 开启 xpack.security 强制密码（Basic auth over HTTP，免 TLS）。顺带：修 v9 弃用 API、把建索引下沉业务层、mapping 抽成 JSON 文件。
+**影响范围**:
+- **客户端配置**：core `data.es` 由单 `addr` 改 `addrs`(列表，多节点即集群) + `username` + `password`；migrator `migrator.es` 补 username/password。core 5 份 + migrator 4 份 yaml 同步（local/test 明文 `elastic`/`elastic`，dev/staging/prod 走 `${ES_PASS}`）
+- **服务端**：`docker-compose.yaml` webook-es `xpack.security.enabled=true` + `ELASTIC_PASSWORD=${ES_PASS}` + healthcheck 带 `-u`；core/migrator 容器转发 `ES_PASS`
+- **部署变量**：`deploy/.env.*(.example)` 加 `ES_PASS`（命名随 `MYSQL_PASS`/`REDIS_PASS` 惯例；ES bootstrap 密码 ≥6 位）
+- **运维**：`mk/es.mk` 全部 curl 加 `-u $(ES_USER):$(ES_PASS)`（默认 elastic/elastic，可覆盖）
+- **弃用 API**：`NewTypedClient`/`NewClient(Config)` 已弃用 → 全线改函数式 `NewTyped`/`New` + `WithAddresses` + `WithBasicAuth`（core ioc、migrator ioc+test、sandbox demo 一致）
+- **分层重构**：`ensureArticleIndex` 从 `ioc/es.go` 下沉 `dao/article_search.go`（建 article_v1 是业务关注点），ioc 只建 client；建索引失败经 `LoggerX` 告警不阻断启动；`NewElasticArticleDAO` 加 logger 参数，`wire ./...` 重生成
+- **mapping 抽文件**：article_v1 与 sandbox demo 的 mapping 从内联 `map[string]any` 抽成 `article_index.json` / `doc_index.json`，`//go:embed` 读入
+**技术决策**: ① ES「集群」= 多个 Addresses（非 redis 那种分片 client），addrs 列表即可，不引 `mode` 字段；② Basic auth over HTTP（`http.ssl.enabled=false`）单机内网免 TLS，与生产同构；③ 密码键名 `ES_PASS` 随 `*_PASS` 惯例；本地统一 `elastic`（`13520` 仅 5 位，ES 拒）；④ 建索引下沉 DAO 构造函数（wire 启动期跑一次）、mapping 用 go:embed 避免 JSON 硬编码。
+**验证**: sandbox/es 连**已开安全**的本地 ES（elastic/elastic）**41/41 全绿**——与 core `es.go` 同款 `NewTyped+WithAddresses+WithBasicAuth`，佐证认证客户端可用；`make -f mk/es.mk status` 实测 article_v1（6 docs）；`make verify` 10 模块 workspace+GOWORK=off 全绿（含 wire 重生成）。
+**待办**: **任何已部署环境（dev/staging/prod）** 开安全后，若 es-data volume 已存在，`ELASTIC_PASSWORD` 仅在空 volume 首次 bootstrap 生效——需 `docker volume rm webook-<env>_es-data` 重建或走 `_security/user/elastic/_password` 轮换，否则 core/migrator Basic auth 与 healthcheck `-u` 均失败、ES unhealthy 拖累依赖启动；且 ES 安全上线须与新 core/migrator 镜像同批（旧镜像不发凭据）。真机复验 core article 检索 + migrator ES 源/汇。
+**会话**: 692a66ff-es-demo（接续）
+**发布**: 待上线（core/migrator 随镜像；ES 镜像已在 compose 开安全）
+
+## [2026-07-10] sandbox/es 全面 ES v9 集成 demo（TDD）
+
+**变更内容**: 新增 `sandbox/es/`（独立 `module es`）——用官方 `go-elasticsearch/v9` TypedClient 的**全面用法示范**，交付形态为集成测试驱动的薄封装 `DocStore`（无 main）。**按能力分文件**（doc/store/index/document/bulk/search/aggregation/advanced），**41 个集成测试**连真实本地 ES 9.3.2 全绿，附完整 `README.md`。
+**影响范围**:
+- 新增 `sandbox/es/`：源文件 `doc.go`(实体+mapping) / `store.go`(DocStore+客户端工厂+结果类型+错误判定) / `index.go` / `document.go` / `bulk.go` / `search.go` / `aggregation.go` / `advanced.go`，测试一源一测 + `helper_test.go`（共享脚手架）+ `README.md`（独立模块，不入 webook go.work，零侵入）
+- 查询/映射沿用项目 `internal/repository/dao/article_search.go` 的 `map[string]any` + `Raw(bytes.Reader)` 风格；响应走 TypedClient 强类型解析（`resp.Hits`/`resp.Aggregations`，`TypedKeys(true)` 解聚合 union）
+- 覆盖场景：**A 索引管理**(建+mapping/exists/读mapping/删+幂等) · **B 文档CRUD**(index/create-409/get/get-404/部分update/update-404/delete/exists) · **C Bulk**(批量/混合/部分失败逐条409+404) · **D 搜索**(matchall/match/term/terms/bool/range/分页/排序/高亮/_source/空结果) · **E 聚合**(terms/stats/嵌套均值) · **F 计数**(全部/带query) · **高级**(PIT+search_after 深分页 / scroll 遍历 / mget / fuzzy·wildcard·prefix·multi_match / function_score·script_score / collapse)
+- 清理上个会话残留的空目录 `sandbox/elasticsearch/`（`module es` 空壳，无源码）
+**技术决策**: ① 客户端选 **v9** 而非项目原用 v8——demo 对齐**真实运行的本地 ES 9.3.2**（客户端 major 必须匹配 server major；webook 本次也已同步升 v9，见下条）；② 交付薄封装 + 集成测试而非 `main()`+打印，按能力分文件、源↔测一一对应，符合项目测试组织铁律；③ 样本文档实体命名 **`Doc`（中性通用文档）**，`Content` 用空格英文保证标准分词器下 match 确定，`Category/Tags` 用 keyword；④ `CreatedAt` 遵循项目时间铁律（Unix 毫秒 int64 + `date/epoch_millis`）；⑤ **每个测试独占索引**（名字由 `t.Name()` 生成），消除共享索引反复删建的偶发 `index_not_found` 竞态，并行安全；⑥ 引入 `testify`（项目统一断言库，test-only）。
+**验证**: TDD 首轮 CreateIndex 打桩跑出真实断言失败（`Should be true / get mapping: 非预期状态码 404`）确认 RED 非编译错，实现后转绿；重构后全量 `go test ./...` **41/41 PASS**（连跑 3 次稳定，修掉初版共享索引偶发失败）、`go vet` 干净、gofmt 已跑。ES 环境 `127.0.0.1:9200`（无认证），可用 `ES_ADDR` 覆盖。
+**待办**: 无（联动的 v8→v9 客户端 + docker 镜像升级见下条）。
+**会话**: 692a66ff-es-demo（接续）
+**发布**: 不涉及（sandbox demo）
+
+## [2026-07-10] go-elasticsearch v8→v9 客户端迁移 + docker ES 镜像 9.3.2
+
+**变更内容**: 本地/线上 ES 已到 9.x（本机 9.3.2），把 webook 的 ES 客户端从 `go-elasticsearch/v8 v8.19.6` 升到 `v9 v9.4.2`（客户端 major 必须匹配 server major），并把 `deploy/docker-compose.yaml` 的 `webook-es` 镜像从 `elasticsearch:8.12.2` 升到 `9.3.2`（dev/staging/prod 与本地对齐）。
+**影响范围**:
+- **`internal` 模块**：`ioc/es.go` + `repository/dao/article_search.go` import v8→v9（TypedClient 路径），`go.mod` 依赖 bump，`wire ./...` 重生成（ES client 是 Wire provider）
+- **`migrator` 模块**：`ioc/engines.go`（低层 `NewClient`）+ `pipeline/source/es.go`（`Client`+`esapi`，search_after/aggs）+ `pipeline/sink/es.go`（bulk）+ `pipeline/source/es_test.go` import v8→v9，`go.mod` bump，`wire ./...` 重生成
+- **`deploy/docker-compose.yaml:326`**：`elasticsearch:8.12.2` → `9.3.2`（single-node/xpack.security=false 设置 9.x 通用，无需改）
+**技术决策**: ① v8→v9 是**纯 import 路径切换**——两种用法（internal 的 TypedClient、migrator 的低层 `Client`+`esapi`）在 v9 里 API 完全一致，逐文件核对签名（`Indices.Create/Exists`、`Search().Raw()`、`resp.Hits`、低层 `Search/Bulk`、`esapi.Response.IsError/StatusCode`）均在场；transport 仍 `elastic-transport-go/v8 v8.9.0` 不变；② 镜像选 9.3.2 对齐开发者本机实测版本，非盲追 latest。
+**验证**: 两模块无 v8 残留（go 源 + go.mod + go.sum）；`cd webook && make verify` **10 模块 workspace + GOWORK=off 全绿**（含 wire 重生成）；migrator ES source httptest 测试全绿（FullScan/PKRange）；internal 的 TypedClient 用法由本次 `sandbox/es` demo（同 v9.4.2 客户端、同 `.Raw()`+TypedClient 模式）连真实 ES 9.3.2 **31/31 全绿**佐证运行时可用。
+**待办**: 生产切 ES 9.3.2 后建议真机跑一遍 article 检索（BM25+kNN）与 migrator ES 源/汇对账，最终确认（本地无 docker，未起全栈集成）。
+**会话**: 692a66ff-es-demo（接续）
+**发布**: 待上线（下次 core/migrator 发版随镜像升级生效）
+
 ## [2026-07-09] redisx 统一 redis 配置 + worker/core 集群支持 + MGetPub 集群安全
 
 **变更内容**: ① 新增 `pkg/redisx.Config`（完整 redis 连接 + 高级配置：mode/addr/addrs/password/池/超时/重试/集群路由，零值回落 go-redis 默认）+ `NewClient(cfg)`（按 mode 建单机/集群 UniversalClient、映射全部高级配置），收敛各服务内联 `Config{Addr,Password}`（原 7 模块 ~11 处各写一份）；② worker + core ioc 迁移到 redisx，支持 `mode: single|cluster`；③ **修 core MGetPub 集群 CROSSSLOT**——`MGet(多 key)` → Get 流水线（ClusterClient 按 slot 自动拆分，保分片不 CROSSSLOT）。

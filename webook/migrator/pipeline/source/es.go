@@ -9,8 +9,8 @@ import (
 	"io"
 	"strconv"
 
-	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/elastic/go-elasticsearch/v8/esapi"
+	"github.com/elastic/go-elasticsearch/v9"
+	"github.com/elastic/go-elasticsearch/v9/esapi"
 
 	"github.com/boyxs/train-go/webook/pkg/logger"
 )
@@ -25,7 +25,7 @@ import (
 // PK 字段名来自 TableMapping.PartitionKey（默认 "id"），要求 ES mapping 中该字段是数值类型。
 // _id 也优先用 _source[pkField] 转 int64；解不到 fallback _id 字符串转 int64。
 //
-// 测试策略：用 httptest.NewServer 起假 ES，elasticsearch.NewClient({Addresses: server.URL}) 让请求真打过去。
+// 测试策略：用 httptest.NewServer 起假 ES，elasticsearch.New(WithAddresses(server.URL)) 让请求真打过去。
 type ESSource struct {
 	client  *elasticsearch.Client
 	index   string

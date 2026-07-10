@@ -54,5 +54,5 @@ migrator:
   es:
     addrs:
       - "http://webook-es:9200"
-    # username: ""
-    # password: ""
+    username: "elastic"
+    password: ${ES_PASS}

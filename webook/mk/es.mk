@@ -6,6 +6,12 @@
 ES_HOST  := http://localhost:9200
 ES_INDEX := article_v1
 
+# ES 认证（webook-es 开了 xpack.security 后必带）。本地默认 elastic/elastic，
+# 覆盖：make -f mk/es.mk status ES_PASS=xxx。连无认证 ES 时带上凭据也无害（服务端忽略）。
+ES_USER  ?= elastic
+ES_PASS  ?= elastic
+ES_AUTH  := -u $(ES_USER):$(ES_PASS)
+
 STEP := [>]
 INFO := [-]
 WARN := [!]
@@ -49,17 +55,19 @@ help:
 
 status:
 	@echo "$(STEP) 索引状态:"
-	@curl -s "$(ES_HOST)/_cat/indices/$(ES_INDEX)?v&h=index,health,status,docs.count,store.size"
+	@curl -s $(ES_AUTH) "$(ES_HOST)/_cat/indices/$(ES_INDEX)?v&h=index,health,status,docs.count,store.size"
 	@echo ""
 
 mapping:
 	@echo "$(STEP) $(ES_INDEX) Mapping:"
-	@curl -s "$(ES_HOST)/$(ES_INDEX)/_mapping"
+	@curl -s $(ES_AUTH) "$(ES_HOST)/$(ES_INDEX)/_mapping"
 	@echo ""
 
+# 内联 mapping 与 internal/repository/dao/article_index.json 同源（Go 侧 //go:embed 读那份）；
+# 改 mapping 两处必须同步，否则「手动 make create-index」与「应用启动自动建索引」结果漂移。
 create-index:
 	@echo "$(STEP) 创建索引 $(ES_INDEX)..."
-	@curl -s -X PUT "$(ES_HOST)/$(ES_INDEX)" \
+	@curl -s $(ES_AUTH) -X PUT "$(ES_HOST)/$(ES_INDEX)" \
 	  -H "Content-Type: application/json" \
 	  -d '{"mappings":{"properties":{"id":{"type":"long"},"title":{"type":"text"},"abstract":{"type":"text"},"author_id":{"type":"long"},"author_name":{"type":"keyword"},"status":{"type":"byte"},"created_at":{"type":"date","format":"epoch_millis"},"content_vec":{"type":"dense_vector","dims":1024,"index":true,"similarity":"cosine"}}}}'
 	@echo ""
@@ -67,7 +75,7 @@ create-index:
 
 delete-index:
 	@echo "$(WARN) 删除索引 $(ES_INDEX)（数据不可恢复）..."
-	@curl -s -X DELETE "$(ES_HOST)/$(ES_INDEX)"
+	@curl -s $(ES_AUTH) -X DELETE "$(ES_HOST)/$(ES_INDEX)"
 	@echo ""
 	@echo "$(INFO) 索引已删除。"
 
@@ -82,24 +90,24 @@ reset-index:
 
 list:
 	@echo "$(STEP) 前 10 条文档（id/title/status/author_name）:"
-	@curl -s -X POST "$(ES_HOST)/$(ES_INDEX)/_search" \
+	@curl -s $(ES_AUTH) -X POST "$(ES_HOST)/$(ES_INDEX)/_search" \
 	  -H "Content-Type: application/json" \
 	  -d '{"query":{"match_all":{}},"size":10,"_source":["id","title","status","author_name","created_at"],"sort":[{"id":"desc"}]}'
 	@echo ""
 
 count:
 	@echo "$(STEP) 文档总数:"
-	@curl -s "$(ES_HOST)/$(ES_INDEX)/_count"
+	@curl -s $(ES_AUTH) "$(ES_HOST)/$(ES_INDEX)/_count"
 	@echo ""
 
 get:
 	@echo "$(STEP) 查询文档 ID=$(ID):"
-	@curl -s "$(ES_HOST)/$(ES_INDEX)/_doc/$(ID)"
+	@curl -s $(ES_AUTH) "$(ES_HOST)/$(ES_INDEX)/_doc/$(ID)"
 	@echo ""
 
 delete-doc:
 	@echo "$(WARN) 删除文档 ID=$(ID)..."
-	@curl -s -X DELETE "$(ES_HOST)/$(ES_INDEX)/_doc/$(ID)"
+	@curl -s $(ES_AUTH) -X DELETE "$(ES_HOST)/$(ES_INDEX)/_doc/$(ID)"
 	@echo ""
 
 # ── 搜索调试 ────────────────────────────────────────────────
@@ -107,7 +115,7 @@ delete-doc:
 # 纯 BM25 文本搜索，不含向量（用于验证索引内容和分词效果）
 search:
 	@echo "$(STEP) 全文搜索: \"$(Q)\""
-	@curl -s -X POST "$(ES_HOST)/$(ES_INDEX)/_search" \
+	@curl -s $(ES_AUTH) -X POST "$(ES_HOST)/$(ES_INDEX)/_search" \
 	  -H "Content-Type: application/json" \
 	  -d '{"query":{"bool":{"minimum_should_match":1,"should":[{"match":{"title":"$(Q)"}},{"match":{"abstract":"$(Q)"}}],"filter":{"term":{"status":2}}}},"size":10,"_source":["id","title","abstract","status","author_name"]}'
 	@echo ""
@@ -117,14 +125,14 @@ search:
 # 查看分词结果: make -f mk/es.mk analyze Q="Go并发编程"
 analyze:
 	@echo "$(STEP) 分词结果: \"$(Q)\""
-	@curl -s -X POST "$(ES_HOST)/$(ES_INDEX)/_analyze" \
+	@curl -s $(ES_AUTH) -X POST "$(ES_HOST)/$(ES_INDEX)/_analyze" \
 	  -H "Content-Type: application/json" \
 	  -d '{"text":"$(Q)"}'
 	@echo ""
 
 plugins:
 	@echo "$(STEP) ES 已安装插件:"
-	@curl -s "$(ES_HOST)/_cat/plugins?v"
+	@curl -s $(ES_AUTH) "$(ES_HOST)/_cat/plugins?v"
 	@echo ""
 
 # make -f mk/es.mk <target>

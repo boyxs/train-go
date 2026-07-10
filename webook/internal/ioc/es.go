@@ -1,12 +1,7 @@
 package ioc
 
 import (
-	"bytes"
-	"context"
-	"encoding/json"
-	"fmt"
-
-	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v9"
 	"github.com/redis/go-redis/v9"
 	"github.com/spf13/viper"
 
@@ -15,59 +10,34 @@ import (
 	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
-func InitESClient() *elasticsearch.TypedClient {
-	var addr string
-	if err := viper.UnmarshalKey("data.es.addr", &addr); err != nil || addr == "" {
-		addr = "http://localhost:9200"
+// esConfig core 的 ES 连接配置（对齐 migrator.es 与 pkg/redisx 风格）：
+// addrs 支持多节点即集群；username/password 走 ${ES_PASS}，连启用 xpack.security 的 ES。
+// 目标 ES 未开安全时带上凭据也无害（服务端忽略），故 5 份 yaml 一律带 auth。
+type esConfig struct {
+	Addrs    []string `mapstructure:"addrs"`
+	Username string   `mapstructure:"username"`
+	Password string   `mapstructure:"password"`
+}
+
+func InitESClient(l logger.LoggerX) *elasticsearch.TypedClient {
+	var cfg esConfig
+	if err := viper.UnmarshalKey("data.es", &cfg); err != nil {
+		panic("读取 data.es 配置失败: " + err.Error())
 	}
-	client, err := elasticsearch.NewTypedClient(elasticsearch.Config{
-		Addresses: []string{addr},
-	})
+	if len(cfg.Addrs) == 0 {
+		l.Error("data.es.addrs 未配置，ES 客户端无法初始化")
+		panic("data.es.addrs 未配置")
+	}
+	// go-elasticsearch v9 起用函数式 Option（NewTypedClient/Config 已弃用）。
+	opts := []elasticsearch.Option{
+		elasticsearch.WithAddresses(cfg.Addrs...),
+		elasticsearch.WithBasicAuth(cfg.Username, cfg.Password),
+	}
+	client, err := elasticsearch.NewTyped(opts...)
 	if err != nil {
 		panic("初始化 ES 客户端失败: " + err.Error())
 	}
-	ensureArticleIndex(client)
 	return client
-}
-
-// ensureArticleIndex 若索引不存在则创建，含 dense_vector mapping（kNN 搜索必须）。
-// 若索引已存在（可能是旧 mapping）则跳过；需手动 DELETE /article_v1 后重启以重建。
-func ensureArticleIndex(client *elasticsearch.TypedClient) {
-	const indexName = "article_v1"
-	ctx := context.Background()
-
-	exists, err := client.Indices.Exists(indexName).Do(ctx)
-	if err != nil {
-		fmt.Printf("[ES] 检查索引失败，跳过建索引: %v\n", err)
-		return
-	}
-	if exists {
-		return
-	}
-
-	body, _ := json.Marshal(map[string]any{
-		"mappings": map[string]any{
-			"properties": map[string]any{
-				"id":          map[string]any{"type": "long"},
-				"title":       map[string]any{"type": "text"},
-				"abstract":    map[string]any{"type": "text"},
-				"author_id":   map[string]any{"type": "long"},
-				"author_name": map[string]any{"type": "keyword"},
-				"status":      map[string]any{"type": "byte"},
-				"created_at":  map[string]any{"type": "date", "format": "epoch_millis"},
-				"content_vec": map[string]any{
-					"type":       "dense_vector",
-					"dims":       1024,
-					"index":      true,
-					"similarity": "cosine",
-				},
-			},
-		},
-	})
-
-	if _, err = client.Indices.Create(indexName).Raw(bytes.NewReader(body)).Do(ctx); err != nil {
-		fmt.Printf("[ES] 创建索引失败: %v\n", err)
-	}
 }
 
 func InitEmbeddingConfig() embedding.Config {

@@ -54,7 +54,10 @@ data:
     metadata_retry_backoff: 250ms
     metadata_timeout: 5s
   es:
-    addr: "http://webook-es:9200"
+    addrs: # 多节点即集群
+      - "http://webook-es:9200"
+    username: "elastic"
+    password: ${ES_PASS}
 
 # llm/embedding/ollama 键 snake_case（绑 pkg struct 的 mapstructure tag）；api_key 走 ${ENV} 不进 git
 llm:

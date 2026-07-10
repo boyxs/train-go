@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v9"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -22,9 +22,7 @@ func newTestESClient(t *testing.T, handler http.HandlerFunc) (*elasticsearch.Cli
 	t.Helper()
 	srv := httptest.NewServer(handler)
 	t.Cleanup(srv.Close)
-	cli, err := elasticsearch.NewClient(elasticsearch.Config{
-		Addresses: []string{srv.URL},
-	})
+	cli, err := elasticsearch.New(elasticsearch.WithAddresses(srv.URL))
 	require.NoError(t, err)
 	return cli, srv
 }

@@ -3,8 +3,9 @@
     <module name="work" />
     <working_directory value="$PROJECT_DIR$/webook/worker" />
     <envs>
-      <env name="GOMEMLIMIT" value="256MiB" />
+      <env name="APP_ENV" value="config/local.yaml" />
       <env name="GOGC" value="80" />
+      <env name="GOMEMLIMIT" value="256MiB" />
     </envs>
     <kind value="DIRECTORY" />
     <package value="gitee.com/train-cloud/geektime-basic-go" />

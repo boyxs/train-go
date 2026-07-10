@@ -3,15 +3,23 @@ package dao
 import (
 	"bytes"
 	"context"
+	_ "embed"
 	"encoding/json"
 	"fmt"
 
-	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v9"
 
 	"github.com/boyxs/train-go/webook/internal/errs"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 const articleIndex = "article_v1"
+
+// articleIndexMapping 是 article_v1 的 ES mapping（含 dense_vector，kNN 必需）。
+// 用 //go:embed 从 article_index.json 读，避免把大段 JSON 硬写进 Go 代码。
+//
+//go:embed article_index.json
+var articleIndexMapping []byte
 
 // ArticleESDoc ES 文档结构
 type ArticleESDoc struct {
@@ -35,8 +43,27 @@ type ElasticArticleDAO struct {
 	client *elasticsearch.TypedClient
 }
 
-func NewElasticArticleDAO(client *elasticsearch.TypedClient) ArticleSearchDAO {
+func NewElasticArticleDAO(client *elasticsearch.TypedClient, l logger.LoggerX) ArticleSearchDAO {
+	ensureArticleIndex(client, l)
 	return &ElasticArticleDAO{client: client}
+}
+
+// ensureArticleIndex 索引不存在则按 article_index.json 的 mapping 建；已存在跳过
+// （旧 mapping 需手动 DELETE /article_v1 后重启重建）。失败仅告警不阻断启动——
+// 搜索降级，核心功能不受影响。
+func ensureArticleIndex(client *elasticsearch.TypedClient, l logger.LoggerX) {
+	ctx := context.Background()
+	exists, err := client.Indices.Exists(articleIndex).Do(ctx)
+	if err != nil {
+		l.Warn("检查 ES 索引失败，跳过建索引", logger.Error(err))
+		return
+	}
+	if exists {
+		return
+	}
+	if _, err = client.Indices.Create(articleIndex).Raw(bytes.NewReader(articleIndexMapping)).Do(ctx); err != nil {
+		l.Warn("创建 ES 索引失败", logger.String("index", articleIndex), logger.Error(err))
+	}
 }
 
 func (d *ElasticArticleDAO) Upsert(ctx context.Context, doc ArticleESDoc) error {
