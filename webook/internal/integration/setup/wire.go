@@ -98,6 +98,7 @@ func InitWebServer() *gin.Engine {
 		web.NewInternalInteractionHandler,
 		web.NewOAuth2WechatHandler,
 		web.NewInternalArticleSearchHandler,
+		web.NewInternalTagHandler,
 		web.NewAIClickEventHandler,
 		web.NewAIArticlePolishHandler,
 		service.NewGRPCCommentService,
@@ -133,6 +134,7 @@ func InitArticleReaderHandler() web.ArticleReaderHandler {
 		infraSvcProvider,
 		articleReaderSvcProvider,
 		provideNilCommentClient, // 集成测试不拉 comment gRPC，注 nil（现有用例不触达评论数聚合）
+		newFakeTagService,       // 阅读详情回显补标签：集成测试注 no-op 桩
 		web.NewInternalArticleReaderHandler,
 	)
 	return &web.InternalArticleReaderHandler{}
@@ -170,7 +172,7 @@ var infraSvcProvider = wire.NewSet(
 	InitRedis,
 	// InitRedis 出 UniversalClient（redisx.NewClient）；cache/中间件按需收窄成 Cmdable，锁用 UniversalClient
 	wire.Bind(new(redis.Cmdable), new(redis.UniversalClient)),
-	ioc.InitLockClient, // UserService 依赖 redislock.Client，集成测试走真实锁
+	InitLockClient, // 集成测试版：锁指标走独立 Registry（见 lock.go），避免 InitWebServer 重复注册 panic
 	InitDB,
 	InitLogger,
 )
@@ -182,14 +184,10 @@ var userSvcProvider = wire.NewSet(
 	service.NewInternalUserService,
 )
 
+// searchSvcProvider search/tag 已拆独立 gRPC 服务，集成测试注入 no-op 桩（供 article 作者服务的后台索引/同步空转）。
 var searchSvcProvider = wire.NewSet(
-	ioc.InitESClient,
-	ioc.InitOllamaEmbeddingConfig,
-	ioc.InitEmbeddingConfig,
-	ioc.InitEmbeddingClient,
-	dao.NewElasticArticleDAO,
-	repository.NewESArticleSearchRepository,
-	service.NewArticleSearchService,
+	newFakeSearchService,
+	newFakeTagService,
 )
 
 var articleSvcProvider = wire.NewSet(

@@ -25,9 +25,11 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import React from 'react';
 
 import * as rankingApi from '@/api/ranking';
+import { PALETTE } from '@/constants/theme';
 import { useRequest } from '@/hooks/useRequest';
 import type { ArticleRanking, Dimension } from '@/types/ranking';
 import { getErrorMessage } from '@/utils/apiError';
+import { formatCount } from '@/utils/format';
 
 const DIMENSIONS: { key: Dimension; label: string; icon: React.ReactNode }[] = [
   { key: 'hot', label: '热度', icon: <ThunderboltOutlined /> },
@@ -50,7 +52,7 @@ const OBJECTS: {
 ];
 
 // 奖牌颜色（1/2/3 名）
-const MEDAL_COLORS = ['#F59E0B', '#9CA3AF', '#B45309'];
+const MEDAL_COLORS = ['#F59E0B', PALETTE.subtle, '#B45309'];
 
 // 距次日 00:00 的倒计时（HH:MM:SS）
 function freezeCountdown(now: Date): string {
@@ -65,11 +67,21 @@ function freezeCountdown(now: Date): string {
 
 const CATEGORIES: { key: string; label: string; color: string; bg: string }[] =
   [
-    { key: 'tech', label: '技术', color: '#6366F1', bg: '#E0E7FF' },
-    { key: 'career', label: '职场', color: '#D97706', bg: '#FEF3C7' },
-    { key: 'life', label: '生活', color: '#22C55E', bg: '#F0FDF4' },
-    { key: 'ai', label: 'AI', color: '#0D9488', bg: '#F0FDFA' },
-    { key: 'other', label: '其他', color: '#6B7280', bg: '#F3F4F6' },
+    {
+      key: 'tech',
+      label: '技术',
+      color: PALETTE.info,
+      bg: PALETTE.infoSurface,
+    },
+    { key: 'career', label: '职场', color: PALETTE.warning, bg: '#FEF3C7' },
+    {
+      key: 'life',
+      label: '生活',
+      color: PALETTE.success,
+      bg: PALETTE.successSurface,
+    },
+    { key: 'ai', label: 'AI', color: PALETTE.primary, bg: PALETTE.tealSurface },
+    { key: 'other', label: '其他', color: PALETTE.muted, bg: PALETTE.hairline },
   ];
 
 // 当前 Shanghai 日期字符串 YYYY-MM-DD（业务时区），与后端 carbon.Now().ToDateString() 对齐
@@ -80,13 +92,6 @@ function todayDate(): string {
   });
 }
 
-function formatCount(n: number) {
-  if (n >= 10000) {
-    return `${(n / 1000).toFixed(1)}k`;
-  }
-  return String(n);
-}
-
 // 按维度格式化分数：hot/category 显示整数 + k 缩写；best 显示百分比；new 显示发布时间
 function formatScore(score: number, dim: Dimension): string {
   if (dim === 'best') {
@@ -94,12 +99,7 @@ function formatScore(score: number, dim: Dimension): string {
   }
   if (dim === 'new') {
     // score 是发布毫秒时间戳
-    const d = new Date(score);
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    const hh = String(d.getHours()).padStart(2, '0');
-    const mi = String(d.getMinutes()).padStart(2, '0');
-    return `${mm}-${dd} ${hh}:${mi}`;
+    return dayjs(score).format('MM-DD HH:mm');
   }
   // hot / category：大数缩写
   return formatCount(Math.round(score));
@@ -120,8 +120,8 @@ function TrendBadge({ item }: { item: ArticleRanking }) {
         style={{
           fontSize: 9,
           fontWeight: 700,
-          color: '#EF4444',
-          background: '#FEF2F2',
+          color: PALETTE.danger,
+          background: PALETTE.dangerSurface,
           borderRadius: 10,
           padding: '2px 6px',
         }}
@@ -136,8 +136,8 @@ function TrendBadge({ item }: { item: ArticleRanking }) {
         style={{
           fontSize: 10,
           fontWeight: 700,
-          color: '#EF4444',
-          background: '#FEF2F2',
+          color: PALETTE.danger,
+          background: PALETTE.dangerSurface,
           borderRadius: 10,
           padding: '2px 6px',
           display: 'inline-flex',
@@ -155,7 +155,7 @@ function TrendBadge({ item }: { item: ArticleRanking }) {
         style={{
           fontSize: 10,
           fontWeight: 700,
-          color: '#22C55E',
+          color: PALETTE.success,
           background: '#ECFDF5',
           borderRadius: 10,
           padding: '2px 6px',
@@ -173,8 +173,8 @@ function TrendBadge({ item }: { item: ArticleRanking }) {
       style={{
         fontSize: 10,
         fontWeight: 700,
-        color: '#6B7280',
-        background: '#F3F4F6',
+        color: PALETTE.muted,
+        background: PALETTE.hairline,
         borderRadius: 10,
         padding: '2px 6px',
       }}
@@ -232,7 +232,9 @@ const RankingItem = React.memo(function RankingItem({
           borderRadius: 8,
           transition: 'background 0.15s',
         }}
-        onMouseEnter={(e) => (e.currentTarget.style.background = '#FAFAFA')}
+        onMouseEnter={(e) =>
+          (e.currentTarget.style.background = PALETTE.surfaceHover)
+        }
         onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
       >
         {/* 排名列 */}
@@ -247,7 +249,9 @@ const RankingItem = React.memo(function RankingItem({
               {medal(item.rank)}
             </span>
           ) : (
-            <span style={{ fontSize: 22, fontWeight: 700, color: '#9CA3AF' }}>
+            <span
+              style={{ fontSize: 22, fontWeight: 700, color: PALETTE.subtle }}
+            >
               {item.rank}
             </span>
           )}
@@ -260,7 +264,7 @@ const RankingItem = React.memo(function RankingItem({
             style={{
               fontSize: isMobile ? 14 : 16,
               fontWeight: 700,
-              color: '#1A1A1A',
+              color: PALETTE.ink,
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               display: '-webkit-box',
@@ -277,7 +281,7 @@ const RankingItem = React.memo(function RankingItem({
                 style={{
                   fontSize: 12,
                   fontWeight: 500,
-                  color: '#0D9488',
+                  color: PALETTE.primary,
                   maxWidth: 120,
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
@@ -294,10 +298,13 @@ const RankingItem = React.memo(function RankingItem({
                 alignItems: 'center',
                 gap: 10,
                 fontSize: 12,
-                color: '#6B7280',
+                color: PALETTE.muted,
               }}
             >
-              <span className='hidden md:inline' style={{ color: '#9CA3AF' }}>
+              <span
+                className='hidden md:inline'
+                style={{ color: PALETTE.subtle }}
+              >
                 ·
               </span>
               <span
@@ -322,7 +329,7 @@ const RankingItem = React.memo(function RankingItem({
               style={{
                 flex: 1,
                 height: 6,
-                background: '#F3F4F6',
+                background: PALETTE.hairline,
                 borderRadius: 3,
                 overflow: 'hidden',
               }}
@@ -331,11 +338,13 @@ const RankingItem = React.memo(function RankingItem({
                 style={{
                   width: `${Math.round((item.scoreRatio || 0) * 100)}%`,
                   height: '100%',
-                  background: '#0D9488',
+                  background: PALETTE.primary,
                 }}
               />
             </div>
-            <span style={{ fontSize: 12, fontWeight: 700, color: '#0D9488' }}>
+            <span
+              style={{ fontSize: 12, fontWeight: 700, color: PALETTE.primary }}
+            >
               {formatScore(item.score, dim)}
             </span>
           </div>
@@ -504,20 +513,20 @@ export default function RankingBoard() {
       <div
         className='flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-0'
         style={{
-          background: '#FFFFFF',
+          background: PALETTE.surface,
           borderRadius: 12,
           padding: isMobile ? '14px 16px' : '20px 24px',
         }}
       >
         <div className='flex items-center flex-wrap' style={{ gap: 10 }}>
           <RiseOutlined
-            style={{ fontSize: isMobile ? 20 : 24, color: '#0D9488' }}
+            style={{ fontSize: isMobile ? 20 : 24, color: PALETTE.primary }}
           />
           <span
             style={{
               fontSize: isMobile ? 16 : 20,
               fontWeight: 700,
-              color: '#1A1A1A',
+              color: PALETTE.ink,
             }}
           >
             {today} 今日榜单
@@ -526,8 +535,8 @@ export default function RankingBoard() {
             style={{
               fontSize: 12,
               fontWeight: 600,
-              color: '#0D9488',
-              background: '#F0FDFA',
+              color: PALETTE.primary,
+              background: PALETTE.tealSurface,
               borderRadius: 12,
               padding: '4px 10px',
             }}
@@ -539,11 +548,11 @@ export default function RankingBoard() {
           className='flex items-center flex-wrap'
           style={{ gap: isMobile ? 8 : 16 }}
         >
-          <span style={{ fontSize: 12, fontWeight: 500, color: '#6B7280' }}>
+          <span style={{ fontSize: 12, fontWeight: 500, color: PALETTE.muted }}>
             距次日冻结 {countdown}
           </span>
-          <span style={{ fontSize: 12, color: '#9CA3AF' }}>·</span>
-          <span style={{ fontSize: 12, fontWeight: 500, color: '#6B7280' }}>
+          <span style={{ fontSize: 12, color: PALETTE.subtle }}>·</span>
+          <span style={{ fontSize: 12, fontWeight: 500, color: PALETTE.muted }}>
             {updatedAt
               ? `最后更新 ${dayjs(updatedAt).format('HH:mm')}`
               : '加载中…'}
@@ -557,8 +566,9 @@ export default function RankingBoard() {
               gap: 4,
               fontSize: 12,
               fontWeight: 500,
-              color: displayDate === today ? '#6B7280' : '#0D9488',
-              background: displayDate === today ? '#F5F5F5' : '#F0FDFA',
+              color: displayDate === today ? PALETTE.muted : PALETTE.primary,
+              background:
+                displayDate === today ? PALETTE.page : PALETTE.tealSurface,
               border: 'none',
               borderRadius: 8,
               padding: '6px 12px',
@@ -575,7 +585,7 @@ export default function RankingBoard() {
       <div
         className='flex overflow-x-auto'
         style={{
-          background: '#FFFFFF',
+          background: PALETTE.surface,
           borderRadius: 12,
           padding: isMobile ? '0 12px' : '0 24px',
           gap: isMobile ? 16 : 24,
@@ -590,7 +600,7 @@ export default function RankingBoard() {
               className='shrink-0'
               style={{
                 padding: active ? '16px 0 14px 0' : '16px 0',
-                borderBottom: active ? '2px solid #0D9488' : 'none',
+                borderBottom: active ? `2px solid ${PALETTE.primary}` : 'none',
                 opacity: o.enabled ? 1 : 0.4,
                 cursor: o.enabled ? 'pointer' : 'not-allowed',
               }}
@@ -603,7 +613,7 @@ export default function RankingBoard() {
                   gap: 6,
                   fontSize: isMobile ? 14 : 15,
                   fontWeight: active ? 700 : 500,
-                  color: active ? '#0D9488' : '#6B7280',
+                  color: active ? PALETTE.primary : PALETTE.muted,
                   whiteSpace: 'nowrap',
                 }}
               >
@@ -634,9 +644,9 @@ export default function RankingBoard() {
                 gap: 6,
                 fontSize: 13,
                 fontWeight: active ? 600 : 500,
-                color: active ? '#FFFFFF' : '#1A1A1A',
-                background: active ? '#0D9488' : '#FFFFFF',
-                border: active ? 'none' : '1px solid #E5E7EB',
+                color: active ? PALETTE.surface : PALETTE.ink,
+                background: active ? PALETTE.primary : PALETTE.surface,
+                border: active ? 'none' : `1px solid ${PALETTE.line}`,
                 borderRadius: 8,
                 padding: isMobile ? '6px 12px' : '8px 16px',
                 cursor: 'pointer',
@@ -666,9 +676,9 @@ export default function RankingBoard() {
                 style={{
                   fontSize: 12,
                   fontWeight: 500,
-                  color: active ? '#0D9488' : '#6B7280',
-                  background: active ? '#F0FDFA' : '#FFFFFF',
-                  border: `1px solid ${active ? '#0D9488' : '#E5E7EB'}`,
+                  color: active ? PALETTE.primary : PALETTE.muted,
+                  background: active ? PALETTE.tealSurface : PALETTE.surface,
+                  border: `1px solid ${active ? PALETTE.primary : PALETTE.line}`,
                   borderRadius: 8,
                   padding: '6px 12px',
                   cursor: 'pointer',
@@ -684,7 +694,7 @@ export default function RankingBoard() {
       {/* 列表：committed 快照 + 顶部进度条反馈 loading；切 tab 请求期间列表不变，响应到达时原子切换 */}
       <div
         style={{
-          background: '#FFFFFF',
+          background: PALETTE.surface,
           borderRadius: 12,
           padding: '8px',
           position: 'relative',
@@ -749,8 +759,8 @@ export default function RankingBoard() {
             style={{
               fontSize: 12,
               fontWeight: 600,
-              color: '#FFFFFF',
-              background: '#0D9488',
+              color: PALETTE.surface,
+              background: PALETTE.primary,
               border: 'none',
               borderRadius: 6,
               padding: '4px 10px',
@@ -773,7 +783,7 @@ export default function RankingBoard() {
                 onClick={() => selectArchiveDate(d)}
                 style={{
                   cursor: 'pointer',
-                  background: d === date ? '#F0FDFA' : undefined,
+                  background: d === date ? PALETTE.tealSurface : undefined,
                   padding: '12px 16px',
                   borderRadius: 8,
                 }}
@@ -782,7 +792,7 @@ export default function RankingBoard() {
                   style={{
                     fontSize: 14,
                     fontWeight: d === date ? 700 : 500,
-                    color: d === date ? '#0D9488' : '#1A1A1A',
+                    color: d === date ? PALETTE.primary : PALETTE.ink,
                   }}
                 >
                   {d} {d === today && '（今日）'}

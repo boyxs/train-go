@@ -10,6 +10,7 @@ import {
   Eye,
   Heart,
 } from 'lucide-react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import React, { useEffect, useRef, useState } from 'react';
 
@@ -23,6 +24,7 @@ import { PublicHeader } from '@/components/layout/PublicHeader';
 import { FollowButton } from '@/components/relation/FollowButton';
 import { UserHoverCard } from '@/components/relation/UserHoverCard';
 import { BIZ } from '@/constants/biz';
+import { PALETTE } from '@/constants/theme';
 import { useRequest } from '@/hooks/useRequest';
 import type { Interaction } from '@/types';
 import { getErrorMessage } from '@/utils/apiError';
@@ -158,7 +160,7 @@ function ArticleReadPage({ articleId }: ArticleReadProps) {
 
   if (!article) {
     return (
-      <div className='h-screen flex flex-col overflow-hidden bg-[#F5F5F5]'>
+      <div className='h-screen flex flex-col overflow-hidden bg-page'>
         <PublicHeader />
         <div className='flex-1 overflow-auto'>
           <div className='max-w-3xl mx-auto px-4 py-16'>
@@ -172,7 +174,7 @@ function ArticleReadPage({ articleId }: ArticleReadProps) {
   }
 
   return (
-    <div className='h-screen flex flex-col overflow-hidden bg-[#F5F5F5]'>
+    <div className='h-screen flex flex-col overflow-hidden bg-page'>
       <PublicHeader />
 
       <div className='flex-1 overflow-auto'>
@@ -182,7 +184,7 @@ function ArticleReadPage({ articleId }: ArticleReadProps) {
             onClick={() =>
               window.history.length > 1 ? router.back() : router.push('/feed')
             }
-            className='flex items-center gap-1 mb-4 text-[#6B7280] text-sm font-medium bg-transparent border-none cursor-pointer p-0 hover:text-[#0D9488]'
+            className='flex items-center gap-1 mb-4 text-muted text-sm font-medium bg-transparent border-none cursor-pointer p-0 hover:text-primary'
           >
             <ArrowLeft size={14} />
             返回广场
@@ -193,9 +195,7 @@ function ArticleReadPage({ articleId }: ArticleReadProps) {
             className='bg-white rounded-xl flex flex-col gap-4'
             style={{ padding: '32px 40px' }}
           >
-            <h1 className='text-2xl font-bold text-[#1A1A1A] m-0'>
-              {article.title}
-            </h1>
+            <h1 className='text-2xl font-bold text-ink m-0'>{article.title}</h1>
 
             {/* 作者 + 时间 + 关注（他人主页入口） */}
             <div className='flex items-center gap-3'>
@@ -207,15 +207,18 @@ function ArticleReadPage({ articleId }: ArticleReadProps) {
                   >
                     <div
                       className='flex h-10 w-10 items-center justify-center rounded-full text-base font-bold'
-                      style={{ background: '#F0FDFA', color: '#0D9488' }}
+                      style={{
+                        background: PALETTE.tealSurface,
+                        color: PALETTE.primary,
+                      }}
                     >
                       {(authorName[0] || '?').toUpperCase()}
                     </div>
                     <div>
-                      <div className='text-sm font-semibold text-[#1A1A1A] group-hover:text-[#0D9488]'>
+                      <div className='text-sm font-semibold text-ink group-hover:text-primary'>
                         {authorName}
                       </div>
-                      <div className='text-[13px] text-[#9CA3AF]'>
+                      <div className='text-[13px] text-subtle'>
                         {dayjs(article.createdAt).format('YYYY-MM-DD HH:mm')}
                       </div>
                     </div>
@@ -223,8 +226,8 @@ function ArticleReadPage({ articleId }: ArticleReadProps) {
                 </UserHoverCard>
               ) : (
                 <div className='flex items-center gap-1.5'>
-                  <Clock size={14} color='#9CA3AF' />
-                  <span className='text-[13px] font-medium text-[#9CA3AF]'>
+                  <Clock size={14} color={PALETTE.subtle} />
+                  <span className='text-[13px] font-medium text-subtle'>
                     {dayjs(article.createdAt).format('YYYY-MM-DD HH:mm')}
                   </span>
                 </div>
@@ -242,8 +245,32 @@ function ArticleReadPage({ articleId }: ArticleReadProps) {
               )}
             </div>
 
+            {/* 标签 */}
+            {article.tags && article.tags.length > 0 && (
+              <div className='flex flex-wrap gap-2'>
+                {article.tags.map((t) => (
+                  <Link
+                    key={t.slug}
+                    href={`/tag/${encodeURIComponent(t.slug)}`}
+                    className='no-underline'
+                  >
+                    <span
+                      className='inline-block px-2 py-0.5 text-xs'
+                      style={{
+                        borderRadius: 12,
+                        background: PALETTE.tealSurface,
+                        color: PALETTE.primary,
+                      }}
+                    >
+                      {t.name}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            )}
+
             {/* 分割线 */}
-            <div className='h-px bg-[#F3F4F6]' />
+            <div className='h-px bg-hairline' />
 
             {/* 正文 */}
             <div
@@ -271,14 +298,14 @@ function ArticleReadPage({ articleId }: ArticleReadProps) {
                 style={{
                   padding: '8px 16px',
                   backgroundColor: intr.liked ? '#FFF5F5' : 'transparent',
-                  borderColor: intr.liked ? '#FFE4E4' : '#E5E7EB',
-                  color: intr.liked ? '#EF4444' : '#6B7280',
+                  borderColor: intr.liked ? '#FFE4E4' : PALETTE.line,
+                  color: intr.liked ? PALETTE.danger : PALETTE.muted,
                 }}
               >
                 <Heart
                   size={16}
-                  fill={intr.liked ? '#EF4444' : 'none'}
-                  color={intr.liked ? '#EF4444' : '#9CA3AF'}
+                  fill={intr.liked ? PALETTE.danger : 'none'}
+                  color={intr.liked ? PALETTE.danger : PALETTE.subtle}
                 />
                 <span className='text-[13px] font-semibold'>
                   点赞 {intr.likeCount}
@@ -291,15 +318,17 @@ function ArticleReadPage({ articleId }: ArticleReadProps) {
                 className='flex items-center gap-1.5 rounded-lg border cursor-pointer transition-colors'
                 style={{
                   padding: '8px 16px',
-                  borderColor: intr.collected ? '#0D9488' : '#E5E7EB',
-                  backgroundColor: intr.collected ? '#F0FDFA' : 'transparent',
-                  color: intr.collected ? '#0D9488' : '#6B7280',
+                  borderColor: intr.collected ? PALETTE.primary : PALETTE.line,
+                  backgroundColor: intr.collected
+                    ? PALETTE.tealSurface
+                    : 'transparent',
+                  color: intr.collected ? PALETTE.primary : PALETTE.muted,
                 }}
               >
                 {intr.collected ? (
-                  <BookmarkCheck size={16} color='#0D9488' />
+                  <BookmarkCheck size={16} color={PALETTE.primary} />
                 ) : (
-                  <Bookmark size={16} color='#9CA3AF' />
+                  <Bookmark size={16} color={PALETTE.subtle} />
                 )}
                 <span className='text-[13px] font-semibold'>
                   收藏 {intr.collectCount}
@@ -308,8 +337,8 @@ function ArticleReadPage({ articleId }: ArticleReadProps) {
 
               {/* 阅读量 — 右对齐 */}
               <div className='flex items-center gap-1.5 ml-auto'>
-                <Eye size={14} color='#D1D5DB' />
-                <span className='text-xs font-medium text-[#D1D5DB]'>
+                <Eye size={14} color={PALETTE.faint} />
+                <span className='text-xs font-medium text-faint'>
                   {intr.readCount.toLocaleString()} 次阅读
                 </span>
               </div>

@@ -5,6 +5,7 @@ mockgen:
 	#── pkg（跨服务共享工具）
 	@cd pkg && mockgen -source=./jwtx/types.go -package=jwtmocks -destination=./jwtx/mocks/jwt_mock.go
 	@cd pkg && mockgen -source=./llm/types.go -package=llmmocks -destination=./llm/mocks/llm_mock.go
+	@cd pkg && mockgen -source=./embedding/types.go -package=embmocks -destination=./embedding/mocks/embedding_mock.go
 	@cd pkg && mockgen -source=./redislock/redislock.go -package=lockmocks -destination=./redislock/mocks/lock_mock.go
 	@cd pkg && mockgen -source=./sensitive/types.go -package=sensitivemocks -destination=./sensitive/mocks/filter.mock.go
 	@cd pkg && mockgen -source=./ratelimit/types.go -package=limitmocks -destination=./ratelimit/mocks/limiter.mock.go
@@ -13,6 +14,7 @@ mockgen:
 	@cd internal && mockgen -source=./service/article.go -package=svcmocks -destination=./service/mocks/article_mock.go
 	@cd internal && mockgen -source=./service/code.go -package=svcmocks -destination=./service/mocks/code_mock.go
 	@cd internal && mockgen -source=./service/article_search.go -package=svcmocks -destination=./service/mocks/article_search_mock.go
+	@cd internal && mockgen -source=./service/tag.go -package=svcmocks -destination=./service/mocks/tag_mock.go
 	@cd internal && mockgen -source=./service/interaction.go -package=svcmocks -destination=./service/mocks/interaction_mock.go
 	@cd internal && mockgen -source=./service/comment.go -package=svcmocks -destination=./service/mocks/comment_mock.go
 	@cd internal && mockgen -source=./service/relation.go -package=svcmocks -destination=./service/mocks/relation_mock.go
@@ -20,13 +22,11 @@ mockgen:
 	@cd internal && mockgen -source=./service/article_polish.go -package=svcmocks -destination=./service/mocks/article_polish_mock.go
 	@cd internal && mockgen -source=./service/ranking.go -package=svcmocks -destination=./service/mocks/ranking_mock.go
 	@cd internal && mockgen -source=./service/sms/types.go -package=smsmocks -destination=./service/sms/mocks/sms_mock.go
-	@cd internal && mockgen -source=./service/embedding/types.go -package=embmocks -destination=./service/embedding/mocks/embedding_mock.go
 	#── internal（core：repository）
 	@cd internal && mockgen -source=./repository/user.go -package=repomocks -destination=./repository/mocks/user_mock.go
 	@cd internal && mockgen -source=./repository/article_author.go -package=repomocks -destination=./repository/mocks/article_author_mock.go
 	@cd internal && mockgen -source=./repository/article_reader.go -package=repomocks -destination=./repository/mocks/article_reader_mock.go
 	@cd internal && mockgen -source=./repository/code.go -package=repomocks -destination=./repository/mocks/code_mock.go
-	@cd internal && mockgen -source=./repository/article_search.go -package=repomocks -destination=./repository/mocks/article_search_mock.go
 	@cd internal && mockgen -source=./repository/click_event.go -package=repomocks -destination=./repository/mocks/click_event_mock.go
 	@cd internal && mockgen -source=./repository/ranking.go -package=repomocks -destination=./repository/mocks/ranking_mock.go
 	#── internal（core：dao）
@@ -44,6 +44,8 @@ mockgen:
 	#── internal reflect-mode（外部 go-redis / 下游 gRPC client 接口）
 	@cd internal && mockgen -package=redismocks -destination=./repository/cache/redismocks/cmdable_mock.go github.com/redis/go-redis/v9 Cmdable
 	@cd internal && mockgen -destination=./web/grpcmocks/comment_mock.go -package=grpcmocks github.com/boyxs/train-go/webook/api/gen/comment/v1 CommentServiceClient
+	@cd internal && mockgen -destination=./web/grpcmocks/tag_mock.go -package=grpcmocks github.com/boyxs/train-go/webook/api/gen/tag/v1 TagServiceClient
+	@cd internal && mockgen -destination=./web/grpcmocks/search_mock.go -package=grpcmocks github.com/boyxs/train-go/webook/api/gen/search/v1 SearchServiceClient
 	#── comment（独立 gRPC 微服务：service + repository 接口）
 	@cd comment && mockgen -source=./service/comment.go -package=svcmocks -destination=./service/mocks/comment.mock.go
 	@cd comment && mockgen -source=./repository/comment.go -package=repomocks -destination=./repository/mocks/comment.mock.go

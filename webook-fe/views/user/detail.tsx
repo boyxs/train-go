@@ -12,6 +12,7 @@ import { findProfile, findUserInfo } from '@/api/user';
 import { Loading } from '@/components/common/Loading';
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { FollowButton } from '@/components/relation/FollowButton';
+import { PALETTE } from '@/constants/theme';
 import type { ReaderArticle, RelationStat, UserInfo } from '@/types';
 import { getErrorMessage } from '@/utils/apiError';
 import { formatCount, joinedFor, relativeTime } from '@/utils/format';
@@ -22,10 +23,8 @@ const PAGE_SIZE = 10;
 function Count({ n, label }: { n: number; label: string }) {
   return (
     <div className='flex items-baseline gap-1.5'>
-      <span className='text-base font-bold text-[#1A1A1A]'>
-        {formatCount(n)}
-      </span>
-      <span className='text-sm text-[#6B7280]'>{label}</span>
+      <span className='text-base font-bold text-ink'>{formatCount(n)}</span>
+      <span className='text-sm text-muted'>{label}</span>
     </div>
   );
 }
@@ -195,30 +194,36 @@ export default function UserDetailPage({ userId }: { userId: string }) {
             <div className='flex flex-col gap-4 md:flex-row md:items-start'>
               <div
                 className='flex h-20 w-20 shrink-0 items-center justify-center self-center rounded-full text-3xl font-bold md:self-start'
-                style={{ background: '#F0FDFA', color: '#0D9488' }}
+                style={{
+                  background: PALETTE.tealSurface,
+                  color: PALETTE.primary,
+                }}
               >
                 {info.nickname?.[0]?.toUpperCase() || '?'}
               </div>
 
               <div className='flex min-w-0 flex-1 flex-col gap-1.5'>
                 <div className='flex items-center justify-center gap-2.5 md:justify-start'>
-                  <span className='text-xl font-bold leading-tight text-[#1A1A1A]'>
+                  <span className='text-xl font-bold leading-tight text-ink'>
                     {info.nickname || `用户 #${id}`}
                   </span>
                   {stat?.isMutual && (
                     <span
                       className='rounded-full px-2.5 py-1 text-[11px] font-medium leading-none'
-                      style={{ background: '#F0FDFA', color: '#0D9488' }}
+                      style={{
+                        background: PALETTE.tealSurface,
+                        color: PALETTE.primary,
+                      }}
                     >
                       互相关注
                     </span>
                   )}
                 </div>
-                <div className='text-center text-[13px] text-[#9CA3AF] md:text-left'>
+                <div className='text-center text-[13px] text-subtle md:text-left'>
                   {joinedFor(info.createdAt)}
                 </div>
                 {info.aboutMe && (
-                  <div className='text-center text-sm text-[#6B7280] md:text-left'>
+                  <div className='text-center text-sm text-muted md:text-left'>
                     {info.aboutMe}
                   </div>
                 )}
@@ -285,12 +290,10 @@ export default function UserDetailPage({ userId }: { userId: string }) {
                           href={`/article/${a.id}`}
                           target='_blank'
                           rel='noreferrer'
-                          className='block rounded-xl border border-[#E5E7EB] p-4 transition-colors hover:bg-[#FAFAFA]'
+                          className='block rounded-xl border border-line p-4 transition-colors hover:bg-surface-hover'
                         >
-                          <div className='font-bold text-[#1A1A1A]'>
-                            {a.title}
-                          </div>
-                          <div className='mt-1.5 text-xs text-[#9CA3AF]'>
+                          <div className='font-bold text-ink'>{a.title}</div>
+                          <div className='mt-1.5 text-xs text-subtle'>
                             {relativeTime(a.createdAt)} · 点赞{' '}
                             {formatCount(a.likeCnt)} · 评论{' '}
                             {formatCount(a.commentCnt)}
@@ -315,7 +318,7 @@ export default function UserDetailPage({ userId }: { userId: string }) {
   }
 
   return (
-    <div className='flex h-screen flex-col overflow-hidden bg-[#F5F5F5]'>
+    <div className='flex h-screen flex-col overflow-hidden bg-page'>
       <PublicHeader />
       <div className='flex-1 overflow-y-auto'>
         <div className='mx-auto max-w-3xl px-4 py-6'>{body}</div>

@@ -64,6 +64,7 @@
   - 两者可组合，不同业务各自有独立的全链路实现
   - 例：`AIClickEventService`、`CacheAIClickEventRepository`、`GormAIClickEventDAO`、`RedisAIClickEventCache`
 - 领域命名要通用化，不要绑定单一来源。例如点击追踪不叫 `AIClick`（只有 AI 场景），叫 `ClickEvent`（通用） + `Source` 字段区分来源
+- **通用模块的方法名同样不得硬编码具体 biz**：已有 `biz` 入参就别把业务名写进方法名。用通用名 `BizIdsByTag(tagId, biz, limit)`，**禁止** `ArticleIdsByTag`（本项目真实踩过——通用标签系统的 DAO 方法名塞了 `Article`，被打回）。DAO/service/gRPC 的通用层方法、message 名一律 `Biz*` 而非某业务名；只有明确单业务的服务（如 search 专搜 article_v1）才可用业务名。
 
 ## 9. 测试文件组织
 

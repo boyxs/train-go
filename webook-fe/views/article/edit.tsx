@@ -1,7 +1,7 @@
 'use client';
 
 import { SendOutlined, ThunderboltOutlined } from '@ant-design/icons';
-import { App, Button, Card, Form, Input, Space } from 'antd';
+import { App, Button, Card, Form, Input, Select, Space } from 'antd';
 import { useRouter } from 'next/navigation';
 import React, { useCallback, useEffect, useState } from 'react';
 
@@ -9,6 +9,10 @@ import * as articleApi from '@/api/article';
 import type { PolishResult } from '@/api/article';
 import { PolishModal } from '@/components/article/PolishModal';
 import { Loading } from '@/components/common/Loading';
+import { TagInput } from '@/components/tag/TagInput';
+import { ARTICLE_CATEGORIES } from '@/constants/article';
+import { MAX_TAGS } from '@/constants/tag';
+import { PALETTE } from '@/constants/theme';
 import { useRequest } from '@/hooks/useRequest';
 import type { EditArticleReq } from '@/types';
 import { getErrorMessage } from '@/utils/apiError';
@@ -24,6 +28,7 @@ function ArticleEditPage({ articleId }: ArticleEditProps) {
   const { message } = App.useApp();
   const router = useRouter();
   const isEdit = !!articleId;
+  const tags = Form.useWatch<string[]>('tags', form);
 
   // 编辑模式下加载已有文章内容
   const { data: articleRes, loading } = useRequest(
@@ -41,6 +46,8 @@ function ArticleEditPage({ articleId }: ArticleEditProps) {
         title: article.title,
         abstract: article.abstract,
         content: article.content,
+        category: article.category,
+        tags: article.tags,
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -145,6 +152,15 @@ function ArticleEditPage({ articleId }: ArticleEditProps) {
             />
           </Form.Item>
 
+          <Form.Item label='分区（选填）' name='category'>
+            <Select
+              placeholder='选择分区'
+              allowClear
+              options={ARTICLE_CATEGORIES.map((c) => ({ label: c, value: c }))}
+              style={{ maxWidth: 200 }}
+            />
+          </Form.Item>
+
           <Form.Item
             label='内容'
             name='content'
@@ -153,6 +169,21 @@ function ArticleEditPage({ articleId }: ArticleEditProps) {
             <TextArea
               placeholder='请输入文章内容'
               autoSize={{ minRows: 8, maxRows: 24 }}
+            />
+          </Form.Item>
+
+          <div className='mb-2 flex items-center justify-between'>
+            <span className='text-sm'>标签（选填）</span>
+            <span className='text-sm text-gray-400'>
+              {tags?.length ?? 0} / {MAX_TAGS}
+            </span>
+          </div>
+          <Form.Item name='tags' style={{ marginBottom: 24 }}>
+            <TagInput
+              getContext={() => ({
+                title: form.getFieldValue('title') || '',
+                content: form.getFieldValue('content') || '',
+              })}
             />
           </Form.Item>
 
@@ -185,7 +216,7 @@ function ArticleEditPage({ articleId }: ArticleEditProps) {
                 icon={<ThunderboltOutlined />}
                 loading={polishing}
                 onClick={handlePolish}
-                style={{ color: '#0D9488', borderColor: '#0D9488' }}
+                style={{ color: PALETTE.primary, borderColor: PALETTE.primary }}
               >
                 AI 润色
               </Button>

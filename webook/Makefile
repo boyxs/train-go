@@ -2,8 +2,8 @@
 # goimports -local 用统一前缀即可覆盖全部子模块
 MODULE := github.com/boyxs/train-go/webook
 
-# 全部 10 个 module（叶子 + 服务）——verify 等逐模块操作用
-MODULES := api shared pkg internal chat comment interaction migrator relation worker
+# 全部 12 个 module（叶子 + 服务）——verify 等逐模块操作用
+MODULES := api shared pkg internal chat comment interaction migrator relation worker tag search
 
 # 部署层入口：compose 文件 + .env.local 都在 ../deploy/（项目唯一真相源）
 # image 名 webook:local 与 docker-compose.local.yaml 对齐，pull_policy=never
@@ -12,7 +12,7 @@ COMPOSE := docker compose -p webook-local --env-file $(DEPLOY)/.env.local \
            -f $(DEPLOY)/docker-compose.yaml \
            -f $(DEPLOY)/docker-compose.local.yaml
 
-.PHONY: build dc up down fmt fmt-check verify wire help
+.PHONY: build dc up down fmt fmt-check verify wire backfill-search help
 
 # 宿主机交叉编译 core（internal 模块）Linux 二进制（产物：webook/webook）
 # 注：CI/compose 走 internal/Dockerfile 容器内构建，此目标仅本地手动出二进制
@@ -73,14 +73,24 @@ verify: fmt-check
 		(cd $$m && GOWORK=off GOFLAGS=-mod=readonly go build ./... >/dev/null) && echo ok \
 			|| { echo "FAIL: $$m GOWORK=off build -- check go.mod replace path / dep drift"; exit 1; }; \
 	done
-	@echo "OK: fmt + 10 modules build under workspace and GOWORK=off"
+	@echo "OK: fmt + 12 modules build under workspace and GOWORK=off"
 
-# 重新生成所有模块的 wire_gen.go（多模块：逐模块 wire ./... 覆盖各自 integration/setup），末尾格式化
+# 重新生成所有模块的 wire_gen.go（逐模块 `wire ./...`，覆盖模块根 + integration/setup 的全部 injector）。
+# 每个 test-only 的 integration 包都放了 integration.go 锚文件（见 CLAUDE.md「集成测试规范」），故 `wire ./...`
+# 不会再被空 GoFiles 目录绊倒（否则会在 injector 检测前的 detectOutputDir 阶段报
+# "no files to derive output directory from"、令整条命令退 1），现全成功退 0。末尾格式化。
 wire:
-	@for m in internal chat comment interaction migrator relation worker; do \
+	@for m in internal chat comment interaction migrator relation worker tag search; do \
 		echo "→ wire $$m"; (cd $$m && wire ./...) || exit 1; \
 	done
 	@$(MAKE) fmt
+
+# 存量 published_article 一次性回填进 webook-search 的 ES 索引（幂等，可重复跑）。
+# 需 MySQL（源库）+ etcd（发现）+ webook-search / webook-tag gRPC 在跑；配置同 core（APP_ENV 指某份 yaml）。
+# 完成后用 `make -f mk/es.mk count` 复核 ES 实际文档数（search.Index 对 ES 写失败静默降级）。
+BACKFILL_ENV ?= config/local.yaml
+backfill-search:
+	@cd internal && APP_ENV=$(BACKFILL_ENV) go run ./cmd/backfill-search
 
 help:
 	@echo "make build              - 编译 Linux 二进制（./webook）"
@@ -91,6 +101,7 @@ help:
 	@echo "make fmt-check          - 只检查不改动（CI 用）"
 	@echo "make verify             - 提交前全量校验（格式 + workspace + GOWORK=off 构建，抓 replace 错配）"
 	@echo "make wire               - 重新生成 wire_gen.go + 格式化"
+	@echo "make backfill-search    - 存量文章回填进 search ES 索引（幂等；BACKFILL_ENV 覆盖 yaml）"
 	@echo "make -f mk/k8s.mk help  - K3s 部署相关命令"
 	@echo ""
 	@echo "前置依赖：../deploy/.env.local 必须存在（首次：cp ../deploy/.env.local.example ../deploy/.env.local）"

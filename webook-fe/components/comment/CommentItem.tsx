@@ -7,10 +7,16 @@ import { useRouter } from 'next/navigation';
 import React from 'react';
 
 import { UserHoverCard } from '@/components/relation/UserHoverCard';
+import { PALETTE } from '@/constants/theme';
 import type { Comment } from '@/types';
 
 // 头像配色循环（对齐原型 $primary/$av-amber/$av-green/$av-indigo）
-const AVATAR_COLORS = ['#0D9488', '#D97706', '#22C55E', '#6366F1'];
+const AVATAR_COLORS = [
+  PALETTE.primary,
+  PALETTE.warning,
+  PALETTE.success,
+  PALETTE.info,
+];
 
 function avatarColor(uid: number) {
   return AVATAR_COLORS[Math.abs(uid) % AVATAR_COLORS.length];
@@ -98,7 +104,7 @@ export function CommentItem({
         >
           <span
             style={{
-              color: '#FFFFFF',
+              color: PALETTE.surface,
               fontSize: isReply ? 12 : 14,
               fontWeight: 600,
             }}
@@ -114,8 +120,8 @@ export function CommentItem({
           <UserHoverCard userId={comment.user.id} self={isMine}>
             <span
               onClick={goProfile}
-              className='cursor-pointer hover:text-[#0D9488]'
-              style={{ fontSize: 13, fontWeight: 600, color: '#1A1A1A' }}
+              className='cursor-pointer hover:text-primary'
+              style={{ fontSize: 13, fontWeight: 600, color: PALETTE.ink }}
             >
               {comment.user.name}
             </span>
@@ -125,7 +131,7 @@ export function CommentItem({
               style={{
                 fontSize: 11,
                 fontWeight: 600,
-                color: '#0D9488',
+                color: PALETTE.primary,
                 background: '#E6F4F2',
                 borderRadius: 4,
                 padding: '0 5px',
@@ -134,7 +140,7 @@ export function CommentItem({
               我
             </span>
           )}
-          <span style={{ fontSize: 12, color: '#9CA3AF' }}>
+          <span style={{ fontSize: 12, color: PALETTE.subtle }}>
             · {relativeTime(comment.createdAt)}
           </span>
         </div>
@@ -143,7 +149,7 @@ export function CommentItem({
         <div
           style={{
             fontSize: 14,
-            color: '#1A1A1A',
+            color: PALETTE.ink,
             lineHeight: 1.6,
             whiteSpace: 'pre-wrap',
             wordBreak: 'break-word',
@@ -161,14 +167,14 @@ export function CommentItem({
           >
             <Heart
               size={15}
-              fill={comment.liked ? '#EF4444' : 'none'}
-              color={comment.liked ? '#EF4444' : '#9CA3AF'}
+              fill={comment.liked ? PALETTE.danger : 'none'}
+              color={comment.liked ? PALETTE.danger : PALETTE.subtle}
             />
             <span
               style={{
                 fontSize: 13,
                 fontWeight: 600,
-                color: comment.liked ? '#EF4444' : '#6B7280',
+                color: comment.liked ? PALETTE.danger : PALETTE.muted,
               }}
             >
               {comment.likeCnt}
@@ -180,8 +186,8 @@ export function CommentItem({
             className={ACTION_BTN}
             onClick={() => onReply(comment)}
           >
-            <Reply size={15} color='#9CA3AF' />
-            <span style={{ fontSize: 13, color: '#6B7280' }}>回复</span>
+            <Reply size={15} color={PALETTE.subtle} />
+            <span style={{ fontSize: 13, color: PALETTE.muted }}>回复</span>
           </button>
 
           {isMine && (
@@ -190,8 +196,8 @@ export function CommentItem({
               className={ACTION_BTN}
               onClick={confirmDelete}
             >
-              <Trash2 size={15} color='#9CA3AF' />
-              <span style={{ fontSize: 13, color: '#6B7280' }}>删除</span>
+              <Trash2 size={15} color={PALETTE.subtle} />
+              <span style={{ fontSize: 13, color: PALETTE.muted }}>删除</span>
             </button>
           )}
         </div>

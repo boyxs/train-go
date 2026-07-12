@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"runtime/debug"
 	"time"
 
 	commentv1 "github.com/boyxs/train-go/webook/api/gen/comment/v1"
@@ -22,10 +23,14 @@ type ArticleAuthorService interface {
 	Delete(ctx context.Context, id int64, uid int64) error
 }
 
+// articleTagSource 发布时标签来源标记（作者手动输入；AI 推荐入库同理走 tag 服务另计）。
+const articleTagSource = "author"
+
 type InternalArticleAuthorService struct {
 	authorRepo repository.ArticleAuthorRepository
 	readerRepo repository.ArticleReaderRepository
 	searchSvc  ArticleSearchService
+	tagSvc     TagService
 	l          logger.LoggerX
 }
 
@@ -33,12 +38,14 @@ func NewInternalArticleAuthorService(
 	authorRepo repository.ArticleAuthorRepository,
 	readerRepo repository.ArticleReaderRepository,
 	searchSvc ArticleSearchService,
+	tagSvc TagService,
 	l logger.LoggerX,
 ) ArticleAuthorService {
 	return &InternalArticleAuthorService{
 		authorRepo: authorRepo,
 		readerRepo: readerRepo,
 		searchSvc:  searchSvc,
+		tagSvc:     tagSvc,
 		l:          l,
 	}
 }
@@ -70,20 +77,32 @@ func (s *InternalArticleAuthorService) Publish(ctx context.Context, article doma
 	if err != nil {
 		return 0, err
 	}
-	// 从 DB 回查完整数据（含 AuthorName / CreatedAt），再写入 ES
-	go func(articleId, uid int64) {
-		bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
-		complete, err := s.authorRepo.FindById(bgCtx, articleId, uid)
+	// 后台：全量对齐标签（拿回已解析 slug）+ 回查完整数据（含 AuthorName / CreatedAt）写 ES。
+	// 跨 core+tag+search 三库无事务，tag/search 失败非致命降级（记日志，靠重发/backfill 最终一致）。
+	uid, tagNames := article.Author.Id, article.Tags
+	s.goSafe("发布文章-同步标签+索引", func(bgCtx context.Context) {
+		var slugs []string
+		tags, err := s.tagSvc.SyncTags(bgCtx, domain.BizArticle, id, tagNames, articleTagSource)
+		if err != nil {
+			s.l.Error("发布文章：同步标签失败，降级不带标签索引",
+				logger.Int64("articleId", id), logger.Error(err))
+		} else {
+			slugs = make([]string, 0, len(tags))
+			for _, t := range tags {
+				slugs = append(slugs, t.Slug)
+			}
+		}
+		complete, err := s.authorRepo.FindById(bgCtx, id, uid)
 		if err != nil {
 			s.l.Error("索引文章：回查完整数据失败",
-				logger.Int64("articleId", articleId), logger.Error(err))
+				logger.Int64("articleId", id), logger.Error(err))
 			return
 		}
-		if err := s.searchSvc.IndexArticle(bgCtx, complete); err != nil {
-			s.l.Error("索引文章失败", logger.Int64("articleId", articleId), logger.Error(err))
+		complete.Tags = slugs
+		if err := s.searchSvc.Index(bgCtx, complete); err != nil {
+			s.l.Error("索引文章失败", logger.Int64("articleId", id), logger.Error(err))
 		}
-	}(id, article.Author.Id)
+	})
 	return id, nil
 }
 
@@ -98,18 +117,28 @@ func (s *InternalArticleAuthorService) Withdraw(ctx context.Context, id int64, u
 	if err := s.readerRepo.Delete(ctx, id, uid); err != nil {
 		return err
 	}
-	go func() {
-		bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
-		if err := s.searchSvc.RemoveArticle(bgCtx, id); err != nil {
-			s.l.Error("移除搜索索引失败", logger.Int64("articleId", id), logger.Error(err))
-		}
-	}()
+	s.clearTagAndIndexAsync(id)
 	return nil
 }
 
 func (s *InternalArticleAuthorService) Detail(ctx context.Context, id int64, uid int64) (domain.Article, error) {
-	return s.authorRepo.FindById(ctx, id, uid)
+	article, err := s.authorRepo.FindById(ctx, id, uid)
+	if err != nil {
+		return domain.Article{}, err
+	}
+	// 回显：补该文当前标签名（编辑器预填）；tag 服务失败降级不带标签，不阻断详情。
+	tagMap, tErr := s.tagSvc.TagsByBiz(ctx, domain.BizArticle, []int64{id})
+	if tErr != nil {
+		s.l.Error("文章详情：取标签失败，降级不带标签",
+			logger.Int64("articleId", id), logger.Error(tErr))
+		return article, nil
+	}
+	names := make([]string, 0, len(tagMap[id]))
+	for _, t := range tagMap[id] {
+		names = append(names, t.Name)
+	}
+	article.Tags = names
+	return article, nil
 }
 
 func (s *InternalArticleAuthorService) Page(ctx context.Context, uid int64, page int, pageSize int) ([]domain.Article, int64, error) {
@@ -127,6 +156,37 @@ func (s *InternalArticleAuthorService) List(ctx context.Context, uid int64) ([]d
 	return s.authorRepo.List(ctx, uid)
 }
 
+// clearTagAndIndexAsync 下架/删除后台清理：清标签关联 + 移除搜索索引，均非致命降级（Withdraw/Delete 共用）。
+func (s *InternalArticleAuthorService) clearTagAndIndexAsync(id int64) {
+	s.goSafe("下架文章-清标签+移除索引", func(bgCtx context.Context) {
+		if err := s.tagSvc.ClearTags(bgCtx, domain.BizArticle, id); err != nil {
+			s.l.Error("清标签关联失败", logger.Int64("articleId", id), logger.Error(err))
+		}
+		if err := s.searchSvc.Remove(bgCtx, id); err != nil {
+			s.l.Error("移除搜索索引失败", logger.Int64("articleId", id), logger.Error(err))
+		}
+	})
+}
+
+// goSafe 起后台 goroutine 执行 detached 任务：兜 panic（防单个后台任务拖垮整个进程，
+// gin Recovery 只覆盖请求 goroutine）+ 统一 30s 超时。用 context.Background()（非请求 ctx）：
+// 请求返回后任务仍需完成，不随请求取消。镜像 pkg/cronx、pkg/pool 的 recover 约定。
+func (s *InternalArticleAuthorService) goSafe(task string, fn func(ctx context.Context)) {
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				s.l.Error("后台任务 panic",
+					logger.String("task", task),
+					logger.Field{Key: "panic", Val: r},
+					logger.String("stack", string(debug.Stack())))
+			}
+		}()
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		fn(ctx)
+	}()
+}
+
 func (s *InternalArticleAuthorService) Delete(ctx context.Context, id int64, uid int64) error {
 	if err := s.authorRepo.Delete(ctx, id, uid); err != nil {
 		return err
@@ -134,13 +194,7 @@ func (s *InternalArticleAuthorService) Delete(ctx context.Context, id int64, uid
 	if err := s.readerRepo.Delete(ctx, id, uid); err != nil {
 		return err
 	}
-	go func() {
-		bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
-		if err := s.searchSvc.RemoveArticle(bgCtx, id); err != nil {
-			s.l.Error("移除搜索索引失败", logger.Int64("articleId", id), logger.Error(err))
-		}
-	}()
+	s.clearTagAndIndexAsync(id)
 	return nil
 }
 
@@ -233,7 +287,7 @@ func (s *InternalArticleReaderService) batchInteraction(ctx context.Context, ids
 	}
 	m, err := s.intrSvc.FindByBizIds(ctx, domain.BizArticle, ids)
 	if err != nil {
-		s.l.Error("批量获取文章互动数据失败，降级", logger.Error(err))
+		s.l.Error("批量文章互动计数失败，降级填零", logger.Error(err))
 		return map[int64]domain.Interaction{}
 	}
 	return m

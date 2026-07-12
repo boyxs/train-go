@@ -12,105 +12,110 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
-	"github.com/boyxs/train-go/webook/internal/consts"
 	"github.com/boyxs/train-go/webook/internal/domain"
 	svcmocks "github.com/boyxs/train-go/webook/internal/service/mocks"
-	jwt "github.com/boyxs/train-go/webook/pkg/jwtx"
 	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
-func TestSearchHandler_Search(t *testing.T) {
-	articles := []domain.Article{
-		{Id: 1, Title: "健身饮食", Abstract: "科学饮食方法"},
+// serveSearch 起临时 gin server 发 POST /search/article（接入层无鉴权，纯搬运）。
+// 只 mock service.ArticleSearchService，验证「空 query 挡 400 + 分页归一 + SearchResult→VO 映射」。
+func serveSearch(svc *svcmocks.MockArticleSearchService, body string) *httptest.ResponseRecorder {
+	h := NewInternalArticleSearchHandler(svc, logger.NewNopLogger())
+	engine := gin.New()
+	h.RegisterRoutes(engine)
+	req, _ := http.NewRequest(http.MethodPost, "/search/article", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	engine.ServeHTTP(rec, req)
+	return rec
+}
+
+// 空 query（含纯空白）→ 400，且不调用 service。
+func TestArticleSearchHandler_Search_EmptyQuery(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	svc := svcmocks.NewMockArticleSearchService(ctrl)
+	// 无 EXPECT：调了 service 即 fail
+
+	rec := serveSearch(svc, `{"query":"  "}`)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
+// 正常路径：命中 + facet → VO（list/total/facets）映射正确。
+func TestArticleSearchHandler_Search_OK(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	svc := svcmocks.NewMockArticleSearchService(ctrl)
+	svc.EXPECT().Search(gomock.Any(), "go", []string{"go"}, 1, 10).Return(domain.SearchResult{
+		Articles: []domain.TaggedArticle{
+			{
+				Id:      1,
+				Title:   "Go 并发",
+				Author:  domain.Author{Id: 10, Name: "张三"},
+				Tags:    []domain.Tag{{Slug: "go", Name: "Go"}},
+				ReadCnt: 10, LikeCnt: 3,
+			},
+		},
+		Total:  1,
+		Facets: []domain.TagCount{{Slug: "go", Name: "Go", Count: 5}},
+	}, nil)
+
+	rec := serveSearch(svc, `{"query":"go","page":1,"size":10,"filter":{"tags":["go"]}}`)
+	assert.Equal(t, http.StatusOK, rec.Code)
+
+	var r struct {
+		Data struct {
+			List []struct {
+				Id      int64  `json:"id"`
+				Title   string `json:"title"`
+				ReadCnt int64  `json:"readCnt"`
+				Tags    []struct {
+					Name string `json:"name"`
+					Slug string `json:"slug"`
+				} `json:"tags"`
+			} `json:"list"`
+			Total  int64 `json:"total"`
+			Facets []struct {
+				Name  string `json:"name"`
+				Slug  string `json:"slug"`
+				Count int64  `json:"count"`
+			} `json:"facets"`
+		} `json:"data"`
 	}
-
-	testCases := []struct {
-		name       string
-		reqBody    any
-		mock       func(ctrl *gomock.Controller) *svcmocks.MockArticleSearchService
-		wantCode   int
-		wantResult Result
-	}{
-		{
-			name:    "搜索成功",
-			reqBody: map[string]any{"query": "健身饮食", "page": 1, "size": 10},
-			mock: func(ctrl *gomock.Controller) *svcmocks.MockArticleSearchService {
-				svc := svcmocks.NewMockArticleSearchService(ctrl)
-				svc.EXPECT().Search(gomock.Any(), "健身饮食", 1, 10).
-					Return(articles, int64(1), nil)
-				return svc
-			},
-			wantCode:   http.StatusOK,
-			wantResult: Result{Code: 200, Msg: "OK", Data: map[string]any{"list": articles, "total": float64(1)}},
-		},
-		{
-			name:    "query 为空",
-			reqBody: map[string]any{"query": "", "page": 1, "size": 10},
-			mock: func(ctrl *gomock.Controller) *svcmocks.MockArticleSearchService {
-				return svcmocks.NewMockArticleSearchService(ctrl)
-			},
-			wantCode:   http.StatusBadRequest,
-			wantResult: Result{Code: 400, Msg: "搜索内容不能为空"},
-		},
-		{
-			name:    "page/size 未传使用默认值",
-			reqBody: map[string]any{"query": "test"},
-			mock: func(ctrl *gomock.Controller) *svcmocks.MockArticleSearchService {
-				svc := svcmocks.NewMockArticleSearchService(ctrl)
-				svc.EXPECT().Search(gomock.Any(), "test", 1, 10).
-					Return(nil, int64(0), nil)
-				return svc
-			},
-			wantCode:   http.StatusOK,
-			wantResult: Result{Code: 200, Msg: "OK", Data: map[string]any{"list": nil, "total": float64(0)}},
-		},
-		{
-			name:    "SearchService 失败",
-			reqBody: map[string]any{"query": "test", "page": 1, "size": 10},
-			mock: func(ctrl *gomock.Controller) *svcmocks.MockArticleSearchService {
-				svc := svcmocks.NewMockArticleSearchService(ctrl)
-				svc.EXPECT().Search(gomock.Any(), "test", 1, 10).
-					Return(nil, int64(0), errors.New("es down"))
-				return svc
-			},
-			wantCode:   http.StatusInternalServerError,
-			wantResult: Result{Code: 500, Msg: "系统错误"},
-		},
+	assert.NoError(t, json.NewDecoder(rec.Body).Decode(&r))
+	assert.Equal(t, int64(1), r.Data.Total)
+	if assert.Len(t, r.Data.List, 1) {
+		assert.Equal(t, "Go 并发", r.Data.List[0].Title)
+		assert.Equal(t, int64(10), r.Data.List[0].ReadCnt)
+		if assert.Len(t, r.Data.List[0].Tags, 1) {
+			assert.Equal(t, "Go", r.Data.List[0].Tags[0].Name)
+		}
 	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
-
-			gin.SetMode(gin.TestMode)
-			server := gin.New()
-
-			// 注入 JWT claims
-			server.Use(func(c *gin.Context) {
-				c.Set(consts.UserKey, jwt.UserClaims{Userid: 1})
-				c.Next()
-			})
-
-			h := NewInternalArticleSearchHandler(tc.mock(ctrl), logger.NewNopLogger())
-			h.RegisterRoutes(server)
-
-			body, _ := json.Marshal(tc.reqBody)
-			req, _ := http.NewRequest(http.MethodPost, "/search/article", bytes.NewReader(body))
-			req.Header.Set("Content-Type", "application/json")
-			w := httptest.NewRecorder()
-			server.ServeHTTP(w, req)
-
-			assert.Equal(t, tc.wantCode, w.Code)
-
-			var result Result
-			_ = json.Unmarshal(w.Body.Bytes(), &result)
-			assert.Equal(t, tc.wantResult.Code, result.Code)
-			assert.Equal(t, tc.wantResult.Msg, result.Msg)
-			if tc.wantResult.Code == 0 {
-				// data 结构比较 code/total 足够
-				assert.NotNil(t, result.Data)
-			}
-		})
+	if assert.Len(t, r.Data.Facets, 1) {
+		assert.Equal(t, "Go", r.Data.Facets[0].Name)
+		assert.Equal(t, int64(5), r.Data.Facets[0].Count)
 	}
+}
+
+// 分页归一：page 越界 → clamp maxPageIndex(10000)；size 超上限(>50) → 默认 10。经 mock 入参断言。
+func TestArticleSearchHandler_Search_NormalizesPaging(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	svc := svcmocks.NewMockArticleSearchService(ctrl)
+	svc.EXPECT().Search(gomock.Any(), "go", gomock.Any(), 10000, 10).Return(domain.SearchResult{}, nil)
+
+	rec := serveSearch(svc, `{"query":"go","page":99999,"size":999}`)
+	assert.Equal(t, http.StatusOK, rec.Code)
+}
+
+// service 报普通错误 → 框架转 500。
+func TestArticleSearchHandler_Search_ServiceError(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	svc := svcmocks.NewMockArticleSearchService(ctrl)
+	svc.EXPECT().Search(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(domain.SearchResult{}, errors.New("boom"))
+
+	rec := serveSearch(svc, `{"query":"go"}`)
+	assert.Equal(t, http.StatusInternalServerError, rec.Code)
 }

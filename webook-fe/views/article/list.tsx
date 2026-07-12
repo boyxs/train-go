@@ -20,6 +20,7 @@ import React, { useCallback, useState } from 'react';
 
 import * as articleApi from '@/api/article';
 import { Loading } from '@/components/common/Loading';
+import { PALETTE } from '@/constants/theme';
 import { useRequest } from '@/hooks/useRequest';
 import type { Article } from '@/types';
 import { ArticleStatus } from '@/types';
@@ -130,12 +131,12 @@ function ArticleListPage() {
       width: 120,
       render: (v?: number) =>
         v ? (
-          <span className='flex items-center gap-1 text-[#1A1A1A]'>
-            <Eye size={14} color='#9CA3AF' />
+          <span className='flex items-center gap-1 text-ink'>
+            <Eye size={14} color={PALETTE.subtle} />
             {v.toLocaleString()}
           </span>
         ) : (
-          <span className='text-[#D1D5DB]'>—</span>
+          <span className='text-faint'>—</span>
         ),
     },
     {
@@ -212,7 +213,7 @@ function ArticleListPage() {
           >
             {info.label}
           </Tag>
-          <span className='text-xs text-[#9CA3AF]'>
+          <span className='text-xs text-subtle'>
             {dayjs(article.updatedAt).format('YYYY-MM-DD')}
           </span>
         </div>
@@ -220,37 +221,37 @@ function ArticleListPage() {
         {/* 第三行：阅读量（左）+ 操作（右） */}
         <div className='flex items-center justify-between'>
           {article.readCnt ? (
-            <span className='flex items-center gap-1 text-xs text-[#9CA3AF]'>
+            <span className='flex items-center gap-1 text-xs text-subtle'>
               <Eye size={14} />
               {article.readCnt.toLocaleString()} 次阅读
             </span>
           ) : (
-            <span className='text-xs text-[#D1D5DB]'>— 无阅读量</span>
+            <span className='text-xs text-faint'>— 无阅读量</span>
           )}
           <div className='flex items-center gap-3'>
             <button
-              className='text-[13px] text-[#0D9488] bg-transparent border-none cursor-pointer p-0'
+              className='text-[13px] text-primary bg-transparent border-none cursor-pointer p-0'
               onClick={() => router.push(`/article/edit/${article.id}`)}
             >
               编辑
             </button>
             {article.status === ArticleStatus.Published ? (
               <button
-                className='text-[13px] text-[#D97706] bg-transparent border-none cursor-pointer p-0'
+                className='text-[13px] text-warning bg-transparent border-none cursor-pointer p-0'
                 onClick={() => confirmWithdraw(article.id)}
               >
                 撤回
               </button>
             ) : (
               <button
-                className='text-[13px] text-[#0D9488] bg-transparent border-none cursor-pointer p-0'
+                className='text-[13px] text-primary bg-transparent border-none cursor-pointer p-0'
                 onClick={() => router.push(`/article/edit/${article.id}`)}
               >
                 发布
               </button>
             )}
             <button
-              className='text-[13px] text-[#EF4444] bg-transparent border-none cursor-pointer p-0'
+              className='text-[13px] text-danger bg-transparent border-none cursor-pointer p-0'
               onClick={() => confirmDelete(article.id)}
             >
               删除
@@ -322,7 +323,7 @@ function ArticleListPage() {
       {/* 移动端 */}
       <div className='block md:hidden'>
         <div className='flex items-center justify-between mb-3'>
-          <h2 className='text-lg font-bold text-[#1A1A1A] m-0'>我的文章</h2>
+          <h2 className='text-lg font-bold text-ink m-0'>我的文章</h2>
           {extra}
         </div>
         {articles.length === 0 && !loading ? (

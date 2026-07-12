@@ -9,6 +9,7 @@ import * as commentApi from '@/api/comment';
 import * as interactionApi from '@/api/interaction';
 import * as userApi from '@/api/user';
 import { BIZ } from '@/constants/biz';
+import { PALETTE } from '@/constants/theme';
 import type { Comment, CommentSort } from '@/types';
 import { getErrorMessage } from '@/utils/apiError';
 import { tokenUtil } from '@/utils/token';
@@ -235,14 +236,21 @@ export function CommentSection({ articleId }: CommentSectionProps) {
       {/* 标题 + 排序 */}
       <div className='flex items-center justify-between'>
         <div className='flex items-end gap-1.5'>
-          <span style={{ fontSize: 16, fontWeight: 700, color: '#1A1A1A' }}>
+          <span style={{ fontSize: 16, fontWeight: 700, color: PALETTE.ink }}>
             评论
           </span>
-          <span style={{ fontSize: 13, color: '#9CA3AF' }}>{total} 条</span>
+          <span style={{ fontSize: 13, color: PALETTE.subtle }}>
+            {total} 条
+          </span>
         </div>
         <div
           className='flex items-center'
-          style={{ background: '#F5F5F5', borderRadius: 8, padding: 3, gap: 4 }}
+          style={{
+            background: PALETTE.page,
+            borderRadius: 8,
+            padding: 3,
+            gap: 4,
+          }}
         >
           {SORTS.map((s) => {
             const active = s.key === sort;
@@ -253,8 +261,8 @@ export function CommentSection({ articleId }: CommentSectionProps) {
                 onClick={() => changeSort(s.key)}
                 className='border-none cursor-pointer'
                 style={{
-                  background: active ? '#FFFFFF' : 'transparent',
-                  color: active ? '#0D9488' : '#6B7280',
+                  background: active ? PALETTE.surface : 'transparent',
+                  color: active ? PALETTE.primary : PALETTE.muted,
                   fontSize: 13,
                   fontWeight: active ? 600 : 400,
                   borderRadius: 6,
@@ -277,9 +285,9 @@ export function CommentSection({ articleId }: CommentSectionProps) {
           onClick={() => router.push('/login')}
           className='rounded-lg cursor-pointer text-left'
           style={{
-            border: '1px solid #E5E7EB',
+            border: `1px solid ${PALETTE.line}`,
             padding: '12px 14px',
-            color: '#9CA3AF',
+            color: PALETTE.subtle,
             fontSize: 14,
             background: 'transparent',
           }}
@@ -308,7 +316,8 @@ export function CommentSection({ articleId }: CommentSectionProps) {
                 key={c.id}
                 style={{
                   padding: '16px 0',
-                  borderTop: idx === 0 ? undefined : '1px solid #F3F4F6',
+                  borderTop:
+                    idx === 0 ? undefined : `1px solid ${PALETTE.hairline}`,
                 }}
               >
                 <CommentItem
@@ -339,7 +348,7 @@ export function CommentSection({ articleId }: CommentSectionProps) {
                       marginLeft: REPLY_INDENT,
                       marginTop: 12,
                       paddingLeft: 14,
-                      borderLeft: '2px solid #E5E7EB',
+                      borderLeft: `2px solid ${PALETTE.line}`,
                     }}
                   >
                     {replies.map((rep) => (
@@ -374,12 +383,12 @@ export function CommentSection({ articleId }: CommentSectionProps) {
                     className='flex items-center gap-1.5 bg-transparent border-none cursor-pointer p-0'
                     style={{ marginLeft: REPLY_INDENT, marginTop: 10 }}
                   >
-                    <ChevronDown size={15} color='#0D9488' />
+                    <ChevronDown size={15} color={PALETTE.primary} />
                     <span
                       style={{
                         fontSize: 13,
                         fontWeight: 600,
-                        color: '#0D9488',
+                        color: PALETTE.primary,
                       }}
                     >
                       展开 {c.replyCnt} 条回复

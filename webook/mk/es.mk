@@ -4,7 +4,12 @@
 # ============================================================
 
 ES_HOST  := http://localhost:9200
-ES_INDEX := article_v1
+# ES_INDEX 是稳定「别名」（app 与查询都认它）；物理索引是版本化的 $(ES_PHYSICAL)。
+# 查询/文档类命令走别名；仅索引生命周期（create/delete/reset）动物理索引。
+ES_INDEX    := article
+ES_PHYSICAL := $(ES_INDEX)_v1
+# mapping 单一真相源 = search 服务的 embed 文件（Go 侧 //go:embed 读同一份），create-index 直接读它、杜绝内联漂移。
+ES_MAPPING  := search/repository/dao/article_index.json
 
 # ES 认证（webook-es 开了 xpack.security 后必带）。本地默认 elastic/elastic，
 # 覆盖：make -f mk/es.mk status ES_PASS=xxx。连无认证 ES 时带上凭据也无害（服务端忽略）。
@@ -63,19 +68,21 @@ mapping:
 	@curl -s $(ES_AUTH) "$(ES_HOST)/$(ES_INDEX)/_mapping"
 	@echo ""
 
-# 内联 mapping 与 internal/repository/dao/article_index.json 同源（Go 侧 //go:embed 读那份）；
-# 改 mapping 两处必须同步，否则「手动 make create-index」与「应用启动自动建索引」结果漂移。
+# mapping 直接读 $(ES_MAPPING)（与应用 //go:embed 同一份），无内联、无漂移。
+# 建物理索引 $(ES_PHYSICAL) 后挂别名 $(ES_INDEX)，与应用 ensureIndex 一致（写/查走别名）。
 create-index:
-	@echo "$(STEP) 创建索引 $(ES_INDEX)..."
-	@curl -s $(ES_AUTH) -X PUT "$(ES_HOST)/$(ES_INDEX)" \
+	@echo "$(STEP) 创建物理索引 $(ES_PHYSICAL) + 别名 $(ES_INDEX)..."
+	@curl -s $(ES_AUTH) -X PUT "$(ES_HOST)/$(ES_PHYSICAL)" \
 	  -H "Content-Type: application/json" \
-	  -d '{"mappings":{"properties":{"id":{"type":"long"},"title":{"type":"text"},"abstract":{"type":"text"},"author_id":{"type":"long"},"author_name":{"type":"keyword"},"status":{"type":"byte"},"created_at":{"type":"date","format":"epoch_millis"},"content_vec":{"type":"dense_vector","dims":1024,"index":true,"similarity":"cosine"}}}}'
+	  --data-binary @$(ES_MAPPING)
+	@echo ""
+	@curl -s $(ES_AUTH) -X PUT "$(ES_HOST)/$(ES_PHYSICAL)/_alias/$(ES_INDEX)"
 	@echo ""
 	@echo "$(INFO) 完成。重新发布文章后会自动写入文档。"
 
 delete-index:
-	@echo "$(WARN) 删除索引 $(ES_INDEX)（数据不可恢复）..."
-	@curl -s $(ES_AUTH) -X DELETE "$(ES_HOST)/$(ES_INDEX)"
+	@echo "$(WARN) 删除物理索引 $(ES_PHYSICAL)（别名 $(ES_INDEX) 随之摘除，数据不可恢复）..."
+	@curl -s $(ES_AUTH) -X DELETE "$(ES_HOST)/$(ES_PHYSICAL)"
 	@echo ""
 	@echo "$(INFO) 索引已删除。"
 

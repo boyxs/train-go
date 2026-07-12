@@ -14,6 +14,7 @@ import { CalendarDays, TrendingUp } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 
 import { fetchAIDashboard } from '@/api/ai';
+import { PALETTE } from '@/constants/theme';
 import type { AIClickDashboard, TopArticle } from '@/types';
 import { getErrorMessage } from '@/utils/apiError';
 
@@ -22,25 +23,25 @@ const statCards = [
     key: 'totalClicks',
     label: '总点击次数',
     icon: <ThunderboltOutlined />,
-    color: '#0D9488',
+    color: PALETTE.primary,
   },
   {
     key: 'uniqueUsers',
     label: '独立用户数',
     icon: <TeamOutlined />,
-    color: '#6366F1',
+    color: PALETTE.info,
   },
   {
     key: 'uniqueArticles',
     label: '独立文章数',
     icon: <FileTextOutlined />,
-    color: '#D97706',
+    color: PALETTE.warning,
   },
   {
     key: 'avgClicksPerUser',
     label: '人均点击',
     icon: <BarChartOutlined />,
-    color: '#EF4444',
+    color: PALETTE.danger,
   },
 ] as const;
 
@@ -53,13 +54,19 @@ const columns: ColumnsType<TopArticle> = [
     render: (rank: number) =>
       rank <= 3 ? (
         <Tag
-          color={rank === 1 ? '#0D9488' : rank === 2 ? '#6366F1' : '#D97706'}
+          color={
+            rank === 1
+              ? PALETTE.primary
+              : rank === 2
+                ? PALETTE.info
+                : PALETTE.warning
+          }
           style={{ minWidth: 24, textAlign: 'center', margin: 0 }}
         >
           {rank}
         </Tag>
       ) : (
-        <span className='text-[#9CA3AF]'>{rank}</span>
+        <span className='text-subtle'>{rank}</span>
       ),
   },
   {
@@ -71,7 +78,7 @@ const columns: ColumnsType<TopArticle> = [
         href={`/article/${record.articleId}`}
         target='_blank'
         rel='noopener noreferrer'
-        className='text-[#1A1A1A] hover:text-[#0D9488] transition-colors'
+        className='text-ink hover:text-primary transition-colors'
       >
         {title}
       </a>
@@ -83,16 +90,14 @@ const columns: ColumnsType<TopArticle> = [
     width: 100,
     align: 'right',
     sorter: (a, b) => a.clicks - b.clicks,
-    render: (v: number) => (
-      <span className='font-semibold text-[#1A1A1A]'>{v}</span>
-    ),
+    render: (v: number) => <span className='font-semibold text-ink'>{v}</span>,
   },
   {
     title: '独立用户',
     dataIndex: 'uniqueUsers',
     width: 100,
     align: 'right',
-    render: (v: number) => <span className='text-[#6B7280]'>{v}</span>,
+    render: (v: number) => <span className='text-muted'>{v}</span>,
   },
 ];
 
@@ -119,7 +124,7 @@ export default function AIDashboardPage() {
   if (!data || (data.totalClicks === 0 && data.uniqueUsers === 0)) {
     return (
       <div className='max-w-4xl mx-auto px-4 md:px-6 py-12'>
-        <div className='text-center py-20 text-[#9CA3AF]'>
+        <div className='text-center py-20 text-subtle'>
           <BarChartOutlined style={{ fontSize: 48, marginBottom: 16 }} />
           <p className='text-base'>
             暂无数据，AI 对话中点击文章卡片后将自动记录
@@ -136,21 +141,21 @@ export default function AIDashboardPage() {
     data: data.dailyTrend,
     xField: 'date',
     yField: 'clicks',
-    color: '#0D9488',
+    color: PALETTE.primary,
     columnStyle: { radius: [4, 4, 0, 0] },
     label: {
       position: 'top' as const,
-      style: { fill: '#6B7280', fontSize: 11 },
+      style: { fill: PALETTE.muted, fontSize: 11 },
     },
     xAxis: {
       label: {
         autoRotate: true,
-        style: { fontSize: 11, fill: '#9CA3AF' },
+        style: { fontSize: 11, fill: PALETTE.subtle },
       },
     },
     yAxis: {
-      label: { style: { fontSize: 11, fill: '#9CA3AF' } },
-      grid: { line: { style: { stroke: '#F3F4F6' } } },
+      label: { style: { fontSize: 11, fill: PALETTE.subtle } },
+      grid: { line: { style: { stroke: PALETTE.hairline } } },
     },
     tooltip: {
       domStyles: {
@@ -168,12 +173,12 @@ export default function AIDashboardPage() {
       {/* 标题行 */}
       <div className='flex flex-col md:flex-row md:items-center justify-between mb-6 gap-3'>
         <div>
-          <h1 className='text-xl font-bold text-[#1A1A1A]'>AI 引流数据看板</h1>
-          <p className='text-[13px] text-[#9CA3AF] mt-1'>
+          <h1 className='text-xl font-bold text-ink'>AI 引流数据看板</h1>
+          <p className='text-[13px] text-subtle mt-1'>
             统计用户通过 AI 对话点击文章的行为数据
           </p>
         </div>
-        <div className='flex items-center gap-1.5 bg-[#F3F4F6] rounded-lg px-3 py-1.5 text-[#6B7280] text-xs font-medium w-fit'>
+        <div className='flex items-center gap-1.5 bg-hairline rounded-lg px-3 py-1.5 text-muted text-xs font-medium w-fit'>
           <CalendarDays size={14} />
           最近 30 天
         </div>
@@ -198,11 +203,11 @@ export default function AIDashboardPage() {
               >
                 {card.icon}
               </div>
-              <span className='text-[13px] text-[#9CA3AF] font-medium'>
+              <span className='text-[13px] text-subtle font-medium'>
                 {card.label}
               </span>
             </div>
-            <div className='text-[28px] font-bold text-[#1A1A1A] leading-none'>
+            <div className='text-[28px] font-bold text-ink leading-none'>
               {formatValue(card.key, data[card.key] as number)}
             </div>
           </Card>
@@ -213,7 +218,7 @@ export default function AIDashboardPage() {
       <Card
         title={
           <div className='flex items-center gap-2'>
-            <TrendingUp size={16} className='text-[#0D9488]' />
+            <TrendingUp size={16} className='text-primary' />
             <span className='font-bold'>每日点击趋势</span>
           </div>
         }
@@ -230,7 +235,7 @@ export default function AIDashboardPage() {
       <Card
         title={
           <div className='flex items-center gap-2'>
-            <TrophyOutlined className='text-[#D97706]' />
+            <TrophyOutlined className='text-warning' />
             <span className='font-bold'>热门文章 Top 10</span>
           </div>
         }

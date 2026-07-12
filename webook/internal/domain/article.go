@@ -12,6 +12,8 @@ type Article struct {
 	Category  string        `json:"category"`
 	CreatedAt int64         `json:"createdAt"`
 	UpdatedAt int64         `json:"updatedAt"`
+	// Tags 标签标识：发布时=作者输入的标签名（待 tag.SyncTags 归一）；搜索结果=已命中标签 slug。两条流不交叉。
+	Tags []string `json:"tags,omitempty"`
 }
 
 // ArticleWithStats 读者视角文章 + 聚合计数（互动/评论）。

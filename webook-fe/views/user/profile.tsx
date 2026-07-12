@@ -19,6 +19,7 @@ import { getRelationStat } from '@/api/relation';
 import * as userApi from '@/api/user';
 import { Loading } from '@/components/common/Loading';
 import { FollowList } from '@/components/relation/FollowList';
+import { PALETTE } from '@/constants/theme';
 import { useRequest } from '@/hooks/useRequest';
 import { formatCount } from '@/utils/format';
 
@@ -70,7 +71,7 @@ function ProfilePage() {
           <Avatar
             size={64}
             className='shrink-0'
-            style={{ backgroundColor: '#0D9488', fontSize: 24 }}
+            style={{ backgroundColor: PALETTE.primary, fontSize: 24 }}
           >
             {data.nickname?.[0]?.toUpperCase() ||
               data.email?.[0]?.toUpperCase() ||

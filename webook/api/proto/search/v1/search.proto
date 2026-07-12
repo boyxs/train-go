@@ -4,24 +4,67 @@ package webook.search.v1;
 
 option go_package = "github.com/boyxs/train-go/webook/api/gen/search/v1;searchv1";
 
-// SearchService 提供文章搜索能力（被 webook-chat 等下游服务消费）。
+// SearchService 提供文章搜索能力（被 webook-core 网关 / webook-chat 等下游消费）。
+// 向后兼容扩展：SearchArticles 加 filter_tags/facets，ArticleCard 补字段；新增 Index/Remove/RecommendTags。
 service SearchService {
   rpc SearchArticles(SearchArticlesRequest) returns (SearchArticlesResponse);
+  rpc IndexArticle(IndexArticleRequest) returns (IndexArticleResponse);
+  rpc RemoveArticle(RemoveArticleRequest) returns (RemoveArticleResponse);
+  rpc RecommendTags(RecommendTagsRequest) returns (RecommendTagsResponse);
 }
 
 message SearchArticlesRequest {
   string query = 1;
-  int32 page = 2;   // 1-based
+  int32 page = 2; // 1-based
   int32 size = 3;
+  repeated string filter_tags = 4; // 标签 facet 过滤（AND）
 }
 
 message SearchArticlesResponse {
   repeated ArticleCard articles = 1;
   int64 total = 2;
+  repeated TagCount facets = 3; // 标签 facet 计数（关键词命中集聚合）
 }
 
 message ArticleCard {
   int64 id = 1;
   string title = 2;
   string abstract = 3;
+  int64 author_id = 4;
+  string author_name = 5;
+  string category = 6;
+  repeated string tags = 7; // tag slug
+  int64 created_at = 8;
 }
+
+message TagCount {
+  string slug = 1;
+  int64 count = 2;
+}
+
+// ArticleDoc core 发布时下发给 search 索引（search 内部 embed title+content 生成向量，与 RecommendTags 同口径）。
+message ArticleDoc {
+  int64 id = 1;
+  string title = 2;
+  string abstract = 3;
+  int64 author_id = 4;
+  string author_name = 5;
+  uint32 status = 6;
+  string category = 7;
+  repeated string tags = 8; // tag slug
+  int64 created_at = 9;
+  string content = 10; // 正文全文，仅用于生成 content_vec（不入库、不检索返回），与 RecommendTags 的 embed 口径对齐
+}
+
+message IndexArticleRequest { ArticleDoc doc = 1; }
+message IndexArticleResponse {}
+
+message RemoveArticleRequest { int64 id = 1; }
+message RemoveArticleResponse {}
+
+message RecommendTagsRequest {
+  string title = 1;
+  string content = 2;
+  int32 k = 3;
+}
+message RecommendTagsResponse { repeated TagCount tags = 1; }

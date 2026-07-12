@@ -7,6 +7,7 @@ import React from 'react';
 import { ChatBubble } from '@/components/chat/ChatBubble';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { AuthGuard } from '@/components/layout/AuthGuard';
+import { ANTD_THEME, PALETTE } from '@/constants/theme';
 
 export default function MainLayout({
   children,
@@ -16,12 +17,13 @@ export default function MainLayout({
   return (
     <ConfigProvider
       theme={{
-        token: { colorPrimary: '#0D9488' },
+        ...ANTD_THEME,
         components: {
+          ...ANTD_THEME.components,
           Menu: {
-            itemSelectedColor: '#0D9488',
-            horizontalItemSelectedColor: '#0D9488',
-            itemHoverColor: '#0D9488',
+            itemSelectedColor: PALETTE.primary,
+            horizontalItemSelectedColor: PALETTE.primary,
+            itemHoverColor: PALETTE.primary,
           },
         },
       }}

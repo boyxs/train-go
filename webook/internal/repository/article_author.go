@@ -128,6 +128,7 @@ func (r *CacheArticleAuthorRepository) toDomain(a dao.Article) domain.Article {
 		Abstract:  a.Abstract,
 		Author:    domain.Author{Id: a.AuthorId},
 		Status:    domain.ArticleStatus(a.Status),
+		Category:  a.Category,
 		CreatedAt: a.CreatedAt,
 		UpdatedAt: a.UpdatedAt,
 	}
@@ -141,5 +142,6 @@ func (r *CacheArticleAuthorRepository) toEntity(a domain.Article) dao.Article {
 		Abstract: a.Abstract,
 		AuthorId: a.Author.Id,
 		Status:   a.Status.ToUint8(),
+		Category: a.Category,
 	}
 }

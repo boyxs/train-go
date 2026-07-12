@@ -54,22 +54,31 @@ func InitWebServer() (App, func(), error) {
 	dualWriter := ioc.InitMigratorSDKDualWriter(universalClient, loggerX)
 	taskName := ioc.InitMigratorSDKTaskName()
 	articleReaderRepository := repository.NewCacheArticleReaderRepository(articleReaderDAO, articleReaderNewDAO, articleCache, switchReader, dualWriter, taskName, loggerX)
-	typedClient := ioc.InitESClient(loggerX)
-	articleSearchDAO := dao.NewElasticArticleDAO(typedClient, loggerX)
-	articleSearchRepository := repository.NewESArticleSearchRepository(articleSearchDAO)
-	ollamaConfig := ioc.InitOllamaEmbeddingConfig()
-	config := ioc.InitEmbeddingConfig()
-	embeddingClient := ioc.InitEmbeddingClient(ollamaConfig, config, universalClient, loggerX)
-	articleSearchService := service.NewArticleSearchService(articleSearchRepository, embeddingClient, loggerX)
-	articleAuthorService := service.NewInternalArticleAuthorService(articleAuthorRepository, articleReaderRepository, articleSearchService, loggerX)
 	clientv3Client, cleanup2, err := ioc.InitEtcdClient()
 	if err != nil {
 		cleanup()
 		return App{}, nil, err
 	}
 	prometheusBuilder := ioc.InitGRPCMetrics()
-	interactionConn, cleanup3, err := ioc.InitInteractionConn(clientv3Client, prometheusBuilder)
+	searchConn, cleanup3, err := ioc.InitSearchConn(clientv3Client, prometheusBuilder)
 	if err != nil {
+		cleanup2()
+		cleanup()
+		return App{}, nil, err
+	}
+	searchServiceClient := ioc.InitSearchClient(searchConn)
+	tagConn, cleanup4, err := ioc.InitTagConn(clientv3Client, prometheusBuilder)
+	if err != nil {
+		cleanup3()
+		cleanup2()
+		cleanup()
+		return App{}, nil, err
+	}
+	tagServiceClient := ioc.InitTagClient(tagConn)
+	interactionConn, cleanup5, err := ioc.InitInteractionConn(clientv3Client, prometheusBuilder)
+	if err != nil {
+		cleanup4()
+		cleanup3()
 		cleanup2()
 		cleanup()
 		return App{}, nil, err
@@ -78,15 +87,17 @@ func InitWebServer() (App, func(), error) {
 	rankingCache := cache.NewRedisArticleRankingCache(universalClient, loggerX)
 	rankingDAO := dao.NewGormArticleRankingDAO(db)
 	rankingRepository := repository.NewCacheArticleRankingRepository(rankingCache, rankingDAO, loggerX)
-	pool, cleanup4 := ioc.InitRankingBoostPool(loggerX)
+	pool, cleanup6 := ioc.InitRankingBoostPool(loggerX)
 	kafkaConfig := ioc.InitKafkaConfig()
-	saramaConfig := ioc.InitSaramaConfig(kafkaConfig)
-	producer := ioc.InitEventProducer(kafkaConfig, saramaConfig, loggerX)
+	config := ioc.InitSaramaConfig(kafkaConfig)
+	producer := ioc.InitEventProducer(kafkaConfig, config, loggerX)
 	interactionEventProducer := interaction.NewSaramaInteractionEventProducer(producer)
 	interactionService := ioc.InitInteractionService(interactionServiceClient, rankingRepository, pool, interactionEventProducer, loggerX)
-	articleAuthorHandler := web.NewInternalArticleAuthorHandler(articleAuthorService, interactionService, loggerX)
-	commentConn, cleanup5, err := ioc.InitCommentConn(clientv3Client, prometheusBuilder)
+	articleSearchService := service.NewGRPCArticleSearchService(searchServiceClient, tagServiceClient, interactionService, loggerX)
+	commentConn, cleanup7, err := ioc.InitCommentConn(clientv3Client, prometheusBuilder)
 	if err != nil {
+		cleanup6()
+		cleanup5()
 		cleanup4()
 		cleanup3()
 		cleanup2()
@@ -95,11 +106,15 @@ func InitWebServer() (App, func(), error) {
 	}
 	commentServiceClient := ioc.InitCommentClient(commentConn)
 	articleReaderService := service.NewInternalArticleReaderService(articleReaderRepository, interactionService, commentServiceClient, loggerX)
-	articleReaderHandler := web.NewInternalArticleReaderHandler(articleReaderService, interactionService, loggerX)
+	tagService := service.NewGRPCTagService(tagServiceClient, searchServiceClient, articleReaderService, interactionService, loggerX)
+	articleAuthorService := service.NewInternalArticleAuthorService(articleAuthorRepository, articleReaderRepository, articleSearchService, tagService, loggerX)
+	articleAuthorHandler := web.NewInternalArticleAuthorHandler(articleAuthorService, interactionService, loggerX)
+	articleReaderHandler := web.NewInternalArticleReaderHandler(articleReaderService, interactionService, tagService, loggerX)
 	interactionHandler := web.NewInternalInteractionHandler(interactionService, loggerX)
 	oAuth2Service := ioc.InitWechatOAuth2Service()
 	oAuth2Handler := web.NewOAuth2WechatHandler(handler, oAuth2Service, userService)
 	articleSearchHandler := web.NewInternalArticleSearchHandler(articleSearchService, loggerX)
+	tagHandler := web.NewInternalTagHandler(tagService, loggerX)
 	clickEventDAO := dao.NewGormAIClickEventDAO(db)
 	clickEventCache := cache.NewRedisAIClickEventCache(universalClient)
 	clickEventRepository := repository.NewCacheAIClickEventRepository(clickEventDAO, clickEventCache, loggerX)
@@ -113,8 +128,10 @@ func InitWebServer() (App, func(), error) {
 	rankingHandler := web.NewArticleRankingHandler(rankingService, loggerX)
 	commentService := service.NewGRPCCommentService(commentServiceClient, interactionService, userService, loggerX)
 	commentHandler := web.NewInternalCommentHandler(commentService)
-	relationConn, cleanup6, err := ioc.InitRelationConn(clientv3Client, prometheusBuilder)
+	relationConn, cleanup8, err := ioc.InitRelationConn(clientv3Client, prometheusBuilder)
 	if err != nil {
+		cleanup7()
+		cleanup6()
 		cleanup5()
 		cleanup4()
 		cleanup3()
@@ -126,16 +143,17 @@ func InitWebServer() (App, func(), error) {
 	relationEventProducer := relation.NewSaramaRelationEventProducer(producer)
 	relationService := service.NewGRPCRelationService(relationServiceClient, userService, relationEventProducer, loggerX)
 	relationHandler := web.NewInternalRelationHandler(relationService)
-	engine := ioc.InitWebServer(v, userHandler, articleAuthorHandler, articleReaderHandler, interactionHandler, oAuth2Handler, articleSearchHandler, clickEventHandler, articlePolishHandler, rankingHandler, commentHandler, relationHandler)
-	searchServer := grpc.NewSearchServer(articleSearchService)
+	engine := ioc.InitWebServer(v, userHandler, articleAuthorHandler, articleReaderHandler, interactionHandler, oAuth2Handler, articleSearchHandler, tagHandler, clickEventHandler, articlePolishHandler, rankingHandler, commentHandler, relationHandler)
 	articleReaderServer := grpc.NewArticleReaderServer(articleReaderService)
 	rankingJobServer := grpc.NewRankingJobServer(rankingService)
-	server := ioc.InitGRPCServer(searchServer, articleReaderServer, rankingJobServer, clientv3Client, prometheusBuilder, loggerX)
+	server := ioc.InitGRPCServer(articleReaderServer, rankingJobServer, clientv3Client, prometheusBuilder, loggerX)
 	app := App{
 		Server:     engine,
 		GRPCServer: server,
 	}
 	return app, func() {
+		cleanup8()
+		cleanup7()
 		cleanup6()
 		cleanup5()
 		cleanup4()
@@ -147,8 +165,9 @@ func InitWebServer() (App, func(), error) {
 
 // wire.go:
 
-// searchProviderSet 搜索模块的 Wire Provider 集合（不含 Handler）
-var searchProviderSet = wire.NewSet(ioc.InitESClient, ioc.InitOllamaEmbeddingConfig, ioc.InitEmbeddingConfig, ioc.InitEmbeddingClient, dao.NewElasticArticleDAO, repository.NewESArticleSearchRepository, service.NewArticleSearchService)
+// tagSearchProviderSet tag/search 下游 gRPC client + core BFF 服务（持 client + 聚合，同构 GRPCCommentService）。
+// search 已从 core 抽出为独立服务，core 退为 client（不再持 ES/embedding）。
+var tagSearchProviderSet = wire.NewSet(ioc.InitSearchConn, ioc.InitSearchClient, ioc.InitTagConn, ioc.InitTagClient, service.NewGRPCArticleSearchService, service.NewGRPCTagService)
 
 // clickEventProviderSet 点击埋点模块
 var clickEventProviderSet = wire.NewSet(dao.NewGormAIClickEventDAO, cache.NewRedisAIClickEventCache, repository.NewCacheAIClickEventRepository, service.NewAIClickEventService)

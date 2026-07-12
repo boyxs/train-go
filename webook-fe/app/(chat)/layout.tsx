@@ -5,6 +5,7 @@ import { App, ConfigProvider } from 'antd';
 import React from 'react';
 
 import { AuthGuard } from '@/components/layout/AuthGuard';
+import { ANTD_THEME } from '@/constants/theme';
 
 export default function ChatLayout({
   children,
@@ -12,7 +13,7 @@ export default function ChatLayout({
   children: React.ReactNode;
 }) {
   return (
-    <ConfigProvider theme={{ token: { colorPrimary: '#0D9488' } }}>
+    <ConfigProvider theme={ANTD_THEME}>
       <App>
         <AuthGuard>
           <div className='h-screen flex flex-col overflow-hidden'>

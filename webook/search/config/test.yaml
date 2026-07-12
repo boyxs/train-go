@@ -1,0 +1,32 @@
+# search 集成测试配置（连本机 ES 9.x，xpack.security 开启 elastic/elastic）。
+server:
+  http:
+    addr: ":8080" # 仅 /metrics+/health
+  grpc:
+    addr: ":8081"
+    name: "webook-search"
+    ttl: 30s
+    weight: 10
+    host: ""
+    timeout: 5s
+
+data:
+  es:
+    addrs: [ "http://localhost:9200" ]
+    username: elastic
+    password: elastic
+    index: search_e2e_test # 集成测试专用索引（e2e server 经 setup.InitArticleSearchDAO 读此值；每测试删建，不碰生产 article_v1）
+
+logger:
+  level: debug
+  development: true
+  encoding: json
+  output_paths: [ stdout ]
+  error_output_paths: [ stderr ]
+
+otel:
+  endpoint: "localhost:4317"
+  service_name: "webook-search-test"
+  service_version: "0.1.0"
+  env: "test"
+  sample_ratio: 0.0

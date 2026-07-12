@@ -21,15 +21,22 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	SearchService_SearchArticles_FullMethodName = "/webook.search.v1.SearchService/SearchArticles"
+	SearchService_IndexArticle_FullMethodName   = "/webook.search.v1.SearchService/IndexArticle"
+	SearchService_RemoveArticle_FullMethodName  = "/webook.search.v1.SearchService/RemoveArticle"
+	SearchService_RecommendTags_FullMethodName  = "/webook.search.v1.SearchService/RecommendTags"
 )
 
 // SearchServiceClient is the client API for SearchService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// SearchService 提供文章搜索能力（被 webook-chat 等下游服务消费）。
+// SearchService 提供文章搜索能力（被 webook-core 网关 / webook-chat 等下游消费）。
+// 向后兼容扩展：SearchArticles 加 filter_tags/facets，ArticleCard 补字段；新增 Index/Remove/RecommendTags。
 type SearchServiceClient interface {
 	SearchArticles(ctx context.Context, in *SearchArticlesRequest, opts ...grpc.CallOption) (*SearchArticlesResponse, error)
+	IndexArticle(ctx context.Context, in *IndexArticleRequest, opts ...grpc.CallOption) (*IndexArticleResponse, error)
+	RemoveArticle(ctx context.Context, in *RemoveArticleRequest, opts ...grpc.CallOption) (*RemoveArticleResponse, error)
+	RecommendTags(ctx context.Context, in *RecommendTagsRequest, opts ...grpc.CallOption) (*RecommendTagsResponse, error)
 }
 
 type searchServiceClient struct {
@@ -50,13 +57,47 @@ func (c *searchServiceClient) SearchArticles(ctx context.Context, in *SearchArti
 	return out, nil
 }
 
+func (c *searchServiceClient) IndexArticle(ctx context.Context, in *IndexArticleRequest, opts ...grpc.CallOption) (*IndexArticleResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(IndexArticleResponse)
+	err := c.cc.Invoke(ctx, SearchService_IndexArticle_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *searchServiceClient) RemoveArticle(ctx context.Context, in *RemoveArticleRequest, opts ...grpc.CallOption) (*RemoveArticleResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RemoveArticleResponse)
+	err := c.cc.Invoke(ctx, SearchService_RemoveArticle_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *searchServiceClient) RecommendTags(ctx context.Context, in *RecommendTagsRequest, opts ...grpc.CallOption) (*RecommendTagsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RecommendTagsResponse)
+	err := c.cc.Invoke(ctx, SearchService_RecommendTags_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SearchServiceServer is the server API for SearchService service.
 // All implementations must embed UnimplementedSearchServiceServer
 // for forward compatibility.
 //
-// SearchService 提供文章搜索能力（被 webook-chat 等下游服务消费）。
+// SearchService 提供文章搜索能力（被 webook-core 网关 / webook-chat 等下游消费）。
+// 向后兼容扩展：SearchArticles 加 filter_tags/facets，ArticleCard 补字段；新增 Index/Remove/RecommendTags。
 type SearchServiceServer interface {
 	SearchArticles(context.Context, *SearchArticlesRequest) (*SearchArticlesResponse, error)
+	IndexArticle(context.Context, *IndexArticleRequest) (*IndexArticleResponse, error)
+	RemoveArticle(context.Context, *RemoveArticleRequest) (*RemoveArticleResponse, error)
+	RecommendTags(context.Context, *RecommendTagsRequest) (*RecommendTagsResponse, error)
 	mustEmbedUnimplementedSearchServiceServer()
 }
 
@@ -69,6 +110,15 @@ type UnimplementedSearchServiceServer struct{}
 
 func (UnimplementedSearchServiceServer) SearchArticles(context.Context, *SearchArticlesRequest) (*SearchArticlesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SearchArticles not implemented")
+}
+func (UnimplementedSearchServiceServer) IndexArticle(context.Context, *IndexArticleRequest) (*IndexArticleResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method IndexArticle not implemented")
+}
+func (UnimplementedSearchServiceServer) RemoveArticle(context.Context, *RemoveArticleRequest) (*RemoveArticleResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RemoveArticle not implemented")
+}
+func (UnimplementedSearchServiceServer) RecommendTags(context.Context, *RecommendTagsRequest) (*RecommendTagsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RecommendTags not implemented")
 }
 func (UnimplementedSearchServiceServer) mustEmbedUnimplementedSearchServiceServer() {}
 func (UnimplementedSearchServiceServer) testEmbeddedByValue()                       {}
@@ -109,6 +159,60 @@ func _SearchService_SearchArticles_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SearchService_IndexArticle_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(IndexArticleRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SearchServiceServer).IndexArticle(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SearchService_IndexArticle_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SearchServiceServer).IndexArticle(ctx, req.(*IndexArticleRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SearchService_RemoveArticle_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoveArticleRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SearchServiceServer).RemoveArticle(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SearchService_RemoveArticle_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SearchServiceServer).RemoveArticle(ctx, req.(*RemoveArticleRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SearchService_RecommendTags_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RecommendTagsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SearchServiceServer).RecommendTags(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SearchService_RecommendTags_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SearchServiceServer).RecommendTags(ctx, req.(*RecommendTagsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // SearchService_ServiceDesc is the grpc.ServiceDesc for SearchService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -119,6 +223,18 @@ var SearchService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SearchArticles",
 			Handler:    _SearchService_SearchArticles_Handler,
+		},
+		{
+			MethodName: "IndexArticle",
+			Handler:    _SearchService_IndexArticle_Handler,
+		},
+		{
+			MethodName: "RemoveArticle",
+			Handler:    _SearchService_RemoveArticle_Handler,
+		},
+		{
+			MethodName: "RecommendTags",
+			Handler:    _SearchService_RecommendTags_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

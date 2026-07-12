@@ -2,14 +2,16 @@
 
 import React from 'react';
 
+import { PALETTE } from '@/constants/theme';
+
 // 用户卡（列表项），精确对齐 relation.pen「UserCard」(dEV64)：
 // radius12 · border · padding16 · gap14 · 头像 48 pill · 名 15/600 · bio 13 tertiary · 互关 pill
 const AVATAR_PALETTE = [
-  { bg: '#F0FDFA', fg: '#0D9488' },
-  { bg: '#EEF2FF', fg: '#6366F1' },
-  { bg: '#FFFBEB', fg: '#D97706' },
-  { bg: '#F0FDF4', fg: '#22C55E' },
-  { bg: '#FEF2F2', fg: '#EF4444' },
+  { bg: PALETTE.tealSurface, fg: PALETTE.primary },
+  { bg: '#EEF2FF', fg: PALETTE.info },
+  { bg: PALETTE.warningSurface, fg: PALETTE.warning },
+  { bg: PALETTE.successSurface, fg: PALETTE.success },
+  { bg: PALETTE.dangerSurface, fg: PALETTE.danger },
 ];
 
 interface UserCardProps {
@@ -35,7 +37,7 @@ export function UserCard({
 }: UserCardProps) {
   const initial = name?.[0]?.toUpperCase() || '?';
   const color = muted
-    ? { bg: '#F3F4F6', fg: '#9CA3AF' }
+    ? { bg: PALETTE.hairline, fg: PALETTE.subtle }
     : AVATAR_PALETTE[Math.abs(id) % AVATAR_PALETTE.length];
   const subText = sub ?? bio ?? '';
 
@@ -60,8 +62,8 @@ export function UserCard({
         gap: 14,
         padding: 16,
         borderRadius: 12,
-        border: '1px solid #E5E7EB',
-        background: '#FFFFFF',
+        border: `1px solid ${PALETTE.line}`,
+        background: PALETTE.surface,
         cursor: onClick ? 'pointer' : 'default',
       }}
     >
@@ -87,7 +89,7 @@ export function UserCard({
       {/* 信息 */}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#1A1A1A' }}>
+          <span style={{ fontSize: 15, fontWeight: 600, color: PALETTE.ink }}>
             {name || `用户 #${id}`}
           </span>
           {mutual && (
@@ -95,8 +97,8 @@ export function UserCard({
               style={{
                 fontSize: 11,
                 fontWeight: 500,
-                color: '#0D9488',
-                background: '#F0FDFA',
+                color: PALETTE.primary,
+                background: PALETTE.tealSurface,
                 borderRadius: 999,
                 padding: '4px 10px',
                 lineHeight: 1,
@@ -112,7 +114,7 @@ export function UserCard({
             style={{
               marginTop: 5,
               fontSize: 13,
-              color: '#9CA3AF',
+              color: PALETTE.subtle,
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',

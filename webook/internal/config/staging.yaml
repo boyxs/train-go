@@ -34,6 +34,12 @@ client:
     webook-relation:
       target: "etcd:///service/webook-relation"
       balancer: "breaker_swrr"
+    webook-search:
+      target: "etcd:///service/webook-search"
+      balancer: "breaker_swrr"
+    webook-tag:
+      target: "etcd:///service/webook-tag"
+      balancer: "breaker_swrr"
 
 data:
   mysql:
@@ -53,11 +59,6 @@ data:
     metadata_retry_max: 3
     metadata_retry_backoff: 250ms
     metadata_timeout: 5s
-  es:
-    addrs: # 多节点即集群
-      - "http://webook-es:9200"
-    username: "elastic"
-    password: ${ES_PASS}
 
 llm:
   providers:
@@ -73,18 +74,6 @@ llm:
       model: "kimi-k2.5"
       max_tokens: 2048
       timeout: 60s
-
-embedding:
-  base_url: "https://qianfan.baidubce.com/v2"
-  api_key: ${QIANFAN_API_KEY}
-  model: "qwen3-embedding-0.6b"
-  dims: 1024
-  timeout: 30s
-
-ollama:
-  base_url: "http://webook-ollama:11434"
-  model: "bge-m3"
-  timeout: 5s
 
 migrator:
   sdk:

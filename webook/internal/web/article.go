@@ -31,10 +31,12 @@ func NewInternalArticleAuthorHandler(svc service.ArticleAuthorService, intrSvc s
 }
 
 type editReq struct {
-	Id       int64  `json:"id"`
-	Title    string `json:"title"`
-	Abstract string `json:"abstract"`
-	Content  string `json:"content"`
+	Id       int64    `json:"id"`
+	Title    string   `json:"title"`
+	Abstract string   `json:"abstract"`
+	Content  string   `json:"content"`
+	Category string   `json:"category"` // 分区（可空）
+	Tags     []string `json:"tags"`     // 作者输入的标签名（≤5，发布时经 tag 服务归一，Edit 存草稿不落标签）
 }
 
 type idReq struct {
@@ -67,6 +69,7 @@ func (h *InternalArticleAuthorHandler) Edit(ctx *gin.Context, req editReq) (ginx
 		Title:    req.Title,
 		Abstract: req.Abstract,
 		Content:  req.Content,
+		Category: req.Category,
 		Author:   domain.Author{Id: uc.Userid},
 	})
 	if err != nil {
@@ -85,7 +88,9 @@ func (h *InternalArticleAuthorHandler) Publish(ctx *gin.Context, req editReq) (g
 		Title:    req.Title,
 		Abstract: req.Abstract,
 		Content:  req.Content,
+		Category: req.Category,
 		Author:   domain.Author{Id: uc.Userid},
+		Tags:     req.Tags,
 	})
 	if err != nil {
 		return ginx.Result{}, err
@@ -129,7 +134,9 @@ func (h *InternalArticleAuthorHandler) Detail(ctx *gin.Context, req idReq) (ginx
 		Content:   article.Content,
 		Abstract:  article.Abstract,
 		Status:    article.Status.ToUint8(),
+		Category:  article.Category,
 		ReadCnt:   intr.ReadCount,
+		Tags:      article.Tags,
 		CreatedAt: article.CreatedAt,
 		UpdatedAt: article.UpdatedAt,
 	}}, nil
@@ -147,26 +154,29 @@ type ArticleVO struct {
 
 // AuthorDetailVO 作者视角文章详情
 type AuthorDetailVO struct {
-	Id        int64  `json:"id"`
-	Title     string `json:"title"`
-	Content   string `json:"content"`
-	Abstract  string `json:"abstract"`
-	Status    uint8  `json:"status"`
-	ReadCnt   int64  `json:"readCnt"`
-	CreatedAt int64  `json:"createdAt"`
-	UpdatedAt int64  `json:"updatedAt"`
+	Id        int64    `json:"id"`
+	Title     string   `json:"title"`
+	Content   string   `json:"content"`
+	Abstract  string   `json:"abstract"`
+	Status    uint8    `json:"status"`
+	Category  string   `json:"category"` // 分区回显
+	ReadCnt   int64    `json:"readCnt"`
+	Tags      []string `json:"tags"` // 当前标签名，供编辑器回显
+	CreatedAt int64    `json:"createdAt"`
+	UpdatedAt int64    `json:"updatedAt"`
 }
 
 // ReaderDetailVO 读者视角文章详情
 type ReaderDetailVO struct {
-	Id        int64  `json:"id"`
-	Title     string `json:"title"`
-	Content   string `json:"content"`
-	Abstract  string `json:"abstract"`
-	AuthorId  int64  `json:"authorId"`
-	ReadCnt   int64  `json:"readCnt"`
-	CreatedAt int64  `json:"createdAt"`
-	UpdatedAt int64  `json:"updatedAt"`
+	Id        int64   `json:"id"`
+	Title     string  `json:"title"`
+	Content   string  `json:"content"`
+	Abstract  string  `json:"abstract"`
+	AuthorId  int64   `json:"authorId"`
+	ReadCnt   int64   `json:"readCnt"`
+	Tags      []tagVO `json:"tags"` // 该文标签（阅读页展示，chip 链 /tag/:slug）
+	CreatedAt int64   `json:"createdAt"`
+	UpdatedAt int64   `json:"updatedAt"`
 }
 
 func (h *InternalArticleAuthorHandler) Page(ctx *gin.Context, req pageReq) (ginx.Result, error) {
@@ -234,11 +244,12 @@ type ArticleReaderHandler interface {
 type InternalArticleReaderHandler struct {
 	svc     service.ArticleReaderService
 	intrSvc service.InteractionService
+	tagSvc  service.TagService
 	l       logger.LoggerX
 }
 
-func NewInternalArticleReaderHandler(svc service.ArticleReaderService, intrSvc service.InteractionService, l logger.LoggerX) ArticleReaderHandler {
-	return &InternalArticleReaderHandler{svc: svc, intrSvc: intrSvc, l: l}
+func NewInternalArticleReaderHandler(svc service.ArticleReaderService, intrSvc service.InteractionService, tagSvc service.TagService, l logger.LoggerX) ArticleReaderHandler {
+	return &InternalArticleReaderHandler{svc: svc, intrSvc: intrSvc, tagSvc: tagSvc, l: l}
 }
 
 func (h *InternalArticleReaderHandler) RegisterRoutes(server *gin.Engine) {
@@ -271,6 +282,7 @@ type ReaderArticleVO struct {
 func (h *InternalArticleReaderHandler) Detail(ctx *gin.Context, req idReq) (ginx.Result, error) {
 	var article domain.Article
 	var intr domain.Interaction
+	var tags []domain.Tag
 	var eg errgroup.Group
 	eg.Go(func() error {
 		var e error
@@ -286,6 +298,17 @@ func (h *InternalArticleReaderHandler) Detail(ctx *gin.Context, req idReq) (ginx
 		}
 		return nil
 	})
+	eg.Go(func() error {
+		// 回显：补该文标签（阅读页 chip 链 /tag/:slug）；失败降级不带标签，不阻断详情。
+		tagMap, e := h.tagSvc.TagsByBiz(ctx, domain.BizArticle, []int64{req.Id})
+		if e != nil {
+			h.l.Error("阅读页：取标签失败，降级不带标签",
+				logger.Int64("article_id", req.Id), logger.Error(e))
+			return nil
+		}
+		tags = tagMap[req.Id]
+		return nil
+	})
 	if err := eg.Wait(); err != nil {
 		// errgroup 任一返 err 都视为「文章不存在」（reader 端无权限/无 detail 都按 NotFound 暴露）
 		return ginx.Result{}, errs.ErrArticleNotFound.WithCause(err)
@@ -297,6 +320,7 @@ func (h *InternalArticleReaderHandler) Detail(ctx *gin.Context, req idReq) (ginx
 		Abstract:  article.DisplayAbstract(),
 		AuthorId:  article.Author.Id,
 		ReadCnt:   intr.ReadCount,
+		Tags:      slicex.Map(tags, toTagVO),
 		CreatedAt: article.CreatedAt,
 		UpdatedAt: article.UpdatedAt,
 	}}, nil

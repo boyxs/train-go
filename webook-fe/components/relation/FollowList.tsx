@@ -45,7 +45,7 @@ export function FollowList({
   if (error && items.length === 0) {
     return (
       <div className='flex flex-col items-center gap-3 py-10'>
-        <p className='text-sm text-[#6B7280]'>{error}</p>
+        <p className='text-sm text-muted'>{error}</p>
         <Button onClick={reload}>重试</Button>
       </div>
     );

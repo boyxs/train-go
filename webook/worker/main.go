@@ -59,7 +59,7 @@ func main() {
 	}()
 
 	<-ctx.Done()
-	log.Println("[worker][shutdown] 停机…")
+	log.Println("[worker][shutdown] 收到信号，开始优雅停机…")
 	<-app.Cron.Stop().Done() // 等 in-flight cron 跑完
 	// 等消费者 goroutine 退出（ctx 取消后 Start 跳出消费循环）再 cleanup：
 	// 否则 cleanup 关 interaction gRPC 连接会撞上在途的 handleBatch→IncrReadCount。

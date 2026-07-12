@@ -34,18 +34,28 @@ client:
     webook-relation:
       target: "etcd:///service/webook-relation"
       balancer: "breaker_swrr"
+    webook-search:
+      target: "etcd:///service/webook-search"
+      balancer: "breaker_swrr"
+    webook-tag:
+      target: "etcd:///service/webook-tag"
+      balancer: "breaker_swrr"
 
 data:
   mysql:
     dsn: root:13520@tcp(localhost:3306)/webook_test?parseTime=true&loc=UTC
   redis:
-    # 集成测对接 3 主集群（7001-7003），验证 cluster 下 cache 多 key（MGetPub 走 Get 流水线）无 CROSSSLOT
-    mode: cluster
-    addrs:
-      - "127.0.0.1:7001"
-      - "127.0.0.1:7002"
-      - "127.0.0.1:7003"
+    # 本地为方便测试默认单机（6379）；cluster 支持仍在（redisx.Config.Mode，代码不变，未来会用）。
+    mode: single
+    addr: "127.0.0.1:6379"
     password: "13520"
+    # 集群模式（验 cluster 下 cache 多 key MGetPub 走 Get 流水线无 CROSSSLOT）：起 3 主集群后
+    # 注释掉上面 mode/addr、启用下面即可切回。
+    # mode: cluster
+    # addrs:
+    #   - "127.0.0.1:7001"
+    #   - "127.0.0.1:7002"
+    #   - "127.0.0.1:7003"
   kafka:
     addrs:
       - "localhost:9094"
@@ -57,11 +67,6 @@ data:
     metadata_retry_max: 1
     metadata_retry_backoff: 250ms
     metadata_timeout: 5s
-  es:
-    addrs: # 多节点即集群
-      - "http://localhost:9200"
-    username: "elastic"
-    password: "elastic" # 本地明文（连无认证 ES 时忽略）
 
 llm:
   providers:
@@ -77,18 +82,6 @@ llm:
       model: "kimi-k2.5"
       max_tokens: 2048
       timeout: 60s
-
-embedding:
-  base_url: "https://qianfan.baidubce.com/v2"
-  api_key: ${QIANFAN_API_KEY}
-  model: "qwen3-embedding-0.6b"
-  dims: 1024
-  timeout: 30s
-
-ollama:
-  base_url: "http://localhost:11434"
-  model: "bge-m3"
-  timeout: 5s
 
 migrator:
   sdk:

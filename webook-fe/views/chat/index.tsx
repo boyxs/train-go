@@ -6,6 +6,7 @@ import { Bot } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import React, { useEffect, useState } from 'react';
 
+import { PALETTE } from '@/constants/theme';
 import { useChat } from '@/hooks/useChat';
 import { useConversations } from '@/hooks/useConversations';
 import { getErrorMessage } from '@/utils/apiError';
@@ -101,7 +102,7 @@ function ChatPage() {
   return (
     <div className='flex flex-col h-full'>
       {/* 顶部栏 */}
-      <div className='flex items-center justify-between px-4 md:px-6 h-14 bg-white border-b border-[#E5E7EB] shrink-0'>
+      <div className='flex items-center justify-between px-4 md:px-6 h-14 bg-white border-b border-line shrink-0'>
         {/* 左侧 */}
         <div className='flex items-center gap-2'>
           {/* 移动端：返回广场 */}
@@ -114,7 +115,7 @@ function ChatPage() {
           </div>
           {/* 桌面端：logo 点击回首页 */}
           <span
-            className='hidden md:inline text-lg font-semibold text-[#0D9488] cursor-pointer'
+            className='hidden md:inline text-lg font-semibold text-primary cursor-pointer'
             onClick={() => router.push('/')}
           >
             小微书
@@ -123,8 +124,8 @@ function ChatPage() {
 
         {/* 中间标题（移动端） */}
         <div className='flex md:hidden items-center gap-1.5'>
-          <Bot size={16} color='#0D9488' />
-          <span className='text-sm font-semibold text-[#1A1A1A]'>AI 客服</span>
+          <Bot size={16} color={PALETTE.primary} />
+          <span className='text-sm font-semibold text-ink'>AI 客服</span>
         </div>
 
         {/* 右侧 */}
@@ -138,7 +139,7 @@ function ChatPage() {
               我的文章
             </Button>
             <div
-              className='w-8 h-8 rounded-full bg-[#0D9488] flex items-center justify-center text-white text-sm font-semibold cursor-pointer'
+              className='w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white text-sm font-semibold cursor-pointer'
               onClick={() => router.push('/user/profile')}
             >
               U
@@ -158,7 +159,7 @@ function ChatPage() {
       {/* 主体 */}
       <div className='flex flex-1 overflow-hidden'>
         {/* 桌面端侧栏 */}
-        <div className='hidden md:block w-[280px] border-r border-[#E5E7EB] bg-[#FAFAFA]'>
+        <div className='hidden md:block w-[280px] border-r border-line bg-surface-hover'>
           {sidebar}
         </div>
 

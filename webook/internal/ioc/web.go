@@ -33,6 +33,7 @@ func InitWebServer(
 	interactionHandler web.InteractionHandler,
 	oauth2Handler web.OAuth2Handler,
 	searchHandler web.ArticleSearchHandler,
+	tagHandler web.TagHandler,
 	clickEventHandler web.ClickEventHandler,
 	polishHandler web.ArticlePolishHandler,
 	rankingHandler web.RankingHandler,
@@ -48,12 +49,15 @@ func InitWebServer(
 	// /metrics 放在中间件之前，Prometheus 抓取不经过 CORS/限流/JWT/日志
 	server.GET("/metrics", gin.WrapH(promhttp.Handler()))
 	server.Use(middlewares...)
+	// router 包 server：tag 用 server.Public.GET 自声明公开路由（登记进 routeRegistry），其余照旧走 server
+	router := ginx.NewRouter(server, routeRegistry)
 	userHandler.RegisterRoutes(server)
 	articleHandler.RegisterRoutes(server)
 	articleReaderHandler.RegisterRoutes(server)
 	interactionHandler.RegisterRoutes(server)
 	oauth2Handler.RegisterRoutes(server)
 	searchHandler.RegisterRoutes(server)
+	tagHandler.RegisterRoutes(router)
 	clickEventHandler.RegisterRoutes(server)
 	polishHandler.RegisterRoutes(server)
 	rankingHandler.RegisterRoutes(server)
@@ -81,7 +85,7 @@ func InitMiddlewares(
 		),
 		// HTTP 软超时（默认 15s）；LLM 润色 / 语义搜索豁免——按各自 client 超时(llm 60s / embedding)跑，不被 15s 切
 		timeout.NewMiddlewareBuilder(viper.GetDuration(confkey.ServerHTTPTimeout)).
-			ExemptPrefix("/article/polish", "/search/article").
+			ExemptPrefix("/article/polish", "/search/article", "/tag/recommend").
 			Build(),
 		//cors
 		cors.New(cors.Config{
@@ -129,6 +133,9 @@ func loggerMiddleware(l logger.LoggerX) gin.HandlerFunc {
 	return builder.Build()
 }
 
+// routeRegistry：ginx.Router 的 Public/Optional 自声明路由登记于此，供中间件 resolver 查询（包级单例）。
+var routeRegistry = ginx.NewRouteRegistry()
+
 func loginJwtMiddleware(cmd redis.Cmdable) gin.HandlerFunc {
 	// 验签走 pkg/jwtx 公共中间件，跨服务一致；签发由 jwtx.Handler 在登录 handler 内完成
 	return jwtx.NewMiddlewareBuilder(jwtx.MiddlewareConfig{
@@ -157,5 +164,7 @@ func loginJwtMiddleware(cmd redis.Cmdable) gin.HandlerFunc {
 		// 评论 list/replies + 关系 followees/followers/stat 公开可读，但登录态可选
 		OptionalPaths("/comment/list", "/comment/replies",
 			"/relation/followees", "/relation/followers", "/relation/stat").
+		// 路由自声明级别（ginx.Router 的 Public/Optional），与上面中央表并存
+		WithResolver(routeRegistry.Lookup).
 		Build()
 }

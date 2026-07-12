@@ -5,6 +5,7 @@ import { App, Button, Empty, List } from 'antd';
 import dayjs from 'dayjs';
 import React from 'react';
 
+import { PALETTE } from '@/constants/theme';
 import type { Conversation } from '@/types/chat';
 
 interface ChatSidebarProps {
@@ -67,15 +68,15 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
                 onClick={() => onSelect(conv.id)}
                 className={`mx-2 mb-1 px-3 py-2 rounded-lg cursor-pointer flex items-center justify-between group transition-colors ${
                   activeId === conv.id
-                    ? 'bg-[#0D9488]/10'
-                    : 'hover:bg-[#FAFAFA]'
+                    ? 'bg-primary/10'
+                    : 'hover:bg-surface-hover'
                 }`}
               >
                 <div className='min-w-0 flex-1'>
-                  <div className='text-sm truncate text-[#1A1A1A]'>
+                  <div className='text-sm truncate text-ink'>
                     {conv.title || '新对话'}
                   </div>
-                  <div className='text-xs text-[#9CA3AF] mt-0.5'>
+                  <div className='text-xs text-subtle mt-0.5'>
                     {dayjs(conv.updatedAt).format('MM-DD HH:mm')}
                   </div>
                 </div>
@@ -85,7 +86,7 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
                   icon={<DeleteOutlined />}
                   onClick={(e) => handleDelete(conv.id, e)}
                   className='opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity'
-                  style={{ color: '#EF4444' }}
+                  style={{ color: PALETTE.danger }}
                 />
               </div>
             )}

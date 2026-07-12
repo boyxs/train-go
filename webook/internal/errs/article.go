@@ -8,12 +8,8 @@ var (
 	ErrArticleEmptyTitleOrContent = errs.New(400, "标题和内容不能为空").WithReason("ARTICLE_TITLE_OR_CONTENT_EMPTY")
 )
 
-// 文章搜索（ES）相关错误
-var (
-	ErrSearchDocNotFound = errs.New(404, "搜索文档不存在").WithReason("SEARCH_DOC_NOT_FOUND")
-	ErrESDocNotFound     = errs.New(404, "ES 文档不存在").WithReason("SEARCH_ES_DOC_NOT_FOUND")
-	ErrSearchQueryEmpty  = errs.New(400, "搜索内容不能为空").WithReason("SEARCH_QUERY_EMPTY")
-)
+// 注：搜索（ES）相关错误已随 search 服务拆分，归属 search/errs（reason 全局唯一，core 不重复定义）；
+// core BFF 侧搜索错误经 errconv 客户端拦截器从 search 透传（reason + code 保真）。
 
 // 文章润色业务校验错误（400/429）
 var (

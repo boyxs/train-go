@@ -51,15 +51,15 @@ function BlocklistPage() {
 
   return (
     <div className='mx-auto max-w-2xl'>
-      <h1 className='text-xl font-bold text-[#1A1A1A]'>黑名单</h1>
-      <p className='mb-5 mt-1 text-sm text-[#6B7280]'>
+      <h1 className='text-xl font-bold text-ink'>黑名单</h1>
+      <p className='mb-5 mt-1 text-sm text-muted'>
         被拉黑的用户无法关注你、给你发私信或评论你的内容。
       </p>
       {loading ? (
         <Loading />
       ) : error && items.length === 0 ? (
         <div className='flex flex-col items-center gap-3 py-10'>
-          <p className='text-sm text-[#6B7280]'>{error}</p>
+          <p className='text-sm text-muted'>{error}</p>
           <Button onClick={reload}>重试</Button>
         </div>
       ) : items.length === 0 ? (

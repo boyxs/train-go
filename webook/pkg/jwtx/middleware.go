@@ -7,6 +7,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	stdjwt "github.com/golang-jwt/jwt/v5"
+
+	"github.com/boyxs/train-go/webook/pkg/ginx"
 )
 
 // 验签失败原因码，写进 401 响应 reason 供前端区分处理。
@@ -18,9 +20,12 @@ const (
 // MiddlewareBuilder 验签中间件构造器。
 // 只验证 token，不签发；签发由各服务自己的 jwt handler 负责。
 type MiddlewareBuilder struct {
-	cfg           MiddlewareConfig
-	ignoredPaths  map[string]struct{}
-	optionalPaths map[string]struct{}
+	cfg             MiddlewareConfig
+	ignoredPaths    map[string]struct{}
+	ignoredPrefixes []string
+	optionalPaths   map[string]struct{}
+	// resolve 可选：按 (method, ctx.FullPath()) 解析路由自声明的访问级别；不设则只走上面的中央表。
+	resolve func(method, fullPath string) ginx.Access
 }
 
 func NewMiddlewareBuilder(cfg MiddlewareConfig) *MiddlewareBuilder {
@@ -39,6 +44,12 @@ func (b *MiddlewareBuilder) IgnoredPaths(paths ...string) *MiddlewareBuilder {
 	return b
 }
 
+// IgnoredPrefixes 前缀放行（用于带路径参数的公开路由，如 /tag/:slug、/tag/:slug/articles → "/tag/"）
+func (b *MiddlewareBuilder) IgnoredPrefixes(prefixes ...string) *MiddlewareBuilder {
+	b.ignoredPrefixes = append(b.ignoredPrefixes, prefixes...)
+	return b
+}
+
 // OptionalPaths 验签可选：成功 → 写 UserClaims；失败 → 仍放行（不抛 401）
 func (b *MiddlewareBuilder) OptionalPaths(paths ...string) *MiddlewareBuilder {
 	for _, p := range paths {
@@ -47,14 +58,47 @@ func (b *MiddlewareBuilder) OptionalPaths(paths ...string) *MiddlewareBuilder {
 	return b
 }
 
+// WithResolver 注入路由自声明级别解析：按 (method, ctx.FullPath()) 返回 Access，
+// AccessPublic 放行 / AccessOptional 可选登录 / AccessProtected 走默认校验。供 ginx.Router 用。
+func (b *MiddlewareBuilder) WithResolver(f func(method, fullPath string) ginx.Access) *MiddlewareBuilder {
+	b.resolve = f
+	return b
+}
+
 func (b *MiddlewareBuilder) Build() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		path := ctx.Request.URL.Path
+		route := ctx.FullPath() // 匹配到的路由模板（如 /tag/:slug）
 		if _, ok := b.ignoredPaths[path]; ok {
 			return
 		}
+		if _, ok := b.ignoredPaths[route]; ok {
+			return
+		}
+		// 路由自声明级别（ginx.Router 的 Public/Optional），与中央表并存。
+		if b.resolve != nil {
+			switch b.resolve(ctx.Request.Method, route) {
+			case ginx.AccessPublic:
+				return
+			case ginx.AccessOptional:
+				uc, reason := b.parseWithReason(ctx)
+				if reason == "" {
+					ctx.Set(b.cfg.UserKey, uc)
+				}
+				return
+			}
+		}
+		for _, prefix := range b.ignoredPrefixes {
+			if strings.HasPrefix(path, prefix) {
+				return
+			}
+		}
 		uc, reason := b.parseWithReason(ctx)
-		if _, optional := b.optionalPaths[path]; optional {
+		_, optional := b.optionalPaths[path]
+		if !optional {
+			_, optional = b.optionalPaths[route]
+		}
+		if optional {
 			if reason == "" {
 				ctx.Set(b.cfg.UserKey, uc)
 			}

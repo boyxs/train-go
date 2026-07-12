@@ -1,0 +1,158 @@
+apiVersion: 1
+
+# webook-tag 服务级告警（镜像 webook-relation.yml；tag 是纯 gRPC 后端，
+# 业务指标走 webook_grpc_requests_*，无 HTTP 业务流量，故 5xx/P99 用 gRPC 表达式）
+# metric 命名空间统一 webook_*，service 区分靠 prometheus 注入的 job 标签
+groups:
+  - orgId: 1
+    name: webook-tag
+    folder: Webook
+    interval: 1m
+    rules:
+
+      # ── ① 服务存活 ────────────────────────────────────────
+      - uid: webook-tag-up
+        title: Webook Tag 服务不可达
+        condition: C
+        for: 1m
+        noDataState: NoData
+        execErrState: Error
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "Webook Tag 实例 {{ $labels.instance }} 不可达"
+          runbook_url: "https://wiki.internal/runbook/webook-tag-down"
+        data:
+          - refId: A
+            relativeTimeRange: { from: 60, to: 0 }
+            datasourceUid: prometheus
+            model:
+              expr: 'up{job="webook-tag"}'
+              refId: A
+              instant: true
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: lt, params: [1] }
+              refId: C
+
+      # ── ② gRPC 错误率 > 5%（非 OK code 占比） ──────────────
+      - uid: webook-tag-grpc-error-rate
+        title: Tag gRPC 错误率 > 5%
+        condition: C
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: high
+          team: backend
+        annotations:
+          summary: "Tag gRPC 错误率 {{ $values.B.Value | humanizePercentage }}"
+          runbook_url: "https://wiki.internal/runbook/webook-tag-grpc-error"
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              expr: 'sum(rate(webook_grpc_requests_total{job="webook-tag",type="server",code!="OK"}[5m])) / sum(rate(webook_grpc_requests_total{job="webook-tag",type="server"}[5m]))'
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [0.05] }
+              refId: C
+
+      # ── ③ gRPC P99 延迟 > 1s ──────────────────────────────
+      # tag 是 DB 读写型服务，P99 应在百毫秒级；放宽到 1s 容忍批量 TagsByBiz/BizIdsByTag 查询
+      - uid: webook-tag-grpc-p99
+        title: Tag gRPC P99 延迟 > 1s
+        condition: C
+        for: 10m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: medium
+          team: backend
+        annotations:
+          summary: "Tag gRPC P99 延迟 {{ $values.B.Value }}s"
+          runbook_url: "https://wiki.internal/runbook/webook-tag-latency"
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              expr: 'histogram_quantile(0.99, sum(rate(webook_grpc_requests_duration_seconds_bucket{job="webook-tag",type="server"}[5m])) by (le))'
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [1] }
+              refId: C
+
+      # ── ④ Goroutine 暴涨 ────────────────────────────────
+      - uid: webook-tag-goroutines
+        title: Tag Goroutine 数 > 10000
+        condition: C
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: high
+          team: backend
+        annotations:
+          summary: "Tag Goroutine 数 {{ $values.B.Value }}（疑似泄漏）"
+          runbook_url: "https://wiki.internal/runbook/goroutine-leak"
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              expr: 'go_goroutines{job="webook-tag"}'
+              refId: A
+              instant: true
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [10000] }
+              refId: C

@@ -14,6 +14,7 @@ export type {
   WithdrawArticleReq,
   ReaderArticle,
   AuthorArticlesResult,
+  ReaderArticleDetail,
 } from './article';
 export { ArticleStatus } from './article';
 export type {
@@ -54,3 +55,13 @@ export type {
   DailyTrend,
   TopArticle,
 } from './ai';
+export type {
+  TagSuggest,
+  Tag,
+  TagDetail,
+  FollowResult,
+  TagFacet,
+  TaggedArticle,
+  TagArticleSort,
+  TagArticlesReq,
+} from './tag';

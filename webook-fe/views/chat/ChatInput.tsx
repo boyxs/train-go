@@ -36,9 +36,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   };
 
   return (
-    <div className='bg-white border-t border-[#E5E7EB] px-4 py-3'>
+    <div className='bg-white border-t border-line px-4 py-3'>
       <div className='flex items-center gap-2'>
-        <div className='flex-1 bg-[#F9FAFB] rounded-xl border border-[#E5E7EB] px-3 py-1.5 focus-within:border-[#0D9488] focus-within:ring-1 focus-within:ring-[#0D9488]/20 transition-all'>
+        <div className='flex-1 bg-[#F9FAFB] rounded-xl border border-line px-3 py-1.5 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/20 transition-all'>
           <TextArea
             value={value}
             onChange={(e) => setValue(e.target.value)}

@@ -1,0 +1,81 @@
+syntax = "proto3";
+
+package webook.tag.v1;
+
+option go_package = "github.com/boyxs/train-go/webook/api/gen/tag/v1;tagv1";
+
+// TagService 通用标签服务（被 webook-core 网关消费）。全通用：biz 入参，无业务名硬编码。
+service TagService {
+  rpc Suggest(SuggestRequest) returns (TagList);
+  rpc SyncTags(SyncTagsRequest) returns (TagList);
+  rpc Detail(DetailRequest) returns (Tag);
+  rpc BatchBySlugs(BatchBySlugsRequest) returns (TagList);
+  rpc TagsByBiz(TagsByBizRequest) returns (TagsByBizResponse);
+  rpc BizIdsByTag(BizIdsByTagRequest) returns (BizIdsByTagResponse);
+
+  // ── 关注订阅（uid 由 core 鉴权后注入）──────────────────────
+  rpc Follow(FollowRequest) returns (FollowResponse);
+  rpc Unfollow(FollowRequest) returns (FollowResponse);
+  rpc FollowStatus(FollowStatusRequest) returns (FollowStatusResponse);
+}
+
+message Tag {
+  int64 id = 1;
+  string name = 2;
+  string slug = 3;
+  string type = 4;
+  string description = 5;
+  int64 ref_count = 6;        // 内容引用数（多少对象打了此标签）
+  int64 follow_count = 7;     // 关注数（多少用户关注此标签）
+  int64 weekly_new_count = 8; // 近 7 天新增关联数（仅 Detail 计算，其余 RPC 恒 0）
+}
+
+message TagList { repeated Tag tags = 1; }
+
+message SuggestRequest {
+  string prefix = 1;
+  int32 limit = 2;
+}
+
+message SyncTagsRequest {
+  string biz = 1;
+  int64 biz_id = 2;
+  repeated string names = 3;
+  string source = 4;
+}
+
+message DetailRequest { string slug = 1; }
+
+message BatchBySlugsRequest { repeated string slugs = 1; }
+
+message TagsByBizRequest {
+  string biz = 1;
+  repeated int64 biz_ids = 2;
+}
+message TagsByBizResponse { map<int64, TagList> tags = 1; } // biz_id → 标签列表
+
+message BizIdsByTagRequest {
+  string slug = 1;
+  string biz = 2;
+  int32 limit = 3;
+}
+message BizIdsByTagResponse {
+  repeated int64 ids = 1;
+  int64 total = 2;
+}
+
+// Follow / Unfollow 共用（uid 关注 slug 标签；slug 不存在→ TAG_NOT_FOUND）。
+message FollowRequest {
+  int64 uid = 1;
+  string slug = 2;
+}
+message FollowResponse {
+  bool changed = 1;        // 是否发生真实状态翻转（重复关注/取关幂等 changed=false）
+  int64 follower_count = 2; // 翻转后该标签的关注数（供前端直接回显）
+}
+
+message FollowStatusRequest {
+  int64 uid = 1;
+  string slug = 2;
+}
+message FollowStatusResponse { bool is_following = 1; }

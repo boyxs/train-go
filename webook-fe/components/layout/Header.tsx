@@ -18,6 +18,7 @@ import { Bot } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import React, { useState } from 'react';
 
+import { PALETTE } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
 
 const menuItems: MenuProps['items'] = [
@@ -93,7 +94,7 @@ export const Header: React.FC = () => {
   return (
     <header className='flex items-center bg-white px-3 md:px-6 border-b border-gray-100'>
       <div
-        className='text-base md:text-lg font-semibold mr-4 md:mr-8 cursor-pointer shrink-0 text-[#0D9488]'
+        className='text-base md:text-lg font-semibold mr-4 md:mr-8 cursor-pointer shrink-0 text-primary'
         onClick={() => router.push('/')}
       >
         小微书
@@ -123,7 +124,7 @@ export const Header: React.FC = () => {
           <Avatar
             icon={<UserOutlined />}
             className='cursor-pointer'
-            style={{ backgroundColor: '#0D9488' }}
+            style={{ backgroundColor: PALETTE.primary }}
           />
         </Dropdown>
       </div>

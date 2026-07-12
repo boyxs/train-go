@@ -26,7 +26,7 @@ func InitGRPCMetrics() *metrics.PrometheusBuilder {
 type CoreConn struct{ *grpc.ClientConn }
 
 // InitCoreConn 拨号 webook-core(grpc.client.webook-core,默认 etcd:///service/webook-core)。
-// search / article 工具走这里；interaction 已拆独立服务，见 InitInteractionConn。
+// article-reader 工具走这里；search 已拆独立服务见 InitSearchConn，interaction 见 InitInteractionConn。
 func InitCoreConn(client *etcdv3.Client, grpcMetrics *metrics.PrometheusBuilder) (CoreConn, func(), error) {
 	cfg, err := clientConfig("webook-core")
 	if err != nil {
@@ -70,7 +70,26 @@ func clientConfig(name string) (grpcx.ClientConfig, error) {
 	return cfg, nil
 }
 
-func InitSearchClient(c CoreConn) searchv1.SearchServiceClient {
+// SearchConn 是到 webook-search 的 gRPC 连接（search 已从 core 抽出为独立服务，chat 直连不再经 core）。
+type SearchConn struct{ *grpc.ClientConn }
+
+// InitSearchConn 拨号 webook-search(grpc.client.webook-search,默认 etcd:///service/webook-search)。拦截链与 CoreConn 对称。
+func InitSearchConn(client *etcdv3.Client, grpcMetrics *metrics.PrometheusBuilder) (SearchConn, func(), error) {
+	cfg, err := clientConfig("webook-search")
+	if err != nil {
+		return SearchConn{}, nil, err
+	}
+	conn, cleanup, err := grpcx.NewClient(client, cfg,
+		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
+		grpc.WithChainUnaryInterceptor(grpcMetrics.BuildUnaryClient(), errconv.UnaryClientInterceptor()),
+	)
+	if err != nil {
+		return SearchConn{}, nil, err
+	}
+	return SearchConn{conn}, cleanup, nil
+}
+
+func InitSearchClient(c SearchConn) searchv1.SearchServiceClient {
 	return searchv1.NewSearchServiceClient(c)
 }
 

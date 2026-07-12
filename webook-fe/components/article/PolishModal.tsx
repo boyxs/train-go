@@ -37,23 +37,23 @@ export const PolishModal: React.FC<PolishModalProps> = ({
       <div className='flex gap-4 max-h-[60vh] overflow-auto'>
         {/* 左栏：原文 */}
         <div className='flex-1 min-w-0'>
-          <div className='text-xs font-semibold text-[#9CA3AF] mb-2'>原文</div>
-          <div className='bg-[#F5F5F5] rounded-lg p-4 space-y-3'>
+          <div className='text-xs font-semibold text-subtle mb-2'>原文</div>
+          <div className='bg-page rounded-lg p-4 space-y-3'>
             <div>
-              <div className='text-xs text-[#9CA3AF] mb-1'>标题</div>
-              <div className='text-sm text-[#1A1A1A] font-medium'>
+              <div className='text-xs text-subtle mb-1'>标题</div>
+              <div className='text-sm text-ink font-medium'>
                 {original.title || '（空）'}
               </div>
             </div>
             <div>
-              <div className='text-xs text-[#9CA3AF] mb-1'>摘要</div>
-              <div className='text-sm text-[#6B7280]'>
+              <div className='text-xs text-subtle mb-1'>摘要</div>
+              <div className='text-sm text-muted'>
                 {original.abstract || '（空）'}
               </div>
             </div>
             <div>
-              <div className='text-xs text-[#9CA3AF] mb-1'>正文</div>
-              <div className='text-sm text-[#1A1A1A] whitespace-pre-wrap leading-relaxed'>
+              <div className='text-xs text-subtle mb-1'>正文</div>
+              <div className='text-sm text-ink whitespace-pre-wrap leading-relaxed'>
                 {original.content || '（空）'}
               </div>
             </div>
@@ -62,23 +62,23 @@ export const PolishModal: React.FC<PolishModalProps> = ({
 
         {/* 右栏：润色结果 */}
         <div className='flex-1 min-w-0'>
-          <div className='text-xs font-semibold text-[#0D9488] mb-2'>
+          <div className='text-xs font-semibold text-primary mb-2'>
             润色结果
           </div>
-          <div className='bg-[#F0FDFA] rounded-lg p-4 space-y-3 border border-[#0D9488]/20'>
+          <div className='bg-teal-surface rounded-lg p-4 space-y-3 border border-primary/20'>
             <div>
-              <div className='text-xs text-[#0D9488] mb-1'>标题</div>
-              <div className='text-sm text-[#1A1A1A] font-medium'>
+              <div className='text-xs text-primary mb-1'>标题</div>
+              <div className='text-sm text-ink font-medium'>
                 {polished.title}
               </div>
             </div>
             <div>
-              <div className='text-xs text-[#0D9488] mb-1'>摘要</div>
-              <div className='text-sm text-[#6B7280]'>{polished.abstract}</div>
+              <div className='text-xs text-primary mb-1'>摘要</div>
+              <div className='text-sm text-muted'>{polished.abstract}</div>
             </div>
             <div>
-              <div className='text-xs text-[#0D9488] mb-1'>正文</div>
-              <div className='text-sm text-[#1A1A1A] whitespace-pre-wrap leading-relaxed'>
+              <div className='text-xs text-primary mb-1'>正文</div>
+              <div className='text-sm text-ink whitespace-pre-wrap leading-relaxed'>
                 {polished.content}
               </div>
             </div>

@@ -5,6 +5,7 @@ import { Ban, Check, Loader2, Plus, Users } from 'lucide-react';
 import React from 'react';
 
 import { follow, unfollow } from '@/api/relation';
+import { PALETTE } from '@/constants/theme';
 import { getErrorMessage } from '@/utils/apiError';
 import { tokenUtil } from '@/utils/token';
 
@@ -17,27 +18,27 @@ const STYLES: Record<
   { bg: string; fg: string; border: string; label: string }
 > = {
   'not-following': {
-    bg: '#0D9488',
-    fg: '#FFFFFF',
-    border: '#0D9488',
+    bg: PALETTE.primary,
+    fg: PALETTE.surface,
+    border: PALETTE.primary,
     label: '关注',
   },
   following: {
-    bg: '#FFFFFF',
-    fg: '#6B7280',
-    border: '#E5E7EB',
+    bg: PALETTE.surface,
+    fg: PALETTE.muted,
+    border: PALETTE.line,
     label: '已关注',
   },
   mutual: {
-    bg: '#F0FDFA',
-    fg: '#0D9488',
-    border: '#99F6E4',
+    bg: PALETTE.tealSurface,
+    fg: PALETTE.primary,
+    border: PALETTE.tealBorder,
     label: '互相关注',
   },
   blocked: {
-    bg: '#F5F5F5',
-    fg: '#D1D5DB',
-    border: '#E5E7EB',
+    bg: PALETTE.page,
+    fg: PALETTE.faint,
+    border: PALETTE.line,
     label: '无法关注',
   },
 };

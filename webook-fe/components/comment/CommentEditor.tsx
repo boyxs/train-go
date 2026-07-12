@@ -3,6 +3,8 @@
 import { Button } from 'antd';
 import React, { useState } from 'react';
 
+import { PALETTE } from '@/constants/theme';
+
 const MAX_LEN = 500;
 
 interface CommentEditorProps {
@@ -48,10 +50,10 @@ export function CommentEditor({
   return (
     <div
       className='rounded-lg flex flex-col gap-2.5'
-      style={{ border: '1px solid #E5E7EB', padding: '12px 14px' }}
+      style={{ border: `1px solid ${PALETTE.line}`, padding: '12px 14px' }}
     >
       {replyTo && (
-        <span style={{ fontSize: 13, fontWeight: 600, color: '#0D9488' }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: PALETTE.primary }}>
           回复 @{replyTo}
         </span>
       )}
@@ -63,10 +65,10 @@ export function CommentEditor({
         rows={2}
         onChange={(e) => setContent(e.target.value)}
         className='w-full resize-none border-none outline-none bg-transparent'
-        style={{ fontSize: 14, color: '#1A1A1A', lineHeight: 1.6 }}
+        style={{ fontSize: 14, color: PALETTE.ink, lineHeight: 1.6 }}
       />
       <div className='flex items-center justify-between'>
-        <span style={{ fontSize: 12, color: '#9CA3AF' }}>
+        <span style={{ fontSize: 12, color: PALETTE.subtle }}>
           {trimmed.length} / {MAX_LEN}
         </span>
         <div className='flex items-center gap-2'>

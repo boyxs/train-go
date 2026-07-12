@@ -42,7 +42,7 @@ func InitWebServer() *gin.Engine {
 	userDAO := dao.NewGormUserDAO(db)
 	userCache := cache.NewRedisUserCache(universalClient)
 	userRepository := repository.NewRedisUserRepository(userDAO, userCache)
-	client := ioc.InitLockClient(universalClient)
+	client := InitLockClient(universalClient)
 	userService := service.NewInternalUserService(userRepository, client, loggerX)
 	codeCache := cache.NewRedisCodeCache(universalClient)
 	codeRepository := repository.NewRedisCodeRepository(codeCache)
@@ -58,30 +58,26 @@ func InitWebServer() *gin.Engine {
 	dualWriter := ioc.InitMigratorSDKDualWriter(universalClient, loggerX)
 	taskName := ioc.InitMigratorSDKTaskName()
 	articleReaderRepository := repository.NewCacheArticleReaderRepository(articleReaderDAO, articleReaderNewDAO, articleCache, switchReader, dualWriter, taskName, loggerX)
-	typedClient := ioc.InitESClient(loggerX)
-	articleSearchDAO := dao.NewElasticArticleDAO(typedClient, loggerX)
-	articleSearchRepository := repository.NewESArticleSearchRepository(articleSearchDAO)
-	ollamaConfig := ioc.InitOllamaEmbeddingConfig()
-	config := ioc.InitEmbeddingConfig()
-	embeddingClient := ioc.InitEmbeddingClient(ollamaConfig, config, universalClient, loggerX)
-	articleSearchService := service.NewArticleSearchService(articleSearchRepository, embeddingClient, loggerX)
-	articleAuthorService := service.NewInternalArticleAuthorService(articleAuthorRepository, articleReaderRepository, articleSearchService, loggerX)
+	articleSearchService := newFakeSearchService()
+	tagService := newFakeTagService()
+	articleAuthorService := service.NewInternalArticleAuthorService(articleAuthorRepository, articleReaderRepository, articleSearchService, tagService, loggerX)
 	interactionService := newFakeInteractionService()
 	articleAuthorHandler := web.NewInternalArticleAuthorHandler(articleAuthorService, interactionService, loggerX)
 	commentServiceClient := provideNilCommentClient()
 	articleReaderService := service.NewInternalArticleReaderService(articleReaderRepository, interactionService, commentServiceClient, loggerX)
-	articleReaderHandler := web.NewInternalArticleReaderHandler(articleReaderService, interactionService, loggerX)
+	articleReaderHandler := web.NewInternalArticleReaderHandler(articleReaderService, interactionService, tagService, loggerX)
 	interactionHandler := web.NewInternalInteractionHandler(interactionService, loggerX)
 	oAuth2Service := ioc.InitWechatOAuth2Service()
 	oAuth2Handler := web.NewOAuth2WechatHandler(handler, oAuth2Service, userService)
 	articleSearchHandler := web.NewInternalArticleSearchHandler(articleSearchService, loggerX)
+	tagHandler := web.NewInternalTagHandler(tagService, loggerX)
 	clickEventDAO := dao.NewGormAIClickEventDAO(db)
 	clickEventCache := cache.NewRedisAIClickEventCache(universalClient)
 	clickEventRepository := repository.NewCacheAIClickEventRepository(clickEventDAO, clickEventCache, loggerX)
 	clickEventService := service.NewAIClickEventService(clickEventRepository)
 	clickEventHandler := web.NewAIClickEventHandler(clickEventService, loggerX)
-	llmConfig := ioc.InitLLMConfig()
-	llmClient := ioc.InitLLMClient(llmConfig, loggerX)
+	config := ioc.InitLLMConfig()
+	llmClient := ioc.InitLLMClient(config, loggerX)
 	articlePolishService := service.NewAIArticlePolishService(llmClient)
 	articlePolishHandler := web.NewAIArticlePolishHandler(articlePolishService, universalClient, loggerX)
 	rankingCache := cache.NewRedisArticleRankingCache(universalClient, loggerX)
@@ -92,7 +88,7 @@ func InitWebServer() *gin.Engine {
 	commentService := service.NewGRPCCommentService(commentServiceClient, interactionService, userService, loggerX)
 	commentHandler := web.NewInternalCommentHandler(commentService)
 	relationHandler := provideTestRelationHandler(userService, loggerX)
-	engine := ioc.InitWebServer(v, userHandler, articleAuthorHandler, articleReaderHandler, interactionHandler, oAuth2Handler, articleSearchHandler, clickEventHandler, articlePolishHandler, rankingHandler, commentHandler, relationHandler)
+	engine := ioc.InitWebServer(v, userHandler, articleAuthorHandler, articleReaderHandler, interactionHandler, oAuth2Handler, articleSearchHandler, tagHandler, clickEventHandler, articlePolishHandler, rankingHandler, commentHandler, relationHandler)
 	return engine
 }
 
@@ -109,14 +105,9 @@ func InitArticleAuthorHandler() web.ArticleAuthorHandler {
 	dualWriter := ioc.InitMigratorSDKDualWriter(universalClient, loggerX)
 	taskName := ioc.InitMigratorSDKTaskName()
 	articleReaderRepository := repository.NewCacheArticleReaderRepository(articleReaderDAO, articleReaderNewDAO, articleCache, switchReader, dualWriter, taskName, loggerX)
-	typedClient := ioc.InitESClient(loggerX)
-	articleSearchDAO := dao.NewElasticArticleDAO(typedClient, loggerX)
-	articleSearchRepository := repository.NewESArticleSearchRepository(articleSearchDAO)
-	ollamaConfig := ioc.InitOllamaEmbeddingConfig()
-	config := ioc.InitEmbeddingConfig()
-	client := ioc.InitEmbeddingClient(ollamaConfig, config, universalClient, loggerX)
-	articleSearchService := service.NewArticleSearchService(articleSearchRepository, client, loggerX)
-	articleAuthorService := service.NewInternalArticleAuthorService(articleAuthorRepository, articleReaderRepository, articleSearchService, loggerX)
+	articleSearchService := newFakeSearchService()
+	tagService := newFakeTagService()
+	articleAuthorService := service.NewInternalArticleAuthorService(articleAuthorRepository, articleReaderRepository, articleSearchService, tagService, loggerX)
 	interactionService := newFakeInteractionService()
 	articleAuthorHandler := web.NewInternalArticleAuthorHandler(articleAuthorService, interactionService, loggerX)
 	return articleAuthorHandler
@@ -136,7 +127,8 @@ func InitArticleReaderHandler() web.ArticleReaderHandler {
 	interactionService := newFakeInteractionService()
 	commentServiceClient := provideNilCommentClient()
 	articleReaderService := service.NewInternalArticleReaderService(articleReaderRepository, interactionService, commentServiceClient, loggerX)
-	articleReaderHandler := web.NewInternalArticleReaderHandler(articleReaderService, interactionService, loggerX)
+	tagService := newFakeTagService()
+	articleReaderHandler := web.NewInternalArticleReaderHandler(articleReaderService, interactionService, tagService, loggerX)
 	return articleReaderHandler
 }
 
@@ -216,13 +208,18 @@ func provideTestMiddlewares(l logger.LoggerX, cmd redis.Cmdable, tp trace.Tracer
 }
 
 var infraSvcProvider = wire.NewSet(
-	InitRedis, wire.Bind(new(redis.Cmdable), new(redis.UniversalClient)), ioc.InitLockClient, InitDB,
+	InitRedis, wire.Bind(new(redis.Cmdable), new(redis.UniversalClient)), InitLockClient,
+	InitDB,
 	InitLogger,
 )
 
 var userSvcProvider = wire.NewSet(dao.NewGormUserDAO, cache.NewRedisUserCache, repository.NewRedisUserRepository, service.NewInternalUserService)
 
-var searchSvcProvider = wire.NewSet(ioc.InitESClient, ioc.InitOllamaEmbeddingConfig, ioc.InitEmbeddingConfig, ioc.InitEmbeddingClient, dao.NewElasticArticleDAO, repository.NewESArticleSearchRepository, service.NewArticleSearchService)
+// searchSvcProvider search/tag 已拆独立 gRPC 服务，集成测试注入 no-op 桩（供 article 作者服务的后台索引/同步空转）。
+var searchSvcProvider = wire.NewSet(
+	newFakeSearchService,
+	newFakeTagService,
+)
 
 var articleSvcProvider = wire.NewSet(dao.NewGormArticleAuthorDAO, dao.NewGormArticleReaderDAO, dao.NewGormArticleReaderNewDAO, cache.NewRedisArticleCache, repository.NewCacheArticleAuthorRepository, repository.NewCacheArticleReaderRepository, service.NewInternalArticleAuthorService, service.NewInternalArticleReaderService, ioc.InitMigratorSDKSwitchReader, ioc.InitMigratorSDKDualWriter, ioc.InitMigratorSDKTaskName, interactionSvcProvider,
 	searchSvcProvider,

@@ -34,6 +34,7 @@ func InitApp() (App, func(), error) {
 		ioc.InitGRPCMetrics,
 		ioc.InitCoreConn,
 		ioc.InitInteractionConn,
+		ioc.InitSearchConn,
 		ioc.InitSearchClient,
 		ioc.InitArticleReaderClient,
 		ioc.InitInteractionClient,

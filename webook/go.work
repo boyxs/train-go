@@ -9,6 +9,8 @@ use (
 	./migrator
 	./pkg
 	./relation
+	./search
 	./shared
+	./tag
 	./worker
 )

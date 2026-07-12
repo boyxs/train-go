@@ -12,13 +12,20 @@ import * as articleApi from '@/api/article';
 import { Loading } from '@/components/common/Loading';
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { STORAGE_KEYS } from '@/constants/storage';
+import { PALETTE } from '@/constants/theme';
 import { useRequest } from '@/hooks/useRequest';
 import { useScrollRestore } from '@/hooks/useScrollRestore';
 import type { Article } from '@/types';
 
 const { Text } = Typography;
 
-const dotColors = ['#0D9488', '#6366F1', '#22C55E', '#FCD34D', '#D97706'];
+const dotColors = [
+  PALETTE.primary,
+  PALETTE.info,
+  PALETTE.success,
+  '#FCD34D',
+  PALETTE.warning,
+];
 
 function formatReadCount(n: number): string {
   if (n >= 10000) {
@@ -70,7 +77,7 @@ function ArticleFeedPage() {
   }
 
   return (
-    <div className='h-screen flex flex-col overflow-hidden bg-[#f5f5f5]'>
+    <div className='h-screen flex flex-col overflow-hidden bg-page'>
       <PublicHeader />
 
       <div className='flex-1 overflow-auto' ref={scrollRef}>
@@ -95,7 +102,7 @@ function ArticleFeedPage() {
                           <Text
                             strong
                             style={{ fontSize: 16 }}
-                            className='group-hover:text-[#0D9488] transition-colors'
+                            className='group-hover:text-primary transition-colors'
                           >
                             {article.title}
                           </Text>
@@ -149,7 +156,7 @@ function ArticleFeedPage() {
                             ) : null}
                           </div>
                         </div>
-                        <RightOutlined className='text-gray-300 group-hover:text-[#0D9488] mt-1 text-xs shrink-0' />
+                        <RightOutlined className='text-gray-300 group-hover:text-primary mt-1 text-xs shrink-0' />
                       </div>
                     </div>
                   </Link>

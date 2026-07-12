@@ -19,15 +19,15 @@ import (
 	"github.com/boyxs/train-go/webook/pkg/grpcx"
 )
 
-// searchProviderSet 搜索模块的 Wire Provider 集合（不含 Handler）
-var searchProviderSet = wire.NewSet(
-	ioc.InitESClient,
-	ioc.InitOllamaEmbeddingConfig,
-	ioc.InitEmbeddingConfig,
-	ioc.InitEmbeddingClient,
-	dao.NewElasticArticleDAO,
-	repository.NewESArticleSearchRepository,
-	service.NewArticleSearchService,
+// tagSearchProviderSet tag/search 下游 gRPC client + core BFF 服务（持 client + 聚合，同构 GRPCCommentService）。
+// search 已从 core 抽出为独立服务，core 退为 client（不再持 ES/embedding）。
+var tagSearchProviderSet = wire.NewSet(
+	ioc.InitSearchConn,
+	ioc.InitSearchClient,
+	ioc.InitTagConn,
+	ioc.InitTagClient,
+	service.NewGRPCArticleSearchService, // 持 searchCli + tagCli + intrSvc，聚合 /search/article
+	service.NewGRPCTagService,           // 持 tagCli + searchCli + readerSvc + intrSvc，聚合 /tags/* /tag/:slug
 )
 
 // clickEventProviderSet 点击埋点模块
@@ -112,11 +112,12 @@ func InitWebServer() (App, func(), error) {
 		web.NewInternalInteractionHandler,
 		web.NewOAuth2WechatHandler,
 		web.NewInternalArticleSearchHandler,
+		web.NewInternalTagHandler,
 		web.NewAIClickEventHandler,
 		web.NewAIArticlePolishHandler,
 		ioc.InitJwtHandler,
-		// 搜索模块
-		searchProviderSet,
+		// tag / search（下游 gRPC client + 适配 + 网关聚合）
+		tagSearchProviderSet,
 		migratorSDKProviderSet,
 		// 点击埋点
 		clickEventProviderSet,
@@ -133,7 +134,6 @@ func InitWebServer() (App, func(), error) {
 		ioc.InitEtcdClient,
 		ioc.InitGRPCMetrics, // server + comment client 共享同一指标 builder
 		ioc.InitGRPCServer,
-		grpcsrv.NewSearchServer,
 		grpcsrv.NewArticleReaderServer,
 		// comment gRPC client（core 作 HTTP 网关 → comment 后端）；聚合在 service.GRPCCommentService
 		ioc.InitCommentConn,

@@ -18,6 +18,9 @@ client:
     webook-interaction:
       target: "etcd:///service/webook-interaction"
       balancer: "breaker_swrr"
+    webook-search:
+      target: "etcd:///service/webook-search"
+      balancer: "breaker_swrr"
 
 data:
   mysql:

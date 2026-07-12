@@ -1,6 +1,7 @@
 .idea
 test.db
 *.out
+*.exe
 go.work
 
 # next.js

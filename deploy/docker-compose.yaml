@@ -26,10 +26,8 @@ services:
       APP_ENV: "${CORE_APP_ENV}"         # .env.<env> 指定 config/<env>.yaml
       MYSQL_PASS: "${MYSQL_PASS}"
       REDIS_PASS: "${REDIS_PASS}"
-      ES_PASS: "${ES_PASS}"      # data.es.password 走此占位
       DEEPSEEK_API_KEY: "${DEEPSEEK_API_KEY}"
       KIMI_API_KEY: "${KIMI_API_KEY}"
-      QIANFAN_API_KEY: "${QIANFAN_API_KEY}"
       DEPLOY_ENV: "${DEPLOY_ENV}"
       TZ: "Asia/Shanghai"
       # GOMEMLIMIT 比 mem_limit 留 ~12% buffer（堆外：goroutine 栈/cgo/mmap/网络栈），不够会被 cgroup OOM
@@ -39,7 +37,7 @@ services:
       webook-mysql:   {condition: service_healthy}
       webook-redis:   {condition: service_healthy}
       webook-kafka:   {condition: service_healthy}
-      webook-es:      {condition: service_healthy}
+      # ES 已随 P3 BFF 重构从 core 剥离（检索走 webook-search gRPC，etcd 惰性解析，不进 depends_on）
     healthcheck:
       # 用 /metrics 探活（HTTP 8010 正常监听）；下游 webook-chat 依赖此 healthy 状态再启动
       test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8010/metrics || exit 1"]
@@ -67,6 +65,7 @@ services:
       GOGC: "${CHAT_GOGC:-80}"
     depends_on:
       webook-core:    {condition: service_healthy}    # 主仓 gRPC :8011 就绪后再起 chat
+      webook-search:  {condition: service_healthy}    # chat 直连 search gRPC（SearchArticles）
       webook-mysql:   {condition: service_healthy}
       webook-redis:   {condition: service_healthy}
     healthcheck:
@@ -153,6 +152,61 @@ services:
     healthcheck:
       # /health 探活（relation/main.go 注册，HTTP :8060）；core 经 etcd 解析调用，不进 nginx upstream
       test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8060/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 20s
+
+  # ── tag 服务（标签本体 + 打标签关联，MySQL；core BFF 经 etcd gRPC 调用，不进 nginx） ──
+  webook-tag:
+    image: ${GHCR_REGISTRY:-ghcr.io}/${GH_USER}/webook-tag:${TAG_IMAGE_TAG}
+    container_name: webook-tag
+    restart: always
+    stop_grace_period: 30s   # > 应用优雅停机 drain(20s)
+    mem_limit: ${TAG_MEM:-256m}
+    environment:
+      APP_ENV: "${TAG_APP_ENV}"     # .env.<env> 指定 config/<env>.yaml
+      MYSQL_PASS: "${MYSQL_PASS}"
+      REDIS_PASS: "${REDIS_PASS}"   # data.redis.password 走此占位（详情 Cache-Aside，架构 §F5）
+      DEPLOY_ENV: "${DEPLOY_ENV}"
+      TZ: "Asia/Shanghai"
+      GOMEMLIMIT: "${TAG_GOMEMLIMIT:-200MiB}"
+      GOGC: "${TAG_GOGC:-80}"
+    depends_on:
+      webook-mysql:   {condition: service_healthy}
+      webook-redis:   {condition: service_healthy}
+      webook-etcd:    {condition: service_started}   # gRPC server 启动即注册 etcd（core 经 etcd 解析调用）
+    healthcheck:
+      # /health 探活（tag/main.go 注册，HTTP :8070）；core 经 etcd 解析调用，不进 nginx upstream
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8070/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 20s
+
+  # ── search 服务（ES + embedding 检索；core BFF / chat 经 etcd gRPC 调用，不进 nginx） ──
+  webook-search:
+    image: ${GHCR_REGISTRY:-ghcr.io}/${GH_USER}/webook-search:${SEARCH_IMAGE_TAG}
+    container_name: webook-search
+    restart: always
+    stop_grace_period: 30s
+    mem_limit: ${SEARCH_MEM:-384m}
+    environment:
+      APP_ENV: "${SEARCH_APP_ENV}"     # .env.<env> 指定 config/<env>.yaml
+      ES_PASS: "${ES_PASS}"            # data.es.password 走此占位
+      REDIS_PASS: "${REDIS_PASS}"      # embedding 缓存 redis 密码
+      QIANFAN_API_KEY: "${QIANFAN_API_KEY}" # embedding.api_key 走此占位
+      DEPLOY_ENV: "${DEPLOY_ENV}"
+      TZ: "Asia/Shanghai"
+      GOMEMLIMIT: "${SEARCH_GOMEMLIMIT:-320MiB}"
+      GOGC: "${SEARCH_GOGC:-80}"
+    depends_on:
+      webook-es:      {condition: service_healthy}
+      webook-redis:   {condition: service_healthy}
+      webook-etcd:    {condition: service_started}   # gRPC server 启动即注册 etcd（core/chat 经 etcd 解析调用）
+    healthcheck:
+      # /health 探活（search/main.go 注册，HTTP :8080）
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/health || exit 1"]
       interval: 10s
       timeout: 3s
       retries: 6

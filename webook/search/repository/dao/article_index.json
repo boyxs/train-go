@@ -1,0 +1,21 @@
+{
+  "mappings": {
+    "properties": {
+      "id": { "type": "long" },
+      "title": { "type": "text" },
+      "abstract": { "type": "text" },
+      "author_id": { "type": "long" },
+      "author_name": { "type": "keyword" },
+      "status": { "type": "byte" },
+      "category": { "type": "keyword" },
+      "tags": { "type": "keyword" },
+      "created_at": { "type": "date", "format": "epoch_millis" },
+      "content_vec": {
+        "type": "dense_vector",
+        "dims": 1024,
+        "index": true,
+        "similarity": "cosine"
+      }
+    }
+  }
+}

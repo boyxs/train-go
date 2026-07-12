@@ -12,6 +12,7 @@ import { Bot } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import React, { useRef, useState } from 'react';
 
+import { PALETTE } from '@/constants/theme';
 import { useChat } from '@/hooks/useChat';
 import { useConversations } from '@/hooks/useConversations';
 import { getErrorMessage } from '@/utils/apiError';
@@ -98,9 +99,9 @@ export const ChatBubble: React.FC = () => {
         <button
           onClick={handleOpen}
           className='fixed bottom-6 right-6 z-50 w-12 h-12 rounded-full border-none cursor-pointer shadow-lg flex items-center justify-center transition-transform hover:scale-110'
-          style={{ backgroundColor: '#0D9488' }}
+          style={{ backgroundColor: PALETTE.primary }}
         >
-          <CommentOutlined style={{ fontSize: 22, color: '#fff' }} />
+          <CommentOutlined style={{ fontSize: 22, color: PALETTE.surface }} />
         </button>
       )}
 
@@ -108,7 +109,7 @@ export const ChatBubble: React.FC = () => {
         title={
           <div className='flex items-center justify-between'>
             <div className='flex items-center gap-2'>
-              <Bot size={16} color='#0D9488' />
+              <Bot size={16} color={PALETTE.primary} />
               <span>AI 客服</span>
             </div>
             <div className='flex items-center gap-0.5'>

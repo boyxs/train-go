@@ -1,0 +1,39 @@
+# tag 本地配置（连本机 docker compose 中间件）。与主仓共用 webook 库（不分库），表 tag/tagging。
+# 详情热点读走 Cache-Aside（data.redis，架构 §F5）。
+etcd:
+  endpoints:
+    - "http://127.0.0.1:2379"
+  path: "/webook-tag"
+  type: "yaml"
+
+server:
+  http:
+    addr: ":8070" # 仅 /metrics+/health（非 gin，不挂超时中间件）
+  grpc:
+    addr: ":8071"
+    name: "webook-tag"
+    ttl: 30s
+    weight: 10
+    host: "" # 空=自动探测出口 IP，k8s 填 POD_IP
+    timeout: 5s
+
+data:
+  mysql:
+    dsn: root:13520@tcp(localhost:3306)/webook?parseTime=true&loc=UTC
+  redis:
+    addr: "127.0.0.1:6379"
+    password: "13520"
+
+logger:
+  level: debug
+  development: true
+  encoding: json
+  output_paths: [ stdout ]
+  error_output_paths: [ stderr ]
+
+otel:
+  endpoint: "localhost:4317"
+  service_name: "webook-tag"
+  service_version: "0.1.0"
+  env: "local"
+  sample_ratio: 1.0

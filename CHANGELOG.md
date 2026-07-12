@@ -2,6 +2,107 @@
 
 <!-- 新功能前插在此，日期降序 -->
 
+## [2026-07-12] tag 服务 SQL 脚本补全 + 脚本落点规范对齐 + tag 服务文档
+
+**变更内容**: 补 tag 服务此前缺失的建表脚本（靠 AutoMigrate、无脚本），并把「脚本同步」规范对齐到实际的**按服务落点**约定，补齐 tag 服务 CLAUDE.md。
+**影响范围**:
+- **新增 `tag/scripts/tag.sql`**：`tag`（本体）/ `tagging`（多态关联）/ `tag_follow`（关注边）三表 DDL，逐字段/类型/默认值/索引/唯一约束**严格对齐** `repository/dao` 的 GORM struct（含本轮新增的 `tag.follow_count` 列 + `tag_follow` 表），镜像 `relation/scripts/relation.sql`（表/列注释、bigint 毫秒时间、`{table}` 前缀索引名、utf8mb4_0900_ai_ci、硬删无 `deleted_at`）。throwaway DB 执行校验通过（3 表 + 索引正确）。
+- **规则对齐**（`webook/CLAUDE.md` 数据表规范 #10）：由「同步到 `webook/scripts/webook.sql`」订正为**按服务归属**——core → `webook/scripts/webook.sql`；拆分服务 → `<svc>/scripts/<svc>.sql`（与既有 comment/interaction/migrator/relation 一致）；纯 ES 服务（search）无 SQL、schema 真相源是 `*_index.json`。
+- **新增 `tag/CLAUDE.md`**：补齐拆分服务缺失的服务文档（为什么拆 / 边界 / 接入方 / 关键决策 / 分层 / 部署），镜像 `relation/CLAUDE.md`；部署段（prometheus job / grafana 告警 / CI / Dockerfile / compose / `.env`）经实存校验，无虚假声明。
+**技术决策**: ① SQL 脚本是「AutoMigrate 之外的真相源」，与 model 对齐但不强求与 AutoMigrate 输出逐字节一致（`uint8`→`tinyint` 沿用 relation.sql 惯例）；② search 无 SQL 脚本是对的（ES 服务），规则显式说明避免将来误补；③ 三表硬删风格（tag/tagging 物理删、tag_follow status 翻转），故均无 `deleted_at`，与 relation/interaction 计数表一致。
+**待办**: 无。
+**会话**: 补全 tag SQL 脚本 + 文档对齐
+**发布**: 待上线（纯脚本/文档；tag 表仍由 AutoMigrate 建，脚本供人工/CI/DBA 参考审阅）
+
+## [2026-07-11] tag 详情缓存（Cache-Aside，把 Redis 引入 tag 服务）
+
+**变更内容**: 承 architect 设计（`prd/tag/ARCHITECTURE.md §F5`），给 tag 服务**详情热点读**加 Cache-Aside，把 Redis 引入原 MySQL-only 的 tag 服务。镜像 relation 的 `RedisRelationCache` + `pkg/redisx` + `consts/cache.go` 三件套。
+**影响范围**:
+- **cache 层**：新 `tag/consts/cache.go`（`TagDetailPattern`=`tag:detail:%s`、`TagDetailTTL`=10min）+ `tag/repository/cache/tag.go`（`TagCache` 接口 + `RedisTagCache`：`GetDetail`/`SetDetail`/`DelDetail`，JSON 值 + jitter(0~5min) TTL）+ `tag/ioc/redis.go`（`redisx.NewClient` + prometheus hook + otel，镜像 relation）。
+- **repo 织入**（`repository/tag.go`，`InternalTagRepository` +`cache`+`logger`）：`Detail` Cache-Aside（命中即返 / miss(`redis.Nil`)/故障回源 DB / 回填，失败记日志不阻断，**对外签名行为不变**）；`Follow`/`Unfollow` 真翻转时 `DelDetail(slug)`；`SyncBiz` 用 dao 新返回的 affected tagIds（新增 ∪ 删除）`FindByIds`→slugs→`DelDetail` **精确失效**。
+- **dao**（`dao/tagging.go`）：`SyncByBiz` 签名 +返回 `affectedTagIds`（ref_count 变化的标签，供上层失效）。
+- **配置/依赖**：5 config + test.yaml 加 `data.redis`（local/test 明文 6379、dev/staging/prod `${REDIS_PASS}`）；`wire.go` + `integration/setup/wire.go`(+`setup/redis.go`+`logger.go`) 加 Redis/cache/logger provider 重生成；**go-redis 钉 v9.18.0 对齐 relation/core**（`go mod tidy` 漂到 v9.21 会破 core `redismocks`）。
+- **部署**：`docker-compose` `webook-tag` +`REDIS_PASS` env + `depends_on: webook-redis{healthy}`。
+- **测试**：tag e2e +`TestDetail_CacheAside`（命中返旧值不查库 + Follow 写失效回源读新值）；`TestDetail_WeeklyNewCount` 加 `flushDetail` 保窗口测试真实性；`reset()` 清 `tag:detail:*` 保隔离。
+**技术决策**: ① 只缓存 Detail（`isFollowing` per-viewer / typeahead / list 不缓存，KISS 同 relation「关系态 P0 不缓存」）；② TTL 10min（含 `weeklyNewCount` 时窗、无写触发失效 → 短 TTL 兜漂移 ≤15min，比 relation stats 24h 短）；③ **`SyncByBiz` 返回 affected tagIds 做精确失效**（新增+移除都即时反映 refCount，非 TTL 兜——初版「移除靠 TTL」被既有 `TestRefCountAcrossBiz` 打回，改精确失效）；④ Redis 故障读回源、写失效失败记日志不阻断（脏缓存至 TTL）。
+**验证**: tag `go test ./...`（含 `TestDetail_CacheAside`，真 MySQL 3306 + Redis 6379）全绿；`make verify` 12 模块 workspace + GOWORK=off 双绿（go-redis v9.18.0 对齐、core redismocks 不破）；compose + tag config YAML `python yaml` 校验过；goimports 干净、`wire ./...` 重生成。
+**待办**: search facet / 标签下文章、tag typeahead / list 缓存仍架构 P1。
+**会话**: workflow:architect tag 缓存设计 + 落地
+**发布**: 待上线（tag 随镜像；无 DDL/proto 变更；tag 容器需 `REDIS_PASS` + redis 可达）
+
+## [2026-07-11] 标签「本周新增 X 篇」统计
+
+**变更内容**: 承 `prd/tag/HANDOVER.md` §3.⑥，tag 详情页头部补「本周新增 X 篇」——近 7 天新增关联数（对齐原型 meta「128 篇内容 · 3.2k 人关注 · 本周新增 12 篇」）。
+**影响范围**:
+- **契约**：`Tag` 消息 +`weekly_new_count`（仅 `Detail` 计算，其余 RPC 恒 0；纯新增向后兼容，regen）。
+- **tag 服务**：`TaggingDAO.CountRecentByTag(tagId, since)`（`COUNT WHERE tag_id=? AND created_at>=?`，跨 biz 与 ref_count 同口径，复用 `idx_tagging_tag_biz` 前缀，无新索引）；`repo.Detail(slug, since)` 解析 tag 后填 `WeeklyNewCount`；`service.Detail` 算 `since = now - 7d`（`weeklyNewWindow` 常量）；`grpc.toPb` 映射。e2e +1（近 7 天计 2 + 直插 8 天前旧关联验证滚动窗口排除）。
+- **core BFF**：`domain.Tag` +`WeeklyNewCount` + `toDomainTag` + `tagDetailVO.weeklyNewCount`（Detail 已透传 Tag，无需改聚合逻辑）；handler 单测 +断言。
+- **前端**：`types.TagDetail` +`weeklyNewCount`；`views/tag/detail` 头部 meta 追加「· 本周新增 Z 篇」（仅 Z>0 显示，避免非活跃标签的「0 篇」噪声）。
+**技术决策**: ① **滚动 7 天窗口**（`now - 7*24h`）而非日历周——绕开周起点/时区边界，`created_at` 是绝对毫秒戳、tz 无关；② 计算而非存储——滚动窗口无法像 ref_count/follow_count 增量维护，读时 `COUNT`（per-tag 行数有界，MVP 免专用 created_at 索引）；③ 挂在 `Detail` 而非新 RPC——它是 tag+时间的属性（非 viewer 相关），未来短 TTL 缓存仍可用，与 isFollowing（per-viewer、独立 RPC）区别对待；④ 跨 biz 口径与 `ref_count`/「X 篇内容」一致（当前仅 article biz）。
+**验证**: tag 模块 `go test ./...`（17 集成 e2e，真 MySQL，含窗口排除）全绿；core web 单测（tag handler +weeklyNewCount 断言）绿；`make verify` 12 模块 workspace + GOWORK=off 双绿、goimports 干净；前端 eslint+tsc+`next build` 绿。
+**待办**: 关注数 / tag 详情缓存层（含本周新增）仍按架构 P1。至此 `prd/tag/HANDOVER.md` §3 前端 6 件套（①~⑥）全部完成。
+**会话**: 接 prd/tag/HANDOVER §3.⑥ 本周新增统计
+**发布**: 待上线（tag/core 随镜像 + 前端；proto 纯新增向后兼容；无 DDL）
+
+## [2026-07-11] 标签关注订阅子系统（tag_follow）
+
+**变更内容**: 承 `prd/tag/HANDOVER.md` §3.⑤，新增「用户关注标签」全链路——tag_follow 关注边 + 每标签关注数 + tag 详情页关注按钮/粉丝数。
+**影响范围**:
+- **契约**（`api/proto/tag/v1/tag.proto`）：`Tag` 加 `follow_count`；新增 `Follow`/`Unfollow`（`{uid,slug}→{changed,follower_count}`）/`FollowStatus`（`{uid,slug}→{is_following}`）3 RPC，regen。**向后兼容**（纯新增字段/方法）。
+- **tag 服务**：`tag` 表加 `follow_count` 列（同 `ref_count` 的 per-tag 聚合，AutoMigrate 加 NOT NULL DEFAULT 0）；新表 `tag_follow`（uid+tag_id 关注边，**status 翻转不物理删**，镜像 `relation_follow`）+ `TagFollowDAO`（事务 `FOR UPDATE` 翻转 + `GREATEST(0,…)` 维护 follow_count + 回读返新计数 + `IsFollowing` 点查）；repo `Follow/Unfollow/IsFollowing`（slug→tag 解析，缺失→`ErrTagNotFound`，抽 `findBySlug` 复用）；service + grpc 3 RPC 实现。集成测 e2e +4（翻转/幂等/多用户累计/Detail 回显 follow_count/not-found）。
+- **core BFF**：`domain.Tag` +`FollowCount`；`service.TagService.Detail(slug, viewerId)` 改签名，`errgroup` 并发聚合 Detail + FollowStatus（viewerId≤0 跳过、关注态失败非致命降级 false）+ 新增 `Follow`/`Unfollow` 委托；`web/tag.go` 加 `POST`/`DELETE /tag/:slug/follow`（需登录 `MustClaims`）+ `tagDetailVO` 加 `followCount`/`isFollowing`；`GET /tag/:slug` 由 `Public` 改 **`Optional`**（登录才算 isFollowing）；fake 桩 + mock 重生成 + web handler 单测 +4。
+- **前端**：`api/tag.ts` `followTag`/`unfollowTag` + `types.TagDetail` +`followCount`/`isFollowing` + `FollowResult`；新组件 `components/tag/TagFollowButton`（2 态，镜像 relation `FollowButton` 视觉：teal 实心/白底描边 + 乐观切换 + 登录门控 + 失败回滚）；`views/tag/detail` 头部加关注按钮 + 「N 人关注」（服务端值为基准 + 本地乐观覆盖按 slug 隔离，避开 `set-state-in-effect`）。
+- **视觉收口**（本轮 review 反馈）：① tag 详情页移除冗余面包屑「首页›标签›X」（PublicHeader 已提供返回路径；.pen 原型此前已删，本次重导出 `02-标签浏览页.png` 同步掉旧 PNG 里的面包屑）；② 统一标签 chip 配色到 `#F0FDFA`/`#0D9488`——`TaggedArticleCard`(默认态) + `TagInput` 原用 antd `token.colorPrimaryBg` 渲染偏灰，与 read/user 页及原型的浅 teal 不一致。
+**技术决策**: ① 关注数存 `tag` 表新列而非另建 `tag_stats`——tag 本体就在本服务且已带 `ref_count` 聚合，relation 另建表只因它无实体表；② Follow/Unfollow 走 **slug**（公开标识，tag 服务内部解析 slug→id，省 core 一次往返）而非 tag_id；③ `Detail` 保持 viewer 无关的纯查询用于将来缓存（P1），isFollowing 走独立 `FollowStatus` RPC 不掺进 Detail；④ status 翻转 + `FOR UPDATE` + `GREATEST` 防负，全程镜像已验证的 relation follow 语义。
+**待办**: 关注数 / tag 详情缓存层仍按架构 P1；⑥「本周新增 X 篇」（`tagging.created_at` 窗口计数）原型已画、后端未实现。
+**验证**: tag 模块 `go test ./...`（domain + 16 集成 e2e，真 MySQL；含 follow 翻转/幂等/多用户/not-found）全绿；core `GRPCTagService` service_test +5（Detail 聚合/FollowStatus 降级/未登录跳过/tag 错误传播/Follow·Unfollow，新增 `web/grpcmocks/tag_mock.go` + `mk/mock.mk` 一行）+ TagHandler web_test +4，全绿——闭合 HANDOVER §六「core BFF service_test」遗留（tag 侧）；`make verify` 12 模块 workspace + GOWORK=off 双绿、goimports 干净、`wire ./...`/mockgen 重生成；前端 eslint + tsc + `next build` 全绿。
+**会话**: 接 prd/tag/HANDOVER §3.⑤ 标签关注订阅
+**发布**: 待上线（tag/core 随镜像 + 前端；proto 纯新增向后兼容；tag 服务 AutoMigrate 建 tag_follow + tag.follow_count 列，无手工 DDL）
+
+## [2026-07-11] 鉴权路由自声明（@Public）+ 命名/结构标准化
+
+**变更内容**: core HTTP 鉴权从「中央放行清单 + `/tag` 前缀巧合」演进为「路由就地声明访问级别」（`server.Public.GET`），顺带修前缀 footgun、统一命名/文件结构。
+**影响范围**:
+- `pkg/jwtx/middleware.go`: 中间件除具体 URL 外按 `ctx.FullPath()` 路由模板匹配（消除 `IgnoredPrefixes("/tag/")` 前缀 footgun）；新增 `WithResolver(func → ginx.Access)`，与中央 `IgnoredPaths`/`OptionalPaths` **并存**（三个 setter 未动，chat/migrator 零改动）。
+- `pkg/ginx/router.go`（新）: `Access`（Protected/Public/Optional 枚举，零值=需登录 secure-by-default）+ `RouteRegistry.Lookup` + `Router`（内嵌 protected `scope` + `.Public`/`.Optional`）；`router_test.go` 5 例运行时验证放行/401/footgun。
+- `internal/ioc/web.go`: 包级 `routeRegistry` 注入中间件 resolver + `InitWebServer` 建 `Router`；去 `IgnoredPrefixes`。
+- `internal/web/tag.go`: `RegisterRoutes(*ginx.Router)`，`/tag/:slug`(+`/articles`) 走 `server.Public.GET`；`/tags/suggest`·`/tags/recommend` → `/tag/suggest`·`/tag/recommend`（不再靠单复数区分公开；gin v1.11 静态+带参同层已验）；`ExemptPrefix` 同步。
+- `search/grpc/`: `search.go` 拆 `server.go`（`SearchServer` 骨架）+ `article.go`（article RPC + pb↔domain 映射），与 service/repository/dao 的 biz 命名对齐，为多 biz（user…）让路。
+- `internal/cmd/backfill` → `backfill-search`（struct/injector/Makefile/wire 同步），确立 `cmd/<动词>-<宾语>/` 约定；删误提交的 `backfill.exe` + `.gitignore` 补 `*.exe`。
+**技术决策**: ① @Public 与中央清单并存、非替换；② jwtx→ginx 依赖 acyclic；③ `SearchServer` 不改 `ArticleServer`（一个 proto service 单实现，user RPC 需挂进来）；④ 注释精简到功能级。
+**待办**: core 集成测试的 test 中间件未挂 resolver（tag HTTP 集成测试将来需补，当前无）；`IgnoredPrefixes` doc 示例仍举已废弃的 `/tag`（方法按约定未动，示例待清）。
+**验证**: `make verify` 12 模块 workspace + GOWORK=off 双绿；pkg/ginx router 运行时 5 例、internal web + backfill-search 单测、search 集成全过；`make -n backfill-search` 解析正确。
+**会话**: workflow:ship 鉴权路由标准化批次
+**发布**: 待上线（core/search 随镜像；无 proto/DDL 变更；路由改名前端未引用无破坏）
+
+## [2026-07-11] tag 服务写路径批量化（消写侧 N+1）
+
+**变更内容**: 发文/改标签的 tag 写链路去掉逐行往返——SyncTags 批量 Upsert、SyncByBiz 增删/ref_count 批量化，语义等价、gRPC 契约不变。
+**影响范围**: 仅 `webook/tag/` 内部（gRPC 契约、mock、缓存策略均不动）——
+- `repository/dao/tag.go`：`Upsert(单条)` → `UpsertTags(批量)`：一次 `CreateInBatches(OnConflict{DoNothing})` 建缺失 + 一次 `SELECT type=? AND slug IN` 回取全部真实 id，5~10 → 2 查询。
+- `repository/dao/tagging.go`：`SyncByBiz` 事务内逐行 Create/Delete/ref_count UPDATE → `CreateInBatches` + `DELETE...IN` + ref_count 同向分组 UPDATE（`GREATEST(0,...)` 防负照旧），事务内 ~11 → ~4 语句、与标签数解耦，缩短热门 tag 行锁持有。
+- `repository/tag.go`：`UpsertTags` + 新增 `toEntity`，按输入 slug 顺序重排回查结果（返回顺序=入参顺序）。
+- `service/tag.go`：`SyncTags` 循环 Upsert → 组装 `[]domain.Tag` 一次批量解析。
+- **注释优化**（同会话顺带，tag + search 两服务手写 Go，15 处）：删关联/废话注释（`同 relation`/`对齐架构 §X`/`与 core 同款`/`业界标准`/`镜像 core` 等），保留功能注释（幂等/降级契约/`GREATEST` 防负/候选窗口/索引语义）。纯注释、零行为变更，两模块 build+vet+test 复绿。
+**技术决策**: ① 对齐 relation/interaction 既有 `clause.OnConflict{DoNothing}` + `GREATEST(0, cnt±?)` 惯例，非新造；② 批量 DoNothing + 回查比原逐个「SELECT→INSERT→冲突回查」并发更稳（`uni(slug,type)` 天然兜底）；③ 消费侧（core BFF errgroup 并发 + BatchBySlugs/FindByBizIds/BatchByBiz）已无 N+1，本次补架构此前只优化读侧、漏掉的写侧；④ 缓存仍按架构 P1，不在本轮。详见 `prd/tag/ARCHITECTURE.md` F4。
+**验证**: tag 模块 `go build` + `go vet` + `go test ./...`（domain + 15 集成测试，含 ref_count 双向 / 超限不落库 / 重打标签幂等）+ `GOWORK=off` build/vet 五重绿；goimports 干净。集成测试连真库 `webook_test` 实跑通过。
+**待办**: 无（行为等价优化；缓存层仍按架构 P1 待做）。
+**会话**: workflow:perf tag 写路径批量化
+**发布**: 待上线（tag 随镜像；无契约 / DDL 变更）
+
+## [2026-07-11] tag/search 部署收尾：core BFF 去 ES 部署对齐 + 存量文章回填命令
+
+**变更内容**: 承 `prd/tag/handover.md` 续做部署剩余项。① 把 P3 core BFF 重构（core 退为 tag/search 的 gRPC client、彻底去 ES/embedding）**同步到部署与配置**——此前只加了 tag/search 新服务块，漏改 core 自身的依赖图与死配置。② 新增存量 `published_article` → `webook-search` ES 索引的一次性幂等回填命令。
+**影响范围**:
+- **compose**（`deploy/docker-compose.yaml`）：`webook-core` 去掉 stale `depends_on: webook-es`（core 不再连 ES，却误等 ES 健康才启动）+ 去死 env `ES_PASS`/`QIANFAN_API_KEY`（core 已无消费者）；`webook-chat` 加 `depends_on: webook-search {service_healthy}`（chat 已直连 search gRPC）。
+- **core 配置**（`internal/config/{local,dev,staging,prod,test}.yaml` 5 份）：删死块 `data.es` / `embedding` / `ollama`（`ioc/es.go` 已随 P3 移除、0 消费者）；`config/.env.example` 去 `QIANFAN_API_KEY`。`ES_PASS`/`QIANFAN_API_KEY` 仍由 search（及 migrator 的 `ES_PASS`）使用，故 `deploy/.env*` 保留不动。
+- **backfill 命令**（`internal/cmd/backfill-search/`，wire 装配）：复用 core infra + 下游 gRPC client（DB 源库 + etcd 发现 + search/tag client），分页遍历 `published_article`、逐篇取当前标签（`tag.TagsByBiz`）+ 写 ES（`search.IndexArticle`）。幂等可重复跑。`make backfill-search`（`BACKFILL_ENV` 覆盖 yaml）。含 4 子测（批次终止/取标签降级/单篇失败计数/读源库致命错，不依赖真中间件、CI 可跑）。
+**技术决策**: ① 依 core 既有先例——gRPC 下游（comment/interaction/relation）**不进 depends_on**、靠 etcd 惰性解析；故 core→tag/search 亦不加 depends（search 调用非致命降级，不该因 search 未就绪阻塞 core 启动）；chat→search 沿 chat→core 先例加 `service_healthy`。② backfill 走**发布写路径的下游契约、而非 migrator 管道**（后者裸列拷贝、无 embedding/enrichment/tags，会毁 kNN/facet）；语义是「按当前标签重建索引」，**绝不调 `SyncTags`**（空 names 会清掉已打标签）。③ `author_name` 两侧读路径均不带（与发布索引一致），search 服务端据 title/abstract 现算 `content_vec`。
+**验证**: `make verify` 12 模块 workspace + GOWORK=off 双绿、goimports 干净、`make wire` 重生成 backfill `wire_gen.go`；backfill 4 单测过。7 份 YAML（compose ×2 + core 5 config）过 `python yaml` 校验。⚠ **未实跑**：docker CLI 未装（compose/镜像未 build/run）；backfill 需 MySQL+etcd+search/tag gRPC 在跑才能 e2e（本环境 ES/search 未起），当前仅编译 + 单测 + 照搬已验证的 publish 契约，**不算 e2e 通过**。
+**待办**: ES:9200 + search/tag gRPC 起回后实跑 `make backfill-search` + `make -f mk/es.mk count` 复核（`search.Index` 对 ES 写失败静默降级、命令感知不到）；docker 环境 compose 起全套复核「core 无 ES 依赖」正常。前端（handover §3）+ core BFF service_test/web_test（handover §六）仍在 backlog。
+**会话**: 接 prd/tag/handover 部署收尾（续作）
+**发布**: 待上线（core 随镜像；配置/compose 变更部署时生效）
+
 ## [2026-07-10] ES 集群/认证支持 + xpack.security 强制密码 + ioc 重构
 
 **变更内容**: core/migrator 的 ES 配置支持多节点（集群）+ Basic 认证；`deploy` 的 webook-es 开启 xpack.security 强制密码（Basic auth over HTTP，免 TLS）。顺带：修 v9 弃用 API、把建索引下沉业务层、mapping 抽成 JSON 文件。

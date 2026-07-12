@@ -8,6 +8,7 @@ import React from 'react';
 import { getRelationStat } from '@/api/relation';
 import { findUserInfo } from '@/api/user';
 import { FollowButton } from '@/components/relation/FollowButton';
+import { PALETTE } from '@/constants/theme';
 import type { RelationStat, UserInfo } from '@/types';
 import { formatCount } from '@/utils/format';
 
@@ -26,10 +27,8 @@ const cache = new Map<number, HoverData>();
 function CountItem({ n, label }: { n: number; label: string }) {
   return (
     <div className='flex flex-col items-center'>
-      <span className='text-base font-bold text-[#1A1A1A]'>
-        {formatCount(n)}
-      </span>
-      <span className='text-xs text-[#9CA3AF]'>{label}</span>
+      <span className='text-base font-bold text-ink'>{formatCount(n)}</span>
+      <span className='text-xs text-subtle'>{label}</span>
     </div>
   );
 }
@@ -104,7 +103,7 @@ export function UserHoverCard({ userId, self, children }: UserHoverCardProps) {
       {!data ? (
         <div className='flex justify-center py-6'>
           <Spin spinning={loading} size='small' />
-          {!loading && <span className='text-xs text-[#9CA3AF]'>暂无信息</span>}
+          {!loading && <span className='text-xs text-subtle'>暂无信息</span>}
         </div>
       ) : (
         <div className='flex flex-col gap-3'>
@@ -112,16 +111,19 @@ export function UserHoverCard({ userId, self, children }: UserHoverCardProps) {
           <div className='flex cursor-pointer gap-3' onClick={goProfile}>
             <div
               className='flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-lg font-bold'
-              style={{ background: '#F0FDFA', color: '#0D9488' }}
+              style={{
+                background: PALETTE.tealSurface,
+                color: PALETTE.primary,
+              }}
             >
               {data.info.nickname?.[0]?.toUpperCase() || '?'}
             </div>
             <div className='min-w-0 flex-1'>
-              <div className='truncate text-sm font-bold text-[#1A1A1A]'>
+              <div className='truncate text-sm font-bold text-ink'>
                 {data.info.nickname || `用户 #${userId}`}
               </div>
               {data.info.aboutMe && (
-                <div className='mt-0.5 line-clamp-2 text-xs text-[#6B7280]'>
+                <div className='mt-0.5 line-clamp-2 text-xs text-muted'>
                   {data.info.aboutMe}
                 </div>
               )}
@@ -129,7 +131,7 @@ export function UserHoverCard({ userId, self, children }: UserHoverCardProps) {
           </div>
 
           {/* 计数 */}
-          <div className='flex gap-6 border-t border-[#F3F4F6] pt-3'>
+          <div className='flex gap-6 border-t border-hairline pt-3'>
             <CountItem n={data.stat?.followeeCnt ?? 0} label='关注' />
             <CountItem n={data.stat?.followerCnt ?? 0} label='粉丝' />
           </div>

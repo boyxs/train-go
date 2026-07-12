@@ -16,6 +16,7 @@ import (
 	rankingv1 "github.com/boyxs/train-go/webook/api/gen/ranking/v1"
 	relationv1 "github.com/boyxs/train-go/webook/api/gen/relation/v1"
 	searchv1 "github.com/boyxs/train-go/webook/api/gen/search/v1"
+	tagv1 "github.com/boyxs/train-go/webook/api/gen/tag/v1"
 	grpcsrv "github.com/boyxs/train-go/webook/internal/grpc"
 	"github.com/boyxs/train-go/webook/pkg/grpcx"
 	"github.com/boyxs/train-go/webook/pkg/grpcx/interceptor/errconv"
@@ -34,7 +35,6 @@ func InitGRPCMetrics() *metrics.PrometheusBuilder {
 // InitGRPCServer 组装 server 并注册所有 gRPC service，由 main 起 goroutine 监听。
 // otel StatsHandler 与错误拦截器在此显式传入（grpcx 不内置默认 option）。
 func InitGRPCServer(
-	searchSrv *grpcsrv.SearchServer,
 	articleSrv *grpcsrv.ArticleReaderServer,
 	rankingJobSrv *grpcsrv.RankingJobServer,
 	client *etcdv3.Client,
@@ -54,7 +54,6 @@ func InitGRPCServer(
 		// metrics 在外层：观测 errconv 转换后的最终 status code
 		grpc.ChainUnaryInterceptor(grpcMetrics.BuildUnaryServer(), errconv.UnaryServerInterceptor(l)),
 	)
-	searchv1.RegisterSearchServiceServer(srv.Server, searchSrv)
 	articlev1.RegisterArticleReaderServiceServer(srv.Server, articleSrv)
 	rankingv1.RegisterRankingJobServiceServer(srv.Server, rankingJobSrv) // webook-worker 调度器触发重算
 	healthpb.RegisterHealthServer(srv.Server, health.NewServer())        // k8s / LB 健康探测
@@ -69,14 +68,7 @@ type CommentConn struct{ *grpc.ClientConn }
 // InitCommentConn 拨号 webook-comment(grpc.client.webook-comment,默认 etcd:///service/webook-comment)。
 // 复用进程内唯一的 grpcMetrics(与 server 共享)，拦截链与 chat→core 对称：otel + metrics(client) + errconv。
 func InitCommentConn(client *etcdv3.Client, grpcMetrics *metrics.PrometheusBuilder) (CommentConn, func(), error) {
-	cfg, err := grpcClientConfig("webook-comment")
-	if err != nil {
-		return CommentConn{}, nil, err
-	}
-	conn, cleanup, err := grpcx.NewClient(client, cfg,
-		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
-		grpc.WithChainUnaryInterceptor(grpcMetrics.BuildUnaryClient(), errconv.UnaryClientInterceptor()),
-	)
+	conn, cleanup, err := dialDownstream(client, grpcMetrics, "webook-comment")
 	if err != nil {
 		return CommentConn{}, nil, err
 	}
@@ -93,14 +85,7 @@ type InteractionConn struct{ *grpc.ClientConn }
 // InitInteractionConn 拨号 webook-interaction(grpc.client.webook-interaction,默认 etcd:///service/webook-interaction)。
 // 复用进程内唯一的 grpcMetrics(与 server / comment client 共享)，拦截链与 comment client 对称。
 func InitInteractionConn(client *etcdv3.Client, grpcMetrics *metrics.PrometheusBuilder) (InteractionConn, func(), error) {
-	cfg, err := grpcClientConfig("webook-interaction")
-	if err != nil {
-		return InteractionConn{}, nil, err
-	}
-	conn, cleanup, err := grpcx.NewClient(client, cfg,
-		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
-		grpc.WithChainUnaryInterceptor(grpcMetrics.BuildUnaryClient(), errconv.UnaryClientInterceptor()),
-	)
+	conn, cleanup, err := dialDownstream(client, grpcMetrics, "webook-interaction")
 	if err != nil {
 		return InteractionConn{}, nil, err
 	}
@@ -116,14 +101,7 @@ type RelationConn struct{ *grpc.ClientConn }
 
 // InitRelationConn 拨号 webook-relation。复用进程内唯一 grpcMetrics（与 server/其他 client 共享），拦截链对称。
 func InitRelationConn(client *etcdv3.Client, grpcMetrics *metrics.PrometheusBuilder) (RelationConn, func(), error) {
-	cfg, err := grpcClientConfig("webook-relation")
-	if err != nil {
-		return RelationConn{}, nil, err
-	}
-	conn, cleanup, err := grpcx.NewClient(client, cfg,
-		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
-		grpc.WithChainUnaryInterceptor(grpcMetrics.BuildUnaryClient(), errconv.UnaryClientInterceptor()),
-	)
+	conn, cleanup, err := dialDownstream(client, grpcMetrics, "webook-relation")
 	if err != nil {
 		return RelationConn{}, nil, err
 	}
@@ -134,11 +112,48 @@ func InitRelationClient(c RelationConn) relationv1.RelationServiceClient {
 	return relationv1.NewRelationServiceClient(c)
 }
 
-// grpcClientConfig 读 client.grpc.<name>(target/balancer/…);target 必填,缺失 → dial 失败,代码不派生。
-func grpcClientConfig(name string) (grpcx.ClientConfig, error) {
+// SearchConn 是到 webook-search 的 gRPC 连接（search 已从 core 抽出为独立服务）。独立类型让 wire 区分多下游 conn。
+type SearchConn struct{ *grpc.ClientConn }
+
+// InitSearchConn 拨号 webook-search(grpc.client.webook-search,默认 etcd:///service/webook-search)。拦截链与其他 client 对称。
+func InitSearchConn(client *etcdv3.Client, grpcMetrics *metrics.PrometheusBuilder) (SearchConn, func(), error) {
+	conn, cleanup, err := dialDownstream(client, grpcMetrics, "webook-search")
+	if err != nil {
+		return SearchConn{}, nil, err
+	}
+	return SearchConn{conn}, cleanup, nil
+}
+
+func InitSearchClient(c SearchConn) searchv1.SearchServiceClient {
+	return searchv1.NewSearchServiceClient(c)
+}
+
+// TagConn 是到 webook-tag 的 gRPC 连接。独立类型让 wire 区分多下游 conn。
+type TagConn struct{ *grpc.ClientConn }
+
+// InitTagConn 拨号 webook-tag(grpc.client.webook-tag,默认 etcd:///service/webook-tag)。拦截链与其他 client 对称。
+func InitTagConn(client *etcdv3.Client, grpcMetrics *metrics.PrometheusBuilder) (TagConn, func(), error) {
+	conn, cleanup, err := dialDownstream(client, grpcMetrics, "webook-tag")
+	if err != nil {
+		return TagConn{}, nil, err
+	}
+	return TagConn{conn}, cleanup, nil
+}
+
+func InitTagClient(c TagConn) tagv1.TagServiceClient {
+	return tagv1.NewTagServiceClient(c)
+}
+
+// dialDownstream 拨号一个下游服务：读 client.grpc.<name>（target/balancer，target 必填缺失即 dial 失败）
+// + 装对称拦截链（otel + metrics(client) + errconv，复用进程内唯一 grpcMetrics）。五个下游唯一差异是服务名，
+// 各 InitXxxConn 只做薄类型包装让 wire 区分多 conn。
+func dialDownstream(client *etcdv3.Client, grpcMetrics *metrics.PrometheusBuilder, name string) (*grpc.ClientConn, func(), error) {
 	var cfg grpcx.ClientConfig
 	if err := viper.UnmarshalKey("client.grpc."+name, &cfg); err != nil {
-		return grpcx.ClientConfig{}, err
+		return nil, nil, err
 	}
-	return cfg, nil
+	return grpcx.NewClient(client, cfg,
+		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
+		grpc.WithChainUnaryInterceptor(grpcMetrics.BuildUnaryClient(), errconv.UnaryClientInterceptor()),
+	)
 }

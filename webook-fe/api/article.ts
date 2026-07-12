@@ -4,6 +4,7 @@ import type {
   EditArticleReq,
   PageReq,
   PageResult,
+  ReaderArticleDetail,
   Result,
   WithdrawArticleReq,
 } from '@/types';
@@ -69,9 +70,11 @@ export function pagePublishedArticles(params: Partial<PageReq> = {}) {
   );
 }
 
-// POST /article/reader/detail — 公开文章详情
+// POST /article/reader/detail — 公开文章详情（含标签，供阅读页展示）
 export function findPublishedArticle(id: number) {
-  return axios.post<Result<Article>>('/article/reader/detail', { id });
+  return axios.post<Result<ReaderArticleDetail>>('/article/reader/detail', {
+    id,
+  });
 }
 
 // POST /article/reader/author — 某作者已发布文章 + 获赞总数（他人主页「TA 的文章」，公开）

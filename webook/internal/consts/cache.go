@@ -24,8 +24,6 @@ const (
 	ChatRateLimitPattern = "chat:ratelimit:%d" // chat:ratelimit:{uid}
 	ChatStreamPattern    = "chat:stream:%d"    // chat:stream:{convId} Redis Stream
 
-	EmbeddingCachePattern = "embedding:cache:%s" // embedding:cache:{textHash}
-
 	ClickEventDashboardKey = "click:event:ai:dashboard" // AI 点击看板缓存
 
 	PolishRateLimitPattern = "polish:ratelimit:%d" // polish:ratelimit:{uid}

@@ -1,4 +1,4 @@
-package service
+package service_test
 
 import (
 	"context"
@@ -6,304 +6,146 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
+	searchv1 "github.com/boyxs/train-go/webook/api/gen/search/v1"
+	tagv1 "github.com/boyxs/train-go/webook/api/gen/tag/v1"
 	"github.com/boyxs/train-go/webook/internal/domain"
-	"github.com/boyxs/train-go/webook/internal/errs"
-	"github.com/boyxs/train-go/webook/internal/repository"
-	repomocks "github.com/boyxs/train-go/webook/internal/repository/mocks"
-	embmocks "github.com/boyxs/train-go/webook/internal/service/embedding/mocks"
+	"github.com/boyxs/train-go/webook/internal/service"
+	svcmocks "github.com/boyxs/train-go/webook/internal/service/mocks"
+	grpcmocks "github.com/boyxs/train-go/webook/internal/web/grpcmocks"
 	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
-var stubVec = make([]float32, 1024)
+// newSearchSvc 装配 GRPCArticleSearchService：搜索/标签下游 gRPC client + 互动 service 全 mock。
+func newSearchSvc(t *testing.T, ctrl *gomock.Controller) (
+	service.ArticleSearchService,
+	*grpcmocks.MockSearchServiceClient,
+	*grpcmocks.MockTagServiceClient,
+	*svcmocks.MockInteractionService,
+) {
+	t.Helper()
+	searchCli := grpcmocks.NewMockSearchServiceClient(ctrl)
+	tagCli := grpcmocks.NewMockTagServiceClient(ctrl)
+	intrSvc := svcmocks.NewMockInteractionService(ctrl)
+	svc := service.NewGRPCArticleSearchService(searchCli, tagCli, intrSvc, logger.NewNopLogger())
+	return svc, searchCli, tagCli, intrSvc
+}
 
-func TestSearchService_Search(t *testing.T) {
-	articles := []domain.Article{
-		{Id: 1, Title: "健身饮食", Abstract: "如何科学饮食"},
-		{Id: 2, Title: "跑步技巧", Abstract: "提升跑步效率"},
+// Search 正常路径：命中文章 + facet；并发补标签名(tag) + 互动计数(interaction)。
+func TestGRPCArticleSearchService_Search_Aggregates(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	svc, searchCli, tagCli, intrSvc := newSearchSvc(t, ctrl)
+
+	searchCli.EXPECT().SearchArticles(gomock.Any(), gomock.Any()).Return(&searchv1.SearchArticlesResponse{
+		Articles: []*searchv1.ArticleCard{
+			{Id: 1, Title: "Go 并发", AuthorId: 10, AuthorName: "张三", Tags: []string{"go"}, CreatedAt: 100},
+		},
+		Total:  1,
+		Facets: []*searchv1.TagCount{{Slug: "go", Count: 5}, {Slug: "rust", Count: 2}},
+	}, nil)
+	tagCli.EXPECT().BatchBySlugs(gomock.Any(), gomock.Any()).Return(&tagv1.TagList{
+		Tags: []*tagv1.Tag{{Slug: "go", Name: "Go"}, {Slug: "rust", Name: "Rust"}},
+	}, nil)
+	intrSvc.EXPECT().FindByBizIds(gomock.Any(), domain.BizArticle, []int64{1}).
+		Return(map[int64]domain.Interaction{1: {ReadCount: 10, LikeCount: 3, CollectCount: 2}}, nil)
+
+	res, err := svc.Search(context.Background(), "go", nil, 1, 10)
+	assert.NoError(t, err)
+	assert.Equal(t, int64(1), res.Total)
+	if assert.Len(t, res.Articles, 1) {
+		a := res.Articles[0]
+		assert.Equal(t, int64(1), a.Id)
+		assert.Equal(t, "张三", a.Author.Name)
+		assert.Equal(t, int64(10), a.ReadCnt)
+		assert.Equal(t, int64(3), a.LikeCnt)
+		assert.Equal(t, int64(2), a.CollectCnt)
+		if assert.Len(t, a.Tags, 1) {
+			assert.Equal(t, "Go", a.Tags[0].Name, "命中标签 slug→name 已解析")
+		}
 	}
-
-	testCases := []struct {
-		name      string
-		query     string
-		page      int
-		size      int
-		mock      func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *embmocks.MockClient)
-		wantList  []domain.Article
-		wantTotal int64
-		wantErr   string
-	}{
-		{
-			name:  "搜索成功有结果",
-			query: "健身饮食",
-			page:  1,
-			size:  10,
-			mock: func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *embmocks.MockClient) {
-				repo := repomocks.NewMockArticleSearchRepository(ctrl)
-				embed := embmocks.NewMockClient(ctrl)
-				embed.EXPECT().Embed(gomock.Any(), "健身饮食").Return(stubVec, nil)
-				repo.EXPECT().Search(gomock.Any(), "健身饮食", stubVec, 0, 10).
-					Return(articles, int64(2), nil)
-				return repo, embed
-			},
-			wantList:  articles,
-			wantTotal: 2,
-		},
-		{
-			name:  "搜索成功空结果",
-			query: "量子力学",
-			page:  1,
-			size:  10,
-			mock: func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *embmocks.MockClient) {
-				repo := repomocks.NewMockArticleSearchRepository(ctrl)
-				embed := embmocks.NewMockClient(ctrl)
-				embed.EXPECT().Embed(gomock.Any(), "量子力学").Return(stubVec, nil)
-				repo.EXPECT().Search(gomock.Any(), "量子力学", stubVec, 0, 10).
-					Return(nil, int64(0), nil)
-				return repo, embed
-			},
-			wantList:  nil,
-			wantTotal: 0,
-		},
-		{
-			name:  "embed 失败",
-			query: "test",
-			page:  1,
-			size:  10,
-			mock: func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *embmocks.MockClient) {
-				repo := repomocks.NewMockArticleSearchRepository(ctrl)
-				embed := embmocks.NewMockClient(ctrl)
-				embed.EXPECT().Embed(gomock.Any(), "test").Return(nil, errors.New("embed error"))
-				return repo, embed
-			},
-			wantErr: "embed error",
-		},
-		{
-			name:  "repo.Search 失败",
-			query: "test",
-			page:  1,
-			size:  10,
-			mock: func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *embmocks.MockClient) {
-				repo := repomocks.NewMockArticleSearchRepository(ctrl)
-				embed := embmocks.NewMockClient(ctrl)
-				embed.EXPECT().Embed(gomock.Any(), "test").Return(stubVec, nil)
-				repo.EXPECT().Search(gomock.Any(), "test", stubVec, 0, 10).
-					Return(nil, int64(0), errors.New("es down"))
-				return repo, embed
-			},
-			wantErr: "es down",
-		},
-		{
-			name:  "query 全空格视为空",
-			query: "   ",
-			page:  1,
-			size:  10,
-			mock: func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *embmocks.MockClient) {
-				return repomocks.NewMockArticleSearchRepository(ctrl), embmocks.NewMockClient(ctrl)
-			},
-			wantErr: "搜索内容不能为空",
-		},
-		{
-			name:  "page=0 当作 page=1",
-			query: "test",
-			page:  0,
-			size:  10,
-			mock: func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *embmocks.MockClient) {
-				repo := repomocks.NewMockArticleSearchRepository(ctrl)
-				embed := embmocks.NewMockClient(ctrl)
-				embed.EXPECT().Embed(gomock.Any(), "test").Return(stubVec, nil)
-				// page=0 → offset=0，等同 page=1
-				repo.EXPECT().Search(gomock.Any(), "test", stubVec, 0, 10).
-					Return(nil, int64(0), nil)
-				return repo, embed
-			},
-		},
-		{
-			name:  "size=0 使用默认值 10",
-			query: "test",
-			page:  1,
-			size:  0,
-			mock: func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *embmocks.MockClient) {
-				repo := repomocks.NewMockArticleSearchRepository(ctrl)
-				embed := embmocks.NewMockClient(ctrl)
-				embed.EXPECT().Embed(gomock.Any(), "test").Return(stubVec, nil)
-				repo.EXPECT().Search(gomock.Any(), "test", stubVec, 0, 10).
-					Return(nil, int64(0), nil)
-				return repo, embed
-			},
-		},
-		{
-			name:  "size 超大截断到 50",
-			query: "test",
-			page:  1,
-			size:  999,
-			mock: func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *embmocks.MockClient) {
-				repo := repomocks.NewMockArticleSearchRepository(ctrl)
-				embed := embmocks.NewMockClient(ctrl)
-				embed.EXPECT().Embed(gomock.Any(), "test").Return(stubVec, nil)
-				repo.EXPECT().Search(gomock.Any(), "test", stubVec, 0, 50).
-					Return(nil, int64(0), nil)
-				return repo, embed
-			},
-		},
+	facetNames := map[string]string{}
+	for _, f := range res.Facets {
+		facetNames[f.Slug] = f.Name
 	}
+	assert.Equal(t, "Go", facetNames["go"], "facet 也补了名字")
+	assert.Equal(t, "Rust", facetNames["rust"])
+}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
-			repo, embed := tc.mock(ctrl)
-			svc := NewArticleSearchService(repo, embed, logger.NewNopLogger())
+// Search：标签名解析(tag)失败 → 名字降级用 slug 占位，整体不报错。
+func TestGRPCArticleSearchService_Search_TagNameDegrade(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	svc, searchCli, tagCli, intrSvc := newSearchSvc(t, ctrl)
 
-			list, total, err := svc.Search(context.Background(), tc.query, tc.page, tc.size)
-			if tc.wantErr != "" {
-				require.Error(t, err)
-				assert.ErrorContains(t, err, tc.wantErr)
-			} else {
-				require.NoError(t, err)
-				assert.Equal(t, tc.wantList, list)
-				assert.Equal(t, tc.wantTotal, total)
-			}
-		})
+	searchCli.EXPECT().SearchArticles(gomock.Any(), gomock.Any()).Return(&searchv1.SearchArticlesResponse{
+		Articles: []*searchv1.ArticleCard{{Id: 1, Tags: []string{"go"}}},
+		Total:    1,
+		Facets:   []*searchv1.TagCount{{Slug: "go", Count: 5}},
+	}, nil)
+	tagCli.EXPECT().BatchBySlugs(gomock.Any(), gomock.Any()).Return(nil, errors.New("tag 服务不可用"))
+	intrSvc.EXPECT().FindByBizIds(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(map[int64]domain.Interaction{1: {LikeCount: 1}}, nil)
+
+	res, err := svc.Search(context.Background(), "go", nil, 1, 10)
+	assert.NoError(t, err, "标签名解析失败应降级不报错")
+	if assert.Len(t, res.Articles, 1) && assert.Len(t, res.Articles[0].Tags, 1) {
+		assert.Equal(t, "go", res.Articles[0].Tags[0].Name, "名字缺失用 slug 占位")
+	}
+	if assert.Len(t, res.Facets, 1) {
+		assert.Equal(t, "go", res.Facets[0].Name)
 	}
 }
 
-func TestSearchService_IndexArticle(t *testing.T) {
-	article := domain.Article{
-		Id: 1, Title: "健身饮食", Abstract: "如何科学饮食",
-		Author: domain.Author{Id: 1, Name: "张三"},
-	}
-	articleNoAbstract := domain.Article{
-		Id: 2, Title: "无摘要文章", Abstract: "",
-		Author: domain.Author{Id: 1, Name: "张三"},
-	}
+// Search：互动计数(interaction)失败 → 计数降级填零，整体不报错。
+func TestGRPCArticleSearchService_Search_InteractionDegrade(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	svc, searchCli, tagCli, intrSvc := newSearchSvc(t, ctrl)
 
-	testCases := []struct {
-		name    string
-		article domain.Article
-		mock    func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *embmocks.MockClient)
-		wantErr bool
-	}{
-		{
-			name:    "成功索引",
-			article: article,
-			mock: func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *embmocks.MockClient) {
-				repo := repomocks.NewMockArticleSearchRepository(ctrl)
-				embed := embmocks.NewMockClient(ctrl)
-				embed.EXPECT().Embed(gomock.Any(), "健身饮食 如何科学饮食").Return(stubVec, nil)
-				repo.EXPECT().Index(gomock.Any(), article, stubVec).Return(nil)
-				return repo, embed
-			},
-		},
-		{
-			name:    "abstract 为空只 embed title",
-			article: articleNoAbstract,
-			mock: func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *embmocks.MockClient) {
-				repo := repomocks.NewMockArticleSearchRepository(ctrl)
-				embed := embmocks.NewMockClient(ctrl)
-				embed.EXPECT().Embed(gomock.Any(), "无摘要文章").Return(stubVec, nil)
-				repo.EXPECT().Index(gomock.Any(), articleNoAbstract, stubVec).Return(nil)
-				return repo, embed
-			},
-		},
-		{
-			name:    "embed 失败只记日志不报错",
-			article: article,
-			mock: func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *embmocks.MockClient) {
-				repo := repomocks.NewMockArticleSearchRepository(ctrl)
-				embed := embmocks.NewMockClient(ctrl)
-				embed.EXPECT().Embed(gomock.Any(), gomock.Any()).Return(nil, errors.New("embed down"))
-				return repo, embed
-			},
-			wantErr: false, // 不阻塞发布
-		},
-		{
-			name:    "repo.Index 失败只记日志不报错",
-			article: article,
-			mock: func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *embmocks.MockClient) {
-				repo := repomocks.NewMockArticleSearchRepository(ctrl)
-				embed := embmocks.NewMockClient(ctrl)
-				embed.EXPECT().Embed(gomock.Any(), gomock.Any()).Return(stubVec, nil)
-				repo.EXPECT().Index(gomock.Any(), article, stubVec).Return(errors.New("es down"))
-				return repo, embed
-			},
-			wantErr: false, // 不阻塞发布
-		},
-	}
+	searchCli.EXPECT().SearchArticles(gomock.Any(), gomock.Any()).Return(&searchv1.SearchArticlesResponse{
+		Articles: []*searchv1.ArticleCard{{Id: 1, Tags: []string{"go"}}},
+		Total:    1,
+	}, nil)
+	tagCli.EXPECT().BatchBySlugs(gomock.Any(), gomock.Any()).Return(&tagv1.TagList{
+		Tags: []*tagv1.Tag{{Slug: "go", Name: "Go"}},
+	}, nil)
+	intrSvc.EXPECT().FindByBizIds(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(nil, errors.New("interaction 不可用"))
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
-			repo, embed := tc.mock(ctrl)
-			svc := NewArticleSearchService(repo, embed, logger.NewNopLogger())
-
-			err := svc.IndexArticle(context.Background(), tc.article)
-			if tc.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-			}
-		})
+	res, err := svc.Search(context.Background(), "go", nil, 1, 10)
+	assert.NoError(t, err, "互动计数失败应降级填零")
+	if assert.Len(t, res.Articles, 1) {
+		assert.Equal(t, int64(0), res.Articles[0].ReadCnt)
+		assert.Equal(t, int64(0), res.Articles[0].LikeCnt)
 	}
 }
 
-func TestSearchService_RemoveArticle(t *testing.T) {
-	testCases := []struct {
-		name    string
-		id      int64
-		mock    func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *embmocks.MockClient)
-		wantErr string
-	}{
-		{
-			name: "成功删除",
-			id:   1,
-			mock: func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *embmocks.MockClient) {
-				repo := repomocks.NewMockArticleSearchRepository(ctrl)
-				embed := embmocks.NewMockClient(ctrl)
-				repo.EXPECT().Remove(gomock.Any(), int64(1)).Return(nil)
-				return repo, embed
-			},
-		},
-		{
-			name: "repo 失败透传错误",
-			id:   1,
-			mock: func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *embmocks.MockClient) {
-				repo := repomocks.NewMockArticleSearchRepository(ctrl)
-				embed := embmocks.NewMockClient(ctrl)
-				repo.EXPECT().Remove(gomock.Any(), int64(1)).Return(errors.New("es down"))
-				return repo, embed
-			},
-			wantErr: "es down",
-		},
-		{
-			name: "文档不存在幂等返回 nil",
-			id:   999,
-			mock: func(ctrl *gomock.Controller) (repository.ArticleSearchRepository, *embmocks.MockClient) {
-				repo := repomocks.NewMockArticleSearchRepository(ctrl)
-				embed := embmocks.NewMockClient(ctrl)
-				repo.EXPECT().Remove(gomock.Any(), int64(999)).Return(errs.ErrSearchDocNotFound)
-				return repo, embed
-			},
-		},
-	}
+// Search：下游 search 失败 → 传播错误（非降级），且不触发后续聚合。
+func TestGRPCArticleSearchService_Search_DownstreamError(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	svc, searchCli, _, _ := newSearchSvc(t, ctrl)
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
-			repo, embed := tc.mock(ctrl)
-			svc := NewArticleSearchService(repo, embed, logger.NewNopLogger())
+	searchCli.EXPECT().SearchArticles(gomock.Any(), gomock.Any()).
+		Return(nil, errors.New("search 不可用"))
 
-			err := svc.RemoveArticle(context.Background(), tc.id)
-			if tc.wantErr != "" {
-				require.Error(t, err)
-				assert.ErrorContains(t, err, tc.wantErr)
-			} else {
-				assert.NoError(t, err)
-			}
-		})
-	}
+	_, err := svc.Search(context.Background(), "go", nil, 1, 10)
+	assert.Error(t, err, "search 下游失败应传播")
+}
+
+// Index / Remove：薄透传，错误原样传播。
+func TestGRPCArticleSearchService_IndexRemove(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	svc, searchCli, _, _ := newSearchSvc(t, ctrl)
+
+	searchCli.EXPECT().IndexArticle(gomock.Any(), gomock.Any()).
+		Return(&searchv1.IndexArticleResponse{}, nil)
+	assert.NoError(t, svc.Index(context.Background(), domain.Article{Id: 1, Title: "t"}))
+
+	searchCli.EXPECT().RemoveArticle(gomock.Any(), gomock.Any()).
+		Return(nil, errors.New("boom"))
+	assert.Error(t, svc.Remove(context.Background(), 1))
 }

@@ -87,6 +87,7 @@ func (r *CacheArticleReaderRepository) Upsert(ctx context.Context, article domai
 		Abstract: article.Abstract,
 		AuthorId: article.Author.Id,
 		Status:   article.Status.ToUint8(),
+		Category: article.Category,
 	}
 	err := r.dualWriter.Write(ctx, r.taskName, func(side migratorsdk.Side) error {
 		return r.daoBySide(side).Upsert(ctx, entity)

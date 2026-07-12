@@ -49,6 +49,18 @@ scrape_configs:
     static_configs:
       - targets: ['localhost:8060']
 
+  # webook-tag 微服务（标签，MySQL）
+  - job_name: 'webook-tag'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['localhost:8070']
+
+  # webook-search 微服务（ES + embedding 检索）
+  - job_name: 'webook-search'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['localhost:8080']
+
   # webook-worker 调度器
   - job_name: 'webook-worker'
     metrics_path: '/metrics'
