@@ -120,7 +120,7 @@ func (h *InternalChatHandler) SendMessage(ctx *gin.Context) {
 	key := fmt.Sprintf(consts.ChatRateLimitPattern, uc.Userid)
 	limited, limitErr := h.limiter.Limit(ctx.Request.Context(), key)
 	if limitErr != nil {
-		h.l.Error("限流检查失败", logger.Int64("uid", uc.Userid), logger.Error(limitErr))
+		h.l.WithContext(ctx).Error("限流检查失败", logger.Int64("uid", uc.Userid), logger.Error(limitErr))
 	}
 	if limited {
 		ginx.WriteError(ctx, errs.ErrChatRateLimit)

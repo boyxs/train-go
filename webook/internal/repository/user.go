@@ -4,11 +4,10 @@ import (
 	"context"
 	"database/sql"
 
-	"go.uber.org/zap"
-
 	"github.com/boyxs/train-go/webook/internal/domain"
 	"github.com/boyxs/train-go/webook/internal/repository/cache"
 	"github.com/boyxs/train-go/webook/internal/repository/dao"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 	"github.com/boyxs/train-go/webook/pkg/slicex"
 )
 
@@ -25,12 +24,14 @@ type UserRepository interface {
 type RedisUserRepository struct {
 	dao   dao.UserDAO
 	cache cache.UserCache
+	l     logger.LoggerX
 }
 
-func NewRedisUserRepository(dao dao.UserDAO, cache cache.UserCache) UserRepository {
+func NewRedisUserRepository(dao dao.UserDAO, cache cache.UserCache, l logger.LoggerX) UserRepository {
 	return &RedisUserRepository{
 		dao:   dao,
 		cache: cache,
+		l:     l,
 	}
 }
 
@@ -45,7 +46,7 @@ func (ur *RedisUserRepository) Update(ctx context.Context, user domain.User) (do
 	}
 	delErr := ur.cache.Del(ctx, user.Id)
 	if delErr != nil {
-		zap.L().Error("删除用户缓存失败", zap.Error(delErr))
+		ur.l.WithContext(ctx).Error("删除用户缓存失败", logger.Error(delErr))
 	}
 	return ur.toDomain(u), err
 }
@@ -70,7 +71,7 @@ func (ur *RedisUserRepository) FindById(ctx context.Context, userid int64) (doma
 	cu = ur.toDomain(u)
 	err = ur.cache.Set(ctx, cu)
 	if err != nil {
-		zap.L().Error("设置用户缓存失败", zap.Error(err))
+		ur.l.WithContext(ctx).Error("设置用户缓存失败", logger.Error(err))
 	}
 	return cu, nil
 }

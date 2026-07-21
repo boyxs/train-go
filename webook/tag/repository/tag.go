@@ -48,7 +48,7 @@ func NewInternalTagRepository(tagDAO dao.TagDAO, taggingDAO dao.TaggingDAO, foll
 // delDetail 写路径失效详情缓存：失败仅记日志不阻断（主写已成功，脏缓存至 TTL）。
 func (r *InternalTagRepository) delDetail(ctx context.Context, slugs ...string) {
 	if err := r.cache.DelDetail(ctx, slugs...); err != nil {
-		r.l.Warn("失效标签详情缓存失败", logger.Error(err))
+		r.l.WithContext(ctx).Warn("失效标签详情缓存失败", logger.Error(err))
 	}
 }
 
@@ -83,7 +83,7 @@ func (r *InternalTagRepository) SyncBiz(ctx context.Context, biz string, bizId i
 	if len(affected) > 0 {
 		tags, err := r.tagDAO.FindByIds(ctx, affected)
 		if err != nil {
-			r.l.Warn("失效标签详情缓存：解析 slug 失败", logger.Error(err))
+			r.l.WithContext(ctx).Warn("失效标签详情缓存：解析 slug 失败", logger.Error(err))
 			return nil // 主写已成功，缓存失效失败不回滚
 		}
 		slugs := make([]string, 0, len(tags))
@@ -102,7 +102,7 @@ func (r *InternalTagRepository) Detail(ctx context.Context, slug string, since i
 	}
 	if !errors.Is(err, redis.Nil) {
 		// 非 miss 的真实故障（连接失败/值损坏）：记日志留观测信号，仍回源 DB
-		r.l.Warn("读标签详情缓存故障，回源 DB", logger.String("slug", slug), logger.Error(err))
+		r.l.WithContext(ctx).Warn("读标签详情缓存故障，回源 DB", logger.String("slug", slug), logger.Error(err))
 	}
 	// miss(redis.Nil) 或缓存故障 → 回源 DB
 	t, err := r.findBySlug(ctx, slug)
@@ -116,7 +116,7 @@ func (r *InternalTagRepository) Detail(ctx context.Context, slug string, since i
 	dt := r.toDomain(t)
 	dt.WeeklyNewCount = recent
 	if err := r.cache.SetDetail(ctx, dt); err != nil {
-		r.l.Warn("回填标签详情缓存失败", logger.String("slug", slug), logger.Error(err))
+		r.l.WithContext(ctx).Warn("回填标签详情缓存失败", logger.String("slug", slug), logger.Error(err))
 	}
 	return dt, nil
 }

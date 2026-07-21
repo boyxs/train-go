@@ -4,9 +4,9 @@ import (
 	"github.com/spf13/viper"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
 	"gorm.io/plugin/opentelemetry/tracing"
 
+	"github.com/boyxs/train-go/webook/pkg/gormx"
 	"github.com/boyxs/train-go/webook/tag/repository/dao"
 
 	gormprom "github.com/boyxs/train-go/webook/pkg/gormx/prometheus"
@@ -15,15 +15,9 @@ import (
 )
 
 func InitDB(_ TimezoneReady, l loggerx.LoggerX) *gorm.DB {
-	adapter := loggerFunc(l.Debug)
+	// GORM SQL 日志经 WithContext(ctx) 出，请求内 SQL 自动带 trace.id（见 pkg/gormx.NewGormLogger）
 	gormConfig := gorm.Config{
-		Logger: logger.New(adapter, logger.Config{
-			SlowThreshold:             0,
-			Colorful:                  true,
-			IgnoreRecordNotFoundError: false,
-			ParameterizedQueries:      false,
-			LogLevel:                  logger.Info,
-		}),
+		Logger: gormx.NewGormLogger(l),
 	}
 	db, err := gorm.Open(mysql.Open(viper.GetString(confkey.DataMySQLDSN)), &gormConfig)
 	if err != nil {
@@ -49,11 +43,4 @@ func InitDB(_ TimezoneReady, l loggerx.LoggerX) *gorm.DB {
 		panic(err)
 	}
 	return db
-}
-
-// loggerFunc 函数类型适配 gorm logger.Writer，调用 Printf 即转调 l.Debug，免写结构体。
-type loggerFunc func(msg string, args ...loggerx.Field)
-
-func (f loggerFunc) Printf(msg string, args ...interface{}) {
-	f(msg, loggerx.Field{Key: "args", Val: args})
 }

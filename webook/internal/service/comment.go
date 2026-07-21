@@ -113,14 +113,14 @@ func (s *GRPCCommentService) aggregate(ctx context.Context, uid int64, comments 
 	}
 	cntMap, err := s.intrSvc.FindByBizIds(ctx, domain.BizComment, ids)
 	if err != nil {
-		s.l.Error("批量获取评论互动数据失败，降级填零", logger.Error(err))
+		s.l.WithContext(ctx).Error("批量获取评论互动数据失败，降级填零", logger.Error(err))
 		cntMap = nil
 	}
 	var likedMap map[int64]bool
 	if uid > 0 {
 		likedMap, err = s.intrSvc.FindUserLiked(ctx, uid, domain.BizComment, ids)
 		if err != nil {
-			s.l.Error("批量获取评论点赞状态失败，降级填零", logger.Error(err))
+			s.l.WithContext(ctx).Error("批量获取评论点赞状态失败，降级填零", logger.Error(err))
 			likedMap = nil
 		}
 	}
@@ -136,7 +136,7 @@ func (s *GRPCCommentService) resolveNames(ctx context.Context, comments []*comme
 	}
 	users, err := s.userSvc.FindByIds(ctx, uids)
 	if err != nil {
-		s.l.Error("批量解析评论者昵称失败", logger.Error(err))
+		s.l.WithContext(ctx).Error("批量解析评论者昵称失败", logger.Error(err))
 		return map[int64]string{}
 	}
 	names := make(map[int64]string, len(users))

@@ -242,7 +242,7 @@ func (h *InternalUserHandler) Profile(ctx *gin.Context) {
 func (h *InternalUserHandler) Info(ctx *gin.Context, req userInfoReq) (ginx.Result, error) {
 	u, err := h.userService.Profile(ctx.Request.Context(), req.Id)
 	if err != nil {
-		h.l.Warn("查询用户公开信息失败", logger.Int64("id", req.Id), logger.Error(err))
+		h.l.WithContext(ctx).Warn("查询用户公开信息失败", logger.Int64("id", req.Id), logger.Error(err))
 		return ginx.NotFound("用户不存在"), nil
 	}
 	return ginx.Result{Data: userInfoVO{

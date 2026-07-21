@@ -115,7 +115,7 @@ func (s *GRPCTagService) Detail(ctx context.Context, slug string, viewerId int64
 		eg.Go(func() error {
 			resp, err := s.tagCli.FollowStatus(ctx, &tagv1.FollowStatusRequest{Uid: viewerId, Slug: slug})
 			if err != nil {
-				s.l.Error("查询标签关注态失败，降级 false", logger.Error(err))
+				s.l.WithContext(ctx).Error("查询标签关注态失败，降级 false", logger.Error(err))
 				return nil // 关注态非致命：不阻断详情
 			}
 			isFollowing = resp.GetIsFollowing()
@@ -217,7 +217,7 @@ func (s *GRPCTagService) TagsByBiz(ctx context.Context, biz string, bizIds []int
 func (s *GRPCTagService) tagsByBiz(ctx context.Context, ids []int64) map[int64][]domain.Tag {
 	m, err := s.TagsByBiz(ctx, domain.BizArticle, ids)
 	if err != nil {
-		s.l.Error("标签页：批量取文章标签失败，降级空", logger.Error(err))
+		s.l.WithContext(ctx).Error("标签页：批量取文章标签失败，降级空", logger.Error(err))
 		return map[int64][]domain.Tag{}
 	}
 	return m
@@ -230,7 +230,7 @@ func (s *GRPCTagService) batchInteraction(ctx context.Context, ids []int64) map[
 	}
 	m, err := s.intrSvc.FindByBizIds(ctx, domain.BizArticle, ids)
 	if err != nil {
-		s.l.Error("批量文章互动计数失败，降级填零", logger.Error(err))
+		s.l.WithContext(ctx).Error("批量文章互动计数失败，降级填零", logger.Error(err))
 		return map[int64]domain.Interaction{}
 	}
 	return m
@@ -243,7 +243,7 @@ func (s *GRPCTagService) resolveTagNames(ctx context.Context, slugs []string) ma
 	}
 	resp, err := s.tagCli.BatchBySlugs(ctx, &tagv1.BatchBySlugsRequest{Slugs: slugs})
 	if err != nil {
-		s.l.Error("解析标签名失败，降级用 slug", logger.Error(err))
+		s.l.WithContext(ctx).Error("解析标签名失败，降级用 slug", logger.Error(err))
 		return map[string]string{}
 	}
 	m := make(map[string]string, len(resp.GetTags()))

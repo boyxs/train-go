@@ -1,0 +1,27 @@
+# Filebeat 9.x —— 采集所有 webook-* 容器 stdout（Docker json-file），转发 Logstash。
+# 只读挂载 /var/lib/docker/containers + docker.sock（见 docker-compose）；容器内以 root 跑 + -strict.perms=false。
+filebeat.inputs:
+  - type: filestream
+    id: webook-container-logs
+    paths:
+      - /var/lib/docker/containers/*/*.log
+    parsers:
+      - container: ~          # 解 Docker json-file 外层，取出应用写的日志行到 message
+    prospector.scanner.symlinks: true
+
+processors:
+  - add_docker_metadata:
+      host: "unix:///var/run/docker.sock"
+  # 只留 webook-* 容器（业务 + 中间件 + nginx），其余丢弃降噪
+  - drop_event:
+      when:
+        not:
+          regexp:
+            container.name: "^webook-"
+
+# 应用 message 是 Zap ECS JSON 串 —— 统一交给 Logstash 解析（单一解析点，不在两处 decode）
+output.logstash:
+  hosts: ["webook-logstash:5044"]
+
+logging.level: info
+logging.to_stderr: true

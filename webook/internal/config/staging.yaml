@@ -10,8 +10,8 @@ server:
     addr: ":8010"
     timeout: 15s
     access_log:
-      allow_req_body: true
-      allow_res_body: true
+      allow_req_body: false # staging 关：预发含真实数据，access log 已提 INFO（与 prod 对齐防泄漏）
+      allow_res_body: false # staging 关：同上
       max_req_len: 2048
       max_res_len: 2048
       max_path_len: 256

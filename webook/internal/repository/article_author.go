@@ -3,11 +3,10 @@ package repository
 import (
 	"context"
 
-	"go.uber.org/zap"
-
 	"github.com/boyxs/train-go/webook/internal/domain"
 	"github.com/boyxs/train-go/webook/internal/repository/cache"
 	"github.com/boyxs/train-go/webook/internal/repository/dao"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 // ArticleAuthorRepository 制作库 Repository
@@ -24,15 +23,18 @@ type ArticleAuthorRepository interface {
 type CacheArticleAuthorRepository struct {
 	dao   dao.ArticleAuthorDAO
 	cache cache.ArticleCache
+	l     logger.LoggerX
 }
 
 func NewCacheArticleAuthorRepository(
 	dao dao.ArticleAuthorDAO,
 	cache cache.ArticleCache,
+	l logger.LoggerX,
 ) ArticleAuthorRepository {
 	return &CacheArticleAuthorRepository{
 		dao:   dao,
 		cache: cache,
+		l:     l,
 	}
 }
 
@@ -110,13 +112,13 @@ func (r *CacheArticleAuthorRepository) Delete(ctx context.Context, id int64, uid
 
 func (r *CacheArticleAuthorRepository) delCache(ctx context.Context, uid int64, id int64) {
 	if err := r.cache.Del(ctx, uid, id); err != nil {
-		zap.L().Error("删除文章缓存失败", zap.Int64("uid", uid), zap.Int64("id", id), zap.Error(err))
+		r.l.WithContext(ctx).Error("删除文章缓存失败", logger.Int64("uid", uid), logger.Int64("id", id), logger.Error(err))
 	}
 }
 
 func (r *CacheArticleAuthorRepository) setCache(ctx context.Context, article domain.Article) {
 	if err := r.cache.Set(ctx, article); err != nil {
-		zap.L().Error("设置文章缓存失败", zap.Int64("uid", article.Author.Id), zap.Int64("id", article.Id), zap.Error(err))
+		r.l.WithContext(ctx).Error("设置文章缓存失败", logger.Int64("uid", article.Author.Id), logger.Int64("id", article.Id), logger.Error(err))
 	}
 }
 

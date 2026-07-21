@@ -16,6 +16,6 @@ func NewSmsService(l logger.LoggerX) sms.SmsService {
 }
 
 func (s *SmsService) Send(ctx context.Context, templateId string, args []string, phoneNumbers ...string) error {
-	s.l.Debug("发送验证码", logger.Strings("code", args))
+	s.l.WithContext(ctx).Debug("发送验证码", logger.Strings("code", args))
 	return nil
 }

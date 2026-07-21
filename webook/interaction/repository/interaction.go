@@ -48,7 +48,7 @@ func (r *CacheInteractionRepository) IncrReadCount(ctx context.Context, biz stri
 		return err
 	}
 	if cErr := r.cache.IncrReadCntIfPresent(ctx, biz, bizId, 1); cErr != nil {
-		r.l.Error("缓存增加阅读量失败",
+		r.l.WithContext(ctx).Error("缓存增加阅读量失败",
 			logger.String("biz", biz), logger.Int64("bizId", bizId), logger.Error(cErr))
 	}
 	return nil
@@ -68,7 +68,7 @@ func (r *CacheInteractionRepository) BatchIncrReadCount(ctx context.Context, ite
 	// best-effort 回写缓存：present 才 incr（与单条 IncrReadCount 一致），失败只记日志不阻断
 	for _, it := range items {
 		if cErr := r.cache.IncrReadCntIfPresent(ctx, it.Biz, it.BizId, it.Count); cErr != nil {
-			r.l.Error("批量增加阅读量缓存失败",
+			r.l.WithContext(ctx).Error("批量增加阅读量缓存失败",
 				logger.String("biz", it.Biz), logger.Int64("bizId", it.BizId), logger.Error(cErr))
 		}
 	}
@@ -113,14 +113,14 @@ func (r *CacheInteractionRepository) CancelCollect(ctx context.Context, uid int6
 
 func (r *CacheInteractionRepository) delUserStateCache(ctx context.Context, uid int64, biz string, bizId int64) {
 	if err := r.cache.DelUserState(ctx, uid, biz, bizId); err != nil {
-		r.l.Error("删除用户互动状态缓存失败",
+		r.l.WithContext(ctx).Error("删除用户互动状态缓存失败",
 			logger.Int64("uid", uid), logger.Error(err))
 	}
 }
 
 func (r *CacheInteractionRepository) delCache(ctx context.Context, biz string, bizId int64) {
 	if err := r.cache.Del(ctx, biz, bizId); err != nil {
-		r.l.Error("删除互动缓存失败",
+		r.l.WithContext(ctx).Error("删除互动缓存失败",
 			logger.String("biz", biz), logger.Int64("bizId", bizId), logger.Error(err))
 	}
 }
@@ -146,7 +146,7 @@ func (r *CacheInteractionRepository) FindInteraction(ctx context.Context, uid in
 		CollectCount: daoIntr.CollectCount,
 	}
 	if cErr := r.cache.Set(ctx, result); cErr != nil {
-		r.l.Error("回填互动缓存失败",
+		r.l.WithContext(ctx).Error("回填互动缓存失败",
 			logger.String("biz", biz), logger.Int64("bizId", bizId), logger.Error(cErr))
 	}
 	if uid > 0 {
@@ -190,7 +190,7 @@ func (r *CacheInteractionRepository) FindByBizIds(ctx context.Context, biz strin
 		// ① 大批量/高 QPS 下无界 spawn goroutine；② 脱离请求生命周期，丢 trace/取消信号。
 		// miss 通常是少数，同步回填可接受；单条失败只记日志不阻断整体返回。
 		if setErr := r.cache.Set(ctx, intr); setErr != nil {
-			r.l.Error("批量查询回填互动缓存失败",
+			r.l.WithContext(ctx).Error("批量查询回填互动缓存失败",
 				logger.Int64("bizId", intr.BizId), logger.Error(setErr))
 		}
 	}
@@ -223,12 +223,12 @@ func (r *CacheInteractionRepository) FindUserState(ctx context.Context, uid int6
 	}
 	ui, err := r.dao.FindUserInteraction(ctx, uid, biz, bizId)
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		r.l.Error("查询用户互动状态失败",
+		r.l.WithContext(ctx).Error("查询用户互动状态失败",
 			logger.Int64("uid", uid), logger.String("biz", biz), logger.Int64("bizId", bizId), logger.Error(err))
 		return false, false, err
 	}
 	if setErr := r.cache.SetUserState(ctx, uid, biz, bizId, ui.Liked, ui.Collected); setErr != nil {
-		r.l.Error("回填用户互动状态缓存失败",
+		r.l.WithContext(ctx).Error("回填用户互动状态缓存失败",
 			logger.Int64("uid", uid), logger.Error(setErr))
 	}
 	return ui.Liked, ui.Collected, nil

@@ -1,5 +1,7 @@
 package logger
 
+import "context"
+
 type NopLogger struct {
 }
 
@@ -18,4 +20,8 @@ func (n *NopLogger) Warn(msg string, args ...Field) {
 }
 
 func (n *NopLogger) Error(msg string, args ...Field) {
+}
+
+func (n *NopLogger) WithContext(ctx context.Context) LoggerX {
+	return n
 }

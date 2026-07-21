@@ -51,7 +51,7 @@ func (s *InternalCommentService) Create(ctx context.Context, c domain.Comment) (
 	// 按用户限流防刷；限流器自身故障时降级放行（可用性优先），仅记日志
 	limited, err := s.limiter.Limit(ctx, fmt.Sprintf("comment:create:%d", c.UserId))
 	if err != nil {
-		s.l.Error("评论限流器异常，降级放行", logger.Int64("uid", c.UserId), logger.Error(err))
+		s.l.WithContext(ctx).Error("评论限流器异常，降级放行", logger.Int64("uid", c.UserId), logger.Error(err))
 	} else if limited {
 		return domain.Comment{}, errs.ErrRateLimited
 	}

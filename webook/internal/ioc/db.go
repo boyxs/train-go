@@ -4,26 +4,19 @@ import (
 	"github.com/spf13/viper"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
 	"gorm.io/plugin/opentelemetry/tracing"
 
 	"github.com/boyxs/train-go/webook/internal/repository/dao"
+	"github.com/boyxs/train-go/webook/pkg/gormx"
 	gormprom "github.com/boyxs/train-go/webook/pkg/gormx/prometheus"
 	loggerx "github.com/boyxs/train-go/webook/pkg/logger"
 	"github.com/boyxs/train-go/webook/shared/confkey"
 )
 
 func InitDB(_ TimezoneReady, l loggerx.LoggerX) *gorm.DB {
-	//adapter := &LoggerAdapter{fn: l.Debug}
-	adapter := loggerFunc(l.Debug)
+	// GORM SQL 日志经 WithContext(ctx) 出，请求内 SQL 自动带 trace.id（见 pkg/gormx.NewGormLogger）
 	gormConfig := gorm.Config{
-		Logger: logger.New(adapter, logger.Config{
-			SlowThreshold:             0,
-			Colorful:                  true,
-			IgnoreRecordNotFoundError: false,
-			ParameterizedQueries:      false,
-			LogLevel:                  logger.Info,
-		}),
+		Logger: gormx.NewGormLogger(l),
 	}
 	db, err := gorm.Open(mysql.Open(viper.GetString(confkey.DataMySQLDSN)), &gormConfig)
 	// db, err := gorm.Open(mysql.Open(config.Config.MySQL.DSN), &gorm.Config{})
@@ -54,22 +47,4 @@ func InitDB(_ TimezoneReady, l loggerx.LoggerX) *gorm.DB {
 		panic(err)
 	}
 	return db
-}
-
-// loggerFunc 函数类型是一等公民
-// 使用 loggerFunc(l.Debug) （二者函数签名需相同）做类型转换，调用Printf时就相当于调用l.Debug
-// 这样就不用写结构体了
-type loggerFunc func(msg string, args ...loggerx.Field)
-
-func (f loggerFunc) Printf(msg string, args ...interface{}) {
-	f(msg, loggerx.Field{Key: "args", Val: args})
-}
-
-// LoggerAdapter 结构体方式适配
-type LoggerAdapter struct {
-	fn func(msg string, args ...loggerx.Field)
-}
-
-func (a *LoggerAdapter) Printf(msg string, args ...interface{}) {
-	a.fn(msg, loggerx.Field{Key: "args", Val: args})
 }

@@ -129,7 +129,7 @@ func (s *InternalArticleAuthorService) Detail(ctx context.Context, id int64, uid
 	// 回显：补该文当前标签名（编辑器预填）；tag 服务失败降级不带标签，不阻断详情。
 	tagMap, tErr := s.tagSvc.TagsByBiz(ctx, domain.BizArticle, []int64{id})
 	if tErr != nil {
-		s.l.Error("文章详情：取标签失败，降级不带标签",
+		s.l.WithContext(ctx).Error("文章详情：取标签失败，降级不带标签",
 			logger.Int64("articleId", id), logger.Error(tErr))
 		return article, nil
 	}
@@ -287,7 +287,7 @@ func (s *InternalArticleReaderService) batchInteraction(ctx context.Context, ids
 	}
 	m, err := s.intrSvc.FindByBizIds(ctx, domain.BizArticle, ids)
 	if err != nil {
-		s.l.Error("批量文章互动计数失败，降级填零", logger.Error(err))
+		s.l.WithContext(ctx).Error("批量文章互动计数失败，降级填零", logger.Error(err))
 		return map[int64]domain.Interaction{}
 	}
 	return m
@@ -300,7 +300,7 @@ func (s *InternalArticleReaderService) commentCounts(ctx context.Context, ids []
 	}
 	resp, err := s.commentCli.BatchCountComment(ctx, &commentv1.BatchCountCommentRequest{Biz: domain.BizArticle, BizIds: ids})
 	if err != nil {
-		s.l.Error("批量获取文章评论数失败，降级", logger.Error(err))
+		s.l.WithContext(ctx).Error("批量获取文章评论数失败，降级", logger.Error(err))
 		return map[int64]int64{}
 	}
 	return resp.GetCounts()
@@ -310,7 +310,7 @@ func (s *InternalArticleReaderService) commentCounts(ctx context.Context, ids []
 func (s *InternalArticleReaderService) likedTotalByAuthor(ctx context.Context, uid int64) int64 {
 	ids, err := s.readerRepo.ListIdsByAuthor(ctx, uid)
 	if err != nil {
-		s.l.Error("获取作者文章 id 失败", logger.Int64("author_id", uid), logger.Error(err))
+		s.l.WithContext(ctx).Error("获取作者文章 id 失败", logger.Int64("author_id", uid), logger.Error(err))
 		return 0
 	}
 	if len(ids) == 0 {
@@ -318,7 +318,7 @@ func (s *InternalArticleReaderService) likedTotalByAuthor(ctx context.Context, u
 	}
 	m, err := s.intrSvc.FindByBizIds(ctx, domain.BizArticle, ids)
 	if err != nil {
-		s.l.Error("聚合获赞失败", logger.Int64("author_id", uid), logger.Error(err))
+		s.l.WithContext(ctx).Error("聚合获赞失败", logger.Int64("author_id", uid), logger.Error(err))
 		return 0
 	}
 	var total int64

@@ -4,10 +4,10 @@ import (
 	"github.com/spf13/viper"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
-	gormlogger "gorm.io/gorm/logger"
 	"gorm.io/plugin/opentelemetry/tracing"
 
 	"github.com/boyxs/train-go/webook/migrator/repository/dao"
+	"github.com/boyxs/train-go/webook/pkg/gormx"
 	gormprom "github.com/boyxs/train-go/webook/pkg/gormx/prometheus"
 	loggerx "github.com/boyxs/train-go/webook/pkg/logger"
 	"github.com/boyxs/train-go/webook/shared/confkey"
@@ -21,15 +21,9 @@ import (
 // metric 命名按 webook/CLAUDE.md「服务拆分 14 项」硬规则：用 `webook_db_*`（subsystem 维度），
 // 不是 `webook_migrator_*`（service 维度由 Prometheus job label 自动注入）。
 func InitDB(_ TimezoneReady, l loggerx.LoggerX) *gorm.DB {
-	adapter := loggerFunc(l.Debug)
+	// GORM SQL 日志经 WithContext(ctx) 出，请求内 SQL 自动带 trace.id（见 pkg/gormx.NewGormLogger）
 	gormConfig := gorm.Config{
-		Logger: gormlogger.New(adapter, gormlogger.Config{
-			SlowThreshold:             0,
-			Colorful:                  true,
-			IgnoreRecordNotFoundError: false,
-			ParameterizedQueries:      false,
-			LogLevel:                  gormlogger.Info,
-		}),
+		Logger: gormx.NewGormLogger(l),
 	}
 	db, err := gorm.Open(mysql.Open(viper.GetString(confkey.DataMySQLDSN)), &gormConfig)
 	if err != nil {
@@ -52,11 +46,4 @@ func InitDB(_ TimezoneReady, l loggerx.LoggerX) *gorm.DB {
 		panic(err)
 	}
 	return db
-}
-
-// loggerFunc gormlogger.Interface 的轻量适配器，把 GORM 内部 Printf 转成 LoggerX.Debug。
-type loggerFunc func(msg string, args ...loggerx.Field)
-
-func (f loggerFunc) Printf(msg string, args ...interface{}) {
-	f(msg, loggerx.Field{Key: "args", Val: args})
 }

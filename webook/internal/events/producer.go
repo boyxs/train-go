@@ -34,7 +34,7 @@ func (p *SaramaSyncProducer) ProduceEvent(ctx context.Context, topic string, key
 		saramax.RecordSpanError(span, err)
 		return fmt.Errorf("kafka sync send failed: topic=%s key=%s err=%w", topic, key, err)
 	}
-	p.l.Debug("kafka sync sent",
+	p.l.WithContext(ctx).Debug("kafka sync sent",
 		logger.String("topic", topic),
 		logger.String("key", key),
 		logger.Int64("partition", int64(partition)),

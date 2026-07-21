@@ -120,14 +120,13 @@ func InitMiddlewares(
 
 func loggerMiddleware(l logger.LoggerX) gin.HandlerFunc {
 	builder := accesslog.NewLoggerMiddlewareBuilder(func(ctx context.Context, val accesslog.RequestLog) {
-		// 正式环境 默认 INFO，不输出 DEBUG
-		l.Debug("HTTP request", logger.Field{
+		// access log 用 INFO：prod 也可见；WithContext(ctx) 注入 trace.id/span.id 关联链路
+		l.WithContext(ctx).Info("HTTP request", logger.Field{
 			Key: "request",
 			Val: val,
 		})
-	}).
-		AllowReqBody(true).
-		AllowResBody(true)
+	})
+	// req/res body 由 server.http.access_log 配置驱动（默认关，prod 不记 body 防泄漏；dev/local yaml 开）
 	builder.LoadConfig()
 	ConfigChangeCallbacks = append(ConfigChangeCallbacks, builder.LoadConfig)
 	return builder.Build()

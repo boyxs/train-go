@@ -38,7 +38,7 @@ func (r *CacheMessageRepository) Insert(ctx context.Context, msg domain.Message)
 		return domain.Message{}, err
 	}
 	if delErr := r.cache.Del(ctx, msg.ConversationId); delErr != nil {
-		r.l.Error("清除消息列表缓存失败", logger.Int64("convId", msg.ConversationId), logger.Error(delErr))
+		r.l.WithContext(ctx).Error("清除消息列表缓存失败", logger.Int64("convId", msg.ConversationId), logger.Error(delErr))
 	}
 	return r.toDomain(entity), nil
 }
@@ -59,7 +59,7 @@ func (r *CacheMessageRepository) ListRecent(ctx context.Context, convId int64, l
 
 	// 回填缓存，失败不阻塞
 	if setErr := r.cache.SetList(ctx, convId, result); setErr != nil {
-		r.l.Error("回填消息缓存失败", logger.Int64("convId", convId), logger.Error(setErr))
+		r.l.WithContext(ctx).Error("回填消息缓存失败", logger.Int64("convId", convId), logger.Error(setErr))
 	}
 	return result, nil
 }
@@ -74,7 +74,7 @@ func (r *CacheMessageRepository) UpdateContent(ctx context.Context, convId int64
 	}
 	// 写后清缓存（Cache-Aside），失败仅记日志：缓存最迟在 TTL 后失效，不阻断写流程
 	if delErr := r.cache.Del(ctx, convId); delErr != nil {
-		r.l.Error("清除消息缓存失败", logger.Int64("convId", convId), logger.Error(delErr))
+		r.l.WithContext(ctx).Error("清除消息缓存失败", logger.Int64("convId", convId), logger.Error(delErr))
 	}
 	return nil
 }
@@ -85,7 +85,7 @@ func (r *CacheMessageRepository) UpdateFeedback(ctx context.Context, convId int6
 		return err
 	}
 	if delErr := r.cache.Del(ctx, convId); delErr != nil {
-		r.l.Error("清除消息缓存失败", logger.Int64("convId", convId), logger.Error(delErr))
+		r.l.WithContext(ctx).Error("清除消息缓存失败", logger.Int64("convId", convId), logger.Error(delErr))
 	}
 	return nil
 }
@@ -120,7 +120,7 @@ func (r *CacheMessageRepository) Delete(ctx context.Context, convId int64, id in
 	}
 	// 写后清缓存（Cache-Aside），失败仅记日志
 	if delErr := r.cache.Del(ctx, convId); delErr != nil {
-		r.l.Error("清除消息缓存失败", logger.Int64("convId", convId), logger.Error(delErr))
+		r.l.WithContext(ctx).Error("清除消息缓存失败", logger.Int64("convId", convId), logger.Error(delErr))
 	}
 	return nil
 }

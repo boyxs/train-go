@@ -1,0 +1,20 @@
+apiVersion: 1
+
+# 日志告警统一进 Grafana（对齐现有 up/5xx/P99 告警入口），不用 Kibana 自带 rule。
+datasources:
+  - name: Elasticsearch-Logs
+    uid: es-logs
+    type: elasticsearch
+    access: proxy
+    url: http://webook-es:9200
+    basicAuth: true
+    basicAuthUser: elastic
+    # ES_PASS 经 docker-compose 注入 grafana 容器环境，provisioning 用 $__env 读（同 contactpoints）
+    secureJsonData:
+      basicAuthPassword: $__env{ES_PASS}
+    jsonData:
+      index: "webook-logs-*"
+      timeField: "@timestamp"
+      logMessageField: message
+      logLevelField: log.level
+    editable: true

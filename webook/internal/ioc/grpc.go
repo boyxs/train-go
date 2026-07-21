@@ -20,6 +20,7 @@ import (
 	grpcsrv "github.com/boyxs/train-go/webook/internal/grpc"
 	"github.com/boyxs/train-go/webook/pkg/grpcx"
 	"github.com/boyxs/train-go/webook/pkg/grpcx/interceptor/errconv"
+	"github.com/boyxs/train-go/webook/pkg/grpcx/interceptor/logging"
 	"github.com/boyxs/train-go/webook/pkg/grpcx/interceptor/metrics"
 	"github.com/boyxs/train-go/webook/shared/confkey"
 )
@@ -52,7 +53,7 @@ func InitGRPCServer(
 	srv := grpcx.NewServer(cfg, client, l,
 		grpc.StatsHandler(otelgrpc.NewServerHandler()),
 		// metrics 在外层：观测 errconv 转换后的最终 status code
-		grpc.ChainUnaryInterceptor(grpcMetrics.BuildUnaryServer(), errconv.UnaryServerInterceptor(l)),
+		grpc.ChainUnaryInterceptor(grpcMetrics.BuildUnaryServer(), logging.NewInterceptorBuilder(l).BuildUnaryServer(), errconv.UnaryServerInterceptor(l)),
 	)
 	articlev1.RegisterArticleReaderServiceServer(srv.Server, articleSrv)
 	rankingv1.RegisterRankingJobServiceServer(srv.Server, rankingJobSrv) // webook-worker 调度器触发重算

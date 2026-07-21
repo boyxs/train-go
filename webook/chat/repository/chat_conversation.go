@@ -50,7 +50,7 @@ func (r *CacheConversationRepository) List(ctx context.Context, uid int64) ([]do
 		convs = append(convs, r.toDomain(e))
 	}
 	if cacheErr := r.cache.SetList(ctx, uid, convs); cacheErr != nil {
-		r.l.Error("回填对话列表缓存失败", logger.Int64("uid", uid), logger.Error(cacheErr))
+		r.l.WithContext(ctx).Error("回填对话列表缓存失败", logger.Int64("uid", uid), logger.Error(cacheErr))
 	}
 	return convs, nil
 }
@@ -67,7 +67,7 @@ func (r *CacheConversationRepository) Find(ctx context.Context, uid int64, convI
 	}
 	conv := r.toDomain(entity)
 	if setErr := r.cache.Set(ctx, conv); setErr != nil {
-		r.l.Error("回填单条对话缓存失败",
+		r.l.WithContext(ctx).Error("回填单条对话缓存失败",
 			logger.Int64("uid", uid), logger.Int64("convId", convId), logger.Error(setErr))
 	}
 	return conv, nil
@@ -93,13 +93,13 @@ func (r *CacheConversationRepository) Delete(ctx context.Context, uid int64, con
 
 func (r *CacheConversationRepository) delListCache(ctx context.Context, uid int64) {
 	if err := r.cache.Del(ctx, uid); err != nil {
-		r.l.Error("清除对话列表缓存失败", logger.Int64("uid", uid), logger.Error(err))
+		r.l.WithContext(ctx).Error("清除对话列表缓存失败", logger.Int64("uid", uid), logger.Error(err))
 	}
 }
 
 func (r *CacheConversationRepository) delItemCache(ctx context.Context, uid int64, convId int64) {
 	if err := r.cache.DelOne(ctx, uid, convId); err != nil {
-		r.l.Error("清除单条对话缓存失败",
+		r.l.WithContext(ctx).Error("清除单条对话缓存失败",
 			logger.Int64("uid", uid), logger.Int64("convId", convId), logger.Error(err))
 	}
 }

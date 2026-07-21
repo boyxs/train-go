@@ -98,7 +98,7 @@ func (s *GRPCArticleSearchService) batchInteraction(ctx context.Context, ids []i
 	}
 	m, err := s.intrSvc.FindByBizIds(ctx, domain.BizArticle, ids)
 	if err != nil {
-		s.l.Error("批量文章互动计数失败，降级填零", logger.Error(err))
+		s.l.WithContext(ctx).Error("批量文章互动计数失败，降级填零", logger.Error(err))
 		return map[int64]domain.Interaction{}
 	}
 	return m
@@ -111,7 +111,7 @@ func (s *GRPCArticleSearchService) resolveTagNames(ctx context.Context, slugs []
 	}
 	resp, err := s.tagCli.BatchBySlugs(ctx, &tagv1.BatchBySlugsRequest{Slugs: slugs})
 	if err != nil {
-		s.l.Error("解析标签名失败，降级用 slug", logger.Error(err))
+		s.l.WithContext(ctx).Error("解析标签名失败，降级用 slug", logger.Error(err))
 		return map[string]string{}
 	}
 	m := make(map[string]string, len(resp.GetTags()))

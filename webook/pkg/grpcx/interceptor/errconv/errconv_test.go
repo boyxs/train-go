@@ -184,6 +184,8 @@ func (r *recLogger) Info(string, ...logger.Field)  { r.infoN++ }
 func (r *recLogger) Warn(string, ...logger.Field)  { r.warnN++ }
 func (r *recLogger) Error(string, ...logger.Field) { r.errorN++ }
 
+func (r *recLogger) WithContext(context.Context) logger.LoggerX { return r }
+
 // 5.7 客户端取消（context.Canceled）：降级 Debug 不刷 ERROR，回 codes.Canceled 而非 Internal。
 func TestUnaryServerError_ClientCanceled_DebugNotError(t *testing.T) {
 	rec := &recLogger{}

@@ -1,0 +1,4 @@
+# Logstash 9.x 节点设置。管道在 /usr/share/logstash/pipeline（默认 path.config）。
+api.http.host: "0.0.0.0"          # Logstash 9.x：暴露 :9600 API（旧 http.host 已改名 api.http.host）
+# 不向 ES 上报 Logstash 自监控（省 ES 负载 + 免额外鉴权配置；需要时再开 xpack.monitoring）
+xpack.monitoring.enabled: false

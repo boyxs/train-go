@@ -13,6 +13,7 @@ import (
 	commentgrpc "github.com/boyxs/train-go/webook/comment/grpc"
 	"github.com/boyxs/train-go/webook/pkg/grpcx"
 	"github.com/boyxs/train-go/webook/pkg/grpcx/interceptor/errconv"
+	"github.com/boyxs/train-go/webook/pkg/grpcx/interceptor/logging"
 	"github.com/boyxs/train-go/webook/pkg/grpcx/interceptor/metrics"
 	"github.com/boyxs/train-go/webook/pkg/logger"
 	"github.com/boyxs/train-go/webook/shared/confkey"
@@ -34,7 +35,7 @@ func InitGRPCServer(commentSrv *commentgrpc.CommentServer, client *etcdv3.Client
 		WithCounter().WithHistogram().WithInFlight()
 	srv := grpcx.NewServer(cfg, client, l,
 		grpc.StatsHandler(otelgrpc.NewServerHandler(otelgrpc.WithTracerProvider(tp))),
-		grpc.ChainUnaryInterceptor(grpcMetrics.BuildUnaryServer(), errconv.UnaryServerInterceptor(l)),
+		grpc.ChainUnaryInterceptor(grpcMetrics.BuildUnaryServer(), logging.NewInterceptorBuilder(l).BuildUnaryServer(), errconv.UnaryServerInterceptor(l)),
 	)
 	commentv1.RegisterCommentServiceServer(srv.Server, commentSrv)
 	healthpb.RegisterHealthServer(srv.Server, health.NewServer()) // k8s / LB 健康探测

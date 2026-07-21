@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"time"
 
-	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/boyxs/train-go/webook/pkg/logger"
@@ -145,8 +144,7 @@ func (us *InternalUserService) FindOrCreateByWechat(ctx context.Context, wechatA
 	}
 	// 创建一个新用户
 	// JSON 格式的 wechatAuth
-	zap.L().Info("新用户", zap.Any("wechatAuth", wechatAuth))
-	//us.logger.Info("新用户", zap.Any("wechatAuth", wechatAuth))
+	us.l.WithContext(ctx).Info("新用户", logger.Field{Key: "wechatAuth", Val: wechatAuth})
 	err = us.repo.Create(ctx, domain.User{
 		WechatAuth: wechatAuth,
 	})

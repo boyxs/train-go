@@ -51,7 +51,7 @@ func (b *InterceptorBuilder) BuildUnaryServer() grpc.UnaryServerInterceptor {
 				logger.String("peer_ip", interceptor.PeerIp(ctx)),
 			)
 			fields = appendStatus(fields, err)
-			b.l.Info("Server RPC请求", fields...)
+			b.l.WithContext(ctx).Info("Server RPC请求", fields...)
 		}()
 		resp, err = handler(ctx, req)
 		return
@@ -78,7 +78,7 @@ func (b *InterceptorBuilder) BuildUnaryClient() grpc.UnaryClientInterceptor {
 				logger.String("event", event),
 			)
 			fields = appendStatus(fields, err)
-			b.l.Info("Client RPC请求", fields...)
+			b.l.WithContext(ctx).Info("Client RPC请求", fields...)
 		}()
 		err = invoker(ctx, method, req, reply, cc, opts...)
 		return

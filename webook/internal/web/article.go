@@ -120,7 +120,7 @@ func (h *InternalArticleAuthorHandler) Detail(ctx *gin.Context, req idReq) (ginx
 		var e error
 		intr, e = h.intrSvc.FindInteraction(ctx, 0, domain.BizArticle, req.Id)
 		if e != nil {
-			h.l.Error("获取文章互动数据失败",
+			h.l.WithContext(ctx).Error("获取文章互动数据失败",
 				logger.Int64("article_id", req.Id), logger.Error(e))
 		}
 		return nil
@@ -191,7 +191,7 @@ func (h *InternalArticleAuthorHandler) Page(ctx *gin.Context, req pageReq) (ginx
 	}
 	intrMap, intrErr := h.intrSvc.FindByBizIds(ctx, domain.BizArticle, ids)
 	if intrErr != nil {
-		h.l.Error("批量获取文章互动数据失败", logger.Error(intrErr))
+		h.l.WithContext(ctx).Error("批量获取文章互动数据失败", logger.Error(intrErr))
 		intrMap = map[int64]domain.Interaction{}
 	}
 	list := make([]ArticleVO, 0, len(articles))
@@ -293,7 +293,7 @@ func (h *InternalArticleReaderHandler) Detail(ctx *gin.Context, req idReq) (ginx
 		var e error
 		intr, e = h.intrSvc.FindInteraction(ctx, 0, domain.BizArticle, req.Id)
 		if e != nil {
-			h.l.Error("获取文章互动数据失败",
+			h.l.WithContext(ctx).Error("获取文章互动数据失败",
 				logger.Int64("article_id", req.Id), logger.Error(e))
 		}
 		return nil
@@ -302,7 +302,7 @@ func (h *InternalArticleReaderHandler) Detail(ctx *gin.Context, req idReq) (ginx
 		// 回显：补该文标签（阅读页 chip 链 /tag/:slug）；失败降级不带标签，不阻断详情。
 		tagMap, e := h.tagSvc.TagsByBiz(ctx, domain.BizArticle, []int64{req.Id})
 		if e != nil {
-			h.l.Error("阅读页：取标签失败，降级不带标签",
+			h.l.WithContext(ctx).Error("阅读页：取标签失败，降级不带标签",
 				logger.Int64("article_id", req.Id), logger.Error(e))
 			return nil
 		}
@@ -365,7 +365,7 @@ func (h *InternalArticleReaderHandler) Page(ctx *gin.Context, req pageReq) (ginx
 	}
 	intrMap, intrErr := h.intrSvc.FindByBizIds(ctx, domain.BizArticle, ids)
 	if intrErr != nil {
-		h.l.Error("批量获取文章互动数据失败", logger.Error(intrErr))
+		h.l.WithContext(ctx).Error("批量获取文章互动数据失败", logger.Error(intrErr))
 		intrMap = map[int64]domain.Interaction{}
 	}
 	list := make([]ReaderArticleVO, 0, len(articles))

@@ -222,7 +222,7 @@ func (s *AIChatService) ReadStream(ctx context.Context, convId int64, afterId st
 	for i, raw := range rawEvents {
 		var event domain.ChatEvent
 		if uerr := json.Unmarshal([]byte(raw), &event); uerr != nil {
-			s.l.Warn("ReadStream 事件反序列化失败",
+			s.l.WithContext(ctx).Warn("ReadStream 事件反序列化失败",
 				logger.Int64("convId", convId), logger.String("id", ids[i]), logger.Error(uerr))
 			continue
 		}
@@ -248,7 +248,7 @@ func (s *AIChatService) BlockReadStream(ctx context.Context, convId int64, after
 	for i, raw := range rawEvents {
 		var event domain.ChatEvent
 		if uerr := json.Unmarshal([]byte(raw), &event); uerr != nil {
-			s.l.Warn("BlockReadStream 事件反序列化失败",
+			s.l.WithContext(ctx).Warn("BlockReadStream 事件反序列化失败",
 				logger.Int64("convId", convId), logger.String("id", ids[i]), logger.Error(uerr))
 			continue
 		}
@@ -305,7 +305,7 @@ func (s *AIChatService) searchArticles(ctx context.Context, query string) []*sea
 		Query: query, Page: 1, Size: ragTopK,
 	})
 	if err != nil {
-		s.l.Warn("RAG 检索失败，降级为无 RAG",
+		s.l.WithContext(ctx).Warn("RAG 检索失败，降级为无 RAG",
 			logger.String("query", query),
 			logger.Error(err))
 		return nil

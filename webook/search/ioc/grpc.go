@@ -14,6 +14,7 @@ import (
 
 	"github.com/boyxs/train-go/webook/pkg/grpcx"
 	"github.com/boyxs/train-go/webook/pkg/grpcx/interceptor/errconv"
+	"github.com/boyxs/train-go/webook/pkg/grpcx/interceptor/logging"
 	"github.com/boyxs/train-go/webook/pkg/grpcx/interceptor/metrics"
 	"github.com/boyxs/train-go/webook/pkg/logger"
 	"github.com/boyxs/train-go/webook/shared/confkey"
@@ -36,6 +37,7 @@ func InitGRPCServer(searchSrv *searchgrpc.SearchServer, client *etcdv3.Client, l
 		// ChainUnaryInterceptor(a,b) 入站 a→b→handler：metrics → errconv（*errs.Error→status）
 		grpc.ChainUnaryInterceptor(
 			grpcMetrics.BuildUnaryServer(),
+			logging.NewInterceptorBuilder(l).BuildUnaryServer(),
 			errconv.UnaryServerInterceptor(l),
 		),
 	)

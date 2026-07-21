@@ -143,6 +143,12 @@ func StartConsumerSpan(ctx context.Context, msg *sarama.ConsumerMessage) (contex
 	)
 }
 
+// ExtractTraceContext 仅从消息 headers 提取上游（producer）trace context，不新建 span。
+// 用于 consumer span 建立之前/之外的日志点（如反序列化失败）也能带上 trace_id，追回是哪个 producer 发的。
+func ExtractTraceContext(msg *sarama.ConsumerMessage) context.Context {
+	return otel.GetTextMapPropagator().Extract(context.Background(), NewConsumerHeadersCarrier(msg))
+}
+
 // RecordSpanError 统一设置 span 错误状态
 func RecordSpanError(span trace.Span, err error) {
 	if err != nil {

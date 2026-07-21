@@ -145,6 +145,10 @@ services:
     ports:
       - "${ES_HOST_PORT:-9200}:9200"
 
+  webook-kibana:
+    ports:
+      - "${KIBANA_HOST_PORT:-5601}:5601"
+
   webook-mongo:
     ports:
       - "${MONGO_HOST_PORT:-27017}:27017"

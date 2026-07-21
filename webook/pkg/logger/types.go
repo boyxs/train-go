@@ -1,5 +1,7 @@
 package logger
 
+import "context"
+
 type Logger interface {
 	Debug(msg string, args ...any)
 	Info(msg string, args ...any)
@@ -12,6 +14,8 @@ type LoggerX interface {
 	Info(msg string, args ...Field)
 	Warn(msg string, args ...Field)
 	Error(msg string, args ...Field)
+
+	WithContext(ctx context.Context) LoggerX
 }
 
 type Field struct {

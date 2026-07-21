@@ -533,6 +533,8 @@ services:
       GF_SMTP_STARTTLS_POLICY: "MandatoryStartTLS"
       # 提供给 alerting provisioning 的 contactpoints.yml 用 $__env{ALERT_EMAIL_TO} 读
       ALERT_EMAIL_TO: "${ALERT_EMAIL_TO}"
+      # ES 日志数据源密码（provisioning/datasources/elasticsearch.yml 用 $__env{ES_PASS} 读）
+      ES_PASS: "${ES_PASS}"
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - grafana-data:/var/lib/grafana
@@ -580,6 +582,79 @@ services:
       - otel-collector-storage:/var/lib/otelcol/storage
     depends_on:
       - zipkin
+
+  # ── 日志链路 ELK（Filebeat → Logstash → Elasticsearch[复用 webook-es] → Kibana）────
+  # ES 用现有 webook-es（单节点）：日志走独立索引 webook-logs-* + ILM，与检索 article_v1 隔离。
+  # 首次起栈后跑一次 ./elk/es/setup.sh 建 ILM 策略 + 索引模板（幂等；类比 mongo rs.initiate）。
+  webook-logstash:
+    image: docker.elastic.co/logstash/logstash:9.3.2
+    container_name: webook-logstash
+    profiles: ["elk"]                       # 重量级，opt-in：COMPOSE_PROFILES=elk ./deploy.sh <env>
+    restart: always
+    pull_policy: missing
+    mem_limit: ${LOGSTASH_MEM:-1024m}
+    environment:
+      LS_JAVA_OPTS: "${LOGSTASH_HEAP:--Xms512m -Xmx512m}"
+      ES_PASS: "${ES_PASS}"                 # pipeline 用 ${ES_PASS} 连 ES
+    volumes:
+      - ./elk/logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
+      - ./elk/logstash/pipeline:/usr/share/logstash/pipeline:ro
+    depends_on:
+      webook-es: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9600 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  webook-kibana:
+    image: docker.elastic.co/kibana/kibana:9.3.2
+    container_name: webook-kibana
+    profiles: ["elk"]
+    restart: always
+    pull_policy: missing
+    mem_limit: ${KIBANA_MEM:-1024m}
+    # 宿主端口不在主 compose 暴露（数据面 UI，服务器走内网/socat）；本地经 docker-compose.local.yaml 暴露
+    environment:
+      ELASTICSEARCH_HOSTS: "http://webook-es:9200"
+      ELASTICSEARCH_USERNAME: "kibana_system"   # Kibana 9.x 禁用 elastic 超管连接；用内置 kibana_system（密码由 ./elk/es/setup.sh 设）
+      ELASTICSEARCH_PASSWORD: "${ES_PASS}"
+      # 固定加密密钥（≥32 字符）：免每次重启换 key 报警 + 保存对象跨重启可解密
+      XPACK_SECURITY_ENCRYPTIONKEY: "${KIBANA_ENCKEY:-webook_kibana_saved_objects_key32}"
+      XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY: "${KIBANA_ENCKEY:-webook_kibana_saved_objects_key32}"
+      XPACK_REPORTING_ENCRYPTIONKEY: "${KIBANA_ENCKEY:-webook_kibana_saved_objects_key32}"
+    depends_on:
+      webook-es: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:5601/api/status || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 15
+      start_period: 90s
+
+  webook-filebeat:
+    image: docker.elastic.co/beats/filebeat:9.3.2
+    container_name: webook-filebeat
+    profiles: ["elk"]
+    restart: always
+    pull_policy: missing
+    user: root
+    mem_limit: ${FILEBEAT_MEM:-256m}
+    command: ["-e", "--strict.perms=false"]              # entrypoint 已是 filebeat，只传参数；--strict.perms=false 免挂入配置 owner 校验
+    volumes:
+      - ./elk/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - filebeat-data:/usr/share/filebeat/data           # registry：断点续采
+    depends_on:
+      webook-logstash: {condition: service_healthy}      # 等 logstash 就绪再采，免启动期 output 连不上刷错
+    healthcheck:
+      test: ["CMD-SHELL", "filebeat test output --strict.perms=false || exit 1"]  # 探测到 logstash 的 output 连通性
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
 
   # ── 反代 ─────────────────────────────────────────────────
   nginx:
@@ -665,3 +740,4 @@ volumes:
   prometheus-data:
   grafana-data:
   otel-collector-storage:
+  filebeat-data:

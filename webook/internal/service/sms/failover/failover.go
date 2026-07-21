@@ -40,7 +40,7 @@ func (f *FailoverSmsService) Send(ctx context.Context, templateId string, args [
 		case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
 			return err
 		}
-		f.l.Warn("短信服务商发送失败",
+		f.l.WithContext(ctx).Warn("短信服务商发送失败",
 			logger.Uint64("requestIdx", globalIdx),
 			logger.Uint64("providerIdx", index),
 			logger.Error(err))

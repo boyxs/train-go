@@ -31,6 +31,8 @@ func (r *recLogger) Info(msg string, fs ...logger.Field)  { r.record(msg, fs) }
 func (r *recLogger) Warn(msg string, fs ...logger.Field)  { r.record(msg, fs) }
 func (r *recLogger) Error(msg string, fs ...logger.Field) { r.record(msg, fs) }
 
+func (r *recLogger) WithContext(context.Context) logger.LoggerX { return r }
+
 func (r *recLogger) last() map[string]any { return r.logs[len(r.logs)-1] }
 func (r *recLogger) lastMsg() string      { return r.msgs[len(r.msgs)-1] }
 

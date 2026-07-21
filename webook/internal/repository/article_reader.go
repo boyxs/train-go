@@ -70,7 +70,7 @@ func (r *CacheArticleReaderRepository) daoBySide(side migratorsdk.Side) dao.Arti
 func (r *CacheArticleReaderRepository) chooseSide(ctx context.Context, hashKey int64) migratorsdk.Side {
 	side, err := r.switchReader.ChooseSide(ctx, r.taskName, hashKey)
 	if err != nil {
-		r.l.Warn("ChooseSide 失败，降级 SideOld",
+		r.l.WithContext(ctx).Warn("ChooseSide 失败，降级 SideOld",
 			logger.String("task", r.taskName),
 			logger.Int64("hash_key", hashKey),
 			logger.Error(err))
@@ -97,7 +97,7 @@ func (r *CacheArticleReaderRepository) Upsert(ctx context.Context, article domai
 	}
 	r.delFirstPageCache(ctx)
 	if cErr := r.cache.DelPub(ctx, article.Id); cErr != nil {
-		r.l.Error("Upsert 后清除公开文章缓存失败", logger.Int64("id", article.Id), logger.Error(cErr))
+		r.l.WithContext(ctx).Error("Upsert 后清除公开文章缓存失败", logger.Int64("id", article.Id), logger.Error(cErr))
 	}
 	return nil
 }
@@ -111,14 +111,14 @@ func (r *CacheArticleReaderRepository) Delete(ctx context.Context, id int64, uid
 	}
 	r.delFirstPageCache(ctx)
 	if cErr := r.cache.DelPub(ctx, id); cErr != nil {
-		r.l.Error("删除公开文章缓存失败", logger.Int64("id", id), logger.Error(cErr))
+		r.l.WithContext(ctx).Error("删除公开文章缓存失败", logger.Int64("id", id), logger.Error(cErr))
 	}
 	return nil
 }
 
 func (r *CacheArticleReaderRepository) delFirstPageCache(ctx context.Context) {
 	if err := r.cache.DelFirstPage(ctx); err != nil {
-		r.l.Error("删除首页缓存失败", logger.Error(err))
+		r.l.WithContext(ctx).Error("删除首页缓存失败", logger.Error(err))
 	}
 }
 
@@ -134,7 +134,7 @@ func (r *CacheArticleReaderRepository) FindById(ctx context.Context, id int64) (
 	}
 	result := r.toDomain(pub)
 	if cErr := r.cache.SetPub(ctx, result); cErr != nil {
-		r.l.Error("回填公开文章缓存失败", logger.Int64("id", id), logger.Error(cErr))
+		r.l.WithContext(ctx).Error("回填公开文章缓存失败", logger.Int64("id", id), logger.Error(cErr))
 	}
 	return result, nil
 }
@@ -146,7 +146,7 @@ func (r *CacheArticleReaderRepository) FindByIds(ctx context.Context, ids []int6
 	cacheHit, err := r.cache.MGetPub(ctx, ids)
 	if err != nil {
 		// MGet 整体失败不阻断；当作 0 命中走 DB
-		r.l.Error("MGetPub 失败，全量回源 DB", logger.Error(err))
+		r.l.WithContext(ctx).Error("MGetPub 失败，全量回源 DB", logger.Error(err))
 		cacheHit = map[int64]domain.Article{}
 	}
 
@@ -213,7 +213,7 @@ func (r *CacheArticleReaderRepository) Page(ctx context.Context, offset int, lim
 	// 首页回填缓存
 	if offset == 0 {
 		if cErr := r.cache.SetFirstPage(ctx, result, count); cErr != nil {
-			r.l.Error("回填首页缓存失败", logger.Error(cErr))
+			r.l.WithContext(ctx).Error("回填首页缓存失败", logger.Error(cErr))
 		}
 	}
 

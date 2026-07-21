@@ -48,6 +48,8 @@ func (r *recordingLogger) Info(msg string, args ...logger.Field)  { r.record("in
 func (r *recordingLogger) Warn(msg string, args ...logger.Field)  { r.record("warn", msg, args) }
 func (r *recordingLogger) Error(msg string, args ...logger.Field) { r.record("error", msg, args) }
 
+func (r *recordingLogger) WithContext(context.Context) logger.LoggerX { return r }
+
 func (r *recordingLogger) byLevel(level string) []logEntry {
 	r.mu.Lock()
 	defer r.mu.Unlock()

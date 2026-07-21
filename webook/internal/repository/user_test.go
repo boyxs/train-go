@@ -17,6 +17,7 @@ import (
 	cachemocks "github.com/boyxs/train-go/webook/internal/repository/cache/mocks"
 	"github.com/boyxs/train-go/webook/internal/repository/dao"
 	daomocks "github.com/boyxs/train-go/webook/internal/repository/dao/mocks"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 )
 
 func TestRedisUserRepository_FindById(t *testing.T) {
@@ -175,7 +176,7 @@ func TestRedisUserRepository_FindById(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 			userDAO, userCache := tc.mock(ctrl)
-			repo := NewRedisUserRepository(userDAO, userCache)
+			repo := NewRedisUserRepository(userDAO, userCache, logger.NewNopLogger())
 			user, err := repo.FindById(tc.ctx, tc.userid)
 			assert.Equal(t, tc.wantErr, err)
 			assert.Equal(t, tc.wantUser, user)
