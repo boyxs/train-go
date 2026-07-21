@@ -2,6 +2,24 @@
 
 <!-- 新功能前插在此，日期降序 -->
 
+## [2026-07-21] Feed 关注流：需求 PRD + 原型 5 屏 + 架构设计
+
+**变更内容**: 走 workflow design→architect 双阶段：广场页 `/feed` 升级双 Tab（关注 | 发现），关注流游标 + 无限滚动、卡片带互动计数 + 标签。产出 PRD（14 用户故事 / 9 条验收 / HTTP+gRPC 契约）+ Pencil 原型 5 屏（桌面 / 空态 / 未登录 / 新内容提示 / 移动端，样式复制 article 广场页 + tag chip 规范）+ 架构文档（含前瞻章节）。纯设计交付，未写代码。
+**影响范围**: `prd/feed/`（prd.md · ARCHITECTURE.md · feed.pen · prototypes/01~05-*.png）；`webook/CLAUDE.md` 端口铁律行加设计预定标注（permission 8090/8091 · feed 8100/8101 → 下一个 8110/8111）。
+**技术决策**: ① 独立 `webook/feed/` 纯同步 gRPC 服务（**8100/8101**，8090 已被 permission 设计先占），Kafka 消费按 worker 铁律统一收拢 worker、经 gRPC 派发回 feed；② feed 无 MySQL——收件箱/发件箱全 Redis 投影（inbox ZSET cap 2000 TTL 7d + built 标记 / outbox cap 100 TTL 1h cache-aside / bigv SET），源数据经 core article gRPC 新增 `ListAuthorArticles` 拉取，不直查他服务库；③ 推拉结合：粉丝数 ≥1000（yaml 可调）不写扩散，读时归并大 V outbox；④ 关系变更=失效重建（follow/unfollow/block 一律 DEL 收件箱下次读重建，拉黑级联天然正确）；⑤ 撤回=读时过滤（BFF FindByIds 查线上库自然滤掉）+ DEL outbox；⑥ 新增 topic `article_events`（key=authorId，core 产、失败降级记日志），ZADD/DEL 幂等 → Kafka 整批重投安全；⑦ outbox「存在才追加」需 Lua 原子，防假全量缓存。
+**待办**: ① tag `TagsByBiz` 批量能力确认（否则 BFF N+1，需补批量 rpc）；② article.proto 现有 message 复用确认；③ Kafka 新 topic 建法对齐部署；④ 用户复核后进 `workflow:tdd`（22 任务 6 阶段已拆）；⑤ P1 新内容提示条（`/feed/new-count`）随 P0 后接。
+**会话**: 260721-feed-关注流设计
+**发布**: 待上线（纯设计文档）
+
+## [2026-07-17] SaaS 权限系统（permission）双面完整版：需求 PRD + 原型 10 屏 + 架构设计
+
+**变更内容**: 走 workflow design→architect 双阶段并按用户确认扩展为**双面完整版**（对标若依-pro/芋道多租户版）：租户侧（组织/成员/部门/角色/功能矩阵/数据权限/审计）+ 平台运营侧（租户管理/租户套餐/菜单管理/平台审计）。产出需求 PRD（17 用户故事 / 29 HTTP 接口 / 12 表模型 / 12 条验收标准）+ Pencil 原型 10 屏（租户侧 6+部门 1+平台侧 3）+ 架构文档。纯设计交付，未写代码。
+**影响范围**: `prd/permission/`（PRD.md · ARCHITECTURE.md · permission.pen · prototypes/01~10-*.png）；其他文件零改动。
+**技术决策**: ① 独立 `webook/permission/` gRPC 服务（8090/8091，对齐 tag/search 拆分范式），core 作 HTTP BFF；② 自研 RBAC1+套餐 表驱动 12 表，不引 Casbin；③ **平台侧=系统租户（org.id=1）+ Platform 套餐**，与租户侧共用同一套 RBAC 零特殊分支；④ **有效权限 = ∪(角色) ∩ 套餐**，降级裁剪不清数据（芋道语义）；⑤ 菜单树「代码管语义 / DB 管展示」：dir/menu 可 UI 全管、button 走代码注册；⑥ 数据权限 5 档（若依枚举）多角色取最宽，本期只供数不消费；⑦ 缓存三级失效：单人/角色级精确 DEL + org/全局**版本号 INCR O(1)**（`perm:over:{org}`/`perm:gver` 拼进 set key）；⑧ 鉴权 fail-closed，∩ 套餐在写缓存前完成、热路径零额外计算。
+**待办**: ① **`permission.pen` 需在 Pencil 应用中手动 Ctrl+S 落盘**（MCP 改动不置应用 dirty 位、合成键被拦截，PNG/文档已全部落盘不受影响）；② 用户复核后进 `workflow:tdd`；③ 邀请触达通道（邮件 vs 复制链接）待定；④ Pencil MCP 四个坑已记录 PRD §11。
+**会话**: 260717-permission-SaaS权限系统设计
+**发布**: 待上线（纯设计文档）
+
 ## [2026-07-12] tag 服务 SQL 脚本补全 + 脚本落点规范对齐 + tag 服务文档
 
 **变更内容**: 补 tag 服务此前缺失的建表脚本（靠 AutoMigrate、无脚本），并把「脚本同步」规范对齐到实际的**按服务落点**约定，补齐 tag 服务 CLAUDE.md。

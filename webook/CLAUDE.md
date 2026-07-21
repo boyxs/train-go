@@ -85,7 +85,7 @@ Handler (web/) → Service (service/) → Repository (repository/) → DAO (dao/
 - **core**（最早）：整个服务在 `internal/` 下（含 `main.go` / `wire.go` / `ioc/`），历史遗留布局
 - **拆分服务**（`chat/`、`migrator/`、`interaction/`、`worker/`）：包平铺在 `<svc>/` 下，**不套 `internal/`**——单 module 仓库里 `<svc>/internal/` 只能挡仓内兄弟服务导包，当前无跨服务导包需求，边界靠 review 维持
 - **新增服务跟随平铺布局**，不效仿 core；每个拆分服务各自带 `<svc>/CLAUDE.md`（拆分原因 / 边界 / 接入方）
-- **端口分配（铁律，新增服务动手前必查现有占用）**：业务服务走 `80x0/80x1` 段——**每服务独占一个十位段**，HTTP（metrics/health 或 core 网关）= `80x0`、gRPC = `80x1`。已占用：core `8010/8011` · chat `8020` · comment `8030/8031` · interaction `8040/8041` · worker `8050` · relation `8060/8061` · tag `8070/8071` · search `8080/8081` → **下一个新服务用 `8090/8091`**。运维控制台（migrator）走 `82xx`、otel `88xx`、exporter `9xxx`。**禁止把新服务端口塞进别人的十位段**（如 relation 用 `8042` 撞进 interaction 的 `804x` 段）；config 5 份 yaml 的 `server.http.addr`/`server.grpc.addr` + deploy(compose/prometheus/nginx) 一致按此分配
+- **端口分配（铁律，新增服务动手前必查现有占用）**：业务服务走 `80x0/80x1` 段——**每服务独占一个十位段**，HTTP（metrics/health 或 core 网关）= `80x0`、gRPC = `80x1`。已占用：core `8010/8011` · chat `8020` · comment `8030/8031` · interaction `8040/8041` · worker `8050` · relation `8060/8061` · tag `8070/8071` · search `8080/8081`。设计已预定（未落地）：permission `8090/8091`（`prd/permission/`）· feed `8100/8101`（`prd/feed/`）→ **下一个新服务用 `8110/8111`**。运维控制台（migrator）走 `82xx`、otel `88xx`、exporter `9xxx`。**禁止把新服务端口塞进别人的十位段**（如 relation 用 `8042` 撞进 interaction 的 `804x` 段）；config 5 份 yaml 的 `server.http.addr`/`server.grpc.addr` + deploy(compose/prometheus/nginx) 一致按此分配
 - 接 etcd 配置热更的服务（core / chat / migrator / interaction）`ioc/config.go` 同构持有 `ConfigChangeCallbacks`（`web.go` 追加回调、`main.go` 统一触发），新服务接热更时镜像此文件；**`worker` 是例外**——纯静态本地配置（只 `LoadLocal` 不 `WatchRemote`），etcd 仅用于 gRPC 服务发现，配置变更靠重启
 
 ## 分层规则

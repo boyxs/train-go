@@ -26,5 +26,6 @@
   "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "pencil"
-  ]
+  ],
+  "includeCoAuthoredBy": false
 }
