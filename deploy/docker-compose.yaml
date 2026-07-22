@@ -614,10 +614,15 @@ services:
     mem_limit: ${LOGSTASH_MEM:-768m}
     environment:
       LS_JAVA_OPTS: "${LOGSTASH_HEAP:--Xms384m -Xmx384m}"
-      ES_PASS: "${ES_PASS}"                 # pipeline 用 ${ES_PASS} 连 ES
+      ES_PASS: "${ES_PASS}"                     # pipeline 用 ${ES_PASS} 连 ES
+      LOGSTASH_ES_SCHEME: "${LOGSTASH_ES_SCHEME:-http}"           # 开 TLS 改 https（见 webook.conf output）
+      LOGSTASH_ES_SSL_ENABLED: "${LOGSTASH_ES_SSL_ENABLED:-false}"
+      LOGSTASH_ES_CA_FILE: "${LOGSTASH_ES_CA_FILE:-}"             # 私有 CA 时指向下方挂载路径
     volumes:
       - ./elk/logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
       - ./elk/logstash/pipeline:/usr/share/logstash/pipeline:ro
+      # 开 TLS 且用私有 CA 时挂 CA 进容器（路径对齐 LOGSTASH_ES_CA_FILE），并取消 webook.conf 里 ssl_certificate_authorities 注释：
+      # - ./elk/certs/es-ca.crt:/usr/share/logstash/config/es-ca.crt:ro
     depends_on:
       webook-es:       {condition: service_healthy}
       webook-es-setup: {condition: service_completed_successfully}   # 等 ILM/模板建好再写，首个日索引才用 ECS mapping

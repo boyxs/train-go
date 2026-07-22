@@ -494,7 +494,7 @@ output.logstash:
 - ✅ `SpanContextFromContext` 无 span 安全跳过，logger 不因 trace 缺失报错。
 
 **扩展性**
-- ✅ 加新服务无需改采集配置：Filebeat 按 `webook-*` 容器名通配自动纳入。
+- ⚠ 加新**业务**服务需把容器名加进 Filebeat 白名单（`filebeat.yml` 的 `container.name` 正则）——为控日志量只采业务服务、不通配全部 `webook-*`（中间件/ELK 自身不入 ELK）。
 - ✅ 索引按 `service.name` 字段区分，加服务不加索引（控 shard）。
 
 **容量/成本演进**

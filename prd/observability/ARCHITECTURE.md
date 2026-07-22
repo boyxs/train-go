@@ -28,7 +28,7 @@
 |------|------|------|---------|
 | 产生 | Zap `LoggerX` | 应用结构化日志（业务/access/gRPC），本方案注入 `trace.id`/`span.id`/`service.name` | `pkg/logger/types.go:10-15` |
 | 产生 | nginx | 入口层 JSON access log（已就绪） | `deploy/nginx/nginx.conf:17-30` |
-| 采集 | Filebeat | 读容器 `json-file` + `add_docker_metadata` + multiline 兜底 + 过滤非 `webook-*` | 新增 `deploy/elk/filebeat/` |
+| 采集 | Filebeat | 读容器 `json-file` + `add_docker_metadata` + 只采 Go 业务服务白名单（非通配全部 `webook-*`，中间件/ELK 自身不采） | 新增 `deploy/elk/filebeat/` |
 | 传输/加工 | Logstash | ECS 规范化 + 降噪(drop /health,/metrics) + 脱敏 + 路由 ES + 持久化队列缓冲 | 新增 `deploy/elk/logstash/` |
 | 存储 | Elasticsearch | 索引/检索，复用 `webook-es`（独立索引 + ILM + 角色隔离） | `docker-compose.yaml:381-400` |
 | 检索 | Kibana | Discover / Dashboard / `trace.id`→Zipkin 跳转 | 新增 `webook-kibana:5601` |

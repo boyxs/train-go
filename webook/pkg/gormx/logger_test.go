@@ -82,3 +82,24 @@ func TestGormLogger_Trace_Silent(t *testing.T) {
 	l.Trace(context.Background(), time.Now(), fakeSQL("SELECT 1", 1), errors.New("boom"))
 	assert.Empty(t, calls)
 }
+
+// 慢查询（耗时 ≥ 阈值）升 Warn。
+func TestGormLogger_Trace_SlowQuery(t *testing.T) {
+	var calls []logCall
+	l := gormx.NewGormLogger(recordLogger{calls: &calls}) // 默认阈值 200ms
+	l.Trace(context.Background(), time.Now().Add(-300*time.Millisecond), fakeSQL("SELECT sleep(1)", 1), nil)
+
+	assert.Len(t, calls, 1)
+	assert.Equal(t, "warn", calls[0].level)
+	assert.Equal(t, "gorm slow sql", calls[0].msg)
+}
+
+// IgnoreRecordNotFoundError=false 时 ErrRecordNotFound 也升 Error（扩展配置）。
+func TestGormLogger_Trace_RecordNotFoundAsError(t *testing.T) {
+	var calls []logCall
+	l := gormx.NewGormLogger(recordLogger{calls: &calls}, gormx.Config{IgnoreRecordNotFoundError: false})
+	l.Trace(context.Background(), time.Now(), fakeSQL("SELECT 1", 0), gorm.ErrRecordNotFound)
+
+	assert.Len(t, calls, 1)
+	assert.Equal(t, "error", calls[0].level)
+}
