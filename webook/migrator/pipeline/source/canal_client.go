@@ -115,7 +115,7 @@ func (c *GoMySQLCanalClient) Subscribe(ctx context.Context, fromPos string) (<-c
 				return // 正常退出
 			}
 			// runOnce 异常 → 退避后重连
-			c.l.Warn("canal disconnected, retry with backoff",
+			c.l.Warn(ctx, "canal disconnected, retry with backoff",
 				logger.Int("attempt", attempt),
 				logger.String("last_pos", startPos),
 				logger.Error(runErr))

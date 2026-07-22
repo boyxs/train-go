@@ -111,7 +111,7 @@ func (s *ArticleRankingService) RecomputeHot(ctx context.Context, date string) e
 			grouped := s.filterCategory(candidates, cat)
 			catTop := s.sortAndTake(grouped, consts.ArticleRankingTopN)
 			if err := s.repo.ReplaceTop(ctx, date, string(domain.DimensionCategory), cat, catTop); err != nil {
-				s.l.Error("分区榜替换失败", logger.String("cat", cat), logger.Error(err))
+				s.l.Error(ctx, "分区榜替换失败", logger.String("cat", cat), logger.Error(err))
 			}
 			return nil
 		})

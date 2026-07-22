@@ -121,7 +121,7 @@ func InitMiddlewares(
 func loggerMiddleware(l logger.LoggerX) gin.HandlerFunc {
 	builder := accesslog.NewLoggerMiddlewareBuilder(func(ctx context.Context, val accesslog.RequestLog) {
 		// access log 用 INFO：prod 也可见；WithContext(ctx) 注入 trace.id/span.id 关联链路
-		l.WithContext(ctx).Info("HTTP request", logger.Field{
+		l.Info(ctx, "HTTP request", logger.Field{
 			Key: "request",
 			Val: val,
 		})

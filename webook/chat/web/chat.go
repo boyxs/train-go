@@ -120,7 +120,7 @@ func (h *InternalChatHandler) SendMessage(ctx *gin.Context) {
 	key := fmt.Sprintf(consts.ChatRateLimitPattern, uc.Userid)
 	limited, limitErr := h.limiter.Limit(ctx.Request.Context(), key)
 	if limitErr != nil {
-		h.l.WithContext(ctx).Error("限流检查失败", logger.Int64("uid", uc.Userid), logger.Error(limitErr))
+		h.l.Error(ctx, "限流检查失败", logger.Int64("uid", uc.Userid), logger.Error(limitErr))
 	}
 	if limited {
 		ginx.WriteError(ctx, errs.ErrChatRateLimit)
@@ -213,7 +213,7 @@ func (h *InternalChatHandler) pollStream(
 	if lastId != "$" {
 		events, ids, generating := h.svc.ReadStream(ctx, convId, lastId)
 		for i, e := range events {
-			if line := h.formatSSE(ids[i], e.Type, e); line != "" {
+			if line := h.formatSSE(ctx, ids[i], e.Type, e); line != "" {
 				ch <- line
 			}
 		}
@@ -238,7 +238,7 @@ func (h *InternalChatHandler) pollStream(
 		}
 		events, ids := h.svc.BlockReadStream(ctx, convId, lastId, 2*time.Second)
 		for i, e := range events {
-			if line := h.formatSSE(ids[i], e.Type, e); line != "" {
+			if line := h.formatSSE(ctx, ids[i], e.Type, e); line != "" {
 				ch <- line
 			}
 		}
@@ -273,10 +273,10 @@ func (h *InternalChatHandler) SetFeedback(ctx *gin.Context, req setFeedbackReq) 
 }
 
 // formatSSE 将事件格式化为 SSE 文本；序列化失败返回空串由调用方丢弃，避免推空 frame 误导前端
-func (h *InternalChatHandler) formatSSE(id, eventType string, event any) string {
+func (h *InternalChatHandler) formatSSE(ctx context.Context, id, eventType string, event any) string {
 	data, err := json.Marshal(event)
 	if err != nil {
-		h.l.Error("SSE 事件序列化失败",
+		h.l.Error(ctx, "SSE 事件序列化失败",
 			logger.String("eventType", eventType),
 			logger.Error(err))
 		return ""

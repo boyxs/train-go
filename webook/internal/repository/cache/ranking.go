@@ -146,12 +146,12 @@ func (c *RedisArticleRankingCache) GetDetails(ctx context.Context, date string, 
 		}
 		s, ok := v.(string)
 		if !ok {
-			c.l.WithContext(ctx).Warn("GetDetails 类型断言失败", logger.Int64("articleId", articleIds[i]))
+			c.l.Warn(ctx, "GetDetails 类型断言失败", logger.Int64("articleId", articleIds[i]))
 			continue
 		}
 		var item domain.ArticleRanking
 		if err := json.Unmarshal([]byte(s), &item); err != nil {
-			c.l.WithContext(ctx).Warn("GetDetails JSON 反序列化失败",
+			c.l.Warn(ctx, "GetDetails JSON 反序列化失败",
 				logger.Int64("articleId", articleIds[i]), logger.Error(err))
 			continue
 		}
@@ -197,12 +197,12 @@ func (c *RedisArticleRankingCache) GetPrevRanks(ctx context.Context, date, dim, 
 		}
 		s, ok := v.(string)
 		if !ok {
-			c.l.WithContext(ctx).Warn("GetPrevRanks 类型断言失败", logger.Int64("articleId", articleIds[i]))
+			c.l.Warn(ctx, "GetPrevRanks 类型断言失败", logger.Int64("articleId", articleIds[i]))
 			continue
 		}
 		r, err := strconv.Atoi(s)
 		if err != nil {
-			c.l.WithContext(ctx).Warn("GetPrevRanks 解析 rank 失败",
+			c.l.Warn(ctx, "GetPrevRanks 解析 rank 失败",
 				logger.Int64("articleId", articleIds[i]), logger.Error(err))
 			continue
 		}

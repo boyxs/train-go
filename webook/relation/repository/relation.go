@@ -76,14 +76,14 @@ func (r *CacheRelationRepository) GetStats(ctx context.Context, uid int64) (doma
 	res := r.toDomainStats(daoSt)
 	res.Uid = uid
 	if setErr := r.cache.SetStats(ctx, res); setErr != nil {
-		r.l.WithContext(ctx).Error("回填关系计数缓存失败", logger.Int64("uid", uid), logger.Error(setErr))
+		r.l.Error(ctx, "回填关系计数缓存失败", logger.Int64("uid", uid), logger.Error(setErr))
 	}
 	return res, nil
 }
 
 func (r *CacheRelationRepository) delStats(ctx context.Context, uids ...int64) {
 	if err := r.cache.DelStats(ctx, uids...); err != nil {
-		r.l.WithContext(ctx).Error("删除关系计数缓存失败", logger.Error(err))
+		r.l.Error(ctx, "删除关系计数缓存失败", logger.Error(err))
 	}
 }
 

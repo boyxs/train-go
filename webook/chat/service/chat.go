@@ -222,7 +222,7 @@ func (s *AIChatService) ReadStream(ctx context.Context, convId int64, afterId st
 	for i, raw := range rawEvents {
 		var event domain.ChatEvent
 		if uerr := json.Unmarshal([]byte(raw), &event); uerr != nil {
-			s.l.WithContext(ctx).Warn("ReadStream 事件反序列化失败",
+			s.l.Warn(ctx, "ReadStream 事件反序列化失败",
 				logger.Int64("convId", convId), logger.String("id", ids[i]), logger.Error(uerr))
 			continue
 		}
@@ -248,7 +248,7 @@ func (s *AIChatService) BlockReadStream(ctx context.Context, convId int64, after
 	for i, raw := range rawEvents {
 		var event domain.ChatEvent
 		if uerr := json.Unmarshal([]byte(raw), &event); uerr != nil {
-			s.l.WithContext(ctx).Warn("BlockReadStream 事件反序列化失败",
+			s.l.Warn(ctx, "BlockReadStream 事件反序列化失败",
 				logger.Int64("convId", convId), logger.String("id", ids[i]), logger.Error(uerr))
 			continue
 		}
@@ -305,7 +305,7 @@ func (s *AIChatService) searchArticles(ctx context.Context, query string) []*sea
 		Query: query, Page: 1, Size: ragTopK,
 	})
 	if err != nil {
-		s.l.WithContext(ctx).Warn("RAG 检索失败，降级为无 RAG",
+		s.l.Warn(ctx, "RAG 检索失败，降级为无 RAG",
 			logger.String("query", query),
 			logger.Error(err))
 		return nil
@@ -358,7 +358,7 @@ func (s *AIChatService) runStream(
 		Content:        "",
 	})
 	if err != nil {
-		s.l.Error("Insert assistant placeholder 失败，本轮回复不会持久化",
+		s.l.Error(ctx, "Insert assistant placeholder 失败，本轮回复不会持久化",
 			logger.Int64("convId", convId), logger.Error(err))
 	}
 	placeholderId := placeholder.Id
@@ -372,7 +372,7 @@ func (s *AIChatService) runStream(
 		if placeholderId > 0 && time.Since(lastFlush) > 2*time.Second {
 			lastFlush = time.Now()
 			if err := s.msgRepo.UpdateContent(context.Background(), convId, placeholderId, buf.String(), ""); err != nil {
-				s.l.Error("刷新部分内容失败", logger.Int64("msgId", placeholderId), logger.Error(err))
+				s.l.Error(ctx, "刷新部分内容失败", logger.Int64("msgId", placeholderId), logger.Error(err))
 			}
 		}
 	}
@@ -398,7 +398,7 @@ func (s *AIChatService) runStream(
 		}
 
 		if round == maxToolRounds {
-			s.l.Warn("工具调用超过最大轮次", logger.Int64("convId", convId))
+			s.l.Warn(ctx, "工具调用超过最大轮次", logger.Int64("convId", convId))
 			reply := fullContent.String()
 			s.finalizeReply(placeholderId, convId, uid, reply, allToolResults)
 			s.trySend(ctx, convId, eventCh, domain.ChatEvent{
@@ -536,7 +536,7 @@ func (s *AIChatService) marshalArgs(args map[string]any) string {
 	}
 	b, err := json.Marshal(args)
 	if err != nil {
-		s.l.Warn("tool args 序列化失败，回退空对象", logger.Error(err))
+		s.l.Warn(context.Background(), "tool args 序列化失败，回退空对象", logger.Error(err))
 		return "{}"
 	}
 	return string(b)
@@ -549,7 +549,7 @@ func (s *AIChatService) marshalResult(r domain.ToolResultData) string {
 	}
 	b, err := json.Marshal(r)
 	if err != nil {
-		s.l.Warn("tool result 序列化失败，回退错误占位",
+		s.l.Warn(context.Background(), "tool result 序列化失败，回退错误占位",
 			logger.String("tool", r.Name), logger.Error(err))
 		return `{"error":"序列化失败"}`
 	}
@@ -582,7 +582,7 @@ func (s *AIChatService) publishToStream(convId int64, event domain.ChatEvent) {
 	}
 	key := fmt.Sprintf(consts.ChatStreamPattern, convId)
 	if _, err = s.stream.Publish(context.Background(), key, string(data)); err != nil {
-		s.l.Error("写入 Stream 失败", logger.Int64("convId", convId), logger.Error(err))
+		s.l.Error(context.Background(), "写入 Stream 失败", logger.Int64("convId", convId), logger.Error(err))
 	}
 }
 
@@ -594,7 +594,7 @@ func (s *AIChatService) finalizeReply(msgId int64, convId int64, uid int64, repl
 	// 正常结束但无内容且无工具结果：删除空占位，避免脏数据（同 savePartialReply）
 	if reply == "" && len(toolResults) == 0 {
 		if err := s.msgRepo.Delete(context.Background(), convId, msgId); err != nil {
-			s.l.Error("删除空占位消息失败", logger.Int64("msgId", msgId), logger.Error(err))
+			s.l.Error(context.Background(), "删除空占位消息失败", logger.Int64("msgId", msgId), logger.Error(err))
 		}
 		return
 	}
@@ -602,13 +602,13 @@ func (s *AIChatService) finalizeReply(msgId int64, convId int64, uid int64, repl
 	if len(toolResults) > 0 {
 		b, err := json.Marshal(toolResults)
 		if err != nil {
-			s.l.Error("toolResults 序列化失败", logger.Int64("msgId", msgId), logger.Error(err))
+			s.l.Error(context.Background(), "toolResults 序列化失败", logger.Int64("msgId", msgId), logger.Error(err))
 		} else {
 			toolCallsJSON = string(b)
 		}
 	}
 	if err := s.msgRepo.UpdateContent(context.Background(), convId, msgId, reply, toolCallsJSON); err != nil {
-		s.l.Error("最终更新消息失败", logger.Int64("msgId", msgId), logger.Error(err))
+		s.l.Error(context.Background(), "最终更新消息失败", logger.Int64("msgId", msgId), logger.Error(err))
 	}
 	s.autoTitle(convId, uid, reply)
 }
@@ -621,12 +621,12 @@ func (s *AIChatService) savePartialReply(msgId int64, convId int64, content stri
 	// 中断时无任何内容：删除空占位行，避免残留脏数据带入下次 LLM prompt（DeepSeek 400）
 	if content == "" {
 		if err := s.msgRepo.Delete(context.Background(), convId, msgId); err != nil {
-			s.l.Error("删除空占位消息失败", logger.Int64("msgId", msgId), logger.Error(err))
+			s.l.Error(context.Background(), "删除空占位消息失败", logger.Int64("msgId", msgId), logger.Error(err))
 		}
 		return
 	}
 	if err := s.msgRepo.UpdateContent(context.Background(), convId, msgId, content, ""); err != nil {
-		s.l.Error("保存部分回复失败", logger.Int64("msgId", msgId), logger.Error(err))
+		s.l.Error(context.Background(), "保存部分回复失败", logger.Int64("msgId", msgId), logger.Error(err))
 	}
 }
 
@@ -643,7 +643,7 @@ func (s *AIChatService) autoTitle(convId int64, uid int64, reply string) {
 		return
 	}
 	if err := s.convRepo.UpdateTitle(context.Background(), uid, convId, title); err != nil {
-		s.l.Error("自动生成对话标题失败",
+		s.l.Error(context.Background(), "自动生成对话标题失败",
 			logger.Int64("convId", convId),
 			logger.Error(err))
 	}

@@ -70,7 +70,7 @@ func (s *InternalSwitchService) SetGray(ctx context.Context, taskId int64, perce
 		return fmt.Errorf("set gray redis: %w", err)
 	}
 	if err := s.repo.UpdateGrayPercent(ctx, taskId, int16(percent)); err != nil {
-		s.l.Warn("sync gray to task table failed",
+		s.l.Warn(ctx, "sync gray to task table failed",
 			logger.Int64("task_id", taskId),
 			logger.Int("percent", percent),
 			logger.Error(err))
@@ -129,11 +129,11 @@ func (s *InternalSwitchService) SetStage(ctx context.Context, taskId int64, next
 	// 其他 stage 不动 status：SRC_FIRST/DST_FIRST 期间 status 由引擎维护（保持 incr_running）。
 	if next == domain.StageDstOnly {
 		if err := s.repo.UpdateStatus(ctx, taskId, domain.TaskStatusSwitched); err != nil {
-			s.l.Warn("sync task.status=switched failed",
+			s.l.Warn(ctx, "sync task.status=switched failed",
 				logger.Int64("task_id", taskId), logger.Error(err))
 		}
 	}
-	s.l.Info("stage transitioned",
+	s.l.Info(ctx, "stage transitioned",
 		logger.Int64("task_id", taskId),
 		logger.String("from", string(cur)),
 		logger.String("to", string(next)))
@@ -175,7 +175,7 @@ func (s *InternalSwitchService) consumePropose(ctx context.Context, taskName str
 	}
 	// 双人通过 → 删除 propose key（防 replay）
 	if err := s.state.DeletePropose(ctx, taskName); err != nil {
-		s.l.Warn("delete propose key failed", logger.String("task_name", taskName), logger.Error(err))
+		s.l.Warn(ctx, "delete propose key failed", logger.String("task_name", taskName), logger.Error(err))
 	}
 	return nil
 }
@@ -207,7 +207,7 @@ func (s *InternalSwitchService) Rollback(ctx context.Context, taskId int64) erro
 	}
 	if !cur.CanRollback() {
 		// SRC_ONLY 未进双写 / DST_ONLY 单写不可逆（切回会读到停更的脏 OLD）→ 拒绝
-		s.l.Warn("rollback rejected: stage not in dual-write phase",
+		s.l.Warn(ctx, "rollback rejected: stage not in dual-write phase",
 			logger.Int64("task_id", taskId), logger.String("stage", string(cur)))
 		return migratorerrs.ErrRollbackNotAllowed.
 			WithCause(fmt.Errorf("当前 stage=%s，仅双写期 SRC_FIRST/DST_FIRST 可回滚", cur)).
@@ -221,7 +221,7 @@ func (s *InternalSwitchService) Rollback(ctx context.Context, taskId int64) erro
 	if err := s.state.SetStage(ctx, task.Name, domain.StageSrcFirst); err != nil {
 		return fmt.Errorf("rollback stage: %w", err)
 	}
-	s.l.Info("rollback to SRC_FIRST",
+	s.l.Info(ctx, "rollback to SRC_FIRST",
 		logger.Int64("task_id", taskId),
 		logger.String("task_name", task.Name),
 		logger.String("from", string(cur)))

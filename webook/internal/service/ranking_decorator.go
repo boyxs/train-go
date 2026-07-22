@@ -98,12 +98,12 @@ func (s *ArticleRankingAwareInteractionService) boost(biz string, bizId int64, d
 		defer cancel()
 		date := carbon.Now().ToDateString()
 		if err := s.rankRepo.IncrScore(ctx, date, string(domain.DimensionHot), "", bizId, delta); err != nil {
-			s.l.Error("ranking boost 失败",
+			s.l.Error(ctx, "ranking boost 失败",
 				logger.Int64("bizId", bizId), logger.String("date", date), logger.Error(err))
 		}
 	})
 	if !ok {
 		s.boostDropped.Inc()
-		s.l.Warn("ranking boost 队列已满，丢弃本次增量", logger.Int64("bizId", bizId))
+		s.l.Warn(context.Background(), "ranking boost 队列已满，丢弃本次增量", logger.Int64("bizId", bizId))
 	}
 }

@@ -1,6 +1,7 @@
 package ioc
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -26,7 +27,7 @@ const (
 func InitRankingBoostPool(l logger.LoggerX) (*pool.Pool, func()) {
 	p := pool.New(rankingBoostWorkers, rankingBoostQueueSize,
 		pool.WithPanicHandler(func(r any) {
-			l.Error("ranking boost 任务 panic", logger.String("panic", fmt.Sprintf("%v", r)))
+			l.Error(context.Background(), "ranking boost 任务 panic", logger.String("panic", fmt.Sprintf("%v", r)))
 		}))
 	return p, p.Shutdown
 }

@@ -32,7 +32,7 @@ func (f *FailoverClient) Embed(ctx context.Context, text string) ([]float32, err
 			return nil, err
 		}
 		lastErr = err
-		f.l.Warn("Embedding 提供方调用失败，尝试下一个",
+		f.l.Warn(ctx, "Embedding 提供方调用失败，尝试下一个",
 			logger.Int64("providerIndex", int64(i)),
 			logger.Error(err))
 	}

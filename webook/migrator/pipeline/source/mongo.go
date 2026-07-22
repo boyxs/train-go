@@ -127,7 +127,7 @@ func (s *goMongoScanner) Scan(ctx context.Context, batchSize int, fn func(doc ma
 	}
 	defer func() {
 		if cerr := cur.Close(ctx); cerr != nil {
-			s.l.Warn("mongo cursor close failed", logger.Error(cerr))
+			s.l.Warn(ctx, "mongo cursor close failed", logger.Error(cerr))
 		}
 	}()
 	for cur.Next(ctx) {
@@ -169,7 +169,7 @@ func (w *goMongoWatcher) Watch(ctx context.Context, resumeToken string, fn func(
 	}
 	defer func() {
 		if cce := cs.Close(context.Background()); cce != nil && err == nil {
-			w.l.Warn("mongo change stream close failed", logger.Error(cce))
+			w.l.Warn(ctx, "mongo change stream close failed", logger.Error(cce))
 		}
 	}()
 	for cs.Next(ctx) {

@@ -88,12 +88,12 @@ func WriteError(ctx *gin.Context, err error) {
 	path := ctx.Request.URL.Path
 	var be *errs.Error
 	if errors.As(err, &be) {
-		L.Warn("业务错误", logger.String("path", path), logger.Error(err))
+		L.Warn(ctx, "业务错误", logger.String("path", path), logger.Error(err))
 		ctx.Set(CtxBizReason, be.Reason) // 供 metrics 中间件读出作 reason label
 		ctx.JSON(be.Code, Result{Code: be.Code, Reason: be.Reason, Msg: be.Message, Metadata: be.Metadata})
 		return
 	}
-	L.Error("业务处理失败", logger.String("path", path), logger.Error(err))
+	L.Error(ctx, "业务处理失败", logger.String("path", path), logger.Error(err))
 	ctx.JSON(http.StatusInternalServerError, Result{Code: http.StatusInternalServerError, Msg: "系统错误"})
 }
 

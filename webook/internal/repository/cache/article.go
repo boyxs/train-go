@@ -137,13 +137,13 @@ func (ac *RedisArticleCache) MGetPub(ctx context.Context, ids []int64) (map[int6
 			continue // 个别 miss
 		}
 		if err != nil {
-			ac.l.WithContext(ctx).Warn("MGetPub 单 key 取值失败",
+			ac.l.Warn(ctx, "MGetPub 单 key 取值失败",
 				logger.Int64("id", ids[i]), logger.Error(err))
 			continue
 		}
 		var article domain.Article
 		if uerr := json.Unmarshal([]byte(raw), &article); uerr != nil {
-			ac.l.WithContext(ctx).Warn("MGetPub 反序列化失败（cache 数据损坏，下次回源 DB 修复）",
+			ac.l.Warn(ctx, "MGetPub 反序列化失败（cache 数据损坏，下次回源 DB 修复）",
 				logger.Int64("id", ids[i]), logger.Error(uerr))
 			continue
 		}

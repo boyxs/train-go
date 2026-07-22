@@ -116,7 +116,7 @@ func (e *AIChatToolExecutor) searchArticles(ctx context.Context, args map[string
 		Query: query, Page: 1, Size: 5,
 	})
 	if err != nil {
-		e.l.WithContext(ctx).Warn("search_articles 工具调用失败", logger.String("query", query), logger.Error(err))
+		e.l.Warn(ctx, "search_articles 工具调用失败", logger.String("query", query), logger.Error(err))
 		return domain.ToolResultData{Name: "search_articles", Error: "搜索失败，请稍后重试"}, nil
 	}
 	cards := make([]domain.ArticleCard, 0, len(resp.GetArticles()))
@@ -137,7 +137,7 @@ func (e *AIChatToolExecutor) getHotArticles(ctx context.Context, args map[string
 		Biz: "article", Limit: int32(limit),
 	})
 	if err != nil {
-		e.l.WithContext(ctx).Warn("get_hot_articles 查询热门 ID 失败", logger.Error(err))
+		e.l.Warn(ctx, "get_hot_articles 查询热门 ID 失败", logger.Error(err))
 		return domain.ToolResultData{Name: "get_hot_articles", Error: "获取热门文章失败"}, nil
 	}
 	if len(resp.GetBizIds()) == 0 {
@@ -153,7 +153,7 @@ func (e *AIChatToolExecutor) getMyFavorites(ctx context.Context, uid int64, args
 		Uid: uid, Biz: "article", Limit: int32(limit),
 	})
 	if err != nil {
-		e.l.WithContext(ctx).Warn("get_my_favorites 查询收藏 ID 失败", logger.Int64("uid", uid), logger.Error(err))
+		e.l.Warn(ctx, "get_my_favorites 查询收藏 ID 失败", logger.Int64("uid", uid), logger.Error(err))
 		return domain.ToolResultData{Name: "get_my_favorites", Error: "获取收藏失败"}, nil
 	}
 	if len(resp.GetBizIds()) == 0 {
@@ -167,7 +167,7 @@ func (e *AIChatToolExecutor) getMyFavorites(ctx context.Context, uid int64, args
 func (e *AIChatToolExecutor) fetchArticleCards(ctx context.Context, ids []int64, toolName string) []domain.ArticleCard {
 	resp, err := e.articleCli.BatchGetArticles(ctx, &articlev1.BatchGetArticlesRequest{Ids: ids})
 	if err != nil {
-		e.l.WithContext(ctx).Warn(toolName+" 批量获取文章详情失败",
+		e.l.Warn(ctx, toolName+" 批量获取文章详情失败",
 			logger.String("code", status.Code(err).String()), logger.Error(err))
 		return nil
 	}

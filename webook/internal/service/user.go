@@ -81,7 +81,7 @@ func (us *InternalUserService) Profile(ctx context.Context, userid int64) (domai
 	// 用独立 ctx 释放，业务 ctx 已超时/取消也能正常解锁。
 	defer func() {
 		if err := lock.Unlock(context.Background()); err != nil && !errors.Is(err, redislock.ErrLockNotHeld) {
-			us.l.Warn("释放用户信息锁失败", logger.Int64("uid", userid), logger.Error(err))
+			us.l.Warn(ctx, "释放用户信息锁失败", logger.Int64("uid", userid), logger.Error(err))
 		}
 	}()
 	user, err := us.repo.FindById(ctx, userid)
@@ -144,7 +144,7 @@ func (us *InternalUserService) FindOrCreateByWechat(ctx context.Context, wechatA
 	}
 	// 创建一个新用户
 	// JSON 格式的 wechatAuth
-	us.l.WithContext(ctx).Info("新用户", logger.Field{Key: "wechatAuth", Val: wechatAuth})
+	us.l.Info(ctx, "新用户", logger.Field{Key: "wechatAuth", Val: wechatAuth})
 	err = us.repo.Create(ctx, domain.User{
 		WechatAuth: wechatAuth,
 	})

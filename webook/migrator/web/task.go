@@ -323,7 +323,7 @@ func (h *InternalTaskHandler) Start(ctx *gin.Context, req startReq) (Result, err
 				if errors.Is(err, migratorerrs.ErrTaskAlreadyRunning) {
 					return
 				}
-				h.l.Warn("FullEngine.Run failed", logger.Int64("task_id", id), logger.Error(err))
+				h.l.Warn(context.Background(), "FullEngine.Run failed", logger.Int64("task_id", id), logger.Error(err))
 			}
 		}()
 	case "incr":
@@ -338,7 +338,7 @@ func (h *InternalTaskHandler) Start(ctx *gin.Context, req startReq) (Result, err
 				if errors.Is(err, migratorerrs.ErrTaskAlreadyRunning) {
 					return
 				}
-				h.l.Warn("IncrEngine.Run failed", logger.Int64("task_id", id), logger.Error(err))
+				h.l.Warn(context.Background(), "IncrEngine.Run failed", logger.Int64("task_id", id), logger.Error(err))
 			}
 		}()
 	}
@@ -408,7 +408,7 @@ func (h *InternalTaskHandler) Throttle(ctx *gin.Context, req throttleReq) (Resul
 func (h *InternalTaskHandler) readThrottle(ctx context.Context, taskId int64) domain.ThrottleConfig {
 	cfg, ok, err := h.svc.GetThrottle(ctx, taskId)
 	if err != nil {
-		h.l.Warn("throttle read failed; falling back to defaults",
+		h.l.Warn(ctx, "throttle read failed; falling back to defaults",
 			logger.Int64("task_id", taskId), logger.Error(err))
 		return domain.ThrottleConfig{}
 	}

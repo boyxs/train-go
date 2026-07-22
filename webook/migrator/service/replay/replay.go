@@ -104,7 +104,7 @@ func (s *InternalReplayService) ReplayDeadLetters(ctx context.Context, taskId in
 	}
 	if len(okIDs) > 0 {
 		if merr := s.dlRepo.MarkReplayed(ctx, okIDs); merr != nil {
-			s.l.Warn("MarkReplayed failed",
+			s.l.Warn(ctx, "MarkReplayed failed",
 				logger.Int64("task_id", taskId),
 				logger.Int("ids_count", len(okIDs)),
 				logger.Error(merr))
@@ -116,7 +116,7 @@ func (s *InternalReplayService) ReplayDeadLetters(ctx context.Context, taskId in
 // recordFailure 把单次重放失败累计到 dead_letter.retry_count + last_error。
 func (s *InternalReplayService) recordFailure(ctx context.Context, dlId int64, msg string) {
 	if err := s.dlRepo.IncrementRetry(ctx, dlId, msg); err != nil {
-		s.l.Warn("IncrementRetry failed",
+		s.l.Warn(ctx, "IncrementRetry failed",
 			logger.Int64("dl_id", dlId),
 			logger.Error(err))
 	}

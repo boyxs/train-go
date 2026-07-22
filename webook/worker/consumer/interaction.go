@@ -47,7 +47,7 @@ func (c *InteractionConsumer) Start(ctx context.Context) error {
 	for ctx.Err() == nil {
 		group, err := sarama.NewConsumerGroup(c.cfg.Addrs, c.cfg.GroupID, c.saramaCfg)
 		if err != nil {
-			c.l.Warn("连接 Kafka 失败，后台重试",
+			c.l.Warn(ctx, "连接 Kafka 失败，后台重试",
 				logger.String("backoff", backoff.String()), logger.Error(err))
 			if !sleep(ctx, backoff) {
 				return nil
@@ -58,12 +58,12 @@ func (c *InteractionConsumer) Start(ctx context.Context) error {
 		backoff = c.cfg.BackoffInitial
 		for ctx.Err() == nil {
 			if err = group.Consume(ctx, []string{event.TopicInteractionEvents}, handler); err != nil {
-				c.l.Warn("消费互动事件出错，重连", logger.Error(err))
+				c.l.Warn(ctx, "消费互动事件出错，重连", logger.Error(err))
 				break
 			}
 		}
 		if closeErr := group.Close(); closeErr != nil {
-			c.l.Warn("关闭消费者组出错", logger.Error(closeErr))
+			c.l.Warn(ctx, "关闭消费者组出错", logger.Error(closeErr))
 		}
 	}
 	return nil

@@ -66,7 +66,7 @@ func (c *BatchConsumer[T]) ConsumeClaim(session sarama.ConsumerGroupSession, cla
 				}
 				var event T
 				if err := json.Unmarshal(msg.Value, &event); err != nil {
-					c.l.WithContext(ExtractTraceContext(msg)).Error("反序列化消息失败，标记消费避免阻塞",
+					c.l.Error(ExtractTraceContext(msg), "反序列化消息失败，标记消费避免阻塞",
 						logger.String("topic", msg.Topic),
 						logger.Int64("offset", msg.Offset),
 						logger.Error(err))
@@ -105,7 +105,7 @@ func (c *BatchConsumer[T]) handleBatch(
 	defer span.End()
 	if err := c.handler(ctx, msgs, events); err != nil {
 		RecordSpanError(span, err)
-		c.l.WithContext(ctx).Error("批量处理消息失败",
+		c.l.Error(ctx, "批量处理消息失败",
 			logger.Int64("size", int64(len(msgs))), logger.Error(err))
 		return
 	}

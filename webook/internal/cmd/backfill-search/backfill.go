@@ -37,7 +37,7 @@ func (b *SearchBackfiller) Run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("统计 published_article 总数: %w", err)
 	}
-	b.l.Info("backfill 开始", logger.Int64("total", total), logger.Int("batch", backfillBatch))
+	b.l.Info(ctx, "backfill 开始", logger.Int64("total", total), logger.Int("batch", backfillBatch))
 
 	var indexed, failed int
 	for offset := 0; ; offset += backfillBatch {
@@ -57,19 +57,19 @@ func (b *SearchBackfiller) Run(ctx context.Context) error {
 			doc := toArticleDoc(r, tagMap[r.Id])
 			if _, err := b.searchCli.IndexArticle(ctx, &searchv1.IndexArticleRequest{Doc: doc}); err != nil {
 				failed++
-				b.l.Error("索引文章失败", logger.Int64("id", r.Id), logger.Error(err))
+				b.l.Error(ctx, "索引文章失败", logger.Int64("id", r.Id), logger.Error(err))
 				continue
 			}
 			indexed++
 		}
-		b.l.Info("backfill 进度",
+		b.l.Info(ctx, "backfill 进度",
 			logger.Int("indexed", indexed), logger.Int("failed", failed), logger.Int64("total", total))
 	}
 
-	b.l.Info("backfill 完成", logger.Int("indexed", indexed), logger.Int("failed", failed))
+	b.l.Info(ctx, "backfill 完成", logger.Int("indexed", indexed), logger.Int("failed", failed))
 	// 提醒：search.Index 对 embed/ES 写失败是「非致命降级」（gRPC 仍返成功），本工具无法感知静默失败。
 	// 完整性以 `make -f mk/es.mk count` 复核 ES 实际文档数。
-	b.l.Info("完整性复核请跑 `make -f mk/es.mk count`（search.Index 对 ES 写失败静默降级，gRPC 不报错）")
+	b.l.Info(ctx, "完整性复核请跑 `make -f mk/es.mk count`（search.Index 对 ES 写失败静默降级，gRPC 不报错）")
 	if failed > 0 {
 		return fmt.Errorf("backfill 完成，但有 %d/%d 篇 gRPC 索引失败（见日志）", failed, total)
 	}
@@ -80,7 +80,7 @@ func (b *SearchBackfiller) Run(ctx context.Context) error {
 func (b *SearchBackfiller) tagSlugsByBiz(ctx context.Context, ids []int64) map[int64][]string {
 	resp, err := b.tagCli.TagsByBiz(ctx, &tagv1.TagsByBizRequest{Biz: domain.BizArticle, BizIds: ids})
 	if err != nil {
-		b.l.Warn("批量取标签失败，本批降级不带标签索引", logger.Error(err))
+		b.l.Warn(ctx, "批量取标签失败，本批降级不带标签索引", logger.Error(err))
 		return map[int64][]string{}
 	}
 	out := make(map[int64][]string, len(resp.GetTags()))

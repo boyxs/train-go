@@ -39,7 +39,7 @@ func (r *CacheCommentRepository) Create(ctx context.Context, c domain.Comment) (
 	}
 	// 写后清评论总数缓存（Cache-Aside），失败仅记日志：缓存最迟 TTL 后失效，不阻断写
 	if delErr := r.cache.DelCount(ctx, c.Biz, c.BizId); delErr != nil {
-		r.l.WithContext(ctx).Error("清除评论计数缓存失败",
+		r.l.Error(ctx, "清除评论计数缓存失败",
 			logger.String("biz", c.Biz), logger.Int64("bizId", c.BizId), logger.Error(delErr))
 	}
 	return r.toDomain(entity), nil
@@ -84,7 +84,7 @@ func (r *CacheCommentRepository) Delete(ctx context.Context, id, uid int64) (boo
 	}
 	if ok {
 		if delErr := r.cache.DelCount(ctx, c.Biz, c.BizId); delErr != nil {
-			r.l.WithContext(ctx).Error("清除评论计数缓存失败",
+			r.l.Error(ctx, "清除评论计数缓存失败",
 				logger.String("biz", c.Biz), logger.Int64("bizId", c.BizId), logger.Error(delErr))
 		}
 	}
@@ -98,7 +98,7 @@ func (r *CacheCommentRepository) Count(ctx context.Context, biz string, bizId in
 		return n, nil
 	}
 	if !cache.IsMiss(err) {
-		r.l.WithContext(ctx).Error("读评论计数缓存失败",
+		r.l.Error(ctx, "读评论计数缓存失败",
 			logger.String("biz", biz), logger.Int64("bizId", bizId), logger.Error(err))
 	}
 	// miss 或读缓存出错 → 回源 DB
@@ -107,7 +107,7 @@ func (r *CacheCommentRepository) Count(ctx context.Context, biz string, bizId in
 		return 0, err
 	}
 	if setErr := r.cache.SetCount(ctx, biz, bizId, n); setErr != nil {
-		r.l.WithContext(ctx).Error("回填评论计数缓存失败",
+		r.l.Error(ctx, "回填评论计数缓存失败",
 			logger.String("biz", biz), logger.Int64("bizId", bizId), logger.Error(setErr))
 	}
 	return n, nil

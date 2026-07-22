@@ -107,7 +107,7 @@ func (e *InternalFullEngine) Run(ctx context.Context, taskId int64, hintShards [
 
 	// 标记 FullRunning；失败仅 Warn 不阻塞（status 是冗余可观测字段，写失败不影响业务）
 	if err := e.taskSvc.UpdateStatus(ctx, taskId, domain.TaskStatusFullRunning); err != nil {
-		e.l.Warn("update task status to full_running failed",
+		e.l.Warn(ctx, "update task status to full_running failed",
 			logger.Int64("task_id", taskId), logger.Error(err))
 	}
 	// defer 统一收口：成功 → FullDone，失败 → Failed。
@@ -119,7 +119,7 @@ func (e *InternalFullEngine) Run(ctx context.Context, taskId int64, hintShards [
 			final = domain.TaskStatusFailed
 		}
 		if err := e.taskSvc.UpdateStatus(context.Background(), taskId, final); err != nil {
-			e.l.Warn("update task final status failed",
+			e.l.Warn(ctx, "update task final status failed",
 				logger.Int64("task_id", taskId),
 				logger.Int("final_status", int(final)),
 				logger.Error(err))
@@ -181,12 +181,12 @@ func (e *InternalFullEngine) Run(ctx context.Context, taskId int64, hintShards [
 		}
 	}
 	if err := g.Wait(); err != nil {
-		e.l.Warn("full engine run aborted",
+		e.l.Warn(ctx, "full engine run aborted",
 			logger.Int64("task_id", taskId), logger.Error(err))
 		runErr = err
 		return runErr
 	}
-	e.l.Info("full engine run done",
+	e.l.Info(ctx, "full engine run done",
 		logger.Int64("task_id", taskId),
 		logger.Int("tables", len(tables)))
 	return nil
@@ -266,7 +266,7 @@ func (e *InternalFullEngine) runShard(
 	if err := <-scanErrCh; err != nil {
 		return fmt.Errorf("source full scan task %d table %d shard %d: %w", taskId, tableIdx, shard.No, err)
 	}
-	e.l.Info("full shard done",
+	e.l.Info(ctx, "full shard done",
 		logger.Int64("task_id", taskId),
 		logger.Int("table_idx", tableIdx),
 		logger.Int("shard", shard.No),

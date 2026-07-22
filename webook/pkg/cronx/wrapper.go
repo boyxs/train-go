@@ -91,13 +91,13 @@ func (w *Wrapper) acquire(ctx context.Context, name, lockKey string) (redislock.
 	lock, ok, err := w.lock.TryLock(ctx, lockKey, redislock.WithWatchdogTimeout(w.lockTTL))
 	if err != nil {
 		w.metrics.Runs(name, "error").Inc()
-		w.l.Error("cronx 抢锁失败",
+		w.l.Error(ctx, "cronx 抢锁失败",
 			logger.String("task", name), logger.String("lockKey", lockKey), logger.Error(err))
 		return nil, false
 	}
 	if !ok {
 		w.metrics.Runs(name, "skipped").Inc()
-		w.l.Debug("cronx 锁被占，跳过本轮",
+		w.l.Debug(ctx, "cronx 锁被占，跳过本轮",
 			logger.String("task", name), logger.String("lockKey", lockKey))
 		return nil, false
 	}
@@ -108,7 +108,7 @@ func (w *Wrapper) release(name string, lock redislock.RedisLock) {
 	ctx, cancel := context.WithTimeout(context.Background(), w.relTimeout)
 	defer cancel()
 	if err := lock.Unlock(ctx); err != nil && !errors.Is(err, redislock.ErrLockNotHeld) {
-		w.l.Warn("cronx 锁释放异常",
+		w.l.Warn(ctx, "cronx 锁释放异常",
 			logger.String("task", name), logger.Error(err))
 	}
 }
@@ -121,7 +121,7 @@ func (w *Wrapper) runTask(ctx context.Context, name string, fn Task) {
 
 	if err != nil {
 		w.metrics.Runs(name, "failed").Inc()
-		w.l.Error("cronx 任务失败",
+		w.l.Error(ctx, "cronx 任务失败",
 			logger.String("task", name),
 			logger.String("date", date),
 			logger.Error(err))
@@ -137,7 +137,7 @@ func (w *Wrapper) recover(name string) {
 		return
 	}
 	w.metrics.Runs(name, "panic").Inc()
-	w.l.Error("cronx 任务 panic",
+	w.l.Error(context.Background(), "cronx 任务 panic",
 		logger.String("task", name),
 		logger.String("panic", fmt.Sprintf("%v", r)),
 		logger.String("stack", string(debug.Stack())))

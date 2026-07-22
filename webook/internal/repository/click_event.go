@@ -37,7 +37,7 @@ func (r *CacheAIClickEventRepository) RecordClick(ctx context.Context, click dom
 	}
 	// 写入后清缓存
 	if cErr := r.cache.DelDashboard(ctx); cErr != nil {
-		r.l.WithContext(ctx).Error("清除看板缓存失败", logger.Error(cErr))
+		r.l.Error(ctx, "清除看板缓存失败", logger.Error(cErr))
 	}
 	return nil
 }
@@ -61,7 +61,7 @@ func (r *CacheAIClickEventRepository) Dashboard(ctx context.Context) (domain.Cli
 
 	// 回填缓存（失败不阻塞）
 	if cErr := r.cache.SetDashboard(ctx, dashboard); cErr != nil {
-		r.l.WithContext(ctx).Error("回填看板缓存失败", logger.Error(cErr))
+		r.l.Error(ctx, "回填看板缓存失败", logger.Error(cErr))
 	}
 
 	return dashboard, nil

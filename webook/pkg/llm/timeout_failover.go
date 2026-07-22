@@ -55,7 +55,7 @@ func (t *TimeoutFailoverClient) ChatStream(ctx context.Context, messages []ChatM
 		newIdx := (idx + 1) % int32(len(t.clients))
 		if atomic.CompareAndSwapInt32(&t.idx, idx, newIdx) {
 			atomic.StoreInt32(&t.cnt, 0)
-			t.l.Warn("LLM 主动切换提供方",
+			t.l.Warn(ctx, "LLM 主动切换提供方",
 				logger.Int32("consecutiveFails", cnt),
 				logger.Int32("from", idx),
 				logger.Int32("to", newIdx))
@@ -76,7 +76,7 @@ func (t *TimeoutFailoverClient) ChatStream(ctx context.Context, messages []ChatM
 	case errors.Is(err, context.DeadlineExceeded):
 		// 超时计入故障
 		atomic.AddInt32(&t.cnt, 1)
-		t.l.Warn("LLM 提供方超时",
+		t.l.Warn(ctx, "LLM 提供方超时",
 			logger.Int32("providerIdx", idx),
 			logger.Error(err))
 		return nil, err
@@ -84,11 +84,11 @@ func (t *TimeoutFailoverClient) ChatStream(ctx context.Context, messages []ChatM
 		// 只有网络/服务端错误才计入故障，业务错误切 provider 也没用
 		if t.isCriticalError(err) {
 			atomic.AddInt32(&t.cnt, 1)
-			t.l.Error("LLM 提供方关键错误",
+			t.l.Error(ctx, "LLM 提供方关键错误",
 				logger.Int32("providerIdx", idx),
 				logger.Error(err))
 		} else {
-			t.l.Warn("LLM 提供方调用失败",
+			t.l.Warn(ctx, "LLM 提供方调用失败",
 				logger.Int32("providerIdx", idx),
 				logger.Error(err))
 		}

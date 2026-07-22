@@ -38,7 +38,7 @@ func (f *FailoverClient) Chat(ctx context.Context, messages []ChatMessage) (stri
 			return "", err
 		}
 		lastErr = err
-		f.l.Warn("LLM Chat 调用失败，尝试下一个",
+		f.l.Warn(ctx, "LLM Chat 调用失败，尝试下一个",
 			logger.Uint64("providerIndex", index),
 			logger.Error(err))
 	}
@@ -60,7 +60,7 @@ func (f *FailoverClient) ChatStream(ctx context.Context, messages []ChatMessage,
 			return nil, err
 		}
 		lastErr = err
-		f.l.Warn("LLM 提供方调用失败，尝试下一个",
+		f.l.Warn(ctx, "LLM 提供方调用失败，尝试下一个",
 			logger.Uint64("providerIndex", index),
 			logger.Error(err))
 	}

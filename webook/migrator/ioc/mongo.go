@@ -22,11 +22,11 @@ func InitMongoClient(l logger.LoggerX) *mongo.Client {
 	opts := mongoopts.Client().ApplyURI(uri).SetServerSelectionTimeout(3 * time.Second)
 	client, err := mongo.Connect(ctx, opts)
 	if err != nil {
-		l.Warn("mongo connect failed", logger.Error(err))
+		l.Warn(ctx, "mongo connect failed", logger.Error(err))
 		return nil
 	}
 	if err := client.Ping(ctx, nil); err != nil {
-		l.Warn("mongo ping failed", logger.Error(err))
+		l.Warn(ctx, "mongo ping failed", logger.Error(err))
 		_ = client.Disconnect(context.Background())
 		return nil
 	}
