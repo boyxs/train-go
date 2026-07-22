@@ -44,7 +44,7 @@ func (b *Builder) Build() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		limited, err := b.limit(ctx)
 		if err != nil {
-			b.l.Error("限流器异常", logger.Error(err))
+			b.l.Error(ctx, "限流器异常", logger.Error(err))
 			// 保守做法：借助 Redis 做限流，Redis 崩溃时为防系统被打垮，直接限流
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, ginx.Internal("服务繁忙，请稍后重试"))
 			// 激进做法：虽然 Redis 崩溃了，但是这个时候还是要尽量服务正常的用户，所以不限流
@@ -52,7 +52,7 @@ func (b *Builder) Build() gin.HandlerFunc {
 			return
 		}
 		if limited {
-			b.l.Warn("触发限流", logger.String("ip", ctx.ClientIP()))
+			b.l.Warn(ctx, "触发限流", logger.String("ip", ctx.ClientIP()))
 			ctx.AbortWithStatusJSON(http.StatusTooManyRequests, ginx.TooManyRequests("请求过于频繁，请稍后重试"))
 			return
 		}

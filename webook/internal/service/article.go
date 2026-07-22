@@ -84,7 +84,7 @@ func (s *InternalArticleAuthorService) Publish(ctx context.Context, article doma
 		var slugs []string
 		tags, err := s.tagSvc.SyncTags(bgCtx, domain.BizArticle, id, tagNames, articleTagSource)
 		if err != nil {
-			s.l.Error("发布文章：同步标签失败，降级不带标签索引",
+			s.l.Error(bgCtx, "发布文章：同步标签失败，降级不带标签索引",
 				logger.Int64("articleId", id), logger.Error(err))
 		} else {
 			slugs = make([]string, 0, len(tags))
@@ -94,13 +94,13 @@ func (s *InternalArticleAuthorService) Publish(ctx context.Context, article doma
 		}
 		complete, err := s.authorRepo.FindById(bgCtx, id, uid)
 		if err != nil {
-			s.l.Error("索引文章：回查完整数据失败",
+			s.l.Error(bgCtx, "索引文章：回查完整数据失败",
 				logger.Int64("articleId", id), logger.Error(err))
 			return
 		}
 		complete.Tags = slugs
 		if err := s.searchSvc.Index(bgCtx, complete); err != nil {
-			s.l.Error("索引文章失败", logger.Int64("articleId", id), logger.Error(err))
+			s.l.Error(bgCtx, "索引文章失败", logger.Int64("articleId", id), logger.Error(err))
 		}
 	})
 	return id, nil
@@ -129,7 +129,7 @@ func (s *InternalArticleAuthorService) Detail(ctx context.Context, id int64, uid
 	// 回显：补该文当前标签名（编辑器预填）；tag 服务失败降级不带标签，不阻断详情。
 	tagMap, tErr := s.tagSvc.TagsByBiz(ctx, domain.BizArticle, []int64{id})
 	if tErr != nil {
-		s.l.WithContext(ctx).Error("文章详情：取标签失败，降级不带标签",
+		s.l.Error(ctx, "文章详情：取标签失败，降级不带标签",
 			logger.Int64("articleId", id), logger.Error(tErr))
 		return article, nil
 	}
@@ -160,10 +160,10 @@ func (s *InternalArticleAuthorService) List(ctx context.Context, uid int64) ([]d
 func (s *InternalArticleAuthorService) clearTagAndIndexAsync(id int64) {
 	s.goSafe("下架文章-清标签+移除索引", func(bgCtx context.Context) {
 		if err := s.tagSvc.ClearTags(bgCtx, domain.BizArticle, id); err != nil {
-			s.l.Error("清标签关联失败", logger.Int64("articleId", id), logger.Error(err))
+			s.l.Error(bgCtx, "清标签关联失败", logger.Int64("articleId", id), logger.Error(err))
 		}
 		if err := s.searchSvc.Remove(bgCtx, id); err != nil {
-			s.l.Error("移除搜索索引失败", logger.Int64("articleId", id), logger.Error(err))
+			s.l.Error(bgCtx, "移除搜索索引失败", logger.Int64("articleId", id), logger.Error(err))
 		}
 	})
 }
@@ -175,7 +175,7 @@ func (s *InternalArticleAuthorService) goSafe(task string, fn func(ctx context.C
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
-				s.l.Error("后台任务 panic",
+				s.l.Error(context.Background(), "后台任务 panic",
 					logger.String("task", task),
 					logger.Field{Key: "panic", Val: r},
 					logger.String("stack", string(debug.Stack())))
@@ -287,7 +287,7 @@ func (s *InternalArticleReaderService) batchInteraction(ctx context.Context, ids
 	}
 	m, err := s.intrSvc.FindByBizIds(ctx, domain.BizArticle, ids)
 	if err != nil {
-		s.l.WithContext(ctx).Error("批量文章互动计数失败，降级填零", logger.Error(err))
+		s.l.Error(ctx, "批量文章互动计数失败，降级填零", logger.Error(err))
 		return map[int64]domain.Interaction{}
 	}
 	return m
@@ -300,7 +300,7 @@ func (s *InternalArticleReaderService) commentCounts(ctx context.Context, ids []
 	}
 	resp, err := s.commentCli.BatchCountComment(ctx, &commentv1.BatchCountCommentRequest{Biz: domain.BizArticle, BizIds: ids})
 	if err != nil {
-		s.l.WithContext(ctx).Error("批量获取文章评论数失败，降级", logger.Error(err))
+		s.l.Error(ctx, "批量获取文章评论数失败，降级", logger.Error(err))
 		return map[int64]int64{}
 	}
 	return resp.GetCounts()
@@ -310,7 +310,7 @@ func (s *InternalArticleReaderService) commentCounts(ctx context.Context, ids []
 func (s *InternalArticleReaderService) likedTotalByAuthor(ctx context.Context, uid int64) int64 {
 	ids, err := s.readerRepo.ListIdsByAuthor(ctx, uid)
 	if err != nil {
-		s.l.WithContext(ctx).Error("获取作者文章 id 失败", logger.Int64("author_id", uid), logger.Error(err))
+		s.l.Error(ctx, "获取作者文章 id 失败", logger.Int64("author_id", uid), logger.Error(err))
 		return 0
 	}
 	if len(ids) == 0 {
@@ -318,7 +318,7 @@ func (s *InternalArticleReaderService) likedTotalByAuthor(ctx context.Context, u
 	}
 	m, err := s.intrSvc.FindByBizIds(ctx, domain.BizArticle, ids)
 	if err != nil {
-		s.l.WithContext(ctx).Error("聚合获赞失败", logger.Int64("author_id", uid), logger.Error(err))
+		s.l.Error(ctx, "聚合获赞失败", logger.Int64("author_id", uid), logger.Error(err))
 		return 0
 	}
 	var total int64

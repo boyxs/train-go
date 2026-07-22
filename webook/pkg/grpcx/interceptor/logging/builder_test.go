@@ -26,12 +26,10 @@ func (r *recLogger) record(msg string, fs []logger.Field) {
 	r.logs = append(r.logs, m)
 	r.msgs = append(r.msgs, msg)
 }
-func (r *recLogger) Debug(msg string, fs ...logger.Field) { r.record(msg, fs) }
-func (r *recLogger) Info(msg string, fs ...logger.Field)  { r.record(msg, fs) }
-func (r *recLogger) Warn(msg string, fs ...logger.Field)  { r.record(msg, fs) }
-func (r *recLogger) Error(msg string, fs ...logger.Field) { r.record(msg, fs) }
-
-func (r *recLogger) WithContext(context.Context) logger.LoggerX { return r }
+func (r *recLogger) Debug(_ context.Context, msg string, fs ...logger.Field) { r.record(msg, fs) }
+func (r *recLogger) Info(_ context.Context, msg string, fs ...logger.Field)  { r.record(msg, fs) }
+func (r *recLogger) Warn(_ context.Context, msg string, fs ...logger.Field)  { r.record(msg, fs) }
+func (r *recLogger) Error(_ context.Context, msg string, fs ...logger.Field) { r.record(msg, fs) }
 
 func (r *recLogger) last() map[string]any { return r.logs[len(r.logs)-1] }
 func (r *recLogger) lastMsg() string      { return r.msgs[len(r.msgs)-1] }
@@ -45,10 +43,10 @@ func TestServer_Normal(t *testing.T) {
 
 	assert.Equal(t, "Server RPC请求", rec.lastMsg())
 	f := rec.last()
-	assert.Equal(t, "normal", f["event"])
-	assert.Equal(t, "/x.Y/Z", f["method"])
-	assert.Equal(t, "unary", f["type"])
-	assert.Contains(t, f, "cost")
+	assert.Equal(t, "normal", f["grpc.event"])
+	assert.Equal(t, "/x.Y/Z", f["grpc.method"])
+	assert.Equal(t, "unary", f["grpc.type"])
+	assert.Contains(t, f, "grpc.cost")
 	assert.NotContains(t, f, "grpc.code", "成功不记 code")
 }
 
@@ -62,7 +60,7 @@ func TestServer_Error_RecordsCode(t *testing.T) {
 	f := rec.last()
 	assert.Equal(t, "NotFound", f["grpc.code"])
 	assert.Equal(t, "nope", f["grpc.message"])
-	assert.Equal(t, "normal", f["event"])
+	assert.Equal(t, "normal", f["grpc.event"])
 }
 
 func TestServer_Panic_GenericToClient_DetailToLog(t *testing.T) {
@@ -78,9 +76,9 @@ func TestServer_Panic_GenericToClient_DetailToLog(t *testing.T) {
 
 	// 日志里：event=recover + panic 详情 + stack
 	f := rec.last()
-	assert.Equal(t, "recover", f["event"])
-	assert.Contains(t, f["panic"], "boom secret")
-	assert.Contains(t, f, "stack")
+	assert.Equal(t, "recover", f["grpc.event"])
+	assert.Contains(t, f["grpc.panic"], "boom secret")
+	assert.Contains(t, f, "grpc.stack")
 	assert.Equal(t, "Internal", f["grpc.code"])
 }
 
@@ -93,8 +91,8 @@ func TestClient_Normal(t *testing.T) {
 
 	assert.Equal(t, "Client RPC请求", rec.lastMsg())
 	f := rec.last()
-	assert.Equal(t, "/x.Y/Z", f["method"])
-	assert.Equal(t, "normal", f["event"])
+	assert.Equal(t, "/x.Y/Z", f["grpc.method"])
+	assert.Equal(t, "normal", f["grpc.event"])
 }
 
 func TestClient_Error_RecordsCode(t *testing.T) {
@@ -117,6 +115,6 @@ func TestClient_Panic_Recovers(t *testing.T) {
 	assert.Equal(t, codes.Internal, status.Code(err))
 	assert.Equal(t, "internal error", status.Convert(err).Message())
 	f := rec.last()
-	assert.Equal(t, "recover", f["event"])
-	assert.Contains(t, f, "stack")
+	assert.Equal(t, "recover", f["grpc.event"])
+	assert.Contains(t, f, "grpc.stack")
 }

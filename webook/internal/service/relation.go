@@ -199,7 +199,7 @@ func (s *GRPCRelationService) resolveUsers(ctx context.Context, ids []int64) map
 	}
 	users, err := s.userSvc.FindByIds(ctx, ids)
 	if err != nil {
-		s.l.WithContext(ctx).Error("批量解析用户信息失败，降级", logger.Error(err))
+		s.l.Error(ctx, "批量解析用户信息失败，降级", logger.Error(err))
 		return map[int64]domain.User{}
 	}
 	return users
@@ -212,7 +212,7 @@ func (s *GRPCRelationService) relationStates(ctx context.Context, viewerId int64
 	}
 	resp, err := s.client.GetRelation(ctx, &relationv1.GetRelationRequest{ViewerId: viewerId, TargetIds: targetIds})
 	if err != nil {
-		s.l.WithContext(ctx).Error("获取关系态失败，降级", logger.Error(err))
+		s.l.Error(ctx, "获取关系态失败，降级", logger.Error(err))
 		return map[int64]*relationv1.RelationState{}
 	}
 	return resp.GetStates()
@@ -225,7 +225,7 @@ func (s *GRPCRelationService) batchStats(ctx context.Context, ids []int64) map[i
 	}
 	resp, err := s.client.BatchGetStats(ctx, &relationv1.BatchGetStatsRequest{Uids: ids})
 	if err != nil {
-		s.l.WithContext(ctx).Error("批量获取关系计数失败，降级", logger.Error(err))
+		s.l.Error(ctx, "批量获取关系计数失败，降级", logger.Error(err))
 		return map[int64]*relationv1.RelationStats{}
 	}
 	return resp.GetStats()
@@ -236,7 +236,7 @@ func (s *GRPCRelationService) produce(ctx context.Context, typ string, followerI
 	if err := s.producer.Produce(ctx, relationevt.RelationEvent{
 		Type: typ, FollowerId: followerId, FolloweeId: followeeId, Ts: time.Now().UnixMilli(),
 	}); err != nil {
-		s.l.WithContext(ctx).Error("relation 事件生产失败",
+		s.l.Error(ctx, "relation 事件生产失败",
 			logger.String("type", typ), logger.Int64("followerId", followerId),
 			logger.Int64("followeeId", followeeId), logger.Error(err))
 	}

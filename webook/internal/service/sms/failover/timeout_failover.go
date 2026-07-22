@@ -47,14 +47,14 @@ func (t *TimeoutFailoverSmsService) Send(ctx context.Context, templateId string,
 		//仅测试End
 		if atomic.CompareAndSwapInt32(&t.idx, idx, newIdx) {
 			atomic.StoreInt32(&t.cnt, 0)
-			t.l.WithContext(ctx).Warn("SMS主动切换成功",
+			t.l.Warn(ctx, "SMS主动切换成功",
 				logger.Int32("consecutiveFails", cnt),
 				logger.Int32("from", idx),
 				logger.Int32("to", newIdx))
 			idx = newIdx
 		} else {
 			newActualIdx := atomic.LoadInt32(&t.idx)
-			t.l.WithContext(ctx).Warn("SMS切换并发竞争",
+			t.l.Warn(ctx, "SMS切换并发竞争",
 				logger.Int32("expected", newIdx),
 				logger.Int32("actual", newActualIdx))
 			idx = newActualIdx
@@ -78,7 +78,7 @@ func (t *TimeoutFailoverSmsService) Send(ctx context.Context, templateId string,
 		if t.isCriticalError(err) {
 			atomic.AddInt32(&t.cnt, 1)
 		}
-		t.l.WithContext(ctx).Warn("SMS服务商调用失败",
+		t.l.Warn(ctx, "SMS服务商调用失败",
 			logger.Int32("providerIdx", idx),
 			logger.Error(err))
 	}

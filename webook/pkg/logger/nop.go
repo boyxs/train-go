@@ -10,18 +10,14 @@ func NewNopLogger() LoggerX {
 
 }
 
-func (n *NopLogger) Debug(msg string, args ...Field) {
+func (n *NopLogger) Debug(ctx context.Context, msg string, args ...Field) {
 }
 
-func (n *NopLogger) Info(msg string, args ...Field) {
+func (n *NopLogger) Info(ctx context.Context, msg string, args ...Field) {
 }
 
-func (n *NopLogger) Warn(msg string, args ...Field) {
+func (n *NopLogger) Warn(ctx context.Context, msg string, args ...Field) {
 }
 
-func (n *NopLogger) Error(msg string, args ...Field) {
-}
-
-func (n *NopLogger) WithContext(ctx context.Context) LoggerX {
-	return n
+func (n *NopLogger) Error(ctx context.Context, msg string, args ...Field) {
 }

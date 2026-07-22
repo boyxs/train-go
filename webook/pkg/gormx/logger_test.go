@@ -29,12 +29,18 @@ func (r recordLogger) record(level, msg string, fields []logger.Field) {
 	*r.calls = append(*r.calls, logCall{level: level, msg: msg, fields: fields})
 }
 
-func (r recordLogger) Debug(msg string, fields ...logger.Field) { r.record("debug", msg, fields) }
-func (r recordLogger) Info(msg string, fields ...logger.Field)  { r.record("info", msg, fields) }
-func (r recordLogger) Warn(msg string, fields ...logger.Field)  { r.record("warn", msg, fields) }
-func (r recordLogger) Error(msg string, fields ...logger.Field) { r.record("error", msg, fields) }
-
-func (r recordLogger) WithContext(context.Context) logger.LoggerX { return r }
+func (r recordLogger) Debug(_ context.Context, msg string, fields ...logger.Field) {
+	r.record("debug", msg, fields)
+}
+func (r recordLogger) Info(_ context.Context, msg string, fields ...logger.Field) {
+	r.record("info", msg, fields)
+}
+func (r recordLogger) Warn(_ context.Context, msg string, fields ...logger.Field) {
+	r.record("warn", msg, fields)
+}
+func (r recordLogger) Error(_ context.Context, msg string, fields ...logger.Field) {
+	r.record("error", msg, fields)
+}
 
 func fakeSQL(sql string, rows int64) func() (string, int64) {
 	return func() (string, int64) { return sql, rows }

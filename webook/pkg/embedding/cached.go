@@ -48,10 +48,10 @@ func (c *CachedClient) Embed(ctx context.Context, text string) ([]float32, error
 		if jsonErr == nil {
 			return vec, nil
 		}
-		c.l.Warn("embedding 缓存值解析失败，回源 API", logger.String("key", key), logger.Error(jsonErr))
+		c.l.Warn(ctx, "embedding 缓存值解析失败，回源 API", logger.String("key", key), logger.Error(jsonErr))
 	case !errors.Is(err, redis.Nil):
 		// 非 miss 的真实故障（连接失败等）：记日志留观测信号，仍回源 API
-		c.l.Warn("读 embedding 缓存故障，回源 API", logger.String("key", key), logger.Error(err))
+		c.l.Warn(ctx, "读 embedding 缓存故障，回源 API", logger.String("key", key), logger.Error(err))
 	}
 
 	// miss → 调 API
@@ -64,7 +64,7 @@ func (c *CachedClient) Embed(ctx context.Context, text string) ([]float32, error
 	if buf, jsonErr := json.Marshal(vec); jsonErr == nil {
 		jitter := time.Duration(rand.Int63n(int64(10 * time.Minute)))
 		if setErr := c.cmd.Set(ctx, key, buf, c.ttl+jitter).Err(); setErr != nil {
-			c.l.Error("回填 embedding 缓存失败",
+			c.l.Error(ctx, "回填 embedding 缓存失败",
 				logger.String("key", key),
 				logger.Error(setErr))
 		}

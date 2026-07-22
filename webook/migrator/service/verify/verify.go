@@ -273,7 +273,7 @@ func (e *InternalVerifyEngine) diffAndLog(ctx context.Context, taskId int64, tab
 	if err := e.validateRepo.BatchInsert(ctx, logs); err != nil {
 		return 0, fmt.Errorf("validate_log batch insert: %w", err)
 	}
-	e.l.Info("verify done",
+	e.l.Info(ctx, "verify done",
 		logger.Int64("task_id", taskId),
 		logger.Int("mismatch_count", len(logs)))
 	return int64(len(logs)), nil
@@ -401,7 +401,7 @@ func (e *InternalVerifyEngine) repairAcrossTables(
 	for _, lg := range logs {
 		ti, ok := tableNameToIdx[lg.BizTable]
 		if !ok {
-			e.l.Warn("repair: validate_log biz_table not in task tables",
+			e.l.Warn(ctx, "repair: validate_log biz_table not in task tables",
 				logger.Int64("validate_log_id", lg.Id),
 				logger.String("biz_table", lg.BizTable))
 			continue
@@ -442,7 +442,7 @@ func (e *InternalVerifyEngine) applyRepairBatch(
 	for _, lg := range logs {
 		mut, mutErr := buildRepairMutation(lg, snapshotKey)
 		if mutErr != nil {
-			e.l.Warn("repair: build mutation failed",
+			e.l.Warn(ctx, "repair: build mutation failed",
 				logger.Int64("validate_log_id", lg.Id),
 				logger.String("kind", lg.MismatchKind),
 				logger.Error(mutErr))
@@ -458,10 +458,10 @@ func (e *InternalVerifyEngine) applyRepairBatch(
 		return 0, fmt.Errorf("repair sink apply: %w", err)
 	}
 	if err := e.validateRepo.MarkRepaired(ctx, successIDs); err != nil {
-		e.l.Warn("repair: mark_repaired failed (sink apply already succeeded)",
+		e.l.Warn(ctx, "repair: mark_repaired failed (sink apply already succeeded)",
 			logger.Int("ids_count", len(successIDs)), logger.Error(err))
 	}
-	e.l.Info("repair done",
+	e.l.Info(ctx, "repair done",
 		logger.String("snapshot_key", snapshotKey),
 		logger.Int64("repaired", int64(len(successIDs))))
 	return int64(len(successIDs)), nil

@@ -43,12 +43,18 @@ func (r *recordingLogger) record(level, msg string, args []logger.Field) {
 	r.entries = append(r.entries, logEntry{level: level, msg: msg, fields: m})
 }
 
-func (r *recordingLogger) Debug(msg string, args ...logger.Field) { r.record("debug", msg, args) }
-func (r *recordingLogger) Info(msg string, args ...logger.Field)  { r.record("info", msg, args) }
-func (r *recordingLogger) Warn(msg string, args ...logger.Field)  { r.record("warn", msg, args) }
-func (r *recordingLogger) Error(msg string, args ...logger.Field) { r.record("error", msg, args) }
-
-func (r *recordingLogger) WithContext(context.Context) logger.LoggerX { return r }
+func (r *recordingLogger) Debug(_ context.Context, msg string, args ...logger.Field) {
+	r.record("debug", msg, args)
+}
+func (r *recordingLogger) Info(_ context.Context, msg string, args ...logger.Field) {
+	r.record("info", msg, args)
+}
+func (r *recordingLogger) Warn(_ context.Context, msg string, args ...logger.Field) {
+	r.record("warn", msg, args)
+}
+func (r *recordingLogger) Error(_ context.Context, msg string, args ...logger.Field) {
+	r.record("error", msg, args)
+}
 
 func (r *recordingLogger) byLevel(level string) []logEntry {
 	r.mu.Lock()

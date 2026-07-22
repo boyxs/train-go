@@ -159,7 +159,7 @@ func (s *Server) keepAlive(ctx context.Context, kaCh <-chan *etcdv3.LeaseKeepAli
 			if ok {
 				continue
 			}
-			s.L.Error("gRPC etcd 续租中断,尝试重注册", logger.String("key", s.key))
+			s.L.Error(ctx, "gRPC etcd 续租中断,尝试重注册", logger.String("key", s.key))
 			for {
 				select {
 				case <-ctx.Done():
@@ -167,7 +167,7 @@ func (s *Server) keepAlive(ctx context.Context, kaCh <-chan *etcdv3.LeaseKeepAli
 				case <-time.After(time.Second):
 				}
 				if err := s.register(ctx); err != nil {
-					s.L.Error("gRPC etcd 重注册失败,重试", logger.Error(err))
+					s.L.Error(ctx, "gRPC etcd 重注册失败,重试", logger.Error(err))
 					continue
 				}
 				return // register 已起新 keepAlive goroutine,本 goroutine 退出

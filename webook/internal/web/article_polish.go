@@ -48,7 +48,7 @@ func (h *AIArticlePolishHandler) Polish(ctx *gin.Context, req polishReq) (ginx.R
 	key := fmt.Sprintf(consts.PolishRateLimitPattern, uc.Userid)
 	limited, limitErr := h.limiter.Limit(ctx.Request.Context(), key)
 	if limitErr != nil {
-		h.l.WithContext(ctx).Error("润色限流检查失败", logger.Int64("uid", uc.Userid), logger.Error(limitErr))
+		h.l.Error(ctx, "润色限流检查失败", logger.Int64("uid", uc.Userid), logger.Error(limitErr))
 	}
 	if limited {
 		return ginx.Result{}, errs.ErrPolishRateLimit

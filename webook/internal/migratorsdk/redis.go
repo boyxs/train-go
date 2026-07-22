@@ -46,7 +46,7 @@ func NewRedisSwitchReader(cmd redis.Cmdable, l logger.LoggerX) SwitchReader {
 func (r *RedisSwitchReader) ChooseSide(ctx context.Context, taskName string, hashKey int64) (Side, error) {
 	stage, err := r.cmd.Get(ctx, keyStage+taskName).Result()
 	if err != nil && !errors.Is(err, redis.Nil) {
-		r.l.WithContext(ctx).Warn("migratorsdk read stage failed, fallback to old",
+		r.l.Warn(ctx, "migratorsdk read stage failed, fallback to old",
 			logger.String("task", taskName), logger.Error(err))
 		return SideOld, nil
 	}
@@ -84,9 +84,9 @@ type FailureRecorder interface {
 // NoOpFailureRecorder 仅 log warn 不落表；适合 demo / 单测。
 type NoOpFailureRecorder struct{ L logger.LoggerX }
 
-func (n NoOpFailureRecorder) Record(_ context.Context, taskName string, cause error) {
+func (n NoOpFailureRecorder) Record(ctx context.Context, taskName string, cause error) {
 	if n.L != nil {
-		n.L.Warn("migratorsdk dual write NEW failed",
+		n.L.Warn(ctx, "migratorsdk dual write NEW failed",
 			logger.String("task", taskName), logger.Error(cause))
 	}
 }
@@ -117,7 +117,7 @@ func NewRedisDualWriter(cmd redis.Cmdable, recorder FailureRecorder, l logger.Lo
 func (w *RedisDualWriter) Write(ctx context.Context, taskName string, fn func(side Side) error) error {
 	stage, err := w.cmd.Get(ctx, keyStage+taskName).Result()
 	if err != nil && !errors.Is(err, redis.Nil) {
-		w.l.WithContext(ctx).Warn("migratorsdk read stage failed, fallback to SRC_ONLY",
+		w.l.Warn(ctx, "migratorsdk read stage failed, fallback to SRC_ONLY",
 			logger.String("task", taskName), logger.Error(err))
 		stage = stageSrcOnly
 	}

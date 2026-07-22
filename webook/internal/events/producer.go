@@ -34,7 +34,7 @@ func (p *SaramaSyncProducer) ProduceEvent(ctx context.Context, topic string, key
 		saramax.RecordSpanError(span, err)
 		return fmt.Errorf("kafka sync send failed: topic=%s key=%s err=%w", topic, key, err)
 	}
-	p.l.WithContext(ctx).Debug("kafka sync sent",
+	p.l.Debug(ctx, "kafka sync sent",
 		logger.String("topic", topic),
 		logger.String("key", key),
 		logger.Int64("partition", int64(partition)),
@@ -93,10 +93,10 @@ func (p *LazyProducer) run() {
 		d, err := p.connect()
 		if err == nil {
 			p.delegate.Store(&producerBox{p: d})
-			p.l.Info("kafka producer 连接成功")
+			p.l.Info(context.Background(), "kafka producer 连接成功")
 			return
 		}
-		p.l.Warn("kafka producer 连接失败，后台重试",
+		p.l.Warn(context.Background(), "kafka producer 连接失败，后台重试",
 			logger.String("backoff", backoff.String()), logger.Error(err))
 		time.Sleep(backoff)
 		if backoff *= 2; backoff > backoffMax {

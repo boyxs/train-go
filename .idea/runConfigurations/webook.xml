@@ -5,8 +5,8 @@
     <script-file value="$PROJECT_DIR$/webook/interaction/scripts/interaction.sql" />
     <script-file value="$PROJECT_DIR$/webook/scripts/webook.sql" />
     <script-mode>FILE</script-mode>
-    <data-source id="052ea3ba-50ba-4eab-9444-d4373027b7eb" namespace="schema/&quot;webook&quot;" />
-    <data-source id="052ea3ba-50ba-4eab-9444-d4373027b7eb" />
+    <data-source id="89e8ccb0-9122-4a7b-b824-df6c0b4dedbd" namespace="schema/&quot;webook&quot;" />
+    <data-source id="89e8ccb0-9122-4a7b-b824-df6c0b4dedbd" namespace="schema/&quot;webook_test&quot;" />
     <method v="2" />
   </configuration>
 </component>

@@ -38,25 +38,25 @@ func (b *InterceptorBuilder) BuildUnaryServer() grpc.UnaryServerInterceptor {
 				event = "recover"
 				// panic 详情（原值 + 栈）只进日志，不回客户端，避免泄漏内部细节
 				fields = append(fields,
-					logger.String("panic", fmt.Sprintf("%v", rec)),
-					logger.String("stack", string(captureStack())))
+					logger.String("grpc.panic", fmt.Sprintf("%v", rec)),
+					logger.String("grpc.stack", string(captureStack())))
 				err = status.Error(codes.Internal, "internal error")
 			}
 			fields = append(fields,
-				logger.Int64("cost", time.Since(start).Milliseconds()),
-				logger.String("type", "unary"),
-				logger.String("method", info.FullMethod),
-				logger.String("event", event),
-				logger.String("peer", interceptor.PeerName(ctx)),
-				logger.String("peer_ip", interceptor.PeerIp(ctx)),
+				logger.Int64("grpc.cost", time.Since(start).Milliseconds()),
+				logger.String("grpc.type", "unary"),
+				logger.String("grpc.method", info.FullMethod),
+				logger.String("grpc.event", event),
+				logger.String("grpc.peer", interceptor.PeerName(ctx)),
+				logger.String("grpc.peer_ip", interceptor.PeerIp(ctx)),
 			)
 			fields = appendStatus(fields, err)
 			// 正常调用记 Debug（ELK 默认丢 debug，不刷每 RPC 一条的流水）；出错/panic 记 Error，info+ 环境也可见
-			lg := b.l.WithContext(ctx)
+			lg := b.l
 			if event == "recover" || err != nil {
-				lg.Error("Server RPC请求", fields...)
+				lg.Error(ctx, "Server RPC请求", fields...)
 			} else {
-				lg.Debug("Server RPC请求", fields...)
+				lg.Debug(ctx, "Server RPC请求", fields...)
 			}
 		}()
 		resp, err = handler(ctx, req)
@@ -73,22 +73,22 @@ func (b *InterceptorBuilder) BuildUnaryClient() grpc.UnaryClientInterceptor {
 			if rec := recover(); rec != nil {
 				event = "recover"
 				fields = append(fields,
-					logger.String("panic", fmt.Sprintf("%v", rec)),
-					logger.String("stack", string(captureStack())))
+					logger.String("grpc.panic", fmt.Sprintf("%v", rec)),
+					logger.String("grpc.stack", string(captureStack())))
 				err = status.Error(codes.Internal, "internal error")
 			}
 			fields = append(fields,
-				logger.Int64("cost", time.Since(start).Milliseconds()),
-				logger.String("type", "unary"),
-				logger.String("method", method),
-				logger.String("event", event),
+				logger.Int64("grpc.cost", time.Since(start).Milliseconds()),
+				logger.String("grpc.type", "unary"),
+				logger.String("grpc.method", method),
+				logger.String("grpc.event", event),
 			)
 			fields = appendStatus(fields, err)
-			lg := b.l.WithContext(ctx)
+			lg := b.l
 			if event == "recover" || err != nil {
-				lg.Error("Client RPC请求", fields...)
+				lg.Error(ctx, "Client RPC请求", fields...)
 			} else {
-				lg.Debug("Client RPC请求", fields...)
+				lg.Debug(ctx, "Client RPC请求", fields...)
 			}
 		}()
 		err = invoker(ctx, method, req, reply, cc, opts...)

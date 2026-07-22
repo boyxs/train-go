@@ -53,7 +53,7 @@ func (s *ESSink) Apply(ctx context.Context, batch []Mutation) error {
 	if res.IsError() {
 		body, rerr := io.ReadAll(res.Body)
 		if rerr != nil {
-			s.l.Warn("read es error body failed",
+			s.l.Warn(ctx, "read es error body failed",
 				logger.Int("status", res.StatusCode), logger.Error(rerr))
 		}
 		return fmt.Errorf("es bulk %d: %s", res.StatusCode, body)
@@ -67,7 +67,7 @@ func (s *ESSink) Apply(ctx context.Context, batch []Mutation) error {
 		for _, item := range br.Items {
 			for op, detail := range item {
 				if detail.Status >= 400 && detail.Status != http.StatusConflict {
-					s.l.Warn("es bulk item failed",
+					s.l.Warn(ctx, "es bulk item failed",
 						logger.String("op", op),
 						logger.Int("status", detail.Status),
 						logger.String("error", detail.Error.Reason))

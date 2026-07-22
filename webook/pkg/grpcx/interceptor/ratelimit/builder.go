@@ -114,7 +114,7 @@ func (b *InterceptorBuilder) allow(ctx context.Context, fullMethod string) (bool
 	}
 	limited, err := lim.Limit(ctx, key)
 	if err != nil {
-		b.l.Error("限流器执行失败",
+		b.l.Error(ctx, "限流器执行失败",
 			logger.Error(err),
 			logger.String("key", key),
 			logger.String("method", fullMethod))

@@ -18,7 +18,7 @@ type Config struct {
 	IgnoreRecordNotFoundError bool                // true 时 ErrRecordNotFound 不当错误
 }
 
-// GormLogger 实现 GORM logger.Interface：SQL 经 LoggerX.WithContext(ctx) 结构化输出（含 trace.id），
+// GormLogger 实现 GORM logger.Interface：SQL 经 LoggerX（ctx 结构化输出，含 trace.id），
 // 按严重度映射 app 级、由 logger.level 决定是否落盘：正常→Debug、慢查询→Warn、真错误(非 RNF)→Error。
 type GormLogger struct {
 	l   loggerx.LoggerX
@@ -45,19 +45,19 @@ func (g *GormLogger) LogMode(level gormlogger.LogLevel) gormlogger.Interface {
 
 func (g *GormLogger) Info(ctx context.Context, msg string, args ...any) {
 	if g.cfg.LogLevel >= gormlogger.Info {
-		g.l.WithContext(ctx).Info(msg, loggerx.Field{Key: "args", Val: args})
+		g.l.Info(ctx, msg, loggerx.Field{Key: "args", Val: args})
 	}
 }
 
 func (g *GormLogger) Warn(ctx context.Context, msg string, args ...any) {
 	if g.cfg.LogLevel >= gormlogger.Warn {
-		g.l.WithContext(ctx).Warn(msg, loggerx.Field{Key: "args", Val: args})
+		g.l.Warn(ctx, msg, loggerx.Field{Key: "args", Val: args})
 	}
 }
 
 func (g *GormLogger) Error(ctx context.Context, msg string, args ...any) {
 	if g.cfg.LogLevel >= gormlogger.Error {
-		g.l.WithContext(ctx).Error(msg, loggerx.Field{Key: "args", Val: args})
+		g.l.Error(ctx, msg, loggerx.Field{Key: "args", Val: args})
 	}
 }
 
@@ -67,7 +67,7 @@ func (g *GormLogger) Trace(ctx context.Context, begin time.Time, fc func() (stri
 	}
 	elapsed := time.Since(begin)
 	sql, rows := fc()
-	l := g.l.WithContext(ctx)
+	l := g.l
 	fs := []loggerx.Field{
 		loggerx.String("sql", sql),
 		loggerx.Int64("rows", rows),
@@ -75,13 +75,13 @@ func (g *GormLogger) Trace(ctx context.Context, begin time.Time, fc func() (stri
 	}
 	switch {
 	case err != nil && (!g.cfg.IgnoreRecordNotFoundError || !errors.Is(err, gorm.ErrRecordNotFound)):
-		l.Error("gorm sql", append(fs, loggerx.Error(err))...)
+		l.Error(ctx, "gorm sql", append(fs, loggerx.Error(err))...)
 	case g.cfg.SlowThreshold > 0 && elapsed >= g.cfg.SlowThreshold:
-		l.Warn("gorm slow sql", append(fs, loggerx.Int64("slow_threshold_ms", g.cfg.SlowThreshold.Milliseconds()))...)
+		l.Warn(ctx, "gorm slow sql", append(fs, loggerx.Int64("slow_threshold_ms", g.cfg.SlowThreshold.Milliseconds()))...)
 	default:
 		if err != nil {
 			fs = append(fs, loggerx.Error(err))
 		}
-		l.Debug("gorm sql", fs...)
+		l.Debug(ctx, "gorm sql", fs...)
 	}
 }

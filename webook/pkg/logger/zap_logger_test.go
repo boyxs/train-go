@@ -34,12 +34,12 @@ func newObserved() (logger.LoggerX, *observer.ObservedLogs) {
 	return logger.NewZapLogger(zap.New(core)), logs
 }
 
-func TestZapLogger_WithContext(t *testing.T) {
+func TestZapLogger_Ctx(t *testing.T) {
 	t.Run("有有效 span：注入 trace.id/span.id 且保留业务字段", func(t *testing.T) {
 		ctx, wantTrace, wantSpan := spanCtx(t)
 		l, logs := newObserved()
 
-		l.WithContext(ctx).Info("hi", logger.String("k", "v"))
+		l.Info(ctx, "hi", logger.String("k", "v"))
 
 		entries := logs.All()
 		assert.Len(t, entries, 1)
@@ -52,7 +52,7 @@ func TestZapLogger_WithContext(t *testing.T) {
 	t.Run("无 span：不注入 trace.id/span.id", func(t *testing.T) {
 		l, logs := newObserved()
 
-		l.WithContext(context.Background()).Info("hi", logger.String("k", "v"))
+		l.Info(context.Background(), "hi", logger.String("k", "v"))
 
 		fields := logs.All()[0].ContextMap()
 		_, hasTrace := fields["trace.id"]
@@ -66,16 +66,16 @@ func TestZapLogger_WithContext(t *testing.T) {
 		l, logs := newObserved()
 		ctx := trace.ContextWithSpanContext(context.Background(), trace.SpanContext{})
 
-		l.WithContext(ctx).Error("boom")
+		l.Error(ctx, "boom")
 
 		_, hasTrace := logs.All()[0].ContextMap()["trace.id"]
 		assert.False(t, hasTrace)
 	})
 
-	t.Run("直接调用不经 WithContext：保持原行为、不带 trace.id", func(t *testing.T) {
+	t.Run("context.Background()：不注入 trace.id", func(t *testing.T) {
 		l, logs := newObserved()
 
-		l.Info("hi", logger.String("k", "v"))
+		l.Info(context.Background(), "hi", logger.String("k", "v"))
 
 		fields := logs.All()[0].ContextMap()
 		_, hasTrace := fields["trace.id"]

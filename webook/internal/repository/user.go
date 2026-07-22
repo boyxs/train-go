@@ -46,7 +46,7 @@ func (ur *RedisUserRepository) Update(ctx context.Context, user domain.User) (do
 	}
 	delErr := ur.cache.Del(ctx, user.Id)
 	if delErr != nil {
-		ur.l.WithContext(ctx).Error("删除用户缓存失败", logger.Error(delErr))
+		ur.l.Error(ctx, "删除用户缓存失败", logger.Error(delErr))
 	}
 	return ur.toDomain(u), err
 }
@@ -71,7 +71,7 @@ func (ur *RedisUserRepository) FindById(ctx context.Context, userid int64) (doma
 	cu = ur.toDomain(u)
 	err = ur.cache.Set(ctx, cu)
 	if err != nil {
-		ur.l.WithContext(ctx).Error("设置用户缓存失败", logger.Error(err))
+		ur.l.Error(ctx, "设置用户缓存失败", logger.Error(err))
 	}
 	return cu, nil
 }

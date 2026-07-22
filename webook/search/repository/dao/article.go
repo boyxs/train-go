@@ -65,7 +65,7 @@ func NewElasticArticleDAO(client *elasticsearch.TypedClient, index string, l log
 	d := &ElasticArticleDAO{client: client, index: index, l: l}
 	if err := d.ensureIndex(); err != nil {
 		// 启动仅告警不阻断（依赖不可达即降级，与本服务风格一致）；写路径会懒重试并 fail-fast。
-		l.Warn("启动 ensureIndex 失败，写路径将懒重试确保", logger.Error(err))
+		l.Warn(context.Background(), "启动 ensureIndex 失败，写路径将懒重试确保", logger.Error(err))
 	}
 	return d
 }

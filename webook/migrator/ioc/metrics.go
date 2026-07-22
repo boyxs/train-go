@@ -60,7 +60,7 @@ func (c *MigrationMetricsCollector) Collect(ch chan<- prometheus.Metric) {
 	defer cancel()
 	counts, err := c.dlRepo.CountUnreplayedByTask(ctx)
 	if err != nil {
-		c.l.Warn("collect dead_letter counts failed", logger.Error(err))
+		c.l.Warn(ctx, "collect dead_letter counts failed", logger.Error(err))
 		return
 	}
 	for id, n := range counts {

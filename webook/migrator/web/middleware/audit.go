@@ -61,7 +61,7 @@ func (m *AuditMiddleware) Build() gin.HandlerFunc {
 		// 抓 request body — handler 会消费 ctx.Request.Body，必须读完后复位
 		bodyBytes, err := io.ReadAll(c.Request.Body)
 		if err != nil {
-			m.l.Warn("audit read request body failed", logger.Error(err))
+			m.l.Warn(c.Request.Context(), "audit read request body failed", logger.Error(err))
 			bodyBytes = nil
 		}
 		c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
@@ -124,7 +124,7 @@ func (m *AuditMiddleware) tryAudit(taskId int64, actor, action, payload, result,
 			ErrorMsg: errorMsg,
 			ClientIp: clientIp,
 		}); err != nil {
-			m.l.Warn("audit insert failed",
+			m.l.Warn(context.Background(), "audit insert failed",
 				logger.Int64("task_id", taskId),
 				logger.String("action", action),
 				logger.Error(err))

@@ -2,6 +2,15 @@
 
 <!-- 新功能前插在此，日期降序 -->
 
+## [2026-07-22] logger 强制 ctx 重构 + gRPC 日志字段命名空间
+
+**变更内容**: `pkg/logger.LoggerX` 从"可选 ctx"（`WithContext(ctx)` 派生 + 4 个无 ctx 基础方法）**破坏性收敛为强制 ctx**：接口只剩 `Debug/Info/Warn/Error(ctx, msg, ...Field)` 4 方法，删除 `WithContext` / `XxxContext` / `ZapLogger.ctx` 字段。全仓 **213 处调用点一次性迁移**（`X.WithContext(ctx).Xxx()` → `X.Xxx(ctx, ...)`；裸调用补 ctx，真无 ctx 处显式 `context.Background()`）。顺带把 gRPC logging 拦截器 access 字段**全部**加 `grpc.` 命名空间（`grpc.cost/type/method/event/peer/peer_ip/panic/stack`，对齐已有 `grpc.code/message`）。
+**影响范围**: `pkg/logger/{types,zap_logger,nop}.go` + 测试；10/12 模块有调用点（pkg·internal·chat·comment·interaction·migrator·relation·search·tag·worker，~80 文件）；`pkg/grpcx/interceptor/logging/builder.go` + 测试（字段命名空间）；cronx/gormx/grpcx 的 LoggerX 测试替身（签名 + 删 WithContext）。
+**技术决策**: ① **强制 ctx 而非保留可选**——上一版（[2026-07-21]）走增量非破坏 `WithContext` 是为逐服务灰度；灰度完成后本次全量收敛，杜绝"忘带 ctx 丢 trace"，方法名不带后缀（`Debug(ctx,...)` 对齐标准库 slog 的 ctx-first 心智，而非 `DebugContext` 后缀派）；② Go 无方法重载 → 同名新旧签名无法并存，破坏性变更必须一次性全改，用 workflow 并行迁移（pkg 先编译绿再 fan out 9 个 service，各 agent `go build && go vet` 自验）；③ 真无 ctx 场景（ioc/main/后台 goroutine/panic handler/构造函数）显式 `context.Background()`（可 grep 审计"无 trace"日志点），有 ctx 处一律传（kafka `ExtractTraceContext(msg)`、异步走 goSafe 的 `bgCtx`、HTTP audit `c.Request.Context()`、migratorsdk 把原丢弃的 `_ ctx` 接回）；④ 删 `WithContext` 一并消除其返回浅拷贝的实例分配；⑤ gRPC 字段 `grpc.` 命名空间——文件本有 `grpc.code/message`，补齐其余避免顶层裸 `method`（gRPC 全限定名）语义不自明 + 与 HTTP `request.*` 潜在撞名。
+**待办**: 无（gRPC 日志字段已全部收敛到 `grpc.*`；Kibana 侧无遗留旧字段查询需迁移）。
+**会话**: 260722-logger-强制ctx重构
+**发布**: 待上线（应用侧改动，随下次出镜像生效）
+
 ## [2026-07-22] ELK 日志运维硬化 + gormx 标准化
 
 **变更内容**: Phase 1 起栈实跑后按问题硬化。**日志降噪**：Filebeat 从"通配所有 `webook-*`"改为**只采 9 个 Go 业务服务**（中间件/nginx/fe/ELK 自身不采，砍 ~87% 非应用日志）；Logstash 丢非 JSON、级别交各服务 `logger.level` 控（移除管道内 debug 硬过滤——prod=info 本就不产 debug，管道保持环境通用）；gRPC 拦截器正常 RPC Info→Debug、错误/panic→Error；`pkg/logger.NewZapLogger` 加 `AddCallerSkip(1)` 让 `log.origin` 指真实业务行。**修复**：Kibana 内存 768m→1024m（低于 1G 启动即 Node JS heap OOM）；`error` 定为标量（zap StacktraceKey `error.stack_trace`→`stack_trace`，避免与标量 `error` 撞成对象被 ES 拒 400）；日志索引 `webook-logs-*`→`logs-webook-*`（进 `logs-*` 命名空间，Kibana「All logs」默认 data view 直接命中）+ 模板 `priority:200` 盖 ES 内置 `logs` data-stream 模板；`webook-es-setup` 一次性 init 容器起栈自动建 ILM/模板 + 设 kibana_system 密码（根治 Kibana 启动撞车）。**gormx 标准化**：`GormLogger` 对齐 `gorm.io/gorm/logger.Config`（`Config{LogLevel/SlowThreshold/IgnoreRecordNotFoundError}`，单构造 `NewGormLogger(l, cfg...)` 通吃默认/自定义），Trace 按严重度映射 app 级——正常→Debug、**慢查询(≥200ms)→Warn**（prod info 也可见）、真错误→Error。**Logstash→ES TLS 脚手架**：`LOGSTASH_ES_SCHEME/SSL_ENABLED/CA_FILE` env 驱动（默认 off，staging/prod 建议开）。**deploy.sh**：service 参数支持正则匹配展开。

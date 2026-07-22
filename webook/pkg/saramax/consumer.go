@@ -27,7 +27,7 @@ func (c *Consumer[T]) ConsumeClaim(session sarama.ConsumerGroupSession, claim sa
 	for msg := range claim.Messages() {
 		var event T
 		if err := json.Unmarshal(msg.Value, &event); err != nil {
-			c.l.WithContext(ExtractTraceContext(msg)).Error("反序列化消息失败",
+			c.l.Error(ExtractTraceContext(msg), "反序列化消息失败",
 				logger.String("topic", msg.Topic),
 				logger.Int64("partition", int64(msg.Partition)),
 				logger.Int64("offset", msg.Offset),
@@ -48,7 +48,7 @@ func (c *Consumer[T]) handleOne(session sarama.ConsumerGroupSession, msg *sarama
 	defer span.End()
 	if err := c.handler(ctx, msg, event); err != nil {
 		RecordSpanError(span, err)
-		c.l.WithContext(ctx).Error("处理消息失败",
+		c.l.Error(ctx, "处理消息失败",
 			logger.String("topic", msg.Topic),
 			logger.Int64("offset", msg.Offset),
 			logger.Error(err))

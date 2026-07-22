@@ -48,7 +48,7 @@ func (r *CacheArticleRankingRepository) Top(ctx context.Context, date, dim, cat 
 	defer cancel()
 	baseItems, err := r.cache.Top(cacheCtx, date, dim, cat, limit)
 	if err != nil {
-		r.l.WithContext(ctx).Error("cache.Top 失败，降级查归档快照",
+		r.l.Error(ctx, "cache.Top 失败，降级查归档快照",
 			logger.String("date", date), logger.String("dim", dim), logger.String("cat", cat),
 			logger.Error(err))
 		return r.fallbackFromDAO(date, dim, cat, limit)
@@ -73,7 +73,7 @@ func (r *CacheArticleRankingRepository) Top(ctx context.Context, date, dim, cat 
 	eg.Go(func() error {
 		m, e := r.cache.GetDetails(detailCtx, date, ids)
 		if e != nil {
-			r.l.WithContext(ctx).Error("读取榜单 detail 失败", logger.Error(e))
+			r.l.Error(ctx, "读取榜单 detail 失败", logger.Error(e))
 			detailMap = map[int64]domain.ArticleRanking{}
 			return nil
 		}
@@ -83,7 +83,7 @@ func (r *CacheArticleRankingRepository) Top(ctx context.Context, date, dim, cat 
 	eg.Go(func() error {
 		m, e := r.cache.GetPrevRanks(prevCtx, date, dim, cat, ids)
 		if e != nil {
-			r.l.WithContext(ctx).Error("读取 prevRank 失败", logger.Error(e))
+			r.l.Error(ctx, "读取 prevRank 失败", logger.Error(e))
 			prevMap = map[int64]int{}
 			return nil
 		}
@@ -128,7 +128,7 @@ func (r *CacheArticleRankingRepository) ReplaceTop(ctx context.Context, date, di
 			ranks[it.ArticleId] = it.Rank
 		}
 		if sErr := r.cache.SnapshotRanks(ctx, date, dim, cat, ranks); sErr != nil {
-			r.l.WithContext(ctx).Error("快照 prevRank 失败", logger.Error(sErr))
+			r.l.Error(ctx, "快照 prevRank 失败", logger.Error(sErr))
 		}
 	}
 
@@ -144,7 +144,7 @@ func (r *CacheArticleRankingRepository) ReplaceTop(ctx context.Context, date, di
 		}
 		if sErr := r.cache.SetDetails(ctx, date, details); sErr != nil {
 			// detail 写失败只影响 Top() 读时缺标题/作者，不阻塞榜单本身
-			r.l.WithContext(ctx).Error("写 detail 失败", logger.Error(sErr))
+			r.l.Error(ctx, "写 detail 失败", logger.Error(sErr))
 		}
 	}
 	return nil
@@ -210,7 +210,7 @@ func (r *CacheArticleRankingRepository) fallbackFromDAO(date, dim, cat string, l
 		cur := base.SubDays(i).ToDateString()
 		models, err := r.dao.ListByDate(ctx, cur, dim, cat)
 		if err != nil {
-			r.l.WithContext(ctx).Error("fallback ListByDate 失败", logger.String("date", cur), logger.Error(err))
+			r.l.Error(ctx, "fallback ListByDate 失败", logger.String("date", cur), logger.Error(err))
 			continue
 		}
 		if len(models) == 0 {
@@ -239,7 +239,7 @@ func (r *CacheArticleRankingRepository) toModels(items []domain.ArticleRanking, 
 	for _, it := range items {
 		bs, err := json.Marshal(it)
 		if err != nil {
-			r.l.Error("序列化 rank item 失败", logger.Error(err))
+			r.l.Error(context.Background(), "序列化 rank item 失败", logger.Error(err))
 			continue
 		}
 		out = append(out, dao.ArticleRanking{

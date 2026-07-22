@@ -64,7 +64,7 @@ func (s *MySQLSource) FullScan(ctx context.Context, shard ShardSpec, out chan<- 
 		for _, r := range rows {
 			pk, ok := toInt64(r[s.pkColumn])
 			if !ok {
-				s.l.Warn("full scan: skip row with non-numeric pk",
+				s.l.Warn(ctx, "full scan: skip row with non-numeric pk",
 					logger.String("table", s.tableName),
 					logger.String("pk_column", s.pkColumn))
 				continue

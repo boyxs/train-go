@@ -53,12 +53,12 @@ func (s *InternalArticleService) Index(ctx context.Context, article domain.Artic
 	vec, err := s.embed.Embed(ctx, text)
 	if err != nil {
 		// embedding 是外部易失依赖，失败降级：不索引、不阻断
-		s.l.WithContext(ctx).Error("索引文章：embed 失败", logger.Int64("articleId", article.Id), logger.Error(err))
+		s.l.Error(ctx, "索引文章：embed 失败", logger.Int64("articleId", article.Id), logger.Error(err))
 		return nil
 	}
 	if err := s.repo.Index(ctx, article, vec); err != nil {
 		// 写入 ES 失败同样降级：记日志、不阻断
-		s.l.WithContext(ctx).Error("索引文章：写入 ES 失败", logger.Int64("articleId", article.Id), logger.Error(err))
+		s.l.Error(ctx, "索引文章：写入 ES 失败", logger.Int64("articleId", article.Id), logger.Error(err))
 		return nil
 	}
 	return nil
@@ -104,7 +104,7 @@ func (s *InternalArticleService) RecommendTags(ctx context.Context, title, conte
 	vec, err := s.embed.Embed(ctx, text)
 	if err != nil {
 		// 降级：无向量则无候选，作者仍可手动输入标签
-		s.l.WithContext(ctx).Error("推荐标签：embed 失败", logger.Error(err))
+		s.l.Error(ctx, "推荐标签：embed 失败", logger.Error(err))
 		return nil, nil
 	}
 	return s.repo.RecommendTags(ctx, vec, k)

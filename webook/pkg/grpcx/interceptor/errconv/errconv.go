@@ -29,12 +29,12 @@ func UnaryServerInterceptor(l logger.LoggerX) grpc.UnaryServerInterceptor {
 			return nil, be.GRPCStatus().Err()
 		}
 		if errors.Is(err, context.Canceled) {
-			l.Debug("gRPC client canceled",
+			l.Debug(ctx, "gRPC client canceled",
 				logger.String("method", info.FullMethod),
 				logger.Error(err))
 			return nil, status.Error(codes.Canceled, "client canceled")
 		}
-		l.Error("gRPC server unhandled error",
+		l.Error(ctx, "gRPC server unhandled error",
 			logger.String("method", info.FullMethod),
 			logger.Error(err))
 		return nil, status.Error(codes.Internal, "internal error")

@@ -144,7 +144,7 @@ func (e *InternalIncrEngine) Run(ctx context.Context, taskId int64) error {
 
 	// 标记 IncrRunning；status 失败仅 Warn。
 	if err := e.taskSvc.UpdateStatus(ctx, taskId, domain.TaskStatusIncrRunning); err != nil {
-		e.l.Warn("update task status to incr_running failed",
+		e.l.Warn(ctx, "update task status to incr_running failed",
 			logger.Int64("task_id", taskId), logger.Error(err))
 	}
 	// Incr 通常长跑，正常退出（Pause / ctx cancel）保持 IncrRunning；只有真错误才标 Failed。
@@ -154,7 +154,7 @@ func (e *InternalIncrEngine) Run(ctx context.Context, taskId int64) error {
 			return // 保持 IncrRunning（Pause 或 ctx cancel 也走这里，仍是 IncrRunning，等下次 Run 再激活）
 		}
 		if err := e.taskSvc.UpdateStatus(context.Background(), taskId, domain.TaskStatusFailed); err != nil {
-			e.l.Warn("update task status to failed",
+			e.l.Warn(ctx, "update task status to failed",
 				logger.Int64("task_id", taskId), logger.Error(err))
 		}
 	}()
@@ -208,7 +208,7 @@ func (e *InternalIncrEngine) Run(ctx context.Context, taskId int64) error {
 		runErr = werr
 		return runErr
 	}
-	e.l.Info("incr engine run done",
+	e.l.Info(ctx, "incr engine run done",
 		logger.Int64("task_id", taskId),
 		logger.Int("tables", len(tables)),
 		logger.Int64("applied", totalApplied))
