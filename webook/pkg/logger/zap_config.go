@@ -6,16 +6,16 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-// EcsEncoderConfig 固定 ECS（Elastic Common Schema）键 + epoch_millis 时间，
-// 统一各环境 JSON 日志 schema（对齐 ELK；@timestamp 用毫秒戳，对齐项目 int64ms 约定）。
+// EcsEncoderConfig 固定 ECS 键 + epoch_millis 时间戳（对齐 ELK / 项目 int64ms）。
 func EcsEncoderConfig() zapcore.EncoderConfig {
 	return zapcore.EncoderConfig{
-		TimeKey:       "@timestamp",
-		LevelKey:      "log.level",
-		NameKey:       "log.logger",
-		CallerKey:     "log.origin",
-		MessageKey:    "message",
-		StacktraceKey: "error.stack_trace",
+		TimeKey:    "@timestamp",
+		LevelKey:   "log.level",
+		NameKey:    "log.logger",
+		CallerKey:  "log.origin",
+		MessageKey: "message",
+		// 堆栈走独立顶层字段，不放 error.stack_trace：否则 error 被当对象，与 logger.Error 写的标量 error 冲突(ES 400)
+		StacktraceKey: "stack_trace",
 		LineEnding:    zapcore.DefaultLineEnding,
 		EncodeLevel:   zapcore.LowercaseLevelEncoder,
 		EncodeTime:    zapcore.EpochMillisTimeEncoder,
@@ -23,10 +23,8 @@ func EcsEncoderConfig() zapcore.EncoderConfig {
 	}
 }
 
-// InitZap 从 viper 的 "logger" + "otel" 段构建标准 *zap.Logger：
-//   - dev/prod 预设 → 覆盖 level/encoding/output_paths
-//   - encoding=json 时统一 ECS 键 + epoch_millis（local 的 console 保留可读预设）
-//   - 附服务身份字段 service.name/version/environment（取自 otel 段，ECS 对齐）
+// InitZap 从 viper logger+otel 段构建 *zap.Logger：dev/prod 预设，json 编码时用 ECS 键，
+// 附 service.name/version/environment（取自 otel 段）。
 func InitZap() *zap.Logger {
 	var lc struct {
 		Level            string   `mapstructure:"level"`

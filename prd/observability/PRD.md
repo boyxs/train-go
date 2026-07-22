@@ -103,7 +103,7 @@ flowchart LR
   N -->|stdout| DJ
   DJ --> FB["Filebeat<br/>add_docker_metadata / multiline"]
   FB -->|:5044 beats| LS["Logstash<br/>filter: ECS规范化 / 降噪 / 脱敏"]
-  LS -->|bulk| ES[("Elasticsearch<br/>webook-logs-* + ILM<br/>复用 webook-es")]
+  LS -->|bulk| ES[("Elasticsearch<br/>logs-webook-* + ILM<br/>复用 webook-es")]
   ES --> KB["Kibana<br/>Discover / Dashboard"]
 
   subgraph Existing["已有（本方案打通关联）"]
@@ -152,8 +152,8 @@ flowchart LR
 | `service.version` | keyword | `.With()` 注入 | 取 `otel.service_version` |
 | **`trace.id`** | keyword | **ctx 注入（本方案核心）** | W3C TraceID，关联 Zipkin |
 | **`span.id`** | keyword | **ctx 注入** | 当前 SpanID |
-| `error.message` | text | `logger.Error(err)` | 错误信息 |
-| `error.stack_trace` | text | zap StacktraceKey | error 级栈 |
+| `error` | text | `logger.Error(err)` | 错误信息（err.Error() 串，含 code/cause）|
+| `stack_trace` | text | zap StacktraceKey | error 级栈（独立顶层字段，不放 error.* 以免与标量 error 撞成 400）|
 | `container.*`/`host.name` | keyword | Filebeat `add_docker_metadata` | 容器/主机元数据 |
 | 业务字段 `uid`/`biz`/`biz_id`… | long/keyword | 调用点手传 | 按需，dynamic 模板控爆炸（§9） |
 | access log：`http.request.method`/`url.path`/`http.response.status_code`/`event.duration`/`client.ip`/`user_agent.original` | 见 §7.4 | access log 中间件 | 请求级 |
@@ -231,7 +231,7 @@ func (z *ZapLogger) toArgs(args []Field) []zap.Field {
 func EcsEncoderConfig() zapcore.EncoderConfig {
 	return zapcore.EncoderConfig{
 		TimeKey: "@timestamp", LevelKey: "log.level", MessageKey: "message",
-		CallerKey: "log.origin", StacktraceKey: "error.stack_trace", NameKey: "log.logger",
+		CallerKey: "log.origin", StacktraceKey: "stack_trace", NameKey: "log.logger",
 		LineEnding:   zapcore.DefaultLineEnding,
 		EncodeLevel:  zapcore.LowercaseLevelEncoder,
 		EncodeTime:   zapcore.EpochMillisTimeEncoder, // 对齐项目 int64 毫秒
@@ -306,17 +306,17 @@ l = l.With(
 沿用项目 ES 规范（CLAUDE.md「ES 索引规范」）：**别名 + 版本化/滚动**，app 只认逻辑写别名。
 
 **索引策略**：每环境一个写别名，按 `service.name` 字段过滤（而非每服务一索引，控单节点 shard 数）。
-- 写别名：`webook-logs-{env}-write` → 后备索引 `webook-logs-{env}-000001`（ILM rollover 递增）
+- 写别名：`logs-webook-{env}-write` → 后备索引 `logs-webook-{env}-000001`（ILM rollover 递增）
 - 单节点 → `number_of_shards: 1` / `number_of_replicas: 0`
 
 **Index Template（关键字段 + 控字段爆炸）**：
 ```jsonc
 {
-  "index_patterns": ["webook-logs-*"],
+  "index_patterns": ["logs-webook-*"],
   "template": {
     "settings": { "number_of_shards": 1, "number_of_replicas": 0,
-                  "index.lifecycle.name": "webook-logs-ilm",
-                  "index.lifecycle.rollover_alias": "webook-logs-dev-write" },
+                  "index.lifecycle.name": "logs-webook-ilm",
+                  "index.lifecycle.rollover_alias": "logs-webook-dev-write" },
     "mappings": {
       "dynamic": true,
       "dynamic_templates": [
@@ -329,7 +329,7 @@ l = l.With(
         "log.level":  { "type": "keyword" },
         "service.name": { "type": "keyword" }, "service.environment": { "type": "keyword" },
         "trace.id":   { "type": "keyword" }, "span.id": { "type": "keyword" },
-        "error.stack_trace": { "type": "text" },
+        "error": { "type": "text" }, "stack_trace": { "type": "text" },
         "http.response.status_code": { "type": "short" },
         "event.duration": { "type": "long" }, "client.ip": { "type": "ip" }
       }
@@ -339,7 +339,7 @@ l = l.With(
 ```
 - `dynamic_templates` 把未知字符串字段统一映射 keyword + `ignore_above`，防字段爆炸/超长。
 
-**ILM 策略**（`webook-logs-ilm`，单节点只 hot→delete）：
+**ILM 策略**（`logs-webook-ilm`，单节点只 hot→delete）：
 - hot：`rollover` 触发条件 `max_age: 1d` 或 `max_primary_shard_size: 5gb`
 - delete：dev `min_age: 7d` / prod `min_age: 30d`（可配）
 
@@ -374,8 +374,8 @@ output {
   elasticsearch {
     hosts => ["http://webook-es:9200"]
     user => "logstash_writer" password => "${ES_LOGS_PASS}"
-    ilm_rollover_alias => "webook-logs-${APP_ENV_SHORT}-write"
-    ilm_policy => "webook-logs-ilm"
+    ilm_rollover_alias => "logs-webook-${APP_ENV_SHORT}-write"
+    ilm_policy => "logs-webook-ilm"
   }
 }
 ```
@@ -409,7 +409,7 @@ output.logstash:
 
 ## 12. Kibana 与联动（trace_id ↔ Zipkin）
 
-- **Data View**：`webook-logs-*`，时间字段 `@timestamp`。
+- **Data View**：`logs-webook-*`，时间字段 `@timestamp`。
 - **基础 Discover 保存查询**：按 `service.name`/`log.level:error`/`trace.id:xxx` 过滤。
 - **Dashboard（Lens）**：① 各服务日志量趋势；② 错误率（`log.level:error` 占比）分服务；③ 慢请求 Top（`event.duration` 排序）；④ 最近 error 列表带 `trace.id`。
 - **trace.id → Zipkin 跳转**：Kibana **Field formatter（Url）** 把 `trace.id` 渲染成链接 `http://<host>:9411/zipkin/traces/{{value}}`，Discover 里一键跳 Zipkin 看完整链路。
@@ -472,7 +472,7 @@ output.logstash:
 
 ## 14. 安全与脱敏
 
-- **ES 弱口令**（现 `elastic/elastic`）：建专用角色最小权限——`logstash_writer`（仅 `webook-logs-*` 写 + ILM）、`kibana_reader`（只读）、`kibana_system`（Kibana 后端）；密码走 `${ENV}` 占位（`ES_LOGS_PASS`/`KIBANA_PASS`），`.env` gitignore，只 track `.example`。
+- **ES 弱口令**（现 `elastic/elastic`）：建专用角色最小权限——`logstash_writer`（仅 `logs-webook-*` 写 + ILM）、`kibana_reader`（只读）、`kibana_system`（Kibana 后端）；密码走 `${ENV}` 占位（`ES_LOGS_PASS`/`KIBANA_PASS`），`.env` gitignore，只 track `.example`。
 - **敏感脱敏两道**：app 侧不打密码/token/PII 字段（review 把关）；Logstash `gsub` 兜底打码（§10）。access log body 默认关或截断。
 - **Kibana 暴露**：dev 暴露宿主 5601；prod 只走 nginx 内网白名单（复用 `/metrics` 的 IP 白名单模式），不公网暴露。
 - **网络**：沿用默认 bridge，容器间 container_name 互通，ELK 不额外开公网端口（除 dev Kibana）。

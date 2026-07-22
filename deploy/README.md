@@ -474,11 +474,22 @@ docker run -d --name mysql-bridge --rm \
   --network webook-dev_default \
   -p 3306:3306 \
   alpine/socat TCP-LISTEN:3306,fork,reuseaddr TCP:webook-mysql:3306
-
 # 本地 DBeaver 连 server-ip:3306，用户 root，密码见 .env.<env> 的 MYSQL_PASS
+
+docker run -d --name kibana-bridge --rm \
+  --network webook-dev_default \
+  -p 5601:5601 \
+  alpine/socat TCP-LISTEN:5601,fork,reuseaddr TCP:webook-kibana:5601
+
+docker run -d --name es-bridge --rm \
+  --network webook-dev_default \
+  -p 9200:9200 \
+  alpine/socat TCP-LISTEN:9200,fork,reuseaddr TCP:webook-es:9200
 
 # 用完停桥
 docker stop mysql-bridge
+docker stop kibana-bridge
+docker stop es-bridge
 ```
 
 **其他中间件**（改容器名和端口）：

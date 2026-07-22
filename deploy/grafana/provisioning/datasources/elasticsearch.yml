@@ -13,7 +13,7 @@ datasources:
     secureJsonData:
       basicAuthPassword: $__env{ES_PASS}
     jsonData:
-      index: "webook-logs-*"
+      index: "logs-webook-*"
       timeField: "@timestamp"
       logMessageField: message
       logLevelField: log.level

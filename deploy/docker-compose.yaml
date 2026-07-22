@@ -584,23 +584,43 @@ services:
       - zipkin
 
   # ── 日志链路 ELK（Filebeat → Logstash → Elasticsearch[复用 webook-es] → Kibana）────
-  # ES 用现有 webook-es（单节点）：日志走独立索引 webook-logs-* + ILM，与检索 article_v1 隔离。
-  # 首次起栈后跑一次 ./elk/es/setup.sh 建 ILM 策略 + 索引模板（幂等；类比 mongo rs.initiate）。
+  # ES 用现有 webook-es（单节点）：日志走独立索引 logs-webook-* + ILM，与检索 article_v1 隔离。
+  # webook-es-setup 起栈时自动建 ILM/模板 + 设 kibana_system 密码（幂等）；logstash/kibana 等它完成再起。
+  # 手动重跑（改保留天数等）见 ./elk/es/setup.sh 头部注释。
+  webook-es-setup:
+    # 一次性 init：建 ILM/模板 + 设 kibana_system 密码后即退（幂等）；复用 ES 镜像（自带 bash+curl）
+    image: elasticsearch:9.3.2
+    container_name: webook-es-setup
+    profiles: ["elk"]
+    restart: "no"
+    pull_policy: missing
+    mem_limit: 128m                          # 只跑 bash+curl（entrypoint 覆盖，无 ES JVM），128m 足够
+    environment:
+      ES_HOST: "http://webook-es:9200"
+      ES_PASS: "${ES_PASS}"
+      LOG_RETENTION_DAYS: "${LOG_RETENTION_DAYS:-7}"
+    volumes:
+      - ./elk/es/setup.sh:/setup.sh:ro
+    entrypoint: ["bash", "/setup.sh"]
+    depends_on:
+      webook-es: {condition: service_healthy}
+
   webook-logstash:
     image: docker.elastic.co/logstash/logstash:9.3.2
     container_name: webook-logstash
     profiles: ["elk"]                       # 重量级，opt-in：COMPOSE_PROFILES=elk ./deploy.sh <env>
     restart: always
     pull_policy: missing
-    mem_limit: ${LOGSTASH_MEM:-1024m}
+    mem_limit: ${LOGSTASH_MEM:-768m}
     environment:
-      LS_JAVA_OPTS: "${LOGSTASH_HEAP:--Xms512m -Xmx512m}"
+      LS_JAVA_OPTS: "${LOGSTASH_HEAP:--Xms384m -Xmx384m}"
       ES_PASS: "${ES_PASS}"                 # pipeline 用 ${ES_PASS} 连 ES
     volumes:
       - ./elk/logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
       - ./elk/logstash/pipeline:/usr/share/logstash/pipeline:ro
     depends_on:
-      webook-es: {condition: service_healthy}
+      webook-es:       {condition: service_healthy}
+      webook-es-setup: {condition: service_completed_successfully}   # 等 ILM/模板建好再写，首个日索引才用 ECS mapping
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:9600 || exit 1"]
       interval: 15s
@@ -614,18 +634,21 @@ services:
     profiles: ["elk"]
     restart: always
     pull_policy: missing
-    mem_limit: ${KIBANA_MEM:-1024m}
-    # 宿主端口不在主 compose 暴露（数据面 UI，服务器走内网/socat）；本地经 docker-compose.local.yaml 暴露
+    mem_limit: ${KIBANA_MEM:-768m}
+    # 数据面 UI，发布宿主端口（对齐 Grafana/Prometheus/Zipkin）；敏感场景可改 127.0.0.1:${KIBANA_PORT}:5601 只绑回环 + SSH 隧道
+    ports:
+      - "${KIBANA_PORT:-5601}:5601"
     environment:
       ELASTICSEARCH_HOSTS: "http://webook-es:9200"
-      ELASTICSEARCH_USERNAME: "kibana_system"   # Kibana 9.x 禁用 elastic 超管连接；用内置 kibana_system（密码由 ./elk/es/setup.sh 设）
+      ELASTICSEARCH_USERNAME: "kibana_system"   # Kibana 9.x 禁用 elastic 超管连接；用内置 kibana_system（密码由 webook-es-setup 设）
       ELASTICSEARCH_PASSWORD: "${ES_PASS}"
       # 固定加密密钥（≥32 字符）：免每次重启换 key 报警 + 保存对象跨重启可解密
       XPACK_SECURITY_ENCRYPTIONKEY: "${KIBANA_ENCKEY:-webook_kibana_saved_objects_key32}"
       XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY: "${KIBANA_ENCKEY:-webook_kibana_saved_objects_key32}"
       XPACK_REPORTING_ENCRYPTIONKEY: "${KIBANA_ENCKEY:-webook_kibana_saved_objects_key32}"
     depends_on:
-      webook-es: {condition: service_healthy}
+      webook-es:       {condition: service_healthy}
+      webook-es-setup: {condition: service_completed_successfully}   # 等 kibana_system 密码设好再起，免认证失败反复重启
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:5601/api/status || exit 1"]
       interval: 20s

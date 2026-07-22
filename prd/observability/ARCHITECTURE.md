@@ -192,9 +192,9 @@ ES 文档: { @timestamp, log.level, message, trace.id, span.id, service.name, co
 ### 4.1 索引 / 别名 / ILM 拓扑
 
 ```
-写别名 webook-logs-{env}-write ──▶ 后备索引 webook-logs-{env}-000001, -000002, ...（ILM rollover 递增）
+写别名 logs-webook-{env}-write ──▶ 后备索引 logs-webook-{env}-000001, -000002, ...（ILM rollover 递增）
                                         │
-    ILM(webook-logs-ilm):  hot[rollover: 1d 或 5gb] ──▶ delete[dev 7d / prod 30d]
+    ILM(logs-webook-ilm):  hot[rollover: 1d 或 5gb] ──▶ delete[dev 7d / prod 30d]
     过滤维度: service.name 字段（非每服务一索引 → 控单节点 shard 数）
     单节点: number_of_shards=1, number_of_replicas=0
 ```
@@ -205,8 +205,8 @@ ES 文档: { @timestamp, log.level, message, trace.id, span.id, service.name, co
 
 | 隔离维度 | 手段 |
 |---------|------|
-| 数据隔离 | 独立索引 `webook-logs-*`（别名 + 版本化，遵项目 ES 规范）+ ILM 自动过期 |
-| 权限隔离 | 专用角色：`logstash_writer`（仅 `webook-logs-*` 写 + ILM）/ `kibana_reader`（只读）/ `kibana_system`；替换 `elastic/elastic` 弱口令 |
+| 数据隔离 | 独立索引 `logs-webook-*`（别名 + 版本化，遵项目 ES 规范）+ ILM 自动过期 |
+| 权限隔离 | 专用角色：`logstash_writer`（仅 `logs-webook-*` 写 + ILM）/ `kibana_reader`（只读）/ `kibana_system`；替换 `elastic/elastic` 弱口令 |
 | 资源隔离 | ES 堆上调（dev 384m→768m / prod 1024m→1536m）吸收日志写入；量大再拆独立实例（演进） |
 
 ### 4.3 字段爆炸防护
