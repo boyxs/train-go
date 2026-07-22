@@ -634,7 +634,7 @@ services:
     profiles: ["elk"]
     restart: always
     pull_policy: missing
-    mem_limit: ${KIBANA_MEM:-768m}
+    mem_limit: ${KIBANA_MEM:-1024m}    # Kibana(Node) 需 ≥1G，低于此启动即 JS heap OOM
     # 数据面 UI，发布宿主端口（对齐 Grafana/Prometheus/Zipkin）；敏感场景可改 127.0.0.1:${KIBANA_PORT}:5601 只绑回环 + SSH 隧道
     ports:
       - "${KIBANA_PORT:-5601}:5601"

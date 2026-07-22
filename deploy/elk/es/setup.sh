@@ -55,6 +55,7 @@ curl_es -X PUT "${ES_HOST}/_index_template/logs-webook" -d '{
         "span.id":                   { "type": "keyword" },
         "error":                     { "type": "text" },
         "stack_trace":               { "type": "text" },
+        "attr":                      { "type": "flattened" },
         "http.response.status_code": { "type": "short" },
         "event.duration":            { "type": "long" },
         "client.ip":                 { "type": "ip" }

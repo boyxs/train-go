@@ -12,12 +12,13 @@ filebeat.inputs:
 processors:
   - add_docker_metadata:
       host: "unix:///var/run/docker.sock"
-  # 只留 webook-* 容器（业务 + 中间件 + nginx），其余丢弃降噪
+  # 只采 Go 业务服务容器（这些才产 ECS JSON + trace.id）；中间件/nginx/fe/ELK 自身不采，
+  # 免非应用的原始 stdout 刷爆日志索引（新增业务服务记得加进下面白名单）
   - drop_event:
       when:
         not:
           regexp:
-            container.name: "^webook-"
+            container.name: "^webook-(core|chat|comment|interaction|relation|tag|search|worker|migrator)$"
 
 # 应用 message 是 Zap ECS JSON 串 —— 统一交给 Logstash 解析（单一解析点，不在两处 decode）
 output.logstash:

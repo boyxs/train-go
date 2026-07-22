@@ -49,7 +49,7 @@ func TestServer_Normal(t *testing.T) {
 	assert.Equal(t, "/x.Y/Z", f["method"])
 	assert.Equal(t, "unary", f["type"])
 	assert.Contains(t, f, "cost")
-	assert.NotContains(t, f, "code", "成功不记 code")
+	assert.NotContains(t, f, "grpc.code", "成功不记 code")
 }
 
 func TestServer_Error_RecordsCode(t *testing.T) {
@@ -60,8 +60,8 @@ func TestServer_Error_RecordsCode(t *testing.T) {
 	assert.Equal(t, codes.NotFound, status.Code(err))
 
 	f := rec.last()
-	assert.Equal(t, "NotFound", f["code"])
-	assert.Equal(t, "nope", f["message"])
+	assert.Equal(t, "NotFound", f["grpc.code"])
+	assert.Equal(t, "nope", f["grpc.message"])
 	assert.Equal(t, "normal", f["event"])
 }
 
@@ -81,7 +81,7 @@ func TestServer_Panic_GenericToClient_DetailToLog(t *testing.T) {
 	assert.Equal(t, "recover", f["event"])
 	assert.Contains(t, f["panic"], "boom secret")
 	assert.Contains(t, f, "stack")
-	assert.Equal(t, "Internal", f["code"])
+	assert.Equal(t, "Internal", f["grpc.code"])
 }
 
 func TestClient_Normal(t *testing.T) {
@@ -105,7 +105,7 @@ func TestClient_Error_RecordsCode(t *testing.T) {
 			return status.Error(codes.Unavailable, "down")
 		})
 	assert.Equal(t, codes.Unavailable, status.Code(err))
-	assert.Equal(t, "Unavailable", rec.last()["code"])
+	assert.Equal(t, "Unavailable", rec.last()["grpc.code"])
 }
 
 func TestClient_Panic_Recovers(t *testing.T) {

@@ -48,7 +48,8 @@ func (z *ZapLogger) toArgs(args []Field) []zap.Field {
 }
 
 func NewZapLogger(l *zap.Logger) LoggerX {
+	// AddCallerSkip(1) 跳过本包 Debug/Info/... 包装层，log.origin 指到真正业务调用点而非 zap_logger.go
 	return &ZapLogger{
-		l: l,
+		l: l.WithOptions(zap.AddCallerSkip(1)),
 	}
 }

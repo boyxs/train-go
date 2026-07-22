@@ -51,7 +51,13 @@ func (b *InterceptorBuilder) BuildUnaryServer() grpc.UnaryServerInterceptor {
 				logger.String("peer_ip", interceptor.PeerIp(ctx)),
 			)
 			fields = appendStatus(fields, err)
-			b.l.WithContext(ctx).Info("Server RPC请求", fields...)
+			// 正常调用记 Debug（ELK 默认丢 debug，不刷每 RPC 一条的流水）；出错/panic 记 Error，info+ 环境也可见
+			lg := b.l.WithContext(ctx)
+			if event == "recover" || err != nil {
+				lg.Error("Server RPC请求", fields...)
+			} else {
+				lg.Debug("Server RPC请求", fields...)
+			}
 		}()
 		resp, err = handler(ctx, req)
 		return
@@ -78,7 +84,12 @@ func (b *InterceptorBuilder) BuildUnaryClient() grpc.UnaryClientInterceptor {
 				logger.String("event", event),
 			)
 			fields = appendStatus(fields, err)
-			b.l.WithContext(ctx).Info("Client RPC请求", fields...)
+			lg := b.l.WithContext(ctx)
+			if event == "recover" || err != nil {
+				lg.Error("Client RPC请求", fields...)
+			} else {
+				lg.Debug("Client RPC请求", fields...)
+			}
 		}()
 		err = invoker(ctx, method, req, reply, cc, opts...)
 		return
@@ -97,8 +108,9 @@ func appendStatus(fields []logger.Field, err error) []logger.Field {
 		return fields
 	}
 	s, _ := status.FromError(err)
+	// grpc.* 命名空间：message 若用裸键会与 zap 的日志 message 键撞成重复 JSON 键
 	return append(fields,
-		logger.String("code", s.Code().String()),
-		logger.String("message", s.Message()),
+		logger.String("grpc.code", s.Code().String()),
+		logger.String("grpc.message", s.Message()),
 	)
 }

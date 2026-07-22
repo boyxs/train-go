@@ -71,7 +71,7 @@ if [ "$ENV" = "list" ]; then
 fi
 
 if [[ ! "$ENV" =~ ^(local|dev|staging|prod)$ ]]; then
-  echo "用法：./deploy.sh <local|dev|staging|prod> [up|down|stop|rm|nuke|logs|status|pull|build|restart] [service...]"
+  echo "用法：./deploy.sh <local|dev|staging|prod> [up|down|stop|rm|nuke|logs|status|pull|build|restart] [service...(支持正则)]"
   echo "     ./deploy.sh list"
   echo "     可选: --ghcr <host>   覆盖 ghcr 源（如 ghcr.nju.edu.cn），单次生效不改 env 文件"
   exit 1
@@ -94,6 +94,21 @@ if ! [[ "$ACTION" =~ ^(up|down|stop|rm|nuke|logs|status|ps|pull|restart|build)$ 
   echo "❌ 未知操作：$ACTION"
   echo "   支持：up / down / stop / rm / nuke / logs / status / pull / build / restart"
   exit 1
+fi
+
+# service 参数支持正则/部分匹配：每个 pattern 用 grep -E 匹配 compose 定义的服务名并展开为具体服务名。
+# 例：./deploy.sh dev up '^webook-(core|chat)$'  或  ./deploy.sh dev restart 'webook-c'
+# 注：只匹配当前 profile 可见的服务（要匹配 elk 服务需 COMPOSE_PROFILES=elk）。
+if [ ${#SVCS[@]} -gt 0 ]; then
+  _all=$($COMPOSE config --services 2>/dev/null)
+  _matched=""
+  for _pat in "${SVCS[@]}"; do
+    _hit=$(printf '%s\n' "$_all" | grep -E "$_pat" || true)
+    [ -z "$_hit" ] && { echo "❌ 无服务名匹配：$_pat"; echo "   当前可选：$(printf '%s ' $_all)"; exit 1; }
+    _matched="$_matched"$'\n'"$_hit"
+  done
+  SVCS=($(printf '%s\n' "$_matched" | grep -v '^$' | sort -u))
+  echo "🔎 服务匹配展开 → ${SVCS[*]}"
 fi
 
 case "$ACTION" in
