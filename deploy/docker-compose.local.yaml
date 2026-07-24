@@ -67,6 +67,17 @@ services:
     ports:
       - "${RELATION_HOST_PORT:-8060}:8060"
 
+  webook-feed:
+    image: webook-feed:local
+    pull_policy: never
+    build:
+      context: ../webook
+      dockerfile: feed/Dockerfile
+      args:
+        VERSION: local
+    ports:
+      - "${FEED_HOST_PORT:-8100}:8100"
+
   webook-tag:
     image: webook-tag:local
     pull_policy: never

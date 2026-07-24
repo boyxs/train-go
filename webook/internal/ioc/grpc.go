@@ -12,6 +12,7 @@ import (
 
 	articlev1 "github.com/boyxs/train-go/webook/api/gen/article/v1"
 	commentv1 "github.com/boyxs/train-go/webook/api/gen/comment/v1"
+	feedv1 "github.com/boyxs/train-go/webook/api/gen/feed/v1"
 	interactionv1 "github.com/boyxs/train-go/webook/api/gen/interaction/v1"
 	rankingv1 "github.com/boyxs/train-go/webook/api/gen/ranking/v1"
 	relationv1 "github.com/boyxs/train-go/webook/api/gen/relation/v1"
@@ -68,8 +69,8 @@ type CommentConn struct{ *grpc.ClientConn }
 
 // InitCommentConn 拨号 webook-comment(grpc.client.webook-comment,默认 etcd:///service/webook-comment)。
 // 复用进程内唯一的 grpcMetrics(与 server 共享)，拦截链与 chat→core 对称：otel + metrics(client) + errconv。
-func InitCommentConn(client *etcdv3.Client, grpcMetrics *metrics.PrometheusBuilder) (CommentConn, func(), error) {
-	conn, cleanup, err := dialDownstream(client, grpcMetrics, "webook-comment")
+func InitCommentConn(client *etcdv3.Client, grpcMetrics *metrics.PrometheusBuilder, l logger.LoggerX) (CommentConn, func(), error) {
+	conn, cleanup, err := dialDownstream(client, grpcMetrics, l, "webook-comment")
 	if err != nil {
 		return CommentConn{}, nil, err
 	}
@@ -85,8 +86,8 @@ type InteractionConn struct{ *grpc.ClientConn }
 
 // InitInteractionConn 拨号 webook-interaction(grpc.client.webook-interaction,默认 etcd:///service/webook-interaction)。
 // 复用进程内唯一的 grpcMetrics(与 server / comment client 共享)，拦截链与 comment client 对称。
-func InitInteractionConn(client *etcdv3.Client, grpcMetrics *metrics.PrometheusBuilder) (InteractionConn, func(), error) {
-	conn, cleanup, err := dialDownstream(client, grpcMetrics, "webook-interaction")
+func InitInteractionConn(client *etcdv3.Client, grpcMetrics *metrics.PrometheusBuilder, l logger.LoggerX) (InteractionConn, func(), error) {
+	conn, cleanup, err := dialDownstream(client, grpcMetrics, l, "webook-interaction")
 	if err != nil {
 		return InteractionConn{}, nil, err
 	}
@@ -101,8 +102,8 @@ func InitInteractionClient(c InteractionConn) interactionv1.InteractionServiceCl
 type RelationConn struct{ *grpc.ClientConn }
 
 // InitRelationConn 拨号 webook-relation。复用进程内唯一 grpcMetrics（与 server/其他 client 共享），拦截链对称。
-func InitRelationConn(client *etcdv3.Client, grpcMetrics *metrics.PrometheusBuilder) (RelationConn, func(), error) {
-	conn, cleanup, err := dialDownstream(client, grpcMetrics, "webook-relation")
+func InitRelationConn(client *etcdv3.Client, grpcMetrics *metrics.PrometheusBuilder, l logger.LoggerX) (RelationConn, func(), error) {
+	conn, cleanup, err := dialDownstream(client, grpcMetrics, l, "webook-relation")
 	if err != nil {
 		return RelationConn{}, nil, err
 	}
@@ -117,8 +118,8 @@ func InitRelationClient(c RelationConn) relationv1.RelationServiceClient {
 type SearchConn struct{ *grpc.ClientConn }
 
 // InitSearchConn 拨号 webook-search(grpc.client.webook-search,默认 etcd:///service/webook-search)。拦截链与其他 client 对称。
-func InitSearchConn(client *etcdv3.Client, grpcMetrics *metrics.PrometheusBuilder) (SearchConn, func(), error) {
-	conn, cleanup, err := dialDownstream(client, grpcMetrics, "webook-search")
+func InitSearchConn(client *etcdv3.Client, grpcMetrics *metrics.PrometheusBuilder, l logger.LoggerX) (SearchConn, func(), error) {
+	conn, cleanup, err := dialDownstream(client, grpcMetrics, l, "webook-search")
 	if err != nil {
 		return SearchConn{}, nil, err
 	}
@@ -133,8 +134,8 @@ func InitSearchClient(c SearchConn) searchv1.SearchServiceClient {
 type TagConn struct{ *grpc.ClientConn }
 
 // InitTagConn 拨号 webook-tag(grpc.client.webook-tag,默认 etcd:///service/webook-tag)。拦截链与其他 client 对称。
-func InitTagConn(client *etcdv3.Client, grpcMetrics *metrics.PrometheusBuilder) (TagConn, func(), error) {
-	conn, cleanup, err := dialDownstream(client, grpcMetrics, "webook-tag")
+func InitTagConn(client *etcdv3.Client, grpcMetrics *metrics.PrometheusBuilder, l logger.LoggerX) (TagConn, func(), error) {
+	conn, cleanup, err := dialDownstream(client, grpcMetrics, l, "webook-tag")
 	if err != nil {
 		return TagConn{}, nil, err
 	}
@@ -145,16 +146,37 @@ func InitTagClient(c TagConn) tagv1.TagServiceClient {
 	return tagv1.NewTagServiceClient(c)
 }
 
+// FeedConn 是到 webook-feed 的 gRPC 连接（core 作 HTTP 网关调 feed 读关注流）。独立类型让 wire 区分多下游 conn。
+type FeedConn struct{ *grpc.ClientConn }
+
+// InitFeedConn 拨号 webook-feed(client.grpc.webook-feed,默认 etcd:///service/webook-feed)。拦截链与其他 client 对称。
+func InitFeedConn(client *etcdv3.Client, grpcMetrics *metrics.PrometheusBuilder, l logger.LoggerX) (FeedConn, func(), error) {
+	conn, cleanup, err := dialDownstream(client, grpcMetrics, l, "webook-feed")
+	if err != nil {
+		return FeedConn{}, nil, err
+	}
+	return FeedConn{conn}, cleanup, nil
+}
+
+func InitFeedClient(c FeedConn) feedv1.FeedServiceClient {
+	return feedv1.NewFeedServiceClient(c)
+}
+
 // dialDownstream 拨号一个下游服务：读 client.grpc.<name>（target/balancer，target 必填缺失即 dial 失败）
-// + 装对称拦截链（otel + metrics(client) + errconv，复用进程内唯一 grpcMetrics）。五个下游唯一差异是服务名，
-// 各 InitXxxConn 只做薄类型包装让 wire 区分多 conn。
-func dialDownstream(client *etcdv3.Client, grpcMetrics *metrics.PrometheusBuilder, name string) (*grpc.ClientConn, func(), error) {
+// + 装对称拦截链（otel + metrics(client) + logging(client) + errconv，复用进程内唯一 grpcMetrics）。
+// 出站访问日志：调用失败记 grpc.method（含被调服务）+ grpc.code + grpc.cost，定位「哪个下游挂了」（正常 RPC 记 Debug 不刷屏）。
+// 各下游唯一差异是服务名，各 InitXxxConn 只做薄类型包装让 wire 区分多 conn。
+func dialDownstream(client *etcdv3.Client, grpcMetrics *metrics.PrometheusBuilder, l logger.LoggerX, name string) (*grpc.ClientConn, func(), error) {
 	var cfg grpcx.ClientConfig
 	if err := viper.UnmarshalKey("client.grpc."+name, &cfg); err != nil {
 		return nil, nil, err
 	}
 	return grpcx.NewClient(client, cfg,
 		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
-		grpc.WithChainUnaryInterceptor(grpcMetrics.BuildUnaryClient(), errconv.UnaryClientInterceptor()),
+		grpc.WithChainUnaryInterceptor(
+			grpcMetrics.BuildUnaryClient(),
+			logging.NewInterceptorBuilder(l).BuildUnaryClient(),
+			errconv.UnaryClientInterceptor(),
+		),
 	)
 }

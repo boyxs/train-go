@@ -39,6 +39,7 @@ func InitWebServer(
 	rankingHandler web.RankingHandler,
 	commentHandler web.CommentHandler,
 	relationHandler web.RelationHandler,
+	feedHandler web.FeedHandler,
 ) *gin.Engine {
 	server := gin.Default()
 	ginx.UserKey = consts.UserKey // 登录态 ctx key，供 ginx.MustClaims/Claims 读取
@@ -63,6 +64,7 @@ func InitWebServer(
 	rankingHandler.RegisterRoutes(server)
 	commentHandler.RegisterRoutes(server)
 	relationHandler.RegisterRoutes(server)
+	feedHandler.RegisterRoutes(server)
 	return server
 }
 

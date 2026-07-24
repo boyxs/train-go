@@ -7,6 +7,7 @@ import (
 
 	commentv1 "github.com/boyxs/train-go/webook/api/gen/comment/v1"
 	"github.com/boyxs/train-go/webook/internal/domain"
+	articleevt "github.com/boyxs/train-go/webook/internal/events/article"
 	"github.com/boyxs/train-go/webook/internal/repository"
 	"github.com/boyxs/train-go/webook/pkg/logger"
 )
@@ -31,6 +32,7 @@ type InternalArticleAuthorService struct {
 	readerRepo repository.ArticleReaderRepository
 	searchSvc  ArticleSearchService
 	tagSvc     TagService
+	producer   articleevt.ArticleEventProducer
 	l          logger.LoggerX
 }
 
@@ -39,6 +41,7 @@ func NewInternalArticleAuthorService(
 	readerRepo repository.ArticleReaderRepository,
 	searchSvc ArticleSearchService,
 	tagSvc TagService,
+	producer articleevt.ArticleEventProducer,
 	l logger.LoggerX,
 ) ArticleAuthorService {
 	return &InternalArticleAuthorService{
@@ -46,7 +49,18 @@ func NewInternalArticleAuthorService(
 		readerRepo: readerRepo,
 		searchSvc:  searchSvc,
 		tagSvc:     tagSvc,
+		producer:   producer,
 		l:          l,
+	}
+}
+
+// produceArticleEvent 发布/撤回后生产 article_events（best-effort：失败仅记日志，不阻断主流程，靠 TTL 重建兜底）。
+func (s *InternalArticleAuthorService) produceArticleEvent(ctx context.Context, typ string, articleId, authorId int64) {
+	if err := s.producer.Produce(ctx, articleevt.ArticleEvent{
+		Type: typ, ArticleId: articleId, AuthorId: authorId, Ts: time.Now().UnixMilli(),
+	}); err != nil {
+		s.l.Error(ctx, "article 事件生产失败（不阻断主流程）",
+			logger.String("type", typ), logger.Int64("articleId", articleId), logger.Error(err))
 	}
 }
 
@@ -77,6 +91,8 @@ func (s *InternalArticleAuthorService) Publish(ctx context.Context, article doma
 	if err != nil {
 		return 0, err
 	}
+	// 生产 article_events（feed 写扩散源头），best-effort 不阻断发布主流程
+	s.produceArticleEvent(ctx, articleevt.TypePublished, id, article.Author.Id)
 	// 后台：全量对齐标签（拿回已解析 slug）+ 回查完整数据（含 AuthorName / CreatedAt）写 ES。
 	// 跨 core+tag+search 三库无事务，tag/search 失败非致命降级（记日志，靠重发/backfill 最终一致）。
 	uid, tagNames := article.Author.Id, article.Tags
@@ -117,6 +133,8 @@ func (s *InternalArticleAuthorService) Withdraw(ctx context.Context, id int64, u
 	if err := s.readerRepo.Delete(ctx, id, uid); err != nil {
 		return err
 	}
+	// 生产撤回事件（feed 读时过滤 + DEL 作者 outbox），best-effort
+	s.produceArticleEvent(ctx, articleevt.TypeWithdrawn, id, uid)
 	s.clearTagAndIndexAsync(id)
 	return nil
 }
@@ -194,6 +212,8 @@ func (s *InternalArticleAuthorService) Delete(ctx context.Context, id int64, uid
 	if err := s.readerRepo.Delete(ctx, id, uid); err != nil {
 		return err
 	}
+	// 删除已发布文章与撤回同效：通知 feed 清作者 outbox（未发布草稿则为无害 no-op），与 Withdraw 对称
+	s.produceArticleEvent(ctx, articleevt.TypeWithdrawn, id, uid)
 	s.clearTagAndIndexAsync(id)
 	return nil
 }
@@ -204,11 +224,18 @@ type ArticleReaderService interface {
 	Detail(ctx context.Context, id int64) (domain.Article, error)
 	// BatchDetail 批量取文章详情；不存在的 id 静默跳过，返回保留入参顺序
 	BatchDetail(ctx context.Context, ids []int64) ([]domain.Article, error)
+	// CountByIds 统计给定 id 中可见（未撤回/软删）的条数——feed 新内容提示按可见口径计数，免捞全字段
+	CountByIds(ctx context.Context, ids []int64) (int64, error)
 	Page(ctx context.Context, page int, pageSize int) ([]domain.Article, int64, error)
 	// AuthorArticles 他人主页「TA 的文章」：某作者已发布文章分页 + 每篇互动/评论计数 + 获赞总数。
 	// 跨 interaction / comment 聚合的业务逻辑集中在此，web 只映射 VO。
 	AuthorArticles(ctx context.Context, uid int64, page int, pageSize int) (items []domain.ArticleWithStats, total int64, likedTotal int64, err error)
+	// ListAuthorBriefs 某作者最近已发布文章的轻量投影（feed outbox 回源），limit 夹取 1..maxAuthorBriefLimit。
+	ListAuthorBriefs(ctx context.Context, authorId int64, limit int) ([]domain.ArticleBrief, error)
 }
+
+// maxAuthorBriefLimit feed 回源上限（对齐 feed outbox cap），防止调用方传入过大 limit。
+const maxAuthorBriefLimit = 100
 
 type InternalArticleReaderService struct {
 	readerRepo repository.ArticleReaderRepository
@@ -235,8 +262,19 @@ func (s *InternalArticleReaderService) Detail(ctx context.Context, id int64) (do
 	return s.readerRepo.FindById(ctx, id)
 }
 
+func (s *InternalArticleReaderService) ListAuthorBriefs(ctx context.Context, authorId int64, limit int) ([]domain.ArticleBrief, error) {
+	if limit <= 0 || limit > maxAuthorBriefLimit {
+		limit = maxAuthorBriefLimit
+	}
+	return s.readerRepo.ListBriefByAuthor(ctx, authorId, limit)
+}
+
 func (s *InternalArticleReaderService) BatchDetail(ctx context.Context, ids []int64) ([]domain.Article, error) {
 	return s.readerRepo.FindByIds(ctx, ids)
+}
+
+func (s *InternalArticleReaderService) CountByIds(ctx context.Context, ids []int64) (int64, error) {
+	return s.readerRepo.CountByIds(ctx, ids)
 }
 
 func (s *InternalArticleReaderService) Page(ctx context.Context, page int, pageSize int) ([]domain.Article, int64, error) {

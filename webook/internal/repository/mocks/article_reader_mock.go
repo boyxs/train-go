@@ -42,6 +42,21 @@ func (m *MockArticleReaderRepository) EXPECT() *MockArticleReaderRepositoryMockR
 	return m.recorder
 }
 
+// CountByIds mocks base method.
+func (m *MockArticleReaderRepository) CountByIds(ctx context.Context, ids []int64) (int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CountByIds", ctx, ids)
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CountByIds indicates an expected call of CountByIds.
+func (mr *MockArticleReaderRepositoryMockRecorder) CountByIds(ctx, ids any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CountByIds", reflect.TypeOf((*MockArticleReaderRepository)(nil).CountByIds), ctx, ids)
+}
+
 // Delete mocks base method.
 func (m *MockArticleReaderRepository) Delete(ctx context.Context, id, uid int64) error {
 	m.ctrl.T.Helper()
@@ -84,6 +99,21 @@ func (m *MockArticleReaderRepository) FindByIds(ctx context.Context, ids []int64
 func (mr *MockArticleReaderRepositoryMockRecorder) FindByIds(ctx, ids any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByIds", reflect.TypeOf((*MockArticleReaderRepository)(nil).FindByIds), ctx, ids)
+}
+
+// ListBriefByAuthor mocks base method.
+func (m *MockArticleReaderRepository) ListBriefByAuthor(ctx context.Context, authorId int64, limit int) ([]domain.ArticleBrief, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListBriefByAuthor", ctx, authorId, limit)
+	ret0, _ := ret[0].([]domain.ArticleBrief)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListBriefByAuthor indicates an expected call of ListBriefByAuthor.
+func (mr *MockArticleReaderRepositoryMockRecorder) ListBriefByAuthor(ctx, authorId, limit any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListBriefByAuthor", reflect.TypeOf((*MockArticleReaderRepository)(nil).ListBriefByAuthor), ctx, authorId, limit)
 }
 
 // ListIdsByAuthor mocks base method.

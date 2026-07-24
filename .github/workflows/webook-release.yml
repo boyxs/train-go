@@ -1,0 +1,82 @@
+name: Webook Release
+
+# 版本 tag → 构建并推送「语义化版本」镜像。触发只认 tag、不带 paths：本仓惯例把各服务 tag 批量打在
+# 「deploy 同步 commit」上（diff 不含服务代码），带 paths 会因 diff 不命中而静默漏触发。分支滚动镜像见 webook-ci.yml。
+# 【将来抽 reusable】build-push 段可提到 _build-push.yml（on: workflow_call, inputs: image/context/dockerfile/version），本文件退化为「路由 + uses:」。
+
+on:
+  push:
+    # 匹配所有服务的版本 tag（webook-fe-v1.3.0 / webook-feed-v0.1.1 / ...）
+    tags:
+      - 'webook-*-v*.*.*'
+
+# 默认只读；下方 job 提权 packages: write 以推镜像
+permissions:
+  contents: read
+
+env:
+  # 镜像仓库（GitHub Container Registry）
+  REGISTRY: ghcr.io
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # 推 GHCR 需要包写权限
+      packages: write
+    steps:
+      # 拉 tag 指向的代码
+      - uses: actions/checkout@v5
+
+      # 从 tag 名解析出 服务名 / 镜像名 / 构建上下文 / Dockerfile / 版本号。
+      # 路由对全服务通用：core 代码目录是 internal、fe 是独立树，其余服务目录同名。
+      - name: Resolve tag route
+        id: route
+        run: |
+          # 从 tag 名（webook-<svc>-v<ver>）剥出服务名与版本号
+          ref="${GITHUB_REF_NAME}"
+          svc="${ref#webook-}"; svc="${svc%-v*}"
+          ver="${ref##*-v}"
+          # core 代码目录是 internal，fe 是独立树，其余服务目录同名
+          case "$svc" in
+            fe)   ctx="webook-fe"; df="webook-fe/Dockerfile" ;;
+            core) ctx="webook";    df="webook/internal/Dockerfile" ;;
+            *)    ctx="webook";    df="webook/${svc}/Dockerfile" ;;
+          esac
+          {
+            echo "image=${{ github.repository_owner }}/webook-${svc}"
+            echo "version=${ver}"
+            echo "context=${ctx}"
+            echo "dockerfile=${df}"
+          } >> "$GITHUB_OUTPUT"
+          echo "resolved: svc=${svc} ver=${ver} ctx=${ctx} df=${df}"
+
+      # 启用 buildx（多阶段 + gha 缓存）
+      - uses: docker/setup-buildx-action@v3
+      # 登录 GHCR（用 Actions 自带 token）
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push (semver image)
+        uses: docker/build-push-action@v5
+        with:
+          # 路由算出的构建上下文
+          context: ${{ steps.route.outputs.context }}
+          # 路由算出的 Dockerfile
+          file: ${{ steps.route.outputs.dockerfile }}
+          push: true
+          # 唯一 tag = 语义化版本
+          tags: ${{ env.REGISTRY }}/${{ steps.route.outputs.image }}:${{ steps.route.outputs.version }}
+          # 注入版本号（Dockerfile ldflag → 日志 service.version）
+          build-args: |
+            VERSION=${{ steps.route.outputs.version }}
+          # 关 provenance/sbom attestation，产纯 manifest（老 docker-compose 解析 OCI index 会报 manifest unknown）
+          provenance: false
+          sbom: false
+          # 复用 GHA 层缓存，scope 按镜像隔离
+          cache-from: type=gha,scope=${{ steps.route.outputs.image }}
+          cache-to: type=gha,mode=max,scope=${{ steps.route.outputs.image }}

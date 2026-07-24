@@ -8,9 +8,11 @@ import (
 	"gorm.io/gorm"
 
 	articlev1 "github.com/boyxs/train-go/webook/api/gen/article/v1"
+	"github.com/boyxs/train-go/webook/internal/domain"
 	"github.com/boyxs/train-go/webook/internal/errs"
 	"github.com/boyxs/train-go/webook/internal/service"
 	pkgerrs "github.com/boyxs/train-go/webook/pkg/errs"
+	"github.com/boyxs/train-go/webook/pkg/slicex"
 )
 
 const batchGetArticlesMaxIDs = 100
@@ -69,4 +71,20 @@ func (s *ArticleReaderServer) BatchGetArticles(ctx context.Context, req *article
 		})
 	}
 	return &articlev1.BatchGetArticlesResponse{Articles: result}, nil
+}
+
+// ListAuthorArticles feed outbox 回源：返回作者最近已发布文章的轻量投影（仅 id + published_at）。
+func (s *ArticleReaderServer) ListAuthorArticles(ctx context.Context, req *articlev1.ListAuthorArticlesRequest) (*articlev1.ListAuthorArticlesResponse, error) {
+	if req.GetAuthorId() <= 0 {
+		return nil, pkgerrs.New(400, "authorId 必须为正整数")
+	}
+	briefs, err := s.svc.ListAuthorBriefs(ctx, req.GetAuthorId(), int(req.GetLimit()))
+	if err != nil {
+		return nil, err
+	}
+	return &articlev1.ListAuthorArticlesResponse{Items: slicex.Map(briefs, toFeedArticleBriefPb)}, nil
+}
+
+func toFeedArticleBriefPb(b domain.ArticleBrief) *articlev1.FeedArticleBrief {
+	return &articlev1.FeedArticleBrief{Id: b.Id, PublishedAt: b.PublishedAt}
 }

@@ -3,7 +3,7 @@
 MODULE := github.com/boyxs/train-go/webook
 
 # 全部 12 个 module（叶子 + 服务）——verify 等逐模块操作用
-MODULES := api shared pkg internal chat comment interaction migrator relation worker tag search
+MODULES := api shared pkg internal chat comment interaction migrator relation worker tag search feed
 
 # 部署层入口：compose 文件 + .env.local 都在 ../deploy/（项目唯一真相源）
 # image 名 webook:local 与 docker-compose.local.yaml 对齐，pull_policy=never
@@ -80,7 +80,7 @@ verify: fmt-check
 # 不会再被空 GoFiles 目录绊倒（否则会在 injector 检测前的 detectOutputDir 阶段报
 # "no files to derive output directory from"、令整条命令退 1），现全成功退 0。末尾格式化。
 wire:
-	@for m in internal chat comment interaction migrator relation worker tag search; do \
+	@for m in internal chat comment interaction migrator relation worker tag search feed; do \
 		echo "→ wire $$m"; (cd $$m && wire ./...) || exit 1; \
 	done
 	@$(MAKE) fmt

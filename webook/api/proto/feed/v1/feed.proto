@@ -1,0 +1,66 @@
+syntax = "proto3";
+
+package webook.feed.v1;
+
+option go_package = "github.com/boyxs/train-go/webook/api/gen/feed/v1;feedv1";
+
+// FeedService 关注流：把「关注作者的已发布文章」按发布时间倒序聚合成信息流。
+// 纯同步 gRPC：读由 core BFF 调用（鉴权后注入 uid），写由 worker 消费事件后派发。
+// 数据全在 Redis（收件箱 inbox / 发件箱 outbox 投影），无 MySQL；丢失可重建。
+service FeedService {
+  // ── 读（core BFF 调）────────────────────────────────────
+  rpc ListFeed(ListFeedRequest) returns (ListFeedResponse);
+  rpc NewCount(NewCountRequest) returns (NewCountResponse); // P1：自某游标以来的新文章数
+
+  // ── 写（worker 消费事件后派发）──────────────────────────
+  rpc FanoutArticle(FanoutArticleRequest) returns (FanoutArticleResponse);
+  rpc RemoveArticle(RemoveArticleRequest) returns (RemoveArticleResponse);
+  rpc InvalidateInboxes(InvalidateInboxesRequest) returns (InvalidateInboxesResponse);
+}
+
+// FeedItem 关注流条目：仅承载 id + 发布时间，正文/计数/标签由 core BFF 聚合。
+message FeedItem {
+  int64 article_id = 1;
+  int64 published_at = 2; // 发布时间（Unix 毫秒），既是排序 score 也是游标
+}
+
+// ListFeedRequest cursor<=0 取首页，按 published_at DESC。
+message ListFeedRequest {
+  int64 uid = 1;
+  int64 cursor = 2; // 上一批最后一条 published_at；<=0=首页
+  int32 limit = 3;
+}
+message ListFeedResponse {
+  repeated FeedItem items = 1;
+  int64 next_cursor = 2; // 下一页游标（本页最后一条 published_at）；has_more=false 时忽略
+  bool has_more = 3;
+}
+
+message NewCountRequest {
+  int64 uid = 1;
+  int64 since_cursor = 2; // 自此游标（published_at）以来
+}
+message NewCountResponse {
+  repeated int64 article_ids = 1; // since 游标以来的候选文章 id；可见性（撤回/软删过滤）由 core BFF 用 BatchDetail 判定
+}
+
+// FanoutArticle 文章发布后写扩散：普通作者写进粉丝 inbox，大 V 跳过（读时归并 outbox）。
+message FanoutArticleRequest {
+  int64 article_id = 1;
+  int64 author_id = 2;
+  int64 published_at = 3; // 事件 ts（Unix 毫秒）
+}
+message FanoutArticleResponse {}
+
+// RemoveArticle 文章撤回：仅 DEL 作者 outbox，inbox 靠读时过滤（BFF 查线上库天然滤掉）。
+message RemoveArticleRequest {
+  int64 article_id = 1;
+  int64 author_id = 2;
+}
+message RemoveArticleResponse {}
+
+// InvalidateInboxes 关系变更失效重建：DEL 这些用户的 inbox+bigv+built，下次读全量重建。
+message InvalidateInboxesRequest {
+  repeated int64 uids = 1;
+}
+message InvalidateInboxesResponse {}

@@ -49,6 +49,12 @@ scrape_configs:
     static_configs:
       - targets: ['localhost:8060']
 
+  # webook-feed 微服务（关注流，全 Redis 投影）
+  - job_name: 'webook-feed'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['localhost:8100']
+
   # webook-tag 微服务（标签，MySQL）
   - job_name: 'webook-tag'
     metrics_path: '/metrics'

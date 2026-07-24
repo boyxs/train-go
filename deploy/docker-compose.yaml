@@ -157,6 +157,31 @@ services:
       retries: 6
       start_period: 20s
 
+  # ── feed 服务（关注流，全 Redis 投影无 MySQL；core BFF 经 etcd gRPC 调读，worker 派发写扩散，不进 nginx） ──
+  webook-feed:
+    image: ${GHCR_REGISTRY:-ghcr.io}/${GH_USER}/webook-feed:${FEED_IMAGE_TAG}
+    container_name: webook-feed
+    restart: always
+    stop_grace_period: 30s   # > 应用优雅停机 drain(20s)
+    mem_limit: ${FEED_MEM:-256m}
+    environment:
+      APP_ENV: "${FEED_APP_ENV}"     # .env.<env> 指定 config/<env>.yaml
+      REDIS_PASS: "${REDIS_PASS}"
+      DEPLOY_ENV: "${DEPLOY_ENV}"
+      TZ: "Asia/Shanghai"
+      GOMEMLIMIT: "${FEED_GOMEMLIMIT:-224MiB}"
+      GOGC: "${FEED_GOGC:-80}"
+    depends_on:
+      webook-redis:   {condition: service_healthy}
+      webook-etcd:    {condition: service_started}   # gRPC server 启动即注册到 etcd（core/worker 经 etcd 解析调用）
+    healthcheck:
+      # /health 探活（feed/main.go 注册，HTTP :8100）；内部服务，不进 nginx upstream
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8100/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 20s
+
   # ── tag 服务（标签本体 + 打标签关联，MySQL；core BFF 经 etcd gRPC 调用，不进 nginx） ──
   webook-tag:
     image: ${GHCR_REGISTRY:-ghcr.io}/${GH_USER}/webook-tag:${TAG_IMAGE_TAG}

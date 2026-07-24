@@ -1,0 +1,158 @@
+apiVersion: 1
+
+# webook-feed 服务级告警（镜像 webook-relation.yml；feed 是纯 gRPC 后端，
+# 业务指标走 webook_grpc_requests_*，无 HTTP 业务流量，故错误率/P99 用 gRPC 表达式）
+# metric 命名空间统一 webook_*，service 区分靠 prometheus 注入的 job 标签
+groups:
+  - orgId: 1
+    name: webook-feed
+    folder: Webook
+    interval: 1m
+    rules:
+
+      # ── ① 服务存活 ────────────────────────────────────────
+      - uid: webook-feed-up
+        title: Webook Feed 服务不可达
+        condition: C
+        for: 1m
+        noDataState: NoData
+        execErrState: Error
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "Webook Feed 实例 {{ $labels.instance }} 不可达"
+          runbook_url: "https://wiki.internal/runbook/webook-feed-down"
+        data:
+          - refId: A
+            relativeTimeRange: { from: 60, to: 0 }
+            datasourceUid: prometheus
+            model:
+              expr: 'up{job="webook-feed"}'
+              refId: A
+              instant: true
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: lt, params: [1] }
+              refId: C
+
+      # ── ② gRPC 错误率 > 5%（非 OK code 占比） ──────────────
+      - uid: webook-feed-grpc-error-rate
+        title: Feed gRPC 错误率 > 5%
+        condition: C
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: high
+          team: backend
+        annotations:
+          summary: "Feed gRPC 错误率 {{ $values.B.Value | humanizePercentage }}"
+          runbook_url: "https://wiki.internal/runbook/webook-feed-grpc-error"
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              expr: 'sum(rate(webook_grpc_requests_total{job="webook-feed",type="server",code!="OK"}[5m])) / sum(rate(webook_grpc_requests_total{job="webook-feed",type="server"}[5m]))'
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [0.05] }
+              refId: C
+
+      # ── ③ gRPC P99 延迟 > 1s ──────────────────────────────
+      # feed 读路径含 rebuild（关注列表 × outbox 归并），P99 放宽到 1s 容忍首读重建
+      - uid: webook-feed-grpc-p99
+        title: Feed gRPC P99 延迟 > 1s
+        condition: C
+        for: 10m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: medium
+          team: backend
+        annotations:
+          summary: "Feed gRPC P99 延迟 {{ $values.B.Value }}s"
+          runbook_url: "https://wiki.internal/runbook/webook-feed-latency"
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              expr: 'histogram_quantile(0.99, sum(rate(webook_grpc_requests_duration_seconds_bucket{job="webook-feed",type="server"}[5m])) by (le))'
+              refId: A
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [1] }
+              refId: C
+
+      # ── ④ Goroutine 暴涨 ────────────────────────────────
+      - uid: webook-feed-goroutines
+        title: Feed Goroutine 数 > 10000
+        condition: C
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: high
+          team: backend
+        annotations:
+          summary: "Feed Goroutine 数 {{ $values.B.Value }}（疑似泄漏）"
+          runbook_url: "https://wiki.internal/runbook/goroutine-leak"
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: prometheus
+            model:
+              expr: 'go_goroutines{job="webook-feed"}'
+              refId: A
+              instant: true
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [10000] }
+              refId: C

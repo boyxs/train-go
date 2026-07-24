@@ -9,6 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 
+	"github.com/boyxs/train-go/webook/pkg/saramax"
+
 	interactionv1 "github.com/boyxs/train-go/webook/api/gen/interaction/v1"
 	"github.com/boyxs/train-go/webook/pkg/logger"
 	"github.com/boyxs/train-go/webook/worker/consumer/event"
@@ -102,4 +104,10 @@ func TestHandleBatch_ClientError(t *testing.T) {
 		{Type: "read", Biz: "article", BizId: 1},
 	})
 	assert.Error(t, err)
+}
+
+// 独立 group：构造时以基础 group 派生 -interaction 后缀（与 feed 两个消费者对称）。
+func TestNewInteractionConsumer_DerivesGroup(t *testing.T) {
+	c := NewInteractionConsumer(nil, &mockInterClient{}, saramax.GroupConfig{GroupId: "webook-worker"}, logger.NewNopLogger())
+	assert.Equal(t, "webook-worker-interaction", c.cfg.GroupId)
 }

@@ -6,8 +6,8 @@ import (
 	"github.com/IBM/sarama"
 	"github.com/spf13/viper"
 
+	"github.com/boyxs/train-go/webook/pkg/saramax"
 	"github.com/boyxs/train-go/webook/shared/confkey"
-	"github.com/boyxs/train-go/webook/worker/consumer"
 )
 
 // KafkaConfig 映射 yaml data.kafka 段（worker 只消费，不生产）。时间为 duration;缺省就地兜底。
@@ -39,11 +39,11 @@ func InitSaramaConfig(kc KafkaConfig) *sarama.Config {
 	return cfg
 }
 
-// InitConsumerConfig 就地兜底：退避 initial 5s / max 60s。
-func InitConsumerConfig(kc KafkaConfig) consumer.ConsumerConfig {
-	return consumer.ConsumerConfig{
+// InitGroupConfig 就地兜底：退避 initial 5s / max 60s。
+func InitGroupConfig(kc KafkaConfig) saramax.GroupConfig {
+	return saramax.GroupConfig{
 		Addrs:          kc.Addrs,
-		GroupID:        kc.ConsumerGroup,
+		GroupId:        kc.ConsumerGroup,
 		BackoffInitial: orDefaultDur(kc.ConsumerBackoffInit, 5*time.Second),
 		BackoffMax:     orDefaultDur(kc.ConsumerBackoffMax, 60*time.Second),
 	}

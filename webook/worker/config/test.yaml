@@ -16,6 +16,9 @@ client:
     webook-interaction:
       target: "etcd:///service/webook-interaction"
       balancer: "breaker_swrr"
+    webook-feed:
+      target: "etcd:///service/webook-feed"
+      balancer: "breaker_swrr"
 
 data:
   redis:
@@ -35,7 +38,7 @@ data:
     dial_timeout: 10s
     read_timeout: 10s
     write_timeout: 10s
-    consumer_group: "interaction-consumer-test"
+    consumer_group: "webook-worker"
     consumer_backoff_initial: 1s
     consumer_backoff_max: 10s
 

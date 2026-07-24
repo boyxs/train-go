@@ -3,32 +3,15 @@
 import { HomeOutlined, LoginOutlined, ReadOutlined } from '@ant-design/icons';
 import { Button, Space } from 'antd';
 import { useRouter } from 'next/navigation';
-import React, { useSyncExternalStore } from 'react';
+import React from 'react';
 
-import { tokenUtil } from '@/utils/token';
-
-function subscribe(cb: () => void) {
-  window.addEventListener('storage', cb);
-  return () => window.removeEventListener('storage', cb);
-}
-
-// 空订阅：仅用于「是否已在客户端 hydrate」判断（不监听任何外部源）
-const noopSubscribe = () => () => {};
+import { useLoggedIn } from '@/hooks/useLoggedIn';
 
 export const PublicHeader: React.FC = () => {
   const router = useRouter();
-  const loggedIn = useSyncExternalStore(
-    subscribe,
-    () => tokenUtil.hasToken(),
-    () => false,
-  );
-  // localStorage 只在客户端可读：hydrate 前不渲染登录态按钮，避免已登录用户闪现「注册/登录」
-  // 用 useSyncExternalStore（server/首帧=false，hydrate 后=true）而非 setState-in-effect
-  const hydrated = useSyncExternalStore(
-    noopSubscribe,
-    () => true,
-    () => false,
-  );
+  // SSR 安全登录态：hydrate 前 loggedIn=false 且不读 localStorage；hydrated 供 hydrate 前占位，
+  // 避免已登录用户闪现「注册/登录」。
+  const { loggedIn, hydrated } = useLoggedIn();
 
   return (
     <header className='shrink-0 flex items-center justify-between bg-white px-4 md:px-6 py-3 border-b border-gray-100'>

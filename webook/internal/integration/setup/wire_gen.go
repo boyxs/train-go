@@ -60,7 +60,8 @@ func InitWebServer() *gin.Engine {
 	articleReaderRepository := repository.NewCacheArticleReaderRepository(articleReaderDAO, articleReaderNewDAO, articleCache, switchReader, dualWriter, taskName, loggerX)
 	articleSearchService := newFakeSearchService()
 	tagService := newFakeTagService()
-	articleAuthorService := service.NewInternalArticleAuthorService(articleAuthorRepository, articleReaderRepository, articleSearchService, tagService, loggerX)
+	articleEventProducer := NewFakeArticleEventProducer()
+	articleAuthorService := service.NewInternalArticleAuthorService(articleAuthorRepository, articleReaderRepository, articleSearchService, tagService, articleEventProducer, loggerX)
 	interactionService := newFakeInteractionService()
 	articleAuthorHandler := web.NewInternalArticleAuthorHandler(articleAuthorService, interactionService, loggerX)
 	commentServiceClient := provideNilCommentClient()
@@ -88,7 +89,8 @@ func InitWebServer() *gin.Engine {
 	commentService := service.NewGRPCCommentService(commentServiceClient, interactionService, userService, loggerX)
 	commentHandler := web.NewInternalCommentHandler(commentService)
 	relationHandler := provideTestRelationHandler(userService, loggerX)
-	engine := ioc.InitWebServer(v, userHandler, articleAuthorHandler, articleReaderHandler, interactionHandler, oAuth2Handler, articleSearchHandler, tagHandler, clickEventHandler, articlePolishHandler, rankingHandler, commentHandler, relationHandler)
+	feedHandler := provideTestFeedHandler(loggerX)
+	engine := ioc.InitWebServer(v, userHandler, articleAuthorHandler, articleReaderHandler, interactionHandler, oAuth2Handler, articleSearchHandler, tagHandler, clickEventHandler, articlePolishHandler, rankingHandler, commentHandler, relationHandler, feedHandler)
 	return engine
 }
 
@@ -107,7 +109,8 @@ func InitArticleAuthorHandler() web.ArticleAuthorHandler {
 	articleReaderRepository := repository.NewCacheArticleReaderRepository(articleReaderDAO, articleReaderNewDAO, articleCache, switchReader, dualWriter, taskName, loggerX)
 	articleSearchService := newFakeSearchService()
 	tagService := newFakeTagService()
-	articleAuthorService := service.NewInternalArticleAuthorService(articleAuthorRepository, articleReaderRepository, articleSearchService, tagService, loggerX)
+	articleEventProducer := NewFakeArticleEventProducer()
+	articleAuthorService := service.NewInternalArticleAuthorService(articleAuthorRepository, articleReaderRepository, articleSearchService, tagService, articleEventProducer, loggerX)
 	interactionService := newFakeInteractionService()
 	articleAuthorHandler := web.NewInternalArticleAuthorHandler(articleAuthorService, interactionService, loggerX)
 	return articleAuthorHandler
@@ -183,6 +186,12 @@ func provideTestRelationHandler(userSvc service.UserService, l logger.LoggerX) w
 	return web.NewInternalRelationHandler(service.NewGRPCRelationService(nil, userSvc, nil, l))
 }
 
+// provideTestFeedHandler：集成测试不拉起 feed / comment gRPC server，用 nil 下游依赖构造（现有用例不触达 /feed/*）。
+// nil 内联（不出现在 wire_gen 签名）→ wire_gen 无需 import feed/comment proto 包。
+func provideTestFeedHandler(l logger.LoggerX) web.FeedHandler {
+	return web.NewInternalFeedHandler(service.NewGRPCFeedService(nil, nil, nil, nil, nil, nil, l))
+}
+
 // provideTestMiddlewares 与 ioc.InitMiddlewares 同结构，但 metrics 走独立 Registry，
 // 避免每个集成测试 SetupSuite 调 InitWebServer 时 DefaultRegisterer.MustRegister 重复 panic。
 // 省略 cors / 限流 / logger（httptest 无 cross-origin、不需限流、避免输出污染）。
@@ -221,7 +230,7 @@ var searchSvcProvider = wire.NewSet(
 	newFakeTagService,
 )
 
-var articleSvcProvider = wire.NewSet(dao.NewGormArticleAuthorDAO, dao.NewGormArticleReaderDAO, dao.NewGormArticleReaderNewDAO, cache.NewRedisArticleCache, repository.NewCacheArticleAuthorRepository, repository.NewCacheArticleReaderRepository, service.NewInternalArticleAuthorService, service.NewInternalArticleReaderService, ioc.InitMigratorSDKSwitchReader, ioc.InitMigratorSDKDualWriter, ioc.InitMigratorSDKTaskName, interactionSvcProvider,
+var articleSvcProvider = wire.NewSet(dao.NewGormArticleAuthorDAO, dao.NewGormArticleReaderDAO, dao.NewGormArticleReaderNewDAO, cache.NewRedisArticleCache, repository.NewCacheArticleAuthorRepository, repository.NewCacheArticleReaderRepository, service.NewInternalArticleAuthorService, service.NewInternalArticleReaderService, NewFakeArticleEventProducer, ioc.InitMigratorSDKSwitchReader, ioc.InitMigratorSDKDualWriter, ioc.InitMigratorSDKTaskName, interactionSvcProvider,
 	searchSvcProvider,
 )
 
