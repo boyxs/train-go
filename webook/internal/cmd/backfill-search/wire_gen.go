@@ -25,13 +25,13 @@ func InitSearchBackfiller() (*SearchBackfiller, func(), error) {
 		return nil, nil, err
 	}
 	prometheusBuilder := ioc.InitGRPCMetrics()
-	searchConn, cleanup2, err := ioc.InitSearchConn(client, prometheusBuilder)
+	searchConn, cleanup2, err := ioc.InitSearchConn(client, prometheusBuilder, loggerX)
 	if err != nil {
 		cleanup()
 		return nil, nil, err
 	}
 	searchServiceClient := ioc.InitSearchClient(searchConn)
-	tagConn, cleanup3, err := ioc.InitTagConn(client, prometheusBuilder)
+	tagConn, cleanup3, err := ioc.InitTagConn(client, prometheusBuilder, loggerX)
 	if err != nil {
 		cleanup2()
 		cleanup()

@@ -35,15 +35,27 @@ func main() {
 	app.Cron.Start()
 	log.Println("[worker] cron 已启动")
 
-	// Kafka 消费者：read 事件 → interaction gRPC，自管连接，启动不依赖 Kafka。
-	// consumerDone 让停机阶段能等它退出，避免 cleanup 关 interaction 连接时撞在途 IncrReadCount。
-	consumerDone := make(chan struct{})
-	go func() {
-		defer close(consumerDone)
-		if err := app.Consumer.Start(ctx); err != nil {
-			log.Printf("[worker][consumer] exited: %v", err)
-		}
-	}()
+	// Kafka 消费者：read→interaction、article/relation→feed，自管连接，启动不依赖 Kafka。
+	// 各自 done channel 让停机阶段能等其退出，避免 cleanup 关下游 gRPC 连接时撞在途 RPC。
+	consumers := []struct {
+		name  string
+		start func(context.Context) error
+	}{
+		{"interaction", app.Consumer.Start},
+		{"feed-article", app.FeedArticleConsumer.Start},
+		{"feed-relation", app.FeedRelationConsumer.Start},
+	}
+	consumerDones := make([]chan struct{}, len(consumers))
+	for i, c := range consumers {
+		done := make(chan struct{})
+		consumerDones[i] = done
+		go func(name string, start func(context.Context) error, done chan struct{}) {
+			defer close(done)
+			if err := start(ctx); err != nil {
+				log.Printf("[worker][consumer:%s] exited: %v", name, err)
+			}
+		}(c.name, c.start, done)
+	}
 
 	// 最小 HTTP：/metrics + /health
 	httpAddr := viper.GetString(confkey.ServerHTTPAddr)
@@ -61,11 +73,17 @@ func main() {
 	<-ctx.Done()
 	log.Println("[worker][shutdown] 收到信号，开始优雅停机…")
 	<-app.Cron.Stop().Done() // 等 in-flight cron 跑完
-	// 等消费者 goroutine 退出（ctx 取消后 Start 跳出消费循环）再 cleanup：
-	// 否则 cleanup 关 interaction gRPC 连接会撞上在途的 handleBatch→IncrReadCount。
-	// 有界等待，极端卡死不无限阻塞停机。
+	// 等所有消费者 goroutine 退出（ctx 取消后 Start 跳出消费循环）再 cleanup：
+	// 否则 cleanup 关下游 gRPC 连接会撞上在途的 handleBatch→RPC。有界等待，极端卡死不无限阻塞停机。
+	consumersDrained := make(chan struct{})
+	go func() {
+		for _, done := range consumerDones {
+			<-done
+		}
+		close(consumersDrained)
+	}()
 	select {
-	case <-consumerDone:
+	case <-consumersDrained:
 	case <-time.After(10 * time.Second):
 		log.Println("[worker][shutdown] 消费者退出超时，强制继续")
 	}

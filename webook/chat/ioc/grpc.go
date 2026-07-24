@@ -8,7 +8,9 @@ import (
 
 	"github.com/boyxs/train-go/webook/pkg/grpcx"
 	"github.com/boyxs/train-go/webook/pkg/grpcx/interceptor/errconv"
+	"github.com/boyxs/train-go/webook/pkg/grpcx/interceptor/logging"
 	"github.com/boyxs/train-go/webook/pkg/grpcx/interceptor/metrics"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 
 	articlev1 "github.com/boyxs/train-go/webook/api/gen/article/v1"
 	interactionv1 "github.com/boyxs/train-go/webook/api/gen/interaction/v1"
@@ -27,14 +29,18 @@ type CoreConn struct{ *grpc.ClientConn }
 
 // InitCoreConn 拨号 webook-core(grpc.client.webook-core,默认 etcd:///service/webook-core)。
 // article-reader 工具走这里；search 已拆独立服务见 InitSearchConn，interaction 见 InitInteractionConn。
-func InitCoreConn(client *etcdv3.Client, grpcMetrics *metrics.PrometheusBuilder) (CoreConn, func(), error) {
+func InitCoreConn(client *etcdv3.Client, grpcMetrics *metrics.PrometheusBuilder, l logger.LoggerX) (CoreConn, func(), error) {
 	cfg, err := clientConfig("webook-core")
 	if err != nil {
 		return CoreConn{}, nil, err
 	}
 	conn, cleanup, err := grpcx.NewClient(client, cfg,
 		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
-		grpc.WithChainUnaryInterceptor(grpcMetrics.BuildUnaryClient(), errconv.UnaryClientInterceptor()),
+		grpc.WithChainUnaryInterceptor(
+			grpcMetrics.BuildUnaryClient(),
+			logging.NewInterceptorBuilder(l).BuildUnaryClient(),
+			errconv.UnaryClientInterceptor(),
+		),
 	)
 	if err != nil {
 		return CoreConn{}, nil, err
@@ -46,14 +52,18 @@ func InitCoreConn(client *etcdv3.Client, grpcMetrics *metrics.PrometheusBuilder)
 type InteractionConn struct{ *grpc.ClientConn }
 
 // InitInteractionConn 拨号 webook-interaction(grpc.client.webook-interaction,默认 etcd:///service/webook-interaction)。
-func InitInteractionConn(client *etcdv3.Client, grpcMetrics *metrics.PrometheusBuilder) (InteractionConn, func(), error) {
+func InitInteractionConn(client *etcdv3.Client, grpcMetrics *metrics.PrometheusBuilder, l logger.LoggerX) (InteractionConn, func(), error) {
 	cfg, err := clientConfig("webook-interaction")
 	if err != nil {
 		return InteractionConn{}, nil, err
 	}
 	conn, cleanup, err := grpcx.NewClient(client, cfg,
 		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
-		grpc.WithChainUnaryInterceptor(grpcMetrics.BuildUnaryClient(), errconv.UnaryClientInterceptor()),
+		grpc.WithChainUnaryInterceptor(
+			grpcMetrics.BuildUnaryClient(),
+			logging.NewInterceptorBuilder(l).BuildUnaryClient(),
+			errconv.UnaryClientInterceptor(),
+		),
 	)
 	if err != nil {
 		return InteractionConn{}, nil, err
@@ -74,14 +84,18 @@ func clientConfig(name string) (grpcx.ClientConfig, error) {
 type SearchConn struct{ *grpc.ClientConn }
 
 // InitSearchConn 拨号 webook-search(grpc.client.webook-search,默认 etcd:///service/webook-search)。拦截链与 CoreConn 对称。
-func InitSearchConn(client *etcdv3.Client, grpcMetrics *metrics.PrometheusBuilder) (SearchConn, func(), error) {
+func InitSearchConn(client *etcdv3.Client, grpcMetrics *metrics.PrometheusBuilder, l logger.LoggerX) (SearchConn, func(), error) {
 	cfg, err := clientConfig("webook-search")
 	if err != nil {
 		return SearchConn{}, nil, err
 	}
 	conn, cleanup, err := grpcx.NewClient(client, cfg,
 		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
-		grpc.WithChainUnaryInterceptor(grpcMetrics.BuildUnaryClient(), errconv.UnaryClientInterceptor()),
+		grpc.WithChainUnaryInterceptor(
+			grpcMetrics.BuildUnaryClient(),
+			logging.NewInterceptorBuilder(l).BuildUnaryClient(),
+			errconv.UnaryClientInterceptor(),
+		),
 	)
 	if err != nil {
 		return SearchConn{}, nil, err

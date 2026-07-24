@@ -12,61 +12,29 @@ import (
 	"github.com/boyxs/train-go/webook/worker/consumer/event"
 )
 
-// ConsumerConfig 互动事件消费配置。
-type ConsumerConfig struct {
-	Addrs          []string
-	GroupID        string
-	BackoffInitial time.Duration
-	BackoffMax     time.Duration
-}
-
 // InteractionConsumer 消费 read 事件 → 调 interaction gRPC 累加阅读数（调度器只派发，不持数据）。
 // 自管连接：Start 内无限退避重连，启动不依赖 Kafka 实例就绪。
 type InteractionConsumer struct {
 	saramaCfg   *sarama.Config
 	interClient interactionv1.InteractionServiceClient
-	cfg         ConsumerConfig
+	cfg         saramax.GroupConfig
 	l           logger.LoggerX
 }
 
 func NewInteractionConsumer(
 	saramaCfg *sarama.Config,
 	interClient interactionv1.InteractionServiceClient,
-	cfg ConsumerConfig,
+	cfg saramax.GroupConfig,
 	l logger.LoggerX,
 ) *InteractionConsumer {
+	cfg.GroupId += "-interaction" // 独立 group（与 feed-article / feed-relation 对称派生）
 	return &InteractionConsumer{saramaCfg: saramaCfg, interClient: interClient, cfg: cfg, l: l}
 }
 
 func (c *InteractionConsumer) Start(ctx context.Context) error {
 	handler := saramax.NewBatchConsumer[event.InteractionEvent](c.handleBatch, 10, time.Second, c.l)
-	backoff := c.cfg.BackoffInitial
-	if backoff <= 0 {
-		backoff = time.Second
-	}
-	for ctx.Err() == nil {
-		group, err := sarama.NewConsumerGroup(c.cfg.Addrs, c.cfg.GroupID, c.saramaCfg)
-		if err != nil {
-			c.l.Warn(ctx, "连接 Kafka 失败，后台重试",
-				logger.String("backoff", backoff.String()), logger.Error(err))
-			if !sleep(ctx, backoff) {
-				return nil
-			}
-			backoff = grow(backoff, c.cfg.BackoffMax)
-			continue
-		}
-		backoff = c.cfg.BackoffInitial
-		for ctx.Err() == nil {
-			if err = group.Consume(ctx, []string{event.TopicInteractionEvents}, handler); err != nil {
-				c.l.Warn(ctx, "消费互动事件出错，重连", logger.Error(err))
-				break
-			}
-		}
-		if closeErr := group.Close(); closeErr != nil {
-			c.l.Warn(ctx, "关闭消费者组出错", logger.Error(closeErr))
-		}
-	}
-	return nil
+	return saramax.RunGroup(ctx, c.cfg, c.saramaCfg, c.l, "interaction",
+		[]string{event.TopicInteractionEvents}, handler)
 }
 
 // handleBatch ctx 已带 Kafka header 里的 trace context，下游 gRPC span 自动挂上。
@@ -98,20 +66,4 @@ func (c *InteractionConsumer) handleBatch(ctx context.Context, _ []*sarama.Consu
 	}
 	_, err := c.interClient.BatchIncrReadCount(ctx, &interactionv1.BatchIncrReadCountRequest{Items: items})
 	return err
-}
-
-func sleep(ctx context.Context, d time.Duration) bool {
-	select {
-	case <-ctx.Done():
-		return false
-	case <-time.After(d):
-		return true
-	}
-}
-
-func grow(d, max time.Duration) time.Duration {
-	if d *= 2; d > max {
-		return max
-	}
-	return d
 }

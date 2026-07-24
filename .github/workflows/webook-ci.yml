@@ -1,0 +1,280 @@
+name: Webook CI
+
+# 分支 push / PR 的持续集成：检测受影响服务 → 只对它们跑 lint/test，push 时构建滚动镜像。
+# 版本 tag（webook-<svc>-v*）的语义化镜像不在这里，由 webook-release.yml 负责。
+
+on:
+  push:
+    # 合并到 main、推送 feature 分支时触发
+    branches: [main, 'feature/**']
+  pull_request:
+    # 面向 main 的 PR 触发（只跑校验，不推镜像）
+    branches: [main]
+  # 允许在 Actions 页手动触发（调试用）
+  workflow_dispatch:
+
+# 默认最小权限（只读仓库）；需要推镜像的 job 各自提权 packages: write
+permissions:
+  contents: read
+
+concurrency:
+  # 同一分支/PR 的并发 run 归一组
+  group: ci-${{ github.ref }}
+  # 新 push 到来时取消同组旧 run，省 runner
+  cancel-in-progress: true
+
+env:
+  # 镜像仓库（GitHub Container Registry）
+  REGISTRY: ghcr.io
+  # goimports -local 的本地包前缀（分组 import 用）
+  MODULE: github.com/boyxs/train-go/webook
+  # 禁止 CI 改 go.mod/go.sum，依赖漂移必须本地先提交
+  GOFLAGS: "-mod=readonly"
+
+jobs:
+  # ── 检测受影响服务：一次 diff 算出这次改动碰了哪些服务 ──────────────
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      # 受影响的 Go 服务名 JSON 数组，如 ["feed","core"]；'[]' 表示无
+      go: ${{ steps.golist.outputs.services }}
+      # 前端是否受影响：'true' / 'false'
+      fe: ${{ steps.f.outputs.fe }}
+    steps:
+      # 拉代码（dorny 需要工作区算文件 diff）
+      - uses: actions/checkout@v5
+      # dorny/paths-filter：按 filters 归类改动文件，输出命中列表（steps.f.outputs.changes）
+      - uses: dorny/paths-filter@v3
+        id: f
+        with:
+          filters: |
+            # _shared 锚点：Go 各服务共享的编译输入（proto 生成码 / 公共库 / 共享常量 / workspace 定义 / 本 CI 文件）；任一变更 → 所有 Go 服务都要重测
+            _shared: &shared
+              - 'webook/api/**'
+              - 'webook/pkg/**'
+              - 'webook/shared/**'
+              - 'webook/go.work'
+              - 'webook/go.work.sum'
+              - '.github/workflows/webook-ci.yml'
+            # 每个 Go 服务 = 共享(*shared) + 自身目录；命中即进 matrix。dorny 会展平锚点。
+            # core 代码目录是 internal（目录名≠服务名），其余服务目录同名。
+            core:
+              - *shared
+              - 'webook/internal/**'
+            chat:
+              - *shared
+              - 'webook/chat/**'
+            comment:
+              - *shared
+              - 'webook/comment/**'
+            interaction:
+              - *shared
+              - 'webook/interaction/**'
+            migrator:
+              - *shared
+              - 'webook/migrator/**'
+            relation:
+              - *shared
+              - 'webook/relation/**'
+            search:
+              - *shared
+              - 'webook/search/**'
+            tag:
+              - *shared
+              - 'webook/tag/**'
+            worker:
+              - *shared
+              - 'webook/worker/**'
+            feed:
+              - *shared
+              - 'webook/feed/**'
+            # 前端独立树，不依赖 Go 共享
+            fe:
+              - 'webook-fe/**'
+              - '.github/workflows/webook-ci.yml'
+      # 从 dorny 命中列表去掉非服务项（_shared 锚点键 / fe），得到纯 Go 服务数组喂给 matrix
+      - name: Collect affected Go services
+        id: golist
+        run: |
+          services=$(echo '${{ steps.f.outputs.changes }}' | jq -c 'map(select(. != "fe" and . != "_shared"))')
+          echo "services=$services" >> "$GITHUB_OUTPUT"
+          echo "affected: go=$services fe=${{ steps.f.outputs.fe }}"
+
+  # ── Go 服务校验：受影响服务并行跑 import 检查 / vet / 单测 ──────────
+  go-lint-test:
+    needs: detect
+    # 无 Go 服务受影响则整个 job 跳过
+    if: needs.detect.outputs.go != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      # 一个服务失败不牵连取消其它服务的校验
+      fail-fast: false
+      matrix:
+        # 按 detect 输出动态展开，每服务一个并行 job
+        service: ${{ fromJSON(needs.detect.outputs.go) }}
+    defaults:
+      run:
+        # 所有 run 步骤的工作目录（go.work 所在）
+        working-directory: webook
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.25.6'
+          # 开启模块缓存
+          cache: true
+          # 以各模块 go.sum 为缓存 key
+          cache-dependency-path: webook/**/go.sum
+      # 服务名 → 代码目录：仅 core 特殊（→internal），其余同名
+      - name: Map service to dir
+        id: d
+        run: |
+          svc="${{ matrix.service }}"; [ "$svc" = core ] && dir=internal || dir="$svc"
+          echo "dir=$dir" >> "$GITHUB_OUTPUT"
+      # 命中 setup-go 缓存则跳过安装
+      - name: Install goimports
+        run: test -x "$(go env GOPATH)/bin/goimports" || go install golang.org/x/tools/cmd/goimports@v0.26.0
+      # -l 只列不合规文件；非空即失败并提示本地修复命令
+      - name: Check import order
+        run: |
+          DIFF=$(goimports -local "$MODULE" -l ./${{ steps.d.outputs.dir }} ./api ./pkg)
+          if [ -n "$DIFF" ]; then
+            echo "import not sorted; run locally: goimports -local $MODULE -w ."; echo "$DIFF"; exit 1
+          fi
+          echo "import order OK"
+      # 静态检查：本服务 + 共享
+      - name: go vet
+        run: go vet ./${{ steps.d.outputs.dir }}/... ./api/... ./pkg/...
+      # 排除 integration（需真中间件）；main 分支加 -race 抓并发 bug
+      - name: Unit tests
+        run: |
+          PKGS=$(go list ./${{ steps.d.outputs.dir }}/... ./api/... ./pkg/... | grep -v /integration)
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then go test -race $PKGS; else go test $PKGS; fi
+
+  # ── Go 服务滚动镜像：仅 push 时给受影响服务出 main-latest / <sha> ────
+  go-image:
+    # 校验过才构建
+    needs: [detect, go-lint-test]
+    # PR 不推镜像；无受影响服务则跳过
+    if: github.event_name == 'push' && needs.detect.outputs.go != '[]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # 推 GHCR 需要包写权限
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJSON(needs.detect.outputs.go) }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Map service to dir
+        id: d
+        run: |
+          svc="${{ matrix.service }}"; [ "$svc" = core ] && dir=internal || dir="$svc"
+          echo "dir=$dir" >> "$GITHUB_OUTPUT"
+      # 生成滚动镜像 tag：main→main-latest+main-<sha>，feature→feature-<sha>；语义化版本走 release
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/webook-${{ matrix.service }}
+          tags: |
+            type=raw,value=main-latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=main-${{ github.sha }},enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=feature-${{ github.sha }},enable=${{ startsWith(github.ref, 'refs/heads/feature/') }}
+      # 启用 buildx（多阶段构建 + gha 缓存）
+      - uses: docker/setup-buildx-action@v3
+      # 登录 GHCR（用 Actions 自带 token，无需额外密钥）
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build & push
+        uses: docker/build-push-action@v5
+        with:
+          # 构建上下文（go.work 仓根，Dockerfile 内 GOWORK=off 单模块构建）
+          context: webook
+          file: webook/${{ steps.d.outputs.dir }}/Dockerfile
+          push: true
+          # 上一步生成的 tag 列表
+          tags: ${{ steps.meta.outputs.tags }}
+          # 注入构建版本（Dockerfile ldflag → 日志 service.version）
+          build-args: |
+            VERSION=${{ github.sha }}
+          # 关 provenance/sbom attestation，产纯 manifest（老 docker-compose 解析 OCI index 会报 manifest unknown）
+          provenance: false
+          sbom: false
+          # 复用 GitHub Actions 层缓存，scope 按服务隔离互不覆盖
+          cache-from: type=gha,scope=webook-${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=webook-${{ matrix.service }}
+
+  # ── 前端校验：lint / 类型检查 / 构建 ────────────────────────────────
+  fe-lint-build:
+    needs: detect
+    if: needs.detect.outputs.fe == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: webook-fe
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          # 开启 npm 缓存
+          cache: 'npm'
+          cache-dependency-path: webook-fe/package-lock.json
+      # 按 lockfile 干净安装（--no-audit/--no-fund 去噪提速）
+      - name: Install deps
+        run: npm ci --no-audit --no-fund
+      - name: ESLint
+        run: npm run lint
+      # 只做类型检查、不产物
+      - name: Type check
+        run: npx tsc --noEmit
+      # 构建验证（编译通过即可；真实 API 地址由部署环境注入）
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_BASE_URL: /api
+
+  # ── 前端滚动镜像：仅 push ───────────────────────────────────────────
+  fe-image:
+    needs: [detect, fe-lint-build]
+    if: github.event_name == 'push' && needs.detect.outputs.fe == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v5
+      # tag 规则同 Go（滚动 tag；语义化版本走 release）
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/webook-fe
+          tags: |
+            type=raw,value=main-latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=main-${{ github.sha }},enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=feature-${{ github.sha }},enable=${{ startsWith(github.ref, 'refs/heads/feature/') }}
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build & push
+        uses: docker/build-push-action@v5
+        with:
+          # 前端独立上下文
+          context: webook-fe
+          file: webook-fe/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          provenance: false
+          sbom: false
+          cache-from: type=gha,scope=webook-fe
+          cache-to: type=gha,mode=max,scope=webook-fe

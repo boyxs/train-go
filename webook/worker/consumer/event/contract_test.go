@@ -7,7 +7,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	corearticleevt "github.com/boyxs/train-go/webook/internal/events/article"
 	coreevt "github.com/boyxs/train-go/webook/internal/events/interaction"
+	corerelationevt "github.com/boyxs/train-go/webook/internal/events/relation"
 	workerevt "github.com/boyxs/train-go/webook/worker/consumer/event"
 )
 
@@ -45,4 +47,73 @@ func TestInteractionEventContract_RoundTripLossless(t *testing.T) {
 	assert.Equal(t, produced.Type, consumed.Type)
 	assert.Equal(t, produced.Biz, consumed.Biz)
 	assert.Equal(t, produced.BizId, consumed.BizId)
+}
+
+// ── article_events 契约（feed 写扩散/移除）──────────────────────────────
+
+func TestArticleEventContract_TopicMatches(t *testing.T) {
+	assert.Equal(t, corearticleevt.TopicArticleEvents, workerevt.TopicArticleEvents,
+		"core 生产 topic 与 worker 消费 topic 漂移")
+}
+
+func TestArticleEventContract_CanonicalWireFormat(t *testing.T) {
+	const canonical = `{"type":"published","articleId":1001,"authorId":7,"ts":1770000000000}`
+
+	coreJSON, err := json.Marshal(corearticleevt.ArticleEvent{
+		Type: corearticleevt.TypePublished, ArticleId: 1001, AuthorId: 7, Ts: 1770000000000,
+	})
+	require.NoError(t, err)
+	assert.JSONEq(t, canonical, string(coreJSON), "core article 事件线格式漂移")
+
+	workerJSON, err := json.Marshal(workerevt.ArticleEvent{
+		Type: workerevt.ArticleTypePublished, ArticleId: 1001, AuthorId: 7, Ts: 1770000000000,
+	})
+	require.NoError(t, err)
+	assert.JSONEq(t, canonical, string(workerJSON), "worker article 事件线格式漂移")
+}
+
+func TestArticleEventContract_RoundTripLossless(t *testing.T) {
+	produced := corearticleevt.ArticleEvent{Type: corearticleevt.TypeWithdrawn, ArticleId: 42, AuthorId: 9, Ts: 123}
+	data, err := json.Marshal(produced)
+	require.NoError(t, err)
+	var consumed workerevt.ArticleEvent
+	require.NoError(t, json.Unmarshal(data, &consumed), "worker 无法反序列化 core article 事件——契约漂移")
+	assert.Equal(t, produced.Type, consumed.Type)
+	assert.Equal(t, produced.ArticleId, consumed.ArticleId)
+	assert.Equal(t, produced.AuthorId, consumed.AuthorId)
+	assert.Equal(t, produced.Ts, consumed.Ts)
+}
+
+// ── relation_events 契约（feed 失效重建）──────────────────────────────
+
+func TestRelationEventContract_TopicMatches(t *testing.T) {
+	assert.Equal(t, corerelationevt.TopicRelationEvents, workerevt.TopicRelationEvents,
+		"core 生产 topic 与 worker 消费 topic 漂移")
+}
+
+func TestRelationEventContract_CanonicalWireFormat(t *testing.T) {
+	const canonical = `{"type":"block","followerId":7,"followeeId":8,"ts":1770000000000}`
+
+	coreJSON, err := json.Marshal(corerelationevt.RelationEvent{
+		Type: corerelationevt.TypeBlock, FollowerId: 7, FolloweeId: 8, Ts: 1770000000000,
+	})
+	require.NoError(t, err)
+	assert.JSONEq(t, canonical, string(coreJSON), "core relation 事件线格式漂移")
+
+	workerJSON, err := json.Marshal(workerevt.RelationEvent{
+		Type: workerevt.RelationTypeBlock, FollowerId: 7, FolloweeId: 8, Ts: 1770000000000,
+	})
+	require.NoError(t, err)
+	assert.JSONEq(t, canonical, string(workerJSON), "worker relation 事件线格式漂移")
+}
+
+func TestRelationEventContract_RoundTripLossless(t *testing.T) {
+	produced := corerelationevt.RelationEvent{Type: corerelationevt.TypeFollow, FollowerId: 3, FolloweeId: 5, Ts: 99}
+	data, err := json.Marshal(produced)
+	require.NoError(t, err)
+	var consumed workerevt.RelationEvent
+	require.NoError(t, json.Unmarshal(data, &consumed), "worker 无法反序列化 core relation 事件——契约漂移")
+	assert.Equal(t, produced.Type, consumed.Type)
+	assert.Equal(t, produced.FollowerId, consumed.FollowerId)
+	assert.Equal(t, produced.FolloweeId, consumed.FolloweeId)
 }

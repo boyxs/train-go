@@ -44,14 +44,14 @@ func InitApp() (App, func(), error) {
 		return App{}, nil, err
 	}
 	prometheusBuilder := ioc.InitGRPCMetrics()
-	searchConn, cleanup3, err := ioc.InitSearchConn(clientv3Client, prometheusBuilder)
+	searchConn, cleanup3, err := ioc.InitSearchConn(clientv3Client, prometheusBuilder, loggerX)
 	if err != nil {
 		cleanup2()
 		cleanup()
 		return App{}, nil, err
 	}
 	searchServiceClient := ioc.InitSearchClient(searchConn)
-	coreConn, cleanup4, err := ioc.InitCoreConn(clientv3Client, prometheusBuilder)
+	coreConn, cleanup4, err := ioc.InitCoreConn(clientv3Client, prometheusBuilder, loggerX)
 	if err != nil {
 		cleanup3()
 		cleanup2()
@@ -59,7 +59,7 @@ func InitApp() (App, func(), error) {
 		return App{}, nil, err
 	}
 	articleReaderServiceClient := ioc.InitArticleReaderClient(coreConn)
-	interactionConn, cleanup5, err := ioc.InitInteractionConn(clientv3Client, prometheusBuilder)
+	interactionConn, cleanup5, err := ioc.InitInteractionConn(clientv3Client, prometheusBuilder, loggerX)
 	if err != nil {
 		cleanup4()
 		cleanup3()

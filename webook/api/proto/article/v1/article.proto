@@ -11,6 +11,9 @@ service ArticleReaderService {
   // BatchGetArticles 批量按 id 取文章，避免下游（如 chat get_hot_articles）N+1 RPC。
   // NotFound 的 id 在结果中静默跳过，长度可能小于入参。
   rpc BatchGetArticles(BatchGetArticlesRequest) returns (BatchGetArticlesResponse);
+  // ListAuthorArticles 按作者取最近已发表文章的轻量投影（仅 id + 发布时间，不含正文/标题）。
+  // feed 服务 outbox 回源用，published_at 以 published_article.updated_at 近似（编辑重发置顶）。
+  rpc ListAuthorArticles(ListAuthorArticlesRequest) returns (ListAuthorArticlesResponse);
 }
 
 message GetArticleRequest {
@@ -29,4 +32,18 @@ message Article {
   int64 id = 1;
   string title = 2;
   string abstract = 3;
+}
+
+message ListAuthorArticlesRequest {
+  int64 author_id = 1;
+  int32 limit = 2; // 回源上限，对齐 feed outbox cap（默认 100）
+}
+message ListAuthorArticlesResponse {
+  repeated FeedArticleBrief items = 1;
+}
+
+// FeedArticleBrief 关注流回源的轻量文章：仅 id + 发布时间，刻意排除 title/abstract/content。
+message FeedArticleBrief {
+  int64 id = 1;
+  int64 published_at = 2; // 发布时间（Unix 毫秒）= published_article.updated_at
 }

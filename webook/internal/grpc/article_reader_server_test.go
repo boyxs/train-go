@@ -170,6 +170,49 @@ func TestArticleReaderServer_BatchGetArticles_TooMany(t *testing.T) {
 	assert.Equal(t, codes.InvalidArgument, status.Code(err))
 }
 
+func TestArticleReaderServer_ListAuthorArticles_Happy(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mockSvc := svcmocks.NewMockArticleReaderService(ctrl)
+	mockSvc.EXPECT().ListAuthorBriefs(gomock.Any(), int64(7), 100).Return([]domain.ArticleBrief{
+		{Id: 201, PublishedAt: 2010},
+		{Id: 101, PublishedAt: 1010},
+	}, nil)
+
+	conn := startBufServer(t, func(s *grpc.Server) {
+		articlev1.RegisterArticleReaderServiceServer(s, NewArticleReaderServer(mockSvc))
+	})
+	client := articlev1.NewArticleReaderServiceClient(conn)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	resp, err := client.ListAuthorArticles(ctx, &articlev1.ListAuthorArticlesRequest{AuthorId: 7, Limit: 100})
+	require.NoError(t, err)
+	require.Len(t, resp.GetItems(), 2)
+	assert.Equal(t, int64(201), resp.GetItems()[0].GetId())
+	assert.Equal(t, int64(2010), resp.GetItems()[0].GetPublishedAt())
+	assert.Equal(t, int64(101), resp.GetItems()[1].GetId())
+}
+
+func TestArticleReaderServer_ListAuthorArticles_InvalidAuthorId(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mockSvc := svcmocks.NewMockArticleReaderService(ctrl) // 不应触达 svc
+
+	conn := startBufServer(t, func(s *grpc.Server) {
+		articlev1.RegisterArticleReaderServiceServer(s, NewArticleReaderServer(mockSvc))
+	})
+	client := articlev1.NewArticleReaderServiceClient(conn)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	_, err := client.ListAuthorArticles(ctx, &articlev1.ListAuthorArticlesRequest{AuthorId: 0, Limit: 10})
+	require.Error(t, err)
+	assert.Equal(t, codes.InvalidArgument, status.Code(err))
+}
+
 func TestArticleReaderServer_GetArticle_Internal(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()

@@ -41,18 +41,27 @@ mockgen:
 	@cd internal && mockgen -source=./repository/cache/code.go -package=cachemocks -destination=./repository/cache/mocks/code_mock.go
 	@cd internal && mockgen -source=./repository/cache/click_event.go -package=cachemocks -destination=./repository/cache/mocks/click_event_mock.go
 	@cd internal && mockgen -source=./repository/cache/ranking.go -package=cachemocks -destination=./repository/cache/mocks/ranking_mock.go
+	#── internal（core：events 生产者）
+	@cd internal && mockgen -source=./events/article/producer.go -package=articleevtmocks -destination=./events/article/mocks/producer_mock.go
 	#── internal reflect-mode（外部 go-redis / 下游 gRPC client 接口）
 	@cd internal && mockgen -package=redismocks -destination=./repository/cache/redismocks/cmdable_mock.go github.com/redis/go-redis/v9 Cmdable
 	@cd internal && mockgen -destination=./web/grpcmocks/comment_mock.go -package=grpcmocks github.com/boyxs/train-go/webook/api/gen/comment/v1 CommentServiceClient
 	@cd internal && mockgen -destination=./web/grpcmocks/tag_mock.go -package=grpcmocks github.com/boyxs/train-go/webook/api/gen/tag/v1 TagServiceClient
 	@cd internal && mockgen -destination=./web/grpcmocks/search_mock.go -package=grpcmocks github.com/boyxs/train-go/webook/api/gen/search/v1 SearchServiceClient
+	@cd internal && mockgen -destination=./web/grpcmocks/feed_mock.go -package=grpcmocks github.com/boyxs/train-go/webook/api/gen/feed/v1 FeedServiceClient
 	#── comment（独立 gRPC 微服务：service + repository 接口）
 	@cd comment && mockgen -source=./service/comment.go -package=svcmocks -destination=./service/mocks/comment.mock.go
 	@cd comment && mockgen -source=./repository/comment.go -package=repomocks -destination=./repository/mocks/comment.mock.go
-	#── 各 module tidy（mock 依赖已在图中，通常无新增；tidy 触及的 3 个 module 保险）
+	#── feed（独立 gRPC 微服务：service + repository 接口 + 下游 relation/article gRPC client）
+	@cd feed && mockgen -source=./service/feed.go -package=svcmocks -destination=./service/mocks/feed.mock.go
+	@cd feed && mockgen -source=./repository/feed.go -package=repomocks -destination=./repository/mocks/feed.mock.go
+	@cd feed && mockgen -destination=./service/grpcmocks/relation.mock.go -package=grpcmocks github.com/boyxs/train-go/webook/api/gen/relation/v1 RelationServiceClient
+	@cd feed && mockgen -destination=./service/grpcmocks/article.mock.go -package=grpcmocks github.com/boyxs/train-go/webook/api/gen/article/v1 ArticleReaderServiceClient
+	#── 各 module tidy（mock 依赖已在图中，通常无新增；tidy 触及的 module 保险）
 	@cd internal && go mod tidy
 	@cd pkg && go mod tidy
 	@cd comment && go mod tidy
+	@cd feed && go mod tidy
 	#── 格式化生成文件 import 顺序，避免 CI goimports 校验失败
 	@$(MAKE) -f Makefile fmt
 

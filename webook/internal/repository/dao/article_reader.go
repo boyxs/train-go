@@ -14,6 +14,8 @@ type ArticleReaderDAO interface {
 	FindById(ctx context.Context, id int64) (PublishedArticle, error)
 	// FindByIds 一次性 IN 查询多条；返回的列表不保证顺序，调用方按 id 自行索引
 	FindByIds(ctx context.Context, ids []int64) ([]PublishedArticle, error)
+	// CountByIds 统计给定 id 中存在（未软删）的条数——feed 新内容提示按可见口径计数，免为「数个数」捞全字段
+	CountByIds(ctx context.Context, ids []int64) (int64, error)
 	Page(ctx context.Context, offset int, limit int) ([]PublishedArticle, error)
 	Count(ctx context.Context) (int64, error)
 	// PageByAuthor 某作者已发布文章分页（他人主页「TA 的文章」）
@@ -21,6 +23,9 @@ type ArticleReaderDAO interface {
 	CountByAuthor(ctx context.Context, uid int64) (int64, error)
 	// ListIdsByAuthor 取某作者全部已发布文章 id（用于聚合「获赞」总数），上限 1000
 	ListIdsByAuthor(ctx context.Context, uid int64) ([]int64, error)
+	// ListBriefByAuthor 某作者最近已发布文章的轻量投影（仅 id + updated_at，排除 Content BLOB），
+	// feed outbox 回源用，按 updated_at DESC 取 limit 条。
+	ListBriefByAuthor(ctx context.Context, authorId int64, limit int) ([]PublishedArticle, error)
 }
 
 // ArticleReaderNewDAO named type 让 wire 区分 OLD/NEW 两个 ArticleReaderDAO 实例。
@@ -76,6 +81,18 @@ func (d *GormArticleReaderDAO) FindByIds(ctx context.Context, ids []int64) ([]Pu
 	return articleList, err
 }
 
+// CountByIds 统计给定 id 中存在（未软删）的条数。Model 注入 softDelete 过滤（撤回=软删天然滤掉），
+// Table 给动态表名；只回一行 count，比 FindByIds 捞全字段轻得多（feed 新内容提示轮询用）。
+func (d *GormArticleReaderDAO) CountByIds(ctx context.Context, ids []int64) (int64, error) {
+	if len(ids) == 0 {
+		return 0, nil
+	}
+	var count int64
+	err := d.db.WithContext(ctx).Table(d.tableName).Model(&PublishedArticle{}).
+		Where("id IN ?", ids).Count(&count).Error
+	return count, err
+}
+
 func (d *GormArticleReaderDAO) Page(ctx context.Context, offset int, limit int) ([]PublishedArticle, error) {
 	var articles []PublishedArticle
 	err := d.db.WithContext(ctx).Table(d.tableName).
@@ -118,6 +135,18 @@ func (d *GormArticleReaderDAO) ListIdsByAuthor(ctx context.Context, uid int64) (
 		Order("id DESC").Limit(1000).
 		Pluck("id", &ids).Error
 	return ids, err
+}
+
+func (d *GormArticleReaderDAO) ListBriefByAuthor(ctx context.Context, authorId int64, limit int) ([]PublishedArticle, error) {
+	var articles []PublishedArticle
+	// 仅取 id + updated_at（排除 Content BLOB），按发布时间倒序。
+	err := d.db.WithContext(ctx).Table(d.tableName).
+		Select("id, updated_at").
+		Where("author_id = ?", authorId).
+		Order("updated_at DESC").
+		Limit(limit).
+		Find(&articles).Error
+	return articles, err
 }
 
 // PublishedArticle 线上库模型

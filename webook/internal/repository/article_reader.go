@@ -19,11 +19,15 @@ type ArticleReaderRepository interface {
 	FindById(ctx context.Context, id int64) (domain.Article, error)
 	// FindByIds 批量查；缓存命中部分 id 直接返回，剩余走 IN 查询 + 回填。结果按入参 ids 顺序返回，缺失 id 跳过
 	FindByIds(ctx context.Context, ids []int64) ([]domain.Article, error)
+	// CountByIds 统计给定 id 中可见（未撤回/软删）的条数（feed 新内容提示计数，免 FindByIds 捞全字段）
+	CountByIds(ctx context.Context, ids []int64) (int64, error)
 	Page(ctx context.Context, offset int, limit int) ([]domain.Article, int64, error)
 	// PageByAuthor 某作者已发布文章分页 + 总数（他人主页「TA 的文章」）
 	PageByAuthor(ctx context.Context, uid int64, offset int, limit int) ([]domain.Article, int64, error)
 	// ListIdsByAuthor 某作者全部已发布文章 id（聚合「获赞」总数）
 	ListIdsByAuthor(ctx context.Context, uid int64) ([]int64, error)
+	// ListBriefByAuthor 某作者最近已发布文章的轻量投影（feed outbox 回源），published_at=updated_at
+	ListBriefByAuthor(ctx context.Context, authorId int64, limit int) ([]domain.ArticleBrief, error)
 }
 
 // CacheArticleReaderRepository 线上库 Repository（含 migratorsdk 双写 / 切读）。
@@ -247,6 +251,27 @@ func (r *CacheArticleReaderRepository) PageByAuthor(ctx context.Context, uid int
 
 func (r *CacheArticleReaderRepository) ListIdsByAuthor(ctx context.Context, uid int64) ([]int64, error) {
 	return r.oldDAO.ListIdsByAuthor(ctx, uid)
+}
+
+// ListBriefByAuthor 始终走 oldDAO（同 ListIdsByAuthor/PageByAuthor 不切 SDK），不缓存（feed 侧另有 outbox 缓存）。
+func (r *CacheArticleReaderRepository) CountByIds(ctx context.Context, ids []int64) (int64, error) {
+	if len(ids) == 0 {
+		return 0, nil
+	}
+	// 计数不走缓存：直接 COUNT；按 ids[0] 路由 OLD/NEW，与 FindByIds 的迁移路由一致。
+	return r.daoBySide(r.chooseSide(ctx, ids[0])).CountByIds(ctx, ids)
+}
+
+func (r *CacheArticleReaderRepository) ListBriefByAuthor(ctx context.Context, authorId int64, limit int) ([]domain.ArticleBrief, error) {
+	rows, err := r.oldDAO.ListBriefByAuthor(ctx, authorId, limit)
+	if err != nil {
+		return nil, err
+	}
+	briefs := make([]domain.ArticleBrief, 0, len(rows))
+	for _, row := range rows {
+		briefs = append(briefs, domain.ArticleBrief{Id: row.Id, PublishedAt: row.UpdatedAt})
+	}
+	return briefs, nil
 }
 
 func (r *CacheArticleReaderRepository) toDomain(a dao.PublishedArticle) domain.Article {

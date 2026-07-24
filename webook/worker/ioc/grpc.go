@@ -9,8 +9,11 @@ import (
 
 	"github.com/boyxs/train-go/webook/pkg/grpcx"
 	"github.com/boyxs/train-go/webook/pkg/grpcx/interceptor/errconv"
+	"github.com/boyxs/train-go/webook/pkg/grpcx/interceptor/logging"
 	"github.com/boyxs/train-go/webook/pkg/grpcx/interceptor/metrics"
+	"github.com/boyxs/train-go/webook/pkg/logger"
 
+	feedv1 "github.com/boyxs/train-go/webook/api/gen/feed/v1"
 	interactionv1 "github.com/boyxs/train-go/webook/api/gen/interaction/v1"
 	rankingv1 "github.com/boyxs/train-go/webook/api/gen/ranking/v1"
 )
@@ -25,14 +28,18 @@ func InitGRPCMetrics() *metrics.PrometheusBuilder {
 type CoreConn struct{ *grpc.ClientConn }
 
 // InitCoreConn 拨号 webook-core（grpc.client.webook-core，默认 etcd:///service/webook-core）。
-func InitCoreConn(client *etcdv3.Client, grpcMetrics *metrics.PrometheusBuilder, tp trace.TracerProvider) (CoreConn, func(), error) {
+func InitCoreConn(client *etcdv3.Client, grpcMetrics *metrics.PrometheusBuilder, l logger.LoggerX, tp trace.TracerProvider) (CoreConn, func(), error) {
 	cfg, err := clientConfig("webook-core")
 	if err != nil {
 		return CoreConn{}, nil, err
 	}
 	conn, cleanup, err := grpcx.NewClient(client, cfg,
 		grpc.WithStatsHandler(otelgrpc.NewClientHandler(otelgrpc.WithTracerProvider(tp))),
-		grpc.WithChainUnaryInterceptor(grpcMetrics.BuildUnaryClient(), errconv.UnaryClientInterceptor()),
+		grpc.WithChainUnaryInterceptor(
+			grpcMetrics.BuildUnaryClient(),
+			logging.NewInterceptorBuilder(l).BuildUnaryClient(),
+			errconv.UnaryClientInterceptor(),
+		),
 	)
 	if err != nil {
 		return CoreConn{}, nil, err
@@ -44,19 +51,51 @@ func InitCoreConn(client *etcdv3.Client, grpcMetrics *metrics.PrometheusBuilder,
 type InteractionConn struct{ *grpc.ClientConn }
 
 // InitInteractionConn 拨号 webook-interaction（grpc.client.webook-interaction，默认 etcd:///service/webook-interaction）。
-func InitInteractionConn(client *etcdv3.Client, grpcMetrics *metrics.PrometheusBuilder, tp trace.TracerProvider) (InteractionConn, func(), error) {
+func InitInteractionConn(client *etcdv3.Client, grpcMetrics *metrics.PrometheusBuilder, l logger.LoggerX, tp trace.TracerProvider) (InteractionConn, func(), error) {
 	cfg, err := clientConfig("webook-interaction")
 	if err != nil {
 		return InteractionConn{}, nil, err
 	}
 	conn, cleanup, err := grpcx.NewClient(client, cfg,
 		grpc.WithStatsHandler(otelgrpc.NewClientHandler(otelgrpc.WithTracerProvider(tp))),
-		grpc.WithChainUnaryInterceptor(grpcMetrics.BuildUnaryClient(), errconv.UnaryClientInterceptor()),
+		grpc.WithChainUnaryInterceptor(
+			grpcMetrics.BuildUnaryClient(),
+			logging.NewInterceptorBuilder(l).BuildUnaryClient(),
+			errconv.UnaryClientInterceptor(),
+		),
 	)
 	if err != nil {
 		return InteractionConn{}, nil, err
 	}
 	return InteractionConn{conn}, cleanup, nil
+}
+
+// FeedConn 是到 webook-feed 的 gRPC 连接（feed 写扩散/失效重建走这里）。
+type FeedConn struct{ *grpc.ClientConn }
+
+// InitFeedConn 拨号 webook-feed（client.grpc.webook-feed，默认 etcd:///service/webook-feed）。
+func InitFeedConn(client *etcdv3.Client, grpcMetrics *metrics.PrometheusBuilder, l logger.LoggerX, tp trace.TracerProvider) (FeedConn, func(), error) {
+	cfg, err := clientConfig("webook-feed")
+	if err != nil {
+		return FeedConn{}, nil, err
+	}
+	conn, cleanup, err := grpcx.NewClient(client, cfg,
+		grpc.WithStatsHandler(otelgrpc.NewClientHandler(otelgrpc.WithTracerProvider(tp))),
+		grpc.WithChainUnaryInterceptor(
+			grpcMetrics.BuildUnaryClient(),
+			logging.NewInterceptorBuilder(l).BuildUnaryClient(),
+			errconv.UnaryClientInterceptor(),
+		),
+	)
+	if err != nil {
+		return FeedConn{}, nil, err
+	}
+	return FeedConn{conn}, cleanup, nil
+}
+
+// InitFeedClient feed 写扩散/移除/失效 → webook-feed。
+func InitFeedClient(c FeedConn) feedv1.FeedServiceClient {
+	return feedv1.NewFeedServiceClient(c)
 }
 
 // clientConfig 读 client.grpc.<name>（target/balancer/…）;target 必填,缺失 → dial 失败,代码不派生。

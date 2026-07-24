@@ -7,6 +7,7 @@ import (
 	"github.com/google/wire"
 	"github.com/redis/go-redis/v9"
 
+	articleevt "github.com/boyxs/train-go/webook/internal/events/article"
 	intrevt "github.com/boyxs/train-go/webook/internal/events/interaction"
 	relationevt "github.com/boyxs/train-go/webook/internal/events/relation"
 	grpcsrv "github.com/boyxs/train-go/webook/internal/grpc"
@@ -70,6 +71,7 @@ var kafkaProviderSet = wire.NewSet(
 	ioc.InitEventProducer,
 	intrevt.NewSaramaInteractionEventProducer,
 	relationevt.NewSaramaRelationEventProducer,
+	articleevt.NewSaramaArticleEventProducer,
 )
 
 // App 应用入口：Web 服务 + gRPC 服务（消费者/定时任务已抽到 webook-worker）。
@@ -148,6 +150,11 @@ func InitWebServer() (App, func(), error) {
 		ioc.InitRelationClient,
 		service.NewGRPCRelationService,
 		web.NewInternalRelationHandler,
+		// feed gRPC client（core 作 HTTP 网关 → feed 后端）；五源聚合在 service.GRPCFeedService
+		ioc.InitFeedConn,
+		ioc.InitFeedClient,
+		service.NewGRPCFeedService,
+		web.NewInternalFeedHandler,
 		wire.Struct(new(App), "*"),
 	)
 	return App{}, nil, nil

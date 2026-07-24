@@ -202,6 +202,21 @@ func (mr *MockArticleReaderServiceMockRecorder) BatchDetail(ctx, ids any) *gomoc
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchDetail", reflect.TypeOf((*MockArticleReaderService)(nil).BatchDetail), ctx, ids)
 }
 
+// CountByIds mocks base method.
+func (m *MockArticleReaderService) CountByIds(ctx context.Context, ids []int64) (int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CountByIds", ctx, ids)
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CountByIds indicates an expected call of CountByIds.
+func (mr *MockArticleReaderServiceMockRecorder) CountByIds(ctx, ids any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CountByIds", reflect.TypeOf((*MockArticleReaderService)(nil).CountByIds), ctx, ids)
+}
+
 // Detail mocks base method.
 func (m *MockArticleReaderService) Detail(ctx context.Context, id int64) (domain.Article, error) {
 	m.ctrl.T.Helper()
@@ -215,6 +230,21 @@ func (m *MockArticleReaderService) Detail(ctx context.Context, id int64) (domain
 func (mr *MockArticleReaderServiceMockRecorder) Detail(ctx, id any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Detail", reflect.TypeOf((*MockArticleReaderService)(nil).Detail), ctx, id)
+}
+
+// ListAuthorBriefs mocks base method.
+func (m *MockArticleReaderService) ListAuthorBriefs(ctx context.Context, authorId int64, limit int) ([]domain.ArticleBrief, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListAuthorBriefs", ctx, authorId, limit)
+	ret0, _ := ret[0].([]domain.ArticleBrief)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListAuthorBriefs indicates an expected call of ListAuthorBriefs.
+func (mr *MockArticleReaderServiceMockRecorder) ListAuthorBriefs(ctx, authorId, limit any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListAuthorBriefs", reflect.TypeOf((*MockArticleReaderService)(nil).ListAuthorBriefs), ctx, authorId, limit)
 }
 
 // Page mocks base method.

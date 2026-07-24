@@ -40,6 +40,9 @@ client:
     webook-tag:
       target: "etcd:///service/webook-tag"
       balancer: "breaker_swrr"
+    webook-feed:
+      target: "etcd:///service/webook-feed"
+      balancer: "breaker_swrr"
 
 data:
   mysql:

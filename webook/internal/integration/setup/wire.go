@@ -45,6 +45,12 @@ func provideTestRelationHandler(userSvc service.UserService, l logger.LoggerX) w
 	return web.NewInternalRelationHandler(service.NewGRPCRelationService(nil, userSvc, nil, l))
 }
 
+// provideTestFeedHandler：集成测试不拉起 feed / comment gRPC server，用 nil 下游依赖构造（现有用例不触达 /feed/*）。
+// nil 内联（不出现在 wire_gen 签名）→ wire_gen 无需 import feed/comment proto 包。
+func provideTestFeedHandler(l logger.LoggerX) web.FeedHandler {
+	return web.NewInternalFeedHandler(service.NewGRPCFeedService(nil, nil, nil, nil, nil, nil, l))
+}
+
 // provideTestMiddlewares 与 ioc.InitMiddlewares 同结构，但 metrics 走独立 Registry，
 // 避免每个集成测试 SetupSuite 调 InitWebServer 时 DefaultRegisterer.MustRegister 重复 panic。
 // 省略 cors / 限流 / logger（httptest 无 cross-origin、不需限流、避免输出污染）。
@@ -105,6 +111,7 @@ func InitWebServer() *gin.Engine {
 		web.NewInternalCommentHandler,
 		provideNilCommentClient,
 		provideTestRelationHandler,
+		provideTestFeedHandler,
 		ioc.InitJwtHandler,
 		// 点击埋点
 		clickEventSvcProvider,
@@ -199,6 +206,7 @@ var articleSvcProvider = wire.NewSet(
 	repository.NewCacheArticleReaderRepository,
 	service.NewInternalArticleAuthorService,
 	service.NewInternalArticleReaderService,
+	NewFakeArticleEventProducer,
 	ioc.InitMigratorSDKSwitchReader,
 	ioc.InitMigratorSDKDualWriter,
 	ioc.InitMigratorSDKTaskName,

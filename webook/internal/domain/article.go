@@ -24,6 +24,26 @@ type ArticleWithStats struct {
 	CommentCnt int64
 }
 
+// ArticleBrief 文章轻量投影（feed 关注流回源用）：仅 id + 发布时间，刻意排除正文/标题/摘要。
+type ArticleBrief struct {
+	Id          int64
+	PublishedAt int64 // = published_article.updated_at（编辑重发置顶，微博同语义）
+}
+
+// FeedArticleItem 关注流卡片（core BFF 五源聚合结果）：文章 + 作者昵称 + 互动/评论计数 + 标签。
+// 复用 Author / Tag 既有类型；PublishedAt 取自 feed 事件 score（非文章 CreatedAt）。
+type FeedArticleItem struct {
+	ArticleId   int64
+	Title       string
+	Abstract    string
+	Author      Author
+	PublishedAt int64
+	LikeCnt     int64
+	CollectCnt  int64
+	CommentCnt  int64
+	Tags        []Tag
+}
+
 // AbstractMaxRunes 文章摘要缺省从正文截取的字符数上限。
 const AbstractMaxRunes = 128
 

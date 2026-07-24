@@ -8,6 +8,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/boyxs/train-go/webook/internal/domain"
+	articleevtmocks "github.com/boyxs/train-go/webook/internal/events/article/mocks"
 	repomocks "github.com/boyxs/train-go/webook/internal/repository/mocks"
 	"github.com/boyxs/train-go/webook/internal/service"
 	svcmocks "github.com/boyxs/train-go/webook/internal/service/mocks"
@@ -32,7 +33,7 @@ func TestInternalArticleAuthorService_Detail_tags(t *testing.T) {
 		}, nil)
 
 	svc := service.NewInternalArticleAuthorService(
-		authorRepo, nil, nil, tagSvc, logger.NewNopLogger(),
+		authorRepo, nil, nil, tagSvc, articleevtmocks.NewMockArticleEventProducer(ctrl), logger.NewNopLogger(),
 	)
 	got, err := svc.Detail(context.Background(), articleId, uid)
 
@@ -56,7 +57,7 @@ func TestInternalArticleAuthorService_Detail_tagsDegrade(t *testing.T) {
 		Return(nil, assert.AnError)
 
 	svc := service.NewInternalArticleAuthorService(
-		authorRepo, nil, nil, tagSvc, logger.NewNopLogger(),
+		authorRepo, nil, nil, tagSvc, articleevtmocks.NewMockArticleEventProducer(ctrl), logger.NewNopLogger(),
 	)
 	got, err := svc.Detail(context.Background(), articleId, uid)
 

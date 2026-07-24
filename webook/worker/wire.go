@@ -15,9 +15,11 @@ import (
 
 // App worker 调度器进程入口：cron 定时任务 + Kafka 消费者 + 最小 HTTP(metrics/health)。
 type App struct {
-	Cron     *cron.Cron
-	Consumer *consumer.InteractionConsumer
-	Web      *http.ServeMux
+	Cron                 *cron.Cron
+	Consumer             *consumer.InteractionConsumer
+	FeedArticleConsumer  *consumer.FeedArticleConsumer
+	FeedRelationConsumer *consumer.FeedRelationConsumer
+	Web                  *http.ServeMux
 }
 
 func InitApp() (App, func(), error) {
@@ -31,13 +33,17 @@ func InitApp() (App, func(), error) {
 		ioc.InitGRPCMetrics, // core + interaction client 共享同一指标 builder
 		ioc.InitCoreConn,
 		ioc.InitInteractionConn,
+		ioc.InitFeedConn,
 		ioc.InitRankingJobClient,
 		ioc.InitInteractionClient,
+		ioc.InitFeedClient,
 		// Kafka 消费者
 		ioc.InitKafkaConfig,
 		ioc.InitSaramaConfig,
-		ioc.InitConsumerConfig,
+		ioc.InitGroupConfig,
 		consumer.NewInteractionConsumer,
+		consumer.NewFeedArticleConsumer,
+		consumer.NewFeedRelationConsumer,
 		// cron：redis 分布式锁 + 任务指标 + wrapper
 		ioc.InitRedis,
 		ioc.InitLockClient,

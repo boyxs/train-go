@@ -25,12 +25,13 @@ func InitApp() (App, func(), error) {
 		return App{}, nil, err
 	}
 	prometheusBuilder := ioc.InitGRPCMetrics()
+	loggerX := ioc.InitLogger()
 	tracerProvider, cleanup2, err := ioc.InitOTel()
 	if err != nil {
 		cleanup()
 		return App{}, nil, err
 	}
-	coreConn, cleanup3, err := ioc.InitCoreConn(client, prometheusBuilder, tracerProvider)
+	coreConn, cleanup3, err := ioc.InitCoreConn(client, prometheusBuilder, loggerX, tracerProvider)
 	if err != nil {
 		cleanup2()
 		cleanup()
@@ -40,7 +41,6 @@ func InitApp() (App, func(), error) {
 	universalClient := ioc.InitRedis()
 	redislockClient := ioc.InitLockClient(universalClient)
 	metrics := ioc.InitCronMetrics()
-	loggerX := ioc.InitLogger()
 	wrapper := ioc.InitCronWrapper(redislockClient, metrics, loggerX)
 	rankingJob := job.NewRankingJob(rankingJobServiceClient, wrapper)
 	cron, err := ioc.InitCron(timezoneReady, rankingJob)
@@ -52,7 +52,7 @@ func InitApp() (App, func(), error) {
 	}
 	kafkaConfig := ioc.InitKafkaConfig()
 	config := ioc.InitSaramaConfig(kafkaConfig)
-	interactionConn, cleanup4, err := ioc.InitInteractionConn(client, prometheusBuilder, tracerProvider)
+	interactionConn, cleanup4, err := ioc.InitInteractionConn(client, prometheusBuilder, loggerX, tracerProvider)
 	if err != nil {
 		cleanup3()
 		cleanup2()
@@ -60,15 +60,29 @@ func InitApp() (App, func(), error) {
 		return App{}, nil, err
 	}
 	interactionServiceClient := ioc.InitInteractionClient(interactionConn)
-	consumerConfig := ioc.InitConsumerConfig(kafkaConfig)
-	interactionConsumer := consumer.NewInteractionConsumer(config, interactionServiceClient, consumerConfig, loggerX)
+	groupConfig := ioc.InitGroupConfig(kafkaConfig)
+	interactionConsumer := consumer.NewInteractionConsumer(config, interactionServiceClient, groupConfig, loggerX)
+	feedConn, cleanup5, err := ioc.InitFeedConn(client, prometheusBuilder, loggerX, tracerProvider)
+	if err != nil {
+		cleanup4()
+		cleanup3()
+		cleanup2()
+		cleanup()
+		return App{}, nil, err
+	}
+	feedServiceClient := ioc.InitFeedClient(feedConn)
+	feedArticleConsumer := consumer.NewFeedArticleConsumer(config, feedServiceClient, groupConfig, loggerX)
+	feedRelationConsumer := consumer.NewFeedRelationConsumer(config, feedServiceClient, groupConfig, loggerX)
 	serveMux := ioc.InitWebServer()
 	app := App{
-		Cron:     cron,
-		Consumer: interactionConsumer,
-		Web:      serveMux,
+		Cron:                 cron,
+		Consumer:             interactionConsumer,
+		FeedArticleConsumer:  feedArticleConsumer,
+		FeedRelationConsumer: feedRelationConsumer,
+		Web:                  serveMux,
 	}
 	return app, func() {
+		cleanup5()
 		cleanup4()
 		cleanup3()
 		cleanup2()
@@ -80,7 +94,9 @@ func InitApp() (App, func(), error) {
 
 // App worker 调度器进程入口：cron 定时任务 + Kafka 消费者 + 最小 HTTP(metrics/health)。
 type App struct {
-	Cron     *cron.Cron
-	Consumer *consumer.InteractionConsumer
-	Web      *http.ServeMux
+	Cron                 *cron.Cron
+	Consumer             *consumer.InteractionConsumer
+	FeedArticleConsumer  *consumer.FeedArticleConsumer
+	FeedRelationConsumer *consumer.FeedRelationConsumer
+	Web                  *http.ServeMux
 }

@@ -17,6 +17,7 @@ export type {
   ReaderArticleDetail,
 } from './article';
 export { ArticleStatus } from './article';
+export type { FeedTag, FeedAuthor, FeedItem, FeedListReq } from './feed';
 export type {
   RelationStat,
   UserBrief,

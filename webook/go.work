@@ -4,6 +4,7 @@ use (
 	./api
 	./chat
 	./comment
+	./feed
 	./interaction
 	./internal
 	./migrator

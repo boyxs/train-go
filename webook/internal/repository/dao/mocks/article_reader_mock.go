@@ -72,6 +72,21 @@ func (mr *MockArticleReaderDAOMockRecorder) CountByAuthor(ctx, uid any) *gomock.
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CountByAuthor", reflect.TypeOf((*MockArticleReaderDAO)(nil).CountByAuthor), ctx, uid)
 }
 
+// CountByIds mocks base method.
+func (m *MockArticleReaderDAO) CountByIds(ctx context.Context, ids []int64) (int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CountByIds", ctx, ids)
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CountByIds indicates an expected call of CountByIds.
+func (mr *MockArticleReaderDAOMockRecorder) CountByIds(ctx, ids any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CountByIds", reflect.TypeOf((*MockArticleReaderDAO)(nil).CountByIds), ctx, ids)
+}
+
 // Delete mocks base method.
 func (m *MockArticleReaderDAO) Delete(ctx context.Context, id, uid int64) error {
 	m.ctrl.T.Helper()
@@ -114,6 +129,21 @@ func (m *MockArticleReaderDAO) FindByIds(ctx context.Context, ids []int64) ([]da
 func (mr *MockArticleReaderDAOMockRecorder) FindByIds(ctx, ids any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByIds", reflect.TypeOf((*MockArticleReaderDAO)(nil).FindByIds), ctx, ids)
+}
+
+// ListBriefByAuthor mocks base method.
+func (m *MockArticleReaderDAO) ListBriefByAuthor(ctx context.Context, authorId int64, limit int) ([]dao.PublishedArticle, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListBriefByAuthor", ctx, authorId, limit)
+	ret0, _ := ret[0].([]dao.PublishedArticle)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListBriefByAuthor indicates an expected call of ListBriefByAuthor.
+func (mr *MockArticleReaderDAOMockRecorder) ListBriefByAuthor(ctx, authorId, limit any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListBriefByAuthor", reflect.TypeOf((*MockArticleReaderDAO)(nil).ListBriefByAuthor), ctx, authorId, limit)
 }
 
 // ListIdsByAuthor mocks base method.
